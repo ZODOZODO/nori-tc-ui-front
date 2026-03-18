@@ -292,6 +292,8 @@ const buildMdfMessageOptions = (
       messageName: normalizedCurrentValue,
       sourceName: '',
       xmlSnippet: '',
+      targetType: null,
+      outputType: null,
     })
   }
 

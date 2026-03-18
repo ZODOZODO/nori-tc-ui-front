@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { MODEL_DETAIL_NODE_LABELS } from '../types/model.types'
 import type { ModelDiffSection } from '../types/model.types'
