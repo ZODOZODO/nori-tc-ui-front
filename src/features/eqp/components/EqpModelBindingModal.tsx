@@ -25,7 +25,7 @@ import {
   getModelVersionOptions,
   resolveAllowedModelStatus,
 } from '../lib/eqp-management.util'
-import type { EqpManageDetail, EqpManageOptions, EqpUpdateRequest } from '../types/eqp.types'
+import type { EqpJarOption, EqpManageDetail, EqpManageOptions, EqpUpdateRequest } from '../types/eqp.types'
 
 interface EqpModelBindingModalProps {
   open: boolean
@@ -49,6 +49,58 @@ const resolveOptionalSelectValue = (value: string): string | null => {
   return normalized
 }
 
+interface JarSelectOption {
+  value: string
+  label: string
+}
+
+const formatJarOptionLabel = (jarRef: number, jarFileName: string): string =>
+  `${jarFileName} (#${jarRef})`
+
+const buildJarSelectOptions = (
+  baseOptions: readonly EqpJarOption[],
+  selectedJarRef: number | null | undefined,
+  selectedJarFileName: string | null | undefined,
+): JarSelectOption[] => {
+  const mergedOptions = new Map<number, JarSelectOption>()
+
+  for (const option of baseOptions) {
+    mergedOptions.set(option.jarRef, {
+      value: String(option.jarRef),
+      label: formatJarOptionLabel(option.jarRef, option.jarFileName),
+    })
+  }
+
+  if (
+    selectedJarRef !== null &&
+    selectedJarRef !== undefined &&
+    selectedJarRef > 0 &&
+    selectedJarFileName &&
+    !mergedOptions.has(selectedJarRef)
+  ) {
+    mergedOptions.set(selectedJarRef, {
+      value: String(selectedJarRef),
+      label: formatJarOptionLabel(selectedJarRef, selectedJarFileName),
+    })
+  }
+
+  return Array.from(mergedOptions.values())
+}
+
+const resolveOptionalJarRef = (value: string): number | null => {
+  const normalized = resolveOptionalSelectValue(value)
+  if (!normalized) {
+    return null
+  }
+
+  const parsed = Number(normalized)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('Business Jar를 다시 선택해 주세요.')
+  }
+
+  return parsed
+}
+
 /**
  * EQP와 Model/Business Jar 연결을 변경하는 모달입니다.
  * is_dev와 protocol에 맞는 model/version만 선택하도록 필터링합니다.
@@ -66,7 +118,7 @@ export function EqpModelBindingModal({
 }: EqpModelBindingModalProps) {
   const [selectedModelName, setSelectedModelName] = useState('')
   const [selectedModelVersionKey, setSelectedModelVersionKey] = useState('')
-  const [selectedBusinessJarFileName, setSelectedBusinessJarFileName] = useState(EQP_SELECT_NONE_VALUE)
+  const [selectedBusinessJarRef, setSelectedBusinessJarRef] = useState(EQP_SELECT_NONE_VALUE)
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null)
 
   const filteredModelOptions = useMemo(
@@ -84,6 +136,15 @@ export function EqpModelBindingModal({
     () => getModelVersionOptions(filteredModelOptions, selectedModelName),
     [filteredModelOptions, selectedModelName],
   )
+  const businessJarOptions = useMemo(
+    () =>
+      buildJarSelectOptions(
+        options?.businessJarOptions ?? [],
+        detail?.jars?.businessJarRef,
+        detail?.jars?.businessJarFileName,
+      ),
+    [options?.businessJarOptions, detail?.jars?.businessJarRef, detail?.jars?.businessJarFileName],
+  )
 
   useEffect(() => {
     if (!open) {
@@ -92,7 +153,9 @@ export function EqpModelBindingModal({
 
     setSelectedModelName('')
     setSelectedModelVersionKey('')
-    setSelectedBusinessJarFileName(detail?.jars?.businessJarFileName ?? EQP_SELECT_NONE_VALUE)
+    setSelectedBusinessJarRef(
+      detail?.jars?.businessJarRef ? String(detail.jars.businessJarRef) : EQP_SELECT_NONE_VALUE,
+    )
     setLocalErrorMessage(null)
   }, [open, detail])
 
@@ -160,7 +223,7 @@ export function EqpModelBindingModal({
 
       const request = buildEqpUpdateRequest(detail, {
         modelVersionKey: normalizedModelVersionKey,
-        businessJarFileName: resolveOptionalSelectValue(selectedBusinessJarFileName),
+        businessJarRef: resolveOptionalJarRef(selectedBusinessJarRef),
       })
 
       await onSubmit(request)
@@ -267,8 +330,8 @@ export function EqpModelBindingModal({
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-[#1E3D33]">Business Jar</label>
                     <Select
-                      value={toSelectValue(selectedBusinessJarFileName)}
-                      onValueChange={setSelectedBusinessJarFileName}
+                      value={toSelectValue(selectedBusinessJarRef)}
+                      onValueChange={setSelectedBusinessJarRef}
                       disabled={isPending || isOptionsLoading}
                     >
                       <SelectTrigger>
@@ -276,9 +339,9 @@ export function EqpModelBindingModal({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
-                        {(options?.businessJarFileNames ?? []).map((fileName) => (
-                          <SelectItem key={fileName} value={fileName}>
-                            {fileName}
+                        {businessJarOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

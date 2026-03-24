@@ -162,8 +162,18 @@ export interface EqpSocketSettings {
  * EQP 관리 화면 jar 바인딩 응답 모델입니다.
  */
 export interface EqpJarBinding {
+  gatewayJarRef: number | null
   gatewayJarFileName: string | null
+  businessJarRef: number | null
   businessJarFileName: string | null
+}
+
+/**
+ * EQP 관리 화면 jar 선택 옵션 응답 모델입니다.
+ */
+export interface EqpJarOption {
+  jarRef: number
+  jarFileName: string
 }
 
 /**
@@ -242,8 +252,8 @@ export interface EqpModelOption {
  */
 export interface EqpManageOptions {
   socketProtocolTypes: string[]
-  gatewayJarFileNames: string[]
-  businessJarFileNames: string[]
+  gatewayJarOptions: EqpJarOption[]
+  businessJarOptions: EqpJarOption[]
   developModelOptions: EqpModelOption[]
   operateModelOptions: EqpModelOption[]
 }
@@ -271,8 +281,8 @@ export interface EqpCreateRequest {
   eqpPort: number
   modelVersionKey: number
   appliedParamVersion?: string | null
-  gatewayJarFileName?: string | null
-  businessJarFileName?: string | null
+  gatewayJarRef?: number | null
+  businessJarRef?: number | null
   logSettings?: EqpLogSettings | null
   hsmsSettings?: EqpHsmsSettings | null
   socketSettings?: EqpSocketSettings | null
@@ -289,8 +299,8 @@ export interface EqpUpdateRequest {
   eqpPort: number
   modelVersionKey: number
   appliedParamVersion?: string | null
-  gatewayJarFileName?: string | null
-  businessJarFileName?: string | null
+  gatewayJarRef?: number | null
+  businessJarRef?: number | null
   logSettings?: EqpLogSettings | null
   hsmsSettings?: EqpHsmsSettings | null
   socketSettings?: EqpSocketSettings | null

@@ -101,14 +101,10 @@ export const buildEqpUpdateRequest = (
     override.appliedParamVersion !== undefined
       ? override.appliedParamVersion
       : detail.appliedParamVersion ?? null,
-  gatewayJarFileName:
-    override.gatewayJarFileName !== undefined
-      ? override.gatewayJarFileName
-      : detail.jars?.gatewayJarFileName ?? null,
-  businessJarFileName:
-    override.businessJarFileName !== undefined
-      ? override.businessJarFileName
-      : detail.jars?.businessJarFileName ?? null,
+  gatewayJarRef:
+    override.gatewayJarRef !== undefined ? override.gatewayJarRef : detail.jars?.gatewayJarRef ?? null,
+  businessJarRef:
+    override.businessJarRef !== undefined ? override.businessJarRef : detail.jars?.businessJarRef ?? null,
   logSettings: override.logSettings !== undefined ? override.logSettings : cloneLogSettings(detail.logPolicy),
   hsmsSettings:
     override.hsmsSettings !== undefined ? override.hsmsSettings : cloneHsmsSettings(detail.hsmsSettings),

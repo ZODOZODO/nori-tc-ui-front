@@ -36,6 +36,7 @@ import type {
   EqpCreateRequest,
   EqpManageDetail,
   EqpManageOptions,
+  EqpJarOption,
   EqpUpdateRequest,
   ProtocolType,
 } from '../types/eqp.types'
@@ -65,8 +66,8 @@ interface EqpManageFormState {
   eqpPort: string
   modelName: string
   modelVersionKey: string
-  gatewayJarFileName: string
-  businessJarFileName: string
+  gatewayJarRef: string
+  businessJarRef: string
   logLevel: string
   logRetentionDays: string
   logPath: string
@@ -116,6 +117,11 @@ interface ToggleFieldProps {
   onChange: (checked: boolean) => void
 }
 
+interface JarSelectOption {
+  value: string
+  label: string
+}
+
 const toFieldString = (value: string | number | null | undefined): string =>
   value === null || value === undefined ? '' : String(value)
 
@@ -154,12 +160,37 @@ const buildSelectOptions = (
   return mergedOptions
 }
 
-const resolveOptionalSelectValue = (value: string): string | null => {
-  const normalized = value.trim()
-  if (!normalized || normalized === EQP_SELECT_NONE_VALUE) {
-    return null
+const formatJarOptionLabel = (jarRef: number, jarFileName: string): string =>
+  `${jarFileName} (#${jarRef})`
+
+const buildJarSelectOptions = (
+  baseOptions: readonly EqpJarOption[],
+  selectedJarRef: number | null | undefined,
+  selectedJarFileName: string | null | undefined,
+): JarSelectOption[] => {
+  const mergedOptions = new Map<number, JarSelectOption>()
+
+  for (const option of baseOptions) {
+    mergedOptions.set(option.jarRef, {
+      value: String(option.jarRef),
+      label: formatJarOptionLabel(option.jarRef, option.jarFileName),
+    })
   }
-  return normalized
+
+  if (
+    selectedJarRef !== null &&
+    selectedJarRef !== undefined &&
+    selectedJarRef > 0 &&
+    selectedJarFileName &&
+    !mergedOptions.has(selectedJarRef)
+  ) {
+    mergedOptions.set(selectedJarRef, {
+      value: String(selectedJarRef),
+      label: formatJarOptionLabel(selectedJarRef, selectedJarFileName),
+    })
+  }
+
+  return Array.from(mergedOptions.values())
 }
 
 const parseRequiredInteger = (
@@ -251,8 +282,8 @@ const createInitialFormState = (
       eqpPort: '',
       modelName: '',
       modelVersionKey: '',
-      gatewayJarFileName: EQP_SELECT_NONE_VALUE,
-      businessJarFileName: EQP_SELECT_NONE_VALUE,
+      gatewayJarRef: EQP_SELECT_NONE_VALUE,
+      businessJarRef: EQP_SELECT_NONE_VALUE,
       logLevel: DEFAULT_EQP_LOG_SETTINGS.logLevel ?? '',
       logRetentionDays: toFieldString(DEFAULT_EQP_LOG_SETTINGS.logRetentionDays),
       logPath: DEFAULT_EQP_LOG_SETTINGS.logPath ?? '',
@@ -285,8 +316,8 @@ const createInitialFormState = (
     eqpPort: toFieldString(detail?.eqpPort),
     modelName: detail?.modelBinding?.modelName ?? '',
     modelVersionKey: toFieldString(detail?.modelBinding?.modelVersionKey),
-    gatewayJarFileName: detail?.jars?.gatewayJarFileName ?? EQP_SELECT_NONE_VALUE,
-    businessJarFileName: detail?.jars?.businessJarFileName ?? EQP_SELECT_NONE_VALUE,
+    gatewayJarRef: detail?.jars?.gatewayJarRef ? toFieldString(detail.jars.gatewayJarRef) : EQP_SELECT_NONE_VALUE,
+    businessJarRef: detail?.jars?.businessJarRef ? toFieldString(detail.jars.businessJarRef) : EQP_SELECT_NONE_VALUE,
     logLevel: detail?.logPolicy?.logLevel ?? '',
     logRetentionDays: toFieldString(detail?.logPolicy?.logRetentionDays),
     logPath: detail?.logPolicy?.logPath ?? '',
@@ -423,21 +454,21 @@ export function EqpManageFormModal({
   )
   const gatewayJarOptions = useMemo(
     () =>
-      buildSelectOptions(
-        options?.gatewayJarFileNames ?? [],
+      buildJarSelectOptions(
+        options?.gatewayJarOptions ?? [],
+        detail?.jars?.gatewayJarRef,
         detail?.jars?.gatewayJarFileName,
-        formState.gatewayJarFileName,
       ),
-    [options?.gatewayJarFileNames, detail?.jars?.gatewayJarFileName, formState.gatewayJarFileName],
+    [options?.gatewayJarOptions, detail?.jars?.gatewayJarFileName, detail?.jars?.gatewayJarRef],
   )
   const businessJarOptions = useMemo(
     () =>
-      buildSelectOptions(
-        options?.businessJarFileNames ?? [],
+      buildJarSelectOptions(
+        options?.businessJarOptions ?? [],
+        detail?.jars?.businessJarRef,
         detail?.jars?.businessJarFileName,
-        formState.businessJarFileName,
       ),
-    [options?.businessJarFileNames, detail?.jars?.businessJarFileName, formState.businessJarFileName],
+    [options?.businessJarOptions, detail?.jars?.businessJarFileName, detail?.jars?.businessJarRef],
   )
   const socketProtocolTypeOptions = useMemo(
     () =>
@@ -580,8 +611,8 @@ export function EqpManageFormModal({
           eqpPort: parseRequiredInteger(formState.eqpPort, 'EQP Port', { positive: true }),
           modelVersionKey: selectedModelVersionKey,
           appliedParamVersion: null,
-          gatewayJarFileName: resolveOptionalSelectValue(formState.gatewayJarFileName),
-          businessJarFileName: resolveOptionalSelectValue(formState.businessJarFileName),
+          gatewayJarRef: parseOptionalInteger(formState.gatewayJarRef, 'Gateway Jar', { min: 1 }),
+          businessJarRef: parseOptionalInteger(formState.businessJarRef, 'Business Jar', { min: 1 }),
           logSettings: {
             logLevel: resolveOptionalText(formState.logLevel),
             logRetentionDays: parseOptionalInteger(formState.logRetentionDays, 'Log Retention Day', { min: 0 }),
@@ -642,7 +673,8 @@ export function EqpManageFormModal({
         routePartition: parseRequiredInteger(formState.routePartition, 'Route Partition', { min: 0 }),
         eqpIp: formState.eqpIp.trim(),
         eqpPort: parseRequiredInteger(formState.eqpPort, 'EQP Port', { positive: true }),
-        gatewayJarFileName: resolveOptionalSelectValue(formState.gatewayJarFileName),
+        gatewayJarRef: parseOptionalInteger(formState.gatewayJarRef, 'Gateway Jar', { min: 1 }),
+        businessJarRef: parseOptionalInteger(formState.businessJarRef, 'Business Jar', { min: 1 }),
         logSettings: {
           logLevel: resolveOptionalText(formState.logLevel),
           logRetentionDays: parseOptionalInteger(formState.logRetentionDays, 'Log Retention Day', { min: 0 }),
@@ -800,8 +832,8 @@ export function EqpManageFormModal({
 
                     <Field label="Gateway Jar">
                       <Select
-                        value={toSelectValue(formState.gatewayJarFileName)}
-                        onValueChange={handleSelectChange('gatewayJarFileName')}
+                        value={toSelectValue(formState.gatewayJarRef)}
+                        onValueChange={handleSelectChange('gatewayJarRef')}
                         disabled={isPending || isOptionsLoading}
                       >
                         <SelectTrigger>
@@ -809,9 +841,9 @@ export function EqpManageFormModal({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
-                          {gatewayJarOptions.map((fileName) => (
-                            <SelectItem key={fileName} value={fileName}>
-                              {fileName}
+                          {gatewayJarOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -875,20 +907,20 @@ export function EqpManageFormModal({
 
                       <Field label="Business Jar">
                         <Select
-                          value={toSelectValue(formState.businessJarFileName)}
-                          onValueChange={handleSelectChange('businessJarFileName')}
+                          value={toSelectValue(formState.businessJarRef)}
+                          onValueChange={handleSelectChange('businessJarRef')}
                           disabled={isPending || isOptionsLoading}
                         >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Business Jar를 선택해 주세요." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
-                          {businessJarOptions.map((fileName) => (
-                            <SelectItem key={fileName} value={fileName}>
-                              {fileName}
-                            </SelectItem>
-                          ))}
+                          <SelectTrigger>
+                            <SelectValue placeholder="Business Jar를 선택해 주세요." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
+                            {businessJarOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </Field>
