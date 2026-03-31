@@ -32,6 +32,7 @@ import {
   type EqpRuntimeStateResponse,
   type EqpUpdateRequest,
   isApiResponse,
+  isRecord,
 } from '../types/eqp.types'
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
@@ -134,8 +135,6 @@ const resolveSuccessPayload = <TData>(
   return payload.data as TData
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
 
 /**
  * 설비 목록 항목 최소 계약(문자열 eqpId)을 만족하는지 확인합니다.

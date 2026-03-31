@@ -56,7 +56,7 @@ const PANEL_MAX_PERCENT = 85
 const TOP_NAVIGATION_ITEMS = [
   { name: 'Eqp', subLabel: 'Eqp Info', route: '/eqp' },
   { name: 'Model', subLabel: 'Model Info', route: '/model' },
-  { name: 'Deploy', subLabel: 'Eqp Deploy / Model Deploy', route: null },
+  { name: 'Deploy', subLabel: 'Eqp Deploy / Model Deploy', route: '/deploy' },
   { name: 'Dlq', subLabel: 'Gateway Dlq / Business Dlq', route: null },
   { name: 'User', subLabel: 'User Info / Group Info', route: null },
 ] as const
@@ -593,7 +593,7 @@ export function ModelPage() {
       const deltaPercent = (deltaY / containerHeight) * 100
       return Math.min(PANEL_MAX_PERCENT, Math.max(PANEL_MIN_PERCENT, previousPercent + deltaPercent))
     })
-  }, [])
+  }, [setTopPanelHeightPercent])
 
   const handleSidebarDrag = useCallback(
     (deltaX: number) => {

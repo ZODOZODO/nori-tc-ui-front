@@ -28,6 +28,21 @@ export interface UserInfo {
 }
 
 /**
+ * GET /api/user 조회 응답 payload 타입입니다.
+ */
+export interface UserPage {
+  items: UserInfo[]
+  offset: number
+  limit: number
+  count: number
+}
+
+/**
+ * GET /api/user 응답 래퍼 타입입니다.
+ */
+export type UserPageResponse = ApiResponse<UserPage>
+
+/**
  * PUT /api/user/{userPk} 요청 DTO 입니다.
  * password=null이면 기존 비밀번호를 유지합니다.
  */
@@ -80,7 +95,7 @@ export type ProfileFailResponse = ApiResponse<null> & {
 export const DEFAULT_PROFILE_ERROR_MESSAGE =
   '사용자 정보를 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
 /**

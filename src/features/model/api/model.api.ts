@@ -29,6 +29,7 @@ import {
   type ModelRootCreateRequest,
   type ModelUpsertRequest,
   isApiResponse,
+  isRecord,
 } from '../types/model.types'
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
@@ -36,8 +37,6 @@ const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 const MODEL_LIST_FALLBACK_MESSAGE = '모델 목록을 조회하지 못했습니다.'
 const MODEL_DETAIL_NODE_FALLBACK_MESSAGE = '모델 상세 노드 데이터를 조회하지 못했습니다.'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
 
 /**
  * document.cookie에서 특정 쿠키 값을 추출합니다.

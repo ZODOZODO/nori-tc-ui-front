@@ -4,11 +4,14 @@ import {
   createProfileFailResponse,
   DEFAULT_PROFILE_ERROR_MESSAGE,
   isApiResponse,
+  isRecord,
   ProfileApiError,
   type MeInfo,
   type MeResponse,
   type UserInfo,
   type UserInfoResponse,
+  type UserPage,
+  type UserPageResponse,
   type UserPasswordResetRequest,
   type UserPasswordResetResponse,
   type UserUpdateRequest,
@@ -17,6 +20,7 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+const USER_LIST_FALLBACK_MESSAGE = '사용자 목록을 조회하지 못했습니다.'
 
 /**
  * document.cookie에서 특정 쿠키 값을 추출합니다.
@@ -113,6 +117,64 @@ const resolveSuccessPayload = <TData>(
   return payload.data as TData
 }
 
+const isUserInfoItem = (value: unknown): value is UserInfo =>
+  isRecord(value) &&
+  typeof value.userPk === 'number' &&
+  typeof value.userId === 'string' &&
+  typeof value.userIdNorm === 'string' &&
+  typeof value.userName === 'string' &&
+  typeof value.company === 'string' &&
+  typeof value.department === 'string' &&
+  typeof value.email === 'string' &&
+  typeof value.status === 'string' &&
+  typeof value.createdAt === 'string' &&
+  typeof value.updatedAt === 'string' &&
+  typeof value.createdBy === 'string' &&
+  typeof value.updatedBy === 'string'
+
+const normalizeUserPagePayload = (
+  payload: unknown,
+  requestedOffset: number,
+  requestedLimit: number,
+): UserPage => {
+  if (Array.isArray(payload)) {
+    const normalizedItems = payload.filter(isUserInfoItem)
+
+    return {
+      items: normalizedItems,
+      offset: requestedOffset,
+      limit: requestedLimit,
+      count: normalizedItems.length,
+    }
+  }
+
+  if (!isRecord(payload) || !Array.isArray(payload.items)) {
+    throw new ProfileApiError(
+      createProfileFailResponse(
+        {
+          success: false,
+          data: null,
+          errorCode: 'INVALID_RESPONSE',
+          errorMsg: USER_LIST_FALLBACK_MESSAGE,
+        },
+        USER_LIST_FALLBACK_MESSAGE,
+      ),
+    )
+  }
+
+  const items = payload.items.filter(isUserInfoItem)
+  const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
+  const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
+  const count = typeof payload.count === 'number' ? Math.max(payload.count, items.length) : items.length
+
+  return {
+    items,
+    offset,
+    limit,
+    count,
+  }
+}
+
 /**
  * CSRF 헤더가 필요한 요청을 공통 처리합니다.
  */
@@ -160,6 +222,51 @@ export const profileApi = {
     } catch (error) {
       throw normalizeProfileError(error, '사용자 상세 정보를 조회하지 못했습니다.')
     }
+  },
+
+  getUserList: async (offset = 0, limit = 500): Promise<UserPage> => {
+    try {
+      const response = await apiClient.get<UserPageResponse>('/user', {
+        params: { offset, limit },
+        withCredentials: true,
+      })
+
+      return normalizeUserPagePayload(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          USER_LIST_FALLBACK_MESSAGE,
+        ),
+        offset,
+        limit,
+      )
+    } catch (error) {
+      throw normalizeProfileError(error, USER_LIST_FALLBACK_MESSAGE)
+    }
+  },
+
+  getAllUsers: async (): Promise<UserInfo[]> => {
+    const allUsers: UserInfo[] = []
+    const usersById = new Map<number, UserInfo>()
+    const firstPage = await profileApi.getUserList(0, 500)
+    let cursorOffset = 0
+
+    firstPage.items.forEach((user) => {
+      usersById.set(user.userPk, user)
+    })
+
+    cursorOffset += firstPage.limit
+    while (cursorOffset < firstPage.count) {
+      const nextPage = await profileApi.getUserList(cursorOffset, 500)
+      nextPage.items.forEach((user) => {
+        usersById.set(user.userPk, user)
+      })
+      cursorOffset += nextPage.limit
+    }
+
+    allUsers.push(...usersById.values())
+
+    return allUsers
   },
 
   /**

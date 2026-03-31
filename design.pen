@@ -74143,8 +74143,8 @@
     {
       "type": "frame",
       "id": "rmW8s",
-      "x": 14000,
-      "y": 6000,
+      "x": 5756,
+      "y": -2455,
       "name": "MapMachineNode",
       "reusable": true,
       "width": 28,

@@ -35,6 +35,18 @@ export function useUserDetail(userPk: number | null, enabled = true) {
 }
 
 /**
+ * 사용자 목록 조회 훅입니다.
+ */
+export function useUsers(enabled = true) {
+  return useQuery({
+    queryKey: ['user', 'list'],
+    queryFn: () => profileApi.getAllUsers(),
+    enabled,
+    staleTime: 60_000,
+  })
+}
+
+/**
  * 사용자 저장 mutation 훅입니다.
  * 저장 성공 시 사용자 상세/현재 사용자 캐시를 갱신합니다.
  */

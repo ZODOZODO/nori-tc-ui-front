@@ -373,7 +373,7 @@ export type EqpFailResponse = ApiResponse<null> & {
 export const DEFAULT_EQP_ERROR_MESSAGE =
   '설비 정보를 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
 /**
