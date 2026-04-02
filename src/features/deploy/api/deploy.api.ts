@@ -8,6 +8,9 @@ import type {
   DeployHistoryItem,
   DeployHistoryPage,
   DeployMonitorFilters,
+  DeployRegisterScenarioCandidate,
+  DeployRegisterScenarioPreviewRequest,
+  DeployRegisterScenarioPreviewResult,
   DeployScenarioCatalogResponse,
   DeployScenarioSummary,
   DeployRegisterFilters,
@@ -24,10 +27,13 @@ const DEFAULT_DEPLOY_CREATE_ERROR_MESSAGE = 'Deploy 생성에 실패했습니다
 const DEFAULT_DEPLOY_HISTORY_ERROR_MESSAGE = 'Deploy 목록을 조회하지 못했습니다.'
 const DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE = 'Deploy 정보를 조회하지 못했습니다.'
 const DEFAULT_DEPLOY_TARGETS_ERROR_MESSAGE = 'Deploy 대상 상태를 조회하지 못했습니다.'
+const DEFAULT_DEPLOY_START_ERROR_MESSAGE = 'Deploy 실행에 실패했습니다.'
+const DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE = 'Deploy hold 요청에 실패했습니다.'
 const DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE = 'Deploy 취소에 실패했습니다.'
 const DEFAULT_DEPLOY_REDEPLOY_ERROR_MESSAGE = 'Deploy 재실행에 실패했습니다.'
 const DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE = 'Deploy 이력 삭제에 실패했습니다.'
 const DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE = '시나리오 목록을 조회하지 못했습니다.'
+const DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE = '시나리오 preview를 조회하지 못했습니다.'
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 
@@ -54,6 +60,16 @@ const DEPLOY_STATUS_VALUES = [
 const isDeployStatus = (value: unknown): value is DeployStatus =>
   typeof value === 'string' &&
   DEPLOY_STATUS_VALUES.includes(value as (typeof DEPLOY_STATUS_VALUES)[number])
+
+const DEPLOY_EXECUTION_POLICY_VALUES = ['BEST_EFFORT', 'FAIL_FAST'] as const
+
+const isDeployExecutionPolicy = (
+  value: unknown,
+): value is (typeof DEPLOY_EXECUTION_POLICY_VALUES)[number] =>
+  typeof value === 'string' &&
+  DEPLOY_EXECUTION_POLICY_VALUES.includes(
+    value as (typeof DEPLOY_EXECUTION_POLICY_VALUES)[number],
+  )
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -177,6 +193,38 @@ const isDeployRegisterTargetItem = (value: unknown): value is DeployRegisterTarg
   value.eqpId.length > 0 &&
   typeof value.commInterface === 'string'
 
+const normalizeDeployRegisterTargetItem = (
+  value: unknown,
+): DeployRegisterTargetItem | null => {
+  if (!isDeployRegisterTargetItem(value)) {
+    return null
+  }
+
+  return {
+    eqpKey: typeof value.eqpKey === 'number' ? value.eqpKey : null,
+    eqpId: value.eqpId,
+    commInterface: value.commInterface,
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : false,
+    modelVersionKey: typeof value.modelVersionKey === 'number' ? value.modelVersionKey : null,
+    modelName: typeof value.modelName === 'string' ? value.modelName : null,
+    modelVersion: typeof value.modelVersion === 'string' ? value.modelVersion : null,
+    modelStatus: typeof value.modelStatus === 'string' ? value.modelStatus : null,
+    businessJarRef: typeof value.businessJarRef === 'number' ? value.businessJarRef : null,
+    businessJarFileName:
+      typeof value.businessJarFileName === 'string' ? value.businessJarFileName : null,
+    appliedParamVersion:
+      typeof value.appliedParamVersion === 'string' ? value.appliedParamVersion : null,
+    blockedByActiveDeploy:
+      typeof value.blockedByActiveDeploy === 'boolean' ? value.blockedByActiveDeploy : false,
+    activeDeployKey: typeof value.activeDeployKey === 'number' ? value.activeDeployKey : null,
+    activeDeployStatus: isDeployStatus(value.activeDeployStatus) ? value.activeDeployStatus : null,
+    activeDeployName:
+      typeof value.activeDeployName === 'string' ? value.activeDeployName : null,
+    activeRequestedBy:
+      typeof value.activeRequestedBy === 'string' ? value.activeRequestedBy : null,
+  }
+}
+
 const isDeployTargetItem = (value: unknown): value is DeployTargetItem =>
   isRecord(value) &&
   typeof value.deployTargetKey === 'number' &&
@@ -194,6 +242,21 @@ const isDeployScenarioSummary = (value: unknown): value is DeployScenarioSummary
   typeof value.version === 'number' &&
   typeof value.stepCount === 'number'
 
+const isDeployRegisterScenarioCandidate = (
+  value: unknown,
+): value is DeployRegisterScenarioCandidate =>
+  isRecord(value) &&
+  typeof value.code === 'string' &&
+  value.code.length > 0 &&
+  typeof value.name === 'string' &&
+  typeof value.summary === 'string' &&
+  typeof value.version === 'number' &&
+  typeof value.stepCount === 'number' &&
+  Array.isArray(value.coversChangeKinds) &&
+  typeof value.recommended === 'boolean' &&
+  typeof value.selectable === 'boolean' &&
+  typeof value.reason === 'string'
+
 const isDeployHistoryItem = (value: unknown): value is DeployHistoryItem =>
   isRecord(value) &&
   typeof value.deployKey === 'number' &&
@@ -205,6 +268,77 @@ const isDeployHistoryItem = (value: unknown): value is DeployHistoryItem =>
   typeof value.createdAt === 'string' &&
   isRecord(value.targetSummary)
 
+const normalizeDeployHistoryItem = (value: unknown): DeployHistoryItem | null => {
+  if (!isDeployHistoryItem(value)) {
+    return null
+  }
+
+  return {
+    deployKey: value.deployKey,
+    deployName: value.deployName,
+    eventType: value.eventType,
+    deployStatus: isDeployStatus(value.deployStatus) ? value.deployStatus : 'PLANNING',
+    pauseRequested: typeof value.pauseRequested === 'boolean' ? value.pauseRequested : false,
+    executionPolicy:
+      typeof value.executionPolicy === 'string' ? value.executionPolicy : 'BEST_EFFORT',
+    requestedBy: value.requestedBy,
+    createdAt: value.createdAt,
+    startedAt: typeof value.startedAt === 'string' ? value.startedAt : null,
+    finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : null,
+    terminal: typeof value.terminal === 'boolean' ? value.terminal : false,
+    interfaceType: typeof value.interfaceType === 'string' ? value.interfaceType : null,
+    selectedModelName:
+      typeof value.selectedModelName === 'string' ? value.selectedModelName : null,
+    selectedModelVersion:
+      typeof value.selectedModelVersion === 'string' ? value.selectedModelVersion : null,
+    selectedBusinessJarName:
+      typeof value.selectedBusinessJarName === 'string'
+        ? value.selectedBusinessJarName
+        : null,
+    targetSummary: isRecord(value.targetSummary)
+      ? {
+          total: typeof value.targetSummary.total === 'number' ? value.targetSummary.total : 0,
+          pending:
+            typeof value.targetSummary.pending === 'number' ? value.targetSummary.pending : 0,
+          noChange:
+            typeof value.targetSummary.noChange === 'number' ? value.targetSummary.noChange : 0,
+          running:
+            typeof value.targetSummary.running === 'number' ? value.targetSummary.running : 0,
+          completed:
+            typeof value.targetSummary.completed === 'number'
+              ? value.targetSummary.completed
+              : 0,
+          failed: typeof value.targetSummary.failed === 'number' ? value.targetSummary.failed : 0,
+          rollingBack:
+            typeof value.targetSummary.rollingBack === 'number'
+              ? value.targetSummary.rollingBack
+              : 0,
+          rolledBack:
+            typeof value.targetSummary.rolledBack === 'number'
+              ? value.targetSummary.rolledBack
+              : 0,
+          compensationFailed:
+            typeof value.targetSummary.compensationFailed === 'number'
+              ? value.targetSummary.compensationFailed
+              : 0,
+          canceled:
+            typeof value.targetSummary.canceled === 'number' ? value.targetSummary.canceled : 0,
+        }
+      : {
+          total: 0,
+          pending: 0,
+          noChange: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          rollingBack: 0,
+          rolledBack: 0,
+          compensationFailed: 0,
+          canceled: 0,
+        },
+  }
+}
+
 const normalizeRegisterTargetPage = (
   payload: unknown,
   requestedOffset: number,
@@ -214,7 +348,9 @@ const normalizeRegisterTargetPage = (
     throw new DeployApiError(createDeployFailResponse(payload))
   }
 
-  const items = payload.items.filter(isDeployRegisterTargetItem)
+  const items = payload.items
+    .map((item) => normalizeDeployRegisterTargetItem(item))
+    .filter((item): item is DeployRegisterTargetItem => item !== null)
   const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
   const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
   const count = typeof payload.count === 'number' ? Math.max(payload.count, items.length) : items.length
@@ -238,7 +374,9 @@ const normalizeDeployHistoryPage = (
     )
   }
 
-  const items = payload.items.filter(isDeployHistoryItem)
+  const items = payload.items
+    .map((item) => normalizeDeployHistoryItem(item))
+    .filter((item): item is DeployHistoryItem => item !== null)
   const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
   const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
   const count = typeof payload.count === 'number' ? Math.max(payload.count, items.length) : items.length
@@ -273,15 +411,93 @@ const normalizeDeployTargetPage = (
   }
 }
 
-const normalizeDeployActionResult = (payload: unknown): DeployActionResult => {
+const normalizeDeployActionResult = (
+  payload: unknown,
+  fallbackMessage = DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
+): DeployActionResult => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number') {
-    throw new DeployApiError(createDeployFailResponse(payload, DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE))
+    throw new DeployApiError(createDeployFailResponse(payload, fallbackMessage))
   }
 
   return {
     deployKey: payload.deployKey,
     deployStatus: isDeployStatus(payload.deployStatus) ? payload.deployStatus : null,
+    pauseRequested: typeof payload.pauseRequested === 'boolean' ? payload.pauseRequested : null,
     deleted: typeof payload.deleted === 'boolean' ? payload.deleted : null,
+    resultCode: typeof payload.resultCode === 'string' ? payload.resultCode : null,
+    resultMessage: isRecord(payload.resultMessage)
+      ? {
+          title: typeof payload.resultMessage.title === 'string' ? payload.resultMessage.title : '',
+          message:
+            typeof payload.resultMessage.message === 'string' ? payload.resultMessage.message : '',
+          severity:
+            typeof payload.resultMessage.severity === 'string'
+              ? payload.resultMessage.severity
+              : 'INFO',
+        }
+      : null,
+  }
+}
+
+const normalizeDeploySummary = (payload: unknown): DeploySummary => {
+  if (!isRecord(payload) || typeof payload.deployKey !== 'number' || typeof payload.deployName !== 'string') {
+    throw new DeployApiError(createDeployFailResponse(payload, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE))
+  }
+
+  return {
+    deployKey: payload.deployKey,
+    deployName: payload.deployName,
+    eventType: typeof payload.eventType === 'string' ? payload.eventType : 'EQP_REGISTER_DEPLOY',
+    deployStatus: isDeployStatus(payload.deployStatus) ? payload.deployStatus : 'PLANNING',
+    pauseRequested: typeof payload.pauseRequested === 'boolean' ? payload.pauseRequested : false,
+    executionPolicy:
+      isDeployExecutionPolicy(payload.executionPolicy) ? payload.executionPolicy : 'BEST_EFFORT',
+    createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : '',
+    startedAt: typeof payload.startedAt === 'string' ? payload.startedAt : null,
+    finishedAt: typeof payload.finishedAt === 'string' ? payload.finishedAt : null,
+    targetSummary: isRecord(payload.targetSummary)
+      ? {
+          total: typeof payload.targetSummary.total === 'number' ? payload.targetSummary.total : 0,
+          pending:
+            typeof payload.targetSummary.pending === 'number' ? payload.targetSummary.pending : 0,
+          noChange:
+            typeof payload.targetSummary.noChange === 'number' ? payload.targetSummary.noChange : 0,
+          running:
+            typeof payload.targetSummary.running === 'number' ? payload.targetSummary.running : 0,
+          completed:
+            typeof payload.targetSummary.completed === 'number'
+              ? payload.targetSummary.completed
+              : 0,
+          failed: typeof payload.targetSummary.failed === 'number' ? payload.targetSummary.failed : 0,
+          rollingBack:
+            typeof payload.targetSummary.rollingBack === 'number'
+              ? payload.targetSummary.rollingBack
+              : 0,
+          rolledBack:
+            typeof payload.targetSummary.rolledBack === 'number'
+              ? payload.targetSummary.rolledBack
+              : 0,
+          compensationFailed:
+            typeof payload.targetSummary.compensationFailed === 'number'
+              ? payload.targetSummary.compensationFailed
+              : 0,
+          canceled:
+            typeof payload.targetSummary.canceled === 'number' ? payload.targetSummary.canceled : 0,
+        }
+      : {
+          total: 0,
+          pending: 0,
+          noChange: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          rollingBack: 0,
+          rolledBack: 0,
+          compensationFailed: 0,
+          canceled: 0,
+        },
+    terminal: typeof payload.terminal === 'boolean' ? payload.terminal : false,
+    popupRequired: typeof payload.popupRequired === 'boolean' ? payload.popupRequired : false,
     resultCode: typeof payload.resultCode === 'string' ? payload.resultCode : null,
     resultMessage: isRecord(payload.resultMessage)
       ? {
@@ -312,6 +528,35 @@ const normalizeDeployScenarioCatalog = (payload: unknown): DeployScenarioCatalog
     reloadReason: typeof payload.reloadReason === 'string' ? payload.reloadReason : '',
     scenarioCount: payload.scenarioCount,
     scenarios,
+  }
+}
+
+const normalizeDeployRegisterScenarioPreview = (
+  payload: unknown,
+): DeployRegisterScenarioPreviewResult => {
+  if (
+    !isRecord(payload) ||
+    !Array.isArray(payload.removedEqpIds) ||
+    !Array.isArray(payload.remainingEqpIds) ||
+    !Array.isArray(payload.unionChangeKinds) ||
+    !Array.isArray(payload.scenarios)
+  ) {
+    throw new DeployApiError(
+      createDeployFailResponse(payload, DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE),
+    )
+  }
+
+  return {
+    removedEqpIds: payload.removedEqpIds.filter((value): value is string => typeof value === 'string'),
+    remainingEqpIds: payload.remainingEqpIds.filter((value): value is string => typeof value === 'string'),
+    unionChangeKinds: payload.unionChangeKinds.filter((value): value is string => typeof value === 'string'),
+    recommendedScenarioCode:
+      typeof payload.recommendedScenarioCode === 'string' ? payload.recommendedScenarioCode : null,
+    recommendedReason:
+      typeof payload.recommendedReason === 'string'
+        ? payload.recommendedReason
+        : '권장 시나리오를 계산하지 못했습니다.',
+    scenarios: payload.scenarios.filter(isDeployRegisterScenarioCandidate),
   }
 }
 
@@ -369,6 +614,56 @@ export const deployApi = {
     }
   },
 
+  startDeploy: async (deployKey: number): Promise<DeployActionResult> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post(`/deploys/${deployKey}/start`, null, {
+          withCredentials: true,
+          headers: {
+            [CSRF_HEADER_NAME]: csrfToken,
+          },
+          validateStatus: (status) => status >= 200 && status < 600,
+        }),
+      )
+
+      return normalizeDeployActionResult(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          DEFAULT_DEPLOY_START_ERROR_MESSAGE,
+        ),
+        DEFAULT_DEPLOY_START_ERROR_MESSAGE,
+      )
+    } catch (error) {
+      throw normalizeDeployError(error, DEFAULT_DEPLOY_START_ERROR_MESSAGE)
+    }
+  },
+
+  holdDeploy: async (deployKey: number): Promise<DeployActionResult> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post(`/deploys/${deployKey}/hold`, null, {
+          withCredentials: true,
+          headers: {
+            [CSRF_HEADER_NAME]: csrfToken,
+          },
+          validateStatus: (status) => status >= 200 && status < 600,
+        }),
+      )
+
+      return normalizeDeployActionResult(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE,
+        ),
+        DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE,
+      )
+    } catch (error) {
+      throw normalizeDeployError(error, DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE)
+    }
+  },
+
   cancelDeploy: async (deployKey: number): Promise<DeployActionResult> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
@@ -387,6 +682,7 @@ export const deployApi = {
           response.status,
           DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
         ),
+        DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
       )
     } catch (error) {
       throw normalizeDeployError(error, DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE)
@@ -433,6 +729,7 @@ export const deployApi = {
           response.status,
           DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE,
         ),
+        DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE,
       )
     } catch (error) {
       throw normalizeDeployError(error, DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE)
@@ -455,6 +752,32 @@ export const deployApi = {
       )
     } catch (error) {
       throw normalizeDeployError(error, DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE)
+    }
+  },
+
+  previewRegisterScenario: async (
+    request: DeployRegisterScenarioPreviewRequest,
+  ): Promise<DeployRegisterScenarioPreviewResult> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post('/deploys/register/scenario-preview', request, {
+          withCredentials: true,
+          headers: {
+            [CSRF_HEADER_NAME]: csrfToken,
+          },
+          validateStatus: (status) => status >= 200 && status < 600,
+        }),
+      )
+
+      return normalizeDeployRegisterScenarioPreview(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE,
+        ),
+      )
+    } catch (error) {
+      throw normalizeDeployError(error, DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE)
     }
   },
 
@@ -498,10 +821,8 @@ export const deployApi = {
         withCredentials: true,
       })
 
-      return resolveSuccessPayload<DeploySummary>(
-        response.data,
-        response.status,
-        DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE,
+      return normalizeDeploySummary(
+        resolveSuccessPayload<unknown>(response.data, response.status, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE),
       )
     } catch (error) {
       throw normalizeDeployError(error, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE)

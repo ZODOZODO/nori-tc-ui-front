@@ -241,6 +241,28 @@ const parseOptionalInteger = (
   return parsed
 }
 
+const parseOptionalSelectInteger = (
+  value: string,
+  label: string,
+  options: { min?: number } = {},
+): number | null => {
+  const normalized = resolveSelectableOption(value)
+  if (!normalized) {
+    return null
+  }
+
+  const parsed = Number(normalized)
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${label}은(는) 정수로 입력해 주세요.`)
+  }
+
+  if (typeof options.min === 'number' && parsed < options.min) {
+    throw new Error(`${label}은(는) ${options.min} 이상이어야 합니다.`)
+  }
+
+  return parsed
+}
+
 const parseOptionalLong = (
   value: string,
   label: string,
@@ -611,8 +633,12 @@ export function EqpManageFormModal({
           eqpPort: parseRequiredInteger(formState.eqpPort, 'EQP Port', { positive: true }),
           modelVersionKey: selectedModelVersionKey,
           appliedParamVersion: null,
-          gatewayJarRef: parseOptionalInteger(formState.gatewayJarRef, 'Gateway Jar', { min: 1 }),
-          businessJarRef: parseOptionalInteger(formState.businessJarRef, 'Business Jar', { min: 1 }),
+          gatewayJarRef: parseOptionalSelectInteger(formState.gatewayJarRef, 'Gateway Jar', {
+            min: 1,
+          }),
+          businessJarRef: parseOptionalSelectInteger(formState.businessJarRef, 'Business Jar', {
+            min: 1,
+          }),
           logSettings: {
             logLevel: resolveOptionalText(formState.logLevel),
             logRetentionDays: parseOptionalInteger(formState.logRetentionDays, 'Log Retention Day', { min: 0 }),
@@ -673,8 +699,12 @@ export function EqpManageFormModal({
         routePartition: parseRequiredInteger(formState.routePartition, 'Route Partition', { min: 0 }),
         eqpIp: formState.eqpIp.trim(),
         eqpPort: parseRequiredInteger(formState.eqpPort, 'EQP Port', { positive: true }),
-        gatewayJarRef: parseOptionalInteger(formState.gatewayJarRef, 'Gateway Jar', { min: 1 }),
-        businessJarRef: parseOptionalInteger(formState.businessJarRef, 'Business Jar', { min: 1 }),
+        gatewayJarRef: parseOptionalSelectInteger(formState.gatewayJarRef, 'Gateway Jar', {
+          min: 1,
+        }),
+        businessJarRef: parseOptionalSelectInteger(formState.businessJarRef, 'Business Jar', {
+          min: 1,
+        }),
         logSettings: {
           logLevel: resolveOptionalText(formState.logLevel),
           logRetentionDays: parseOptionalInteger(formState.logRetentionDays, 'Log Retention Day', { min: 0 }),

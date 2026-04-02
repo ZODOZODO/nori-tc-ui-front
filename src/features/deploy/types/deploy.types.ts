@@ -3,7 +3,10 @@ import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
 export type DeployMode = 'register' | 'deploy' | 'history'
 
-export type DeployEventType = 'EQP_BUSINESS_JARFILE_UPDATE' | (string & {})
+export type DeployEventType =
+  | 'EQP_BUSINESS_JARFILE_UPDATE'
+  | 'EQP_REGISTER_DEPLOY'
+  | (string & {})
 
 export type DeployExecutionPolicy = 'BEST_EFFORT' | 'FAIL_FAST'
 
@@ -76,6 +79,11 @@ export interface DeployRegisterTargetItem {
   businessJarRef: number | null
   businessJarFileName: string | null
   appliedParamVersion: string | null
+  blockedByActiveDeploy: boolean
+  activeDeployKey: number | null
+  activeDeployStatus: DeployStatus | null
+  activeDeployName: string | null
+  activeRequestedBy: string | null
 }
 
 export interface DeployRegisterTargetPage {
@@ -112,6 +120,7 @@ export interface DeployHistoryItem {
   deployName: string
   eventType: DeployEventType
   deployStatus: DeployStatus
+  pauseRequested: boolean
   executionPolicy: DeployExecutionPolicy
   requestedBy: string
   createdAt: string
@@ -170,6 +179,38 @@ export interface DeployScenarioCatalogResponse {
   scenarios: DeployScenarioSummary[]
 }
 
+export interface DeployRegisterScenarioCandidate {
+  code: string
+  name: string
+  summary: string
+  version: number
+  stepCount: number
+  coversChangeKinds: string[]
+  recommended: boolean
+  selectable: boolean
+  reason: string
+}
+
+export interface DeployRegisterScenarioPreviewRequest {
+  commonRequest: {
+    interfaceType: ProtocolType
+    uiMessage: Record<string, unknown>
+  }
+  targets: Array<{
+    eqpId: string
+    uiMessageOverride?: Record<string, unknown> | null
+  }>
+}
+
+export interface DeployRegisterScenarioPreviewResult {
+  removedEqpIds: string[]
+  remainingEqpIds: string[]
+  unionChangeKinds: string[]
+  recommendedScenarioCode: string | null
+  recommendedReason: string
+  scenarios: DeployRegisterScenarioCandidate[]
+}
+
 export interface DeployMonitorFilters {
   modelName: string
   requestedBy: string
@@ -220,6 +261,7 @@ export type DeployCreateResponse = ApiResponse<DeployCreateResult>
 export interface DeployActionResult {
   deployKey: number
   deployStatus: DeployStatus | null
+  pauseRequested: boolean | null
   deleted: boolean | null
   resultCode: string | null
   resultMessage: DeployResultMessage | null
@@ -234,6 +276,7 @@ export interface DeploySummary {
   deployName: string
   eventType: DeployEventType
   deployStatus: DeployStatus
+  pauseRequested: boolean
   executionPolicy: DeployExecutionPolicy
   createdAt: string
   startedAt: string | null

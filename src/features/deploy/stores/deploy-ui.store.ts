@@ -8,6 +8,7 @@ import {
 } from '../lib/deploy-utils'
 import type {
   CreateLocalDeployInput,
+  DeployEventType,
   DeployHistoryItem,
   DeployMode,
   DeployMonitorFilters,
@@ -48,6 +49,7 @@ interface DeployUiState {
   addSelectedEqps: (targets: DeployRegisterTargetItem[]) => void
   syncSelectedEqpTargets: (targets: DeployRegisterTargetItem[]) => void
   removeSelectedEqp: (eqpId: string) => void
+  removeSelectedEqps: (eqpIds: string[]) => void
   clearSelectedEqps: () => void
   setSelectedEqpParamVersion: (eqpId: string, eqpParamVersion: string) => void
   setSelectedModelName: (modelName: string | null) => void
@@ -61,11 +63,17 @@ interface DeployUiState {
     selectedModelName?: string | null
     selectedModelVersion: string | null
     selectedBusinessJarName: string | null
+    eventType?: DeployEventType
     interfaceType?: DeployRegisterTargetItem['commInterface'] | null
     targetCount?: number
     eqpIds?: string[]
+    activateMode?: boolean
   }) => void
-  markDeployStatus: (deployKey: number, deployStatus: DeployHistoryItem['deployStatus']) => void
+  markDeployStatus: (
+    deployKey: number,
+    deployStatus: DeployHistoryItem['deployStatus'],
+    pauseRequested?: boolean,
+  ) => void
   applyDeploySummary: (summary: DeploySummary) => void
   applyDeployTargets: (deployKey: number, targets: DeployTargetItem[]) => void
   createLocalDeploy: (input: CreateLocalDeployInput) => number | null
@@ -73,6 +81,7 @@ interface DeployUiState {
   deleteLocalDeploy: (deployKey: number) => void
   reconcileServerHistory: (serverDeployKeys: number[]) => void
   clearRegisterState: () => void
+  resetPageState: () => void
   setProfileModalOpen: (open: boolean) => void
 }
 
@@ -101,6 +110,28 @@ export const createDefaultMonitorFilters = (): DeployMonitorFilters => {
 }
 
 const DEPLOY_UI_STORAGE_KEY = 'deploy-ui-state'
+const createInitialDeployUiDataState = () => ({
+  mode: 'register' as DeployMode,
+  selectedEqpIds: [] as string[],
+  selectedEqpTargetsById: {} as Record<string, DeployRegisterTargetItem>,
+  selectedEqpParamVersions: {} as Record<string, string>,
+  selectedInterfaceType: null as DeployRegisterTargetItem['commInterface'] | null,
+  activeDeployKey: null as number | null,
+  deployListOffset: 0,
+  historyListOffset: 0,
+  serverBackedDeployKeys: [] as number[],
+  serverBridgeCreatedAtByDeployKey: {} as Record<number, string>,
+  localHistory: [] as DeployHistoryItem[],
+  localTargetsByDeployKey: {} as Record<number, DeployTargetItem[]>,
+  registerFilters: EMPTY_REGISTER_FILTERS,
+  hasSubmittedRegisterSearch: false,
+  registerSearchRevision: 0,
+  monitorFilters: createDefaultMonitorFilters(),
+  selectedModelName: null as string | null,
+  selectedModelVersionKey: null as number | null,
+  selectedBusinessJarRef: null as number | null,
+  isProfileModalOpen: false,
+})
 const resolveInterfaceType = (
   eqpIds: string[],
   selectedEqpTargetsById: Record<string, DeployRegisterTargetItem>,
@@ -230,6 +261,7 @@ const createServerBridgeHistoryItem = (input: {
   selectedModelName: string | null
   selectedModelVersion: string | null
   selectedBusinessJarName: string | null
+  eventType: DeployEventType
   interfaceType: DeployRegisterTargetItem['commInterface'] | null
   targets: DeployTargetItem[]
   targetCount: number
@@ -239,8 +271,9 @@ const createServerBridgeHistoryItem = (input: {
   return {
     deployKey: input.deployKey,
     deployName: createDeployName(input.selectedModelName, input.selectedModelVersion),
-    eventType: 'EQP_BUSINESS_JARFILE_UPDATE',
+    eventType: input.eventType,
     deployStatus: input.deployStatus,
+    pauseRequested: false,
     executionPolicy: 'BEST_EFFORT',
     requestedBy: input.requestedBy,
     createdAt,
@@ -275,26 +308,7 @@ const mergeHistoryItem = (
 export const useDeployUiStore = create<DeployUiState>()(
   persist(
     (set, get) => ({
-      mode: 'register',
-      selectedEqpIds: [],
-      selectedEqpTargetsById: {},
-      selectedEqpParamVersions: {},
-      selectedInterfaceType: null,
-      activeDeployKey: null,
-      deployListOffset: 0,
-      historyListOffset: 0,
-      serverBackedDeployKeys: [],
-      serverBridgeCreatedAtByDeployKey: {},
-      localHistory: [],
-      localTargetsByDeployKey: {},
-      registerFilters: EMPTY_REGISTER_FILTERS,
-      hasSubmittedRegisterSearch: false,
-      registerSearchRevision: 0,
-      monitorFilters: createDefaultMonitorFilters(),
-      selectedModelName: null,
-      selectedModelVersionKey: null,
-      selectedBusinessJarRef: null,
-      isProfileModalOpen: false,
+      ...createInitialDeployUiDataState(),
       setMode: (mode) => set({ mode }),
       submitRegisterSearch: (filters) =>
         set((state) => ({
@@ -379,6 +393,32 @@ export const useDeployUiStore = create<DeployUiState>()(
             ),
           }
         }),
+      removeSelectedEqps: (eqpIds) =>
+        set((state) => {
+          if (eqpIds.length === 0) {
+            return state
+          }
+
+          const removeSet = new Set(eqpIds)
+          const nextSelectedEqpIds = state.selectedEqpIds.filter((eqpId) => !removeSet.has(eqpId))
+          const nextSelectedEqpTargetsById = { ...state.selectedEqpTargetsById }
+          const nextSelectedEqpParamVersions = { ...state.selectedEqpParamVersions }
+
+          for (const eqpId of removeSet) {
+            delete nextSelectedEqpTargetsById[eqpId]
+            delete nextSelectedEqpParamVersions[eqpId]
+          }
+
+          return {
+            selectedEqpIds: nextSelectedEqpIds,
+            selectedEqpTargetsById: nextSelectedEqpTargetsById,
+            selectedEqpParamVersions: nextSelectedEqpParamVersions,
+            selectedInterfaceType: resolveInterfaceType(
+              nextSelectedEqpIds,
+              nextSelectedEqpTargetsById,
+            ),
+          }
+        }),
       clearSelectedEqps: () =>
         set({
           selectedEqpIds: [],
@@ -404,9 +444,11 @@ export const useDeployUiStore = create<DeployUiState>()(
         selectedModelName,
         selectedModelVersion,
         selectedBusinessJarName,
+        eventType,
         interfaceType,
         targetCount,
         eqpIds,
+        activateMode = true,
       }) => {
         const state = get()
         const resolvedEqpIds = eqpIds ?? state.selectedEqpIds
@@ -423,13 +465,18 @@ export const useDeployUiStore = create<DeployUiState>()(
           selectedModelName: selectedModelName ?? state.selectedModelName,
           selectedModelVersion,
           selectedBusinessJarName,
+          eventType: eventType ?? 'EQP_REGISTER_DEPLOY',
           interfaceType: interfaceType ?? state.selectedInterfaceType,
           targets,
           targetCount: targetCount ?? resolvedEqpIds.length,
         })
 
         set({
-          mode: isTerminalDeployStatus(deployStatus) ? 'history' : 'deploy',
+          mode: activateMode
+            ? isTerminalDeployStatus(deployStatus)
+              ? 'history'
+              : 'deploy'
+            : state.mode,
           activeDeployKey: deployKey,
           deployListOffset: 0,
           historyListOffset: isTerminalDeployStatus(deployStatus) ? 0 : state.historyListOffset,
@@ -445,13 +492,23 @@ export const useDeployUiStore = create<DeployUiState>()(
           },
         })
       },
-      markDeployStatus: (deployKey, deployStatus) =>
+      markDeployStatus: (deployKey, deployStatus, pauseRequested) =>
         set((state) => ({
           localHistory: state.localHistory.map((item) =>
             item.deployKey === deployKey
               ? {
                   ...item,
                   deployStatus,
+                  pauseRequested:
+                    typeof pauseRequested === 'boolean'
+                      ? pauseRequested
+                      : isTerminalDeployStatus(deployStatus)
+                        ? false
+                        : item.pauseRequested,
+                  startedAt:
+                    deployStatus === 'RUNNING' && !item.startedAt
+                      ? new Date().toISOString()
+                      : item.startedAt,
                   terminal: isTerminalDeployStatus(deployStatus),
                   finishedAt: isTerminalDeployStatus(deployStatus)
                     ? new Date().toISOString()
@@ -470,6 +527,7 @@ export const useDeployUiStore = create<DeployUiState>()(
                   deployName: summary.deployName,
                   eventType: summary.eventType,
                   deployStatus: summary.deployStatus,
+                  pauseRequested: summary.pauseRequested,
                   executionPolicy: summary.executionPolicy,
                   createdAt: summary.createdAt,
                   startedAt: summary.startedAt,
@@ -517,10 +575,10 @@ export const useDeployUiStore = create<DeployUiState>()(
           deployTargetKey: deployKey * 100 + index + 1,
           eqpId,
           modelName: state.selectedEqpTargetsById[eqpId]?.modelName ?? 'Unknown Model',
-          targetStatus: index === 0 ? 'RUNNING' : 'PENDING',
-          currentStepOrder: index === 0 ? 10 : 0,
-          currentStepCode: index === 0 ? 'PREPARE_REQUEST' : 'QUEUED',
-          currentStepStatus: index === 0 ? 'RUNNING' : 'PENDING',
+          targetStatus: 'PENDING',
+          currentStepOrder: 0,
+          currentStepCode: 'QUEUED',
+          currentStepStatus: 'PENDING',
           rollbackRequired: false,
           lastErrorMessage: null,
           updatedAt: '2026-03-31T10:00:00Z',
@@ -531,10 +589,11 @@ export const useDeployUiStore = create<DeployUiState>()(
           deployName: createDeployName(state.selectedModelName, selectedModelVersion),
           eventType: 'EQP_BUSINESS_JARFILE_UPDATE',
           deployStatus,
+          pauseRequested: false,
           executionPolicy: 'BEST_EFFORT',
           requestedBy,
           createdAt: '2026-03-31T10:00:00Z',
-          startedAt: deployStatus === 'READY' ? null : '2026-03-31T10:00:10Z',
+          startedAt: null,
           finishedAt: isTerminalDeployStatus(deployStatus) ? '2026-03-31T10:00:40Z' : null,
           terminal: isTerminalDeployStatus(deployStatus),
           interfaceType: state.selectedInterfaceType,
@@ -570,31 +629,31 @@ export const useDeployUiStore = create<DeployUiState>()(
         const clonedTargets: DeployTargetItem[] = sourceTargets.map((target, index) => ({
           ...target,
           deployTargetKey: nextDeployKeyValue * 100 + index + 1,
-          targetStatus: index === 0 ? 'RUNNING' : 'PENDING',
-          currentStepOrder: index === 0 ? 10 : 0,
-          currentStepCode: index === 0 ? 'PREPARE_REQUEST' : 'QUEUED',
-          currentStepStatus: index === 0 ? 'RUNNING' : 'PENDING',
+          targetStatus: 'PENDING',
+          currentStepOrder: 0,
+          currentStepCode: 'QUEUED',
+          currentStepStatus: 'PENDING',
           rollbackRequired: false,
           lastErrorMessage: null,
           updatedAt: '2026-03-31T10:30:00Z',
         }))
 
-        const runningCount = clonedTargets.filter((item) => item.targetStatus === 'RUNNING').length
         const pendingCount = clonedTargets.filter((item) => item.targetStatus === 'PENDING').length
 
         const nextHistoryItem: DeployHistoryItem = {
           ...sourceHistoryItem,
           deployKey: nextDeployKeyValue,
-          deployStatus: runningCount > 0 ? 'RUNNING' : 'READY',
+          deployStatus: 'READY',
+          pauseRequested: false,
           createdAt: '2026-03-31T10:30:00Z',
-          startedAt: '2026-03-31T10:30:05Z',
+          startedAt: null,
           finishedAt: null,
           terminal: false,
           targetSummary: {
             total: clonedTargets.length,
             pending: pendingCount,
             noChange: 0,
-            running: runningCount,
+            running: 0,
             completed: 0,
             failed: 0,
             rollingBack: 0,
@@ -673,6 +732,7 @@ export const useDeployUiStore = create<DeployUiState>()(
           selectedModelVersionKey: null,
           selectedBusinessJarRef: null,
         }),
+      resetPageState: () => set(createInitialDeployUiDataState()),
       setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
     }),
     {
@@ -752,3 +812,11 @@ export const useDeployUiStore = create<DeployUiState>()(
     },
   ),
 )
+
+export const clearDeployUiSessionState = () => {
+  useDeployUiStore.getState().resetPageState()
+
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem(DEPLOY_UI_STORAGE_KEY)
+  }
+}

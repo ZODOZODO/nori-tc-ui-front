@@ -7,6 +7,7 @@ import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
+import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
 import { EqpInfoTable } from './EqpInfoTable'
 import { EqpManageFormModal } from './EqpManageFormModal'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
@@ -16,6 +17,7 @@ import { EqpSidebar } from './EqpSidebar'
 import { GatewayGroupTable } from './GatewayGroupTable'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { authApi } from '@/features/auth/api/auth.api'
+import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
 import { useEqpModelInfo } from '../hooks/useEqpModelInfo'
@@ -60,7 +62,20 @@ type EqpManagementDialogState =
   | { type: 'param'; eqpId: string }
   | { type: 'delete'; eqpId: string }
 
+interface EqpDeleteResultDialogState {
+  open: boolean
+  status: 'success' | 'failure'
+  eqpId: string | null
+  message: string | null
+}
+
 const EMPTY_MANAGEMENT_DIALOG_STATE: EqpManagementDialogState = { type: 'none' }
+const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
+  open: false,
+  status: 'success',
+  eqpId: null,
+  message: null,
+}
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -216,6 +231,9 @@ export function EqpPage() {
     EMPTY_MANAGEMENT_DIALOG_STATE,
   )
   const [managementErrorMessage, setManagementErrorMessage] = useState<string | null>(null)
+  const [deleteResultDialog, setDeleteResultDialog] = useState<EqpDeleteResultDialogState>(
+    EMPTY_EQP_DELETE_RESULT_DIALOG_STATE,
+  )
 
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
@@ -283,8 +301,7 @@ export function EqpPage() {
   const needsManageDetail =
     managementDialog.type === 'info' ||
     managementDialog.type === 'model' ||
-    managementDialog.type === 'param' ||
-    managementDialog.type === 'delete'
+    managementDialog.type === 'param'
   const needsManageOptions =
     managementDialog.type === 'create' ||
     managementDialog.type === 'info' ||
@@ -337,6 +354,7 @@ export function EqpPage() {
 
   const openEqpDeleteDialog = useCallback((eqpId: string) => {
     setManagementErrorMessage(null)
+    setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
     setManagementDialog({ type: 'delete', eqpId })
   }, [])
 
@@ -498,17 +516,31 @@ export function EqpPage() {
       return
     }
 
+    const targetEqpId = managementDialog.eqpId
+
     try {
       setManagementErrorMessage(null)
-      await deleteEqpMutation.mutateAsync({ eqpId: managementDialog.eqpId })
+      await deleteEqpMutation.mutateAsync({ eqpId: targetEqpId })
 
-      if (selectedEqpId === managementDialog.eqpId) {
+      if (selectedEqpId === targetEqpId) {
         resetSelectionTransientStates()
       }
 
       closeManagementDialog()
+      setDeleteResultDialog({
+        open: true,
+        status: 'success',
+        eqpId: targetEqpId,
+        message: `${targetEqpId} 설비가 정상적으로 삭제되었습니다.`,
+      })
     } catch (error) {
-      setManagementErrorMessage(resolveErrorMessage(error, '설비 삭제에 실패했습니다.'))
+      closeManagementDialog()
+      setDeleteResultDialog({
+        open: true,
+        status: 'failure',
+        eqpId: targetEqpId,
+        message: resolveErrorMessage(error, '설비 삭제에 실패했습니다.'),
+      })
     }
   }
 
@@ -776,6 +808,7 @@ export function EqpPage() {
     } catch (error) {
       console.warn('[EqpPage] logout request failed, continuing with local cleanup', error)
     } finally {
+      clearDeployUiSessionState()
       setProfileModalOpen(false)
       resetSelectionTransientStates()
       closeManagementDialog()
@@ -1183,13 +1216,25 @@ export function EqpPage() {
         open={managementDialog.type === 'delete'}
         eqpId={managementDialog.type === 'delete' ? managementDialog.eqpId : null}
         isPending={deleteEqpMutation.isPending}
-        errorMessage={managementModalErrorMessage}
+        errorMessage={null}
         onOpenChange={(open) => {
           if (!open) {
             closeManagementDialog()
           }
         }}
         onConfirm={handleDeleteEqp}
+      />
+
+      <EqpDeleteResultDialog
+        open={deleteResultDialog.open}
+        status={deleteResultDialog.status}
+        eqpId={deleteResultDialog.eqpId}
+        message={deleteResultDialog.message}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
+          }
+        }}
       />
 
       <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />

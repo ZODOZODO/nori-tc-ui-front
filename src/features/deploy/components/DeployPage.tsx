@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { DeployHistoryPanel } from './DeployHistoryPanel'
 import { DeployMonitorPanel } from './DeployMonitorPanel'
 import { DeployRegisterPanel } from './DeployRegisterPanel'
 import { DeploySidebar } from './DeploySidebar'
-import { useDeployUiStore } from '../stores/deploy-ui.store'
+import { clearDeployUiSessionState, useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployMode } from '../types/deploy.types'
 
 const LOGIN_ROUTE = '/login'
@@ -54,6 +54,12 @@ export function DeployPage() {
 
   const activePanel = useMemo(() => renderPanel(mode), [mode])
 
+  useEffect(() => {
+    return () => {
+      clearDeployUiSessionState()
+    }
+  }, [])
+
   const handleNavigateMenu = (route: string | null) => {
     if (!route || route === '/deploy') {
       return
@@ -74,7 +80,7 @@ export function DeployPage() {
     } catch (error) {
       console.warn('[DeployPage] logout request failed, continuing with local cleanup', error)
     } finally {
-      setProfileModalOpen(false)
+      clearDeployUiSessionState()
       queryClient.clear()
       clearCsrfCookie()
       navigate(LOGIN_ROUTE, { replace: true })

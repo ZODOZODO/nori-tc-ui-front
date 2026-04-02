@@ -51,7 +51,12 @@ export const isTerminalDeployStatus = (status: DeployHistoryItem['deployStatus']
   status === 'CANCELED'
 
 export const createDeployName = (modelName: string | null, modelVersion: string | null): string => {
-  const safeModelName = modelName?.trim() || 'Unknown Model'
-  const safeModelVersion = modelVersion?.trim() || 'Unknown Version'
-  return `${safeModelName} ${safeModelVersion} Business Jar Update`
+  const safeModelName = modelName?.trim() || 'Register'
+  const safeModelVersion = modelVersion?.trim()
+
+  if (!safeModelVersion) {
+    return `${safeModelName} Deploy`
+  }
+
+  return `${safeModelName} ${safeModelVersion} Deploy`
 }

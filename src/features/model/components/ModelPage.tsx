@@ -4,6 +4,7 @@ import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { authApi } from '@/features/auth/api/auth.api'
+import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
@@ -1316,6 +1317,7 @@ export function ModelPage() {
     } catch {
       // 로그아웃 API 실패 시에도 로컬 세션 정리를 우선합니다.
     } finally {
+      clearDeployUiSessionState()
       // resetUiState()가 store의 reset()을 호출하므로 topPanelHeightPercent도 함께 초기화됩니다.
       resetUiState()
       setCheckInErrorMessage(null)

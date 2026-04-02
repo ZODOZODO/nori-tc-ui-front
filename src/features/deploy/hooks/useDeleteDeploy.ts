@@ -3,7 +3,7 @@ import { deployApi } from '../api/deploy.api'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
 
 /**
- * 종료된 Deploy 이력 삭제 mutation 훅입니다.
+ * 삭제 가능한 Deploy 항목 삭제 mutation 훅입니다.
  */
 export function useDeleteDeploy() {
   const queryClient = useQueryClient()

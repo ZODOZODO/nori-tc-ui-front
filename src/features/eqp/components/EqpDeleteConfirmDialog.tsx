@@ -1,4 +1,13 @@
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface EqpDeleteConfirmDialogProps {
   open: boolean
@@ -22,32 +31,52 @@ export function EqpDeleteConfirmDialog({
   onConfirm,
 }: EqpDeleteConfirmDialogProps) {
   return (
-    <ConfirmDialog
+    <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!isPending) {
           onOpenChange(nextOpen)
         }
       }}
-      title="Eqp Delete"
-      description={
-        eqpId
-          ? `${eqpId} 설비를 삭제하시겠습니까? 삭제 전에 runtime 종료를 시도하며, 실패하면 삭제가 중단됩니다.`
-          : '선택한 설비를 삭제하시겠습니까?'
-      }
-      confirmText="Delete"
-      cancelText="Cancel"
-      confirmVariant="destructive"
-      isConfirming={isPending}
-      onConfirm={() => {
-        void onConfirm()
-      }}
     >
-      {errorMessage ? (
-        <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
-          {errorMessage}
-        </p>
-      ) : null}
-    </ConfirmDialog>
+      <DialogContent className="max-w-[480px]" showCloseButton={!isPending}>
+        <DialogHeader>
+          <DialogTitle>Eqp Delete</DialogTitle>
+          <DialogDescription>
+            {eqpId
+              ? `${eqpId} 설비를 삭제하시겠습니까? 삭제 전에 runtime 종료를 시도하며, 실패하면 삭제가 중단됩니다.`
+              : '선택한 설비를 삭제하시겠습니까?'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {errorMessage ? (
+          <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => {
+              void onConfirm()
+            }}
+          >
+            {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Loader2, Trash2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Loader2, Trash2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,27 +22,44 @@ import {
 } from '@/components/ui/table'
 import type { EqpJarOption, EqpModelOption } from '@/features/eqp/types/eqp.types'
 import { useMe } from '@/features/profile/hooks/useProfile'
+import { DeployApiError, deployApi } from '../api/deploy.api'
 import { createDeployName } from '../lib/deploy-utils'
+import { deployQueryKeys } from '../lib/deploy-query-keys'
 import { useCreateDeploy } from '../hooks/useCreateDeploy'
 import { useDeployEqpParamVersions } from '../hooks/useDeployEqpParamVersions'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
+import { useDeployRegisterScenarioPreview } from '../hooks/useDeployRegisterScenarioPreview'
 import { useDeployRegisterTargets } from '../hooks/useDeployRegisterTargets'
-import { useDeployScenarios } from '../hooks/useDeployScenarios'
 import { useDeployUiStore } from '../stores/deploy-ui.store'
-import type { DeployCreateRequest, DeployRegisterTargetItem, DeployScenarioSummary } from '../types/deploy.types'
-import { DeployApiError } from '../api/deploy.api'
+import type {
+  DeployCreateRequest,
+  DeployStatus,
+  DeploySummary,
+  DeployRegisterScenarioPreviewRequest,
+  DeployRegisterScenarioPreviewResult,
+  DeployRegisterTargetItem,
+  DeployTargetItem,
+} from '../types/deploy.types'
 
 const EMPTY_SELECT_VALUE = '__empty__'
 const EMPTY_REGISTER_TARGET_ITEMS: DeployRegisterTargetItem[] = []
 const EMPTY_MODEL_OPTIONS: EqpModelOption[] = []
 const EMPTY_JAR_OPTIONS: EqpJarOption[] = []
-const DEPLOY_EVENT_TYPE = 'EQP_BUSINESS_JARFILE_UPDATE'
+const DEPLOY_EVENT_TYPE = 'EQP_REGISTER_DEPLOY'
 
 const cardClassName =
   'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
 
 const getErrorMessage = (error: unknown, fallbackMessage: string): string =>
   error instanceof Error && error.message ? error.message : fallbackMessage
+
+const getDeployErrorDetail = (error: unknown): string | null => {
+  if (!(error instanceof DeployApiError)) {
+    return null
+  }
+
+  return error.payload.errorCode ? `오류 코드: ${error.payload.errorCode}` : null
+}
 
 const mergeModelOptions = (developModelOptions: EqpModelOption[], operateModelOptions: EqpModelOption[]) => {
   const mergedOptionMap = new Map<number, EqpModelOption>()
@@ -73,13 +92,109 @@ interface SelectedEquipmentRowProps {
 
 type DeployDialogState = {
   isSuccess: boolean
+  title: string
   message: string
+  detail: string | null
+  nextMode: 'deploy' | 'history' | null
+  nextDeployKey: number | null
 }
 
 type ScenarioDialogState = {
   isOpen: boolean
   selectedScenarioCode: string
-  message: string
+  preview: DeployRegisterScenarioPreviewResult | null
+}
+
+const CHANGE_KIND_LABEL: Record<string, string> = {
+  MODEL_CHANGED: 'Model',
+  BUSINESS_JAR_CHANGED: 'Business Jar',
+  EQP_PARAM_CHANGED: 'Eqp Param',
+}
+
+const formatChangeKinds = (changeKinds: string[]) =>
+  changeKinds.map((kind) => CHANGE_KIND_LABEL[kind] ?? kind).join(', ')
+
+const FAILED_DEPLOY_STATUSES = new Set<DeployStatus>(['FAILED', 'PARTIAL_FAILED', 'CANCELED'])
+const FAILED_TARGET_STATUSES = new Set([
+  'FAILED',
+  'ROLLING_BACK',
+  'ROLLED_BACK',
+  'COMPENSATION_FAILED',
+  'CANCELED',
+])
+
+const delay = (milliseconds: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds)
+  })
+
+const isFailedDeployOutcome = (summary: DeploySummary, targets: DeployTargetItem[]) =>
+  FAILED_DEPLOY_STATUSES.has(summary.deployStatus) ||
+  summary.targetSummary.failed > 0 ||
+  summary.targetSummary.compensationFailed > 0 ||
+  targets.some(
+    (target) =>
+      FAILED_TARGET_STATUSES.has(target.targetStatus) ||
+      Boolean(target.lastErrorMessage) ||
+      Boolean(target.lastErrorCode),
+  )
+
+const resolveFailureDetail = (targets: DeployTargetItem[]) => {
+  const failedTarget = targets.find(
+    (target) =>
+      FAILED_TARGET_STATUSES.has(target.targetStatus) ||
+      Boolean(target.lastErrorMessage) ||
+      Boolean(target.lastErrorCode),
+  )
+
+  if (!failedTarget) {
+    return null
+  }
+
+  if (failedTarget.lastErrorMessage?.trim()) {
+    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorMessage.trim()}`
+  }
+
+  if (failedTarget.lastErrorCode?.trim()) {
+    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorCode.trim()}`
+  }
+
+  return `설비 ${failedTarget.eqpId} 처리 상태: ${failedTarget.targetStatus}`
+}
+
+const formatDeployDetail = (
+  deployKey: number,
+  deployStatus: DeployStatus,
+  extraDetail?: string | null,
+) => {
+  const baseDetail = `Deploy #${deployKey} · 상태 ${deployStatus}`
+  return extraDetail ? `${baseDetail}\n${extraDetail}` : baseDetail
+}
+
+const formatActiveDeployHint = (item: DeployRegisterTargetItem) => {
+  if (!item.blockedByActiveDeploy) {
+    return null
+  }
+
+  const detailParts: string[] = []
+
+  if (item.activeDeployKey !== null) {
+    detailParts.push(`#${item.activeDeployKey}`)
+  }
+
+  if (item.activeDeployStatus) {
+    detailParts.push(item.activeDeployStatus)
+  }
+
+  if (item.activeDeployName) {
+    detailParts.push(item.activeDeployName)
+  }
+
+  if (item.activeRequestedBy) {
+    detailParts.push(`요청자 ${item.activeRequestedBy}`)
+  }
+
+  return detailParts.join(' · ')
 }
 
 function SelectedEquipmentRow({
@@ -109,11 +224,25 @@ function SelectedEquipmentRow({
   }, [item.appliedParamVersion, paramVersionsQuery.data, selectedEqpParamVersion])
 
   const resolvedParamVersionValue =
-    selectedEqpParamVersion ?? item.appliedParamVersion ?? paramVersionsQuery.data?.[0] ?? EMPTY_SELECT_VALUE
+    selectedEqpParamVersion ?? item.appliedParamVersion ?? EMPTY_SELECT_VALUE
 
   return (
       <TableRow>
-        <TableCell>{item.eqpId}</TableCell>
+        <TableCell>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{item.eqpId}</span>
+            {item.blockedByActiveDeploy ? (
+              <Badge variant="warning">
+                {item.activeDeployStatus ? `ACTIVE ${item.activeDeployStatus}` : 'ACTIVE'}
+              </Badge>
+            ) : null}
+          </div>
+          {item.blockedByActiveDeploy ? (
+            <p className="mt-1 text-xs text-[#A66518]">
+              {formatActiveDeployHint(item) ?? '이미 active Deploy에 포함된 설비입니다.'}
+            </p>
+          ) : null}
+        </TableCell>
         <TableCell>{item.modelName ?? '-'}</TableCell>
         <TableCell>{item.modelVersion ?? '-'}</TableCell>
         <TableCell>{item.businessJarFileName ?? '-'}</TableCell>
@@ -171,6 +300,7 @@ function SelectedEquipmentRow({
 }
 
 export function DeployRegisterPanel() {
+  const queryClient = useQueryClient()
   const registerFilters = useDeployUiStore((state) => state.registerFilters)
   const selectedEqpIds = useDeployUiStore((state) => state.selectedEqpIds)
   const selectedEqpTargetsById = useDeployUiStore((state) => state.selectedEqpTargetsById)
@@ -183,13 +313,18 @@ export function DeployRegisterPanel() {
   const registerSearchRevision = useDeployUiStore((state) => state.registerSearchRevision)
   const submitRegisterSearch = useDeployUiStore((state) => state.submitRegisterSearch)
   const resetRegisterFilters = useDeployUiStore((state) => state.resetRegisterFilters)
+  const resetMonitorFilters = useDeployUiStore((state) => state.resetMonitorFilters)
+  const resetMonitorListOffsets = useDeployUiStore((state) => state.resetMonitorListOffsets)
   const addSelectedEqps = useDeployUiStore((state) => state.addSelectedEqps)
   const syncSelectedEqpTargets = useDeployUiStore((state) => state.syncSelectedEqpTargets)
   const removeSelectedEqp = useDeployUiStore((state) => state.removeSelectedEqp)
+  const removeSelectedEqps = useDeployUiStore((state) => state.removeSelectedEqps)
   const setSelectedEqpParamVersion = useDeployUiStore((state) => state.setSelectedEqpParamVersion)
   const setSelectedModelName = useDeployUiStore((state) => state.setSelectedModelName)
   const setSelectedModelVersionKey = useDeployUiStore((state) => state.setSelectedModelVersionKey)
   const setSelectedBusinessJarRef = useDeployUiStore((state) => state.setSelectedBusinessJarRef)
+  const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
+  const setMode = useDeployUiStore((state) => state.setMode)
   const createServerDeployBridge = useDeployUiStore((state) => state.createServerDeployBridge)
   const clearRegisterState = useDeployUiStore((state) => state.clearRegisterState)
 
@@ -204,7 +339,7 @@ export function DeployRegisterPanel() {
   const [scenarioDialogState, setScenarioDialogState] = useState<ScenarioDialogState>({
     isOpen: false,
     selectedScenarioCode: '',
-    message: '',
+    preview: null,
   })
 
   const registerTargetsQuery = useDeployRegisterTargets(
@@ -215,12 +350,7 @@ export function DeployRegisterPanel() {
   const registerOptionsQuery = useDeployRegisterOptions()
   const meQuery = useMe(true)
   const createDeployMutation = useCreateDeploy()
-  const deployScenariosQuery = useDeployScenarios(DEPLOY_EVENT_TYPE)
-
-  const availableScenarios = useMemo(
-    () => deployScenariosQuery.data?.scenarios ?? [],
-    [deployScenariosQuery.data?.scenarios],
-  )
+  const previewScenarioMutation = useDeployRegisterScenarioPreview()
 
   const registerTargetItems = useMemo(
     () =>
@@ -295,6 +425,38 @@ export function DeployRegisterPanel() {
         .filter((item): item is DeployRegisterTargetItem => Boolean(item)),
     [selectedEqpIds, selectedEqpTargetsById],
   )
+  const blockedSelectedEqpItems = useMemo(
+    () => selectedEqpItems.filter((item) => item.blockedByActiveDeploy),
+    [selectedEqpItems],
+  )
+  const selectedSearchItems = useMemo(
+    () =>
+      searchSelectionIds
+        .map((eqpId) => registerTargetMap.get(eqpId))
+        .filter((item): item is DeployRegisterTargetItem => Boolean(item)),
+    [registerTargetMap, searchSelectionIds],
+  )
+  const addableSearchItems = useMemo(
+    () => selectedSearchItems.filter((item) => !item.blockedByActiveDeploy),
+    [selectedSearchItems],
+  )
+
+  const deployNameContext = useMemo(() => {
+    if (currentModelVersion) {
+      return {
+        modelName: currentModelVersion.modelName,
+        modelVersion: currentModelVersion.modelVersion,
+      }
+    }
+
+    const modelNames = [...new Set(selectedEqpItems.map((item) => item.modelName).filter(Boolean))]
+    const modelVersions = [...new Set(selectedEqpItems.map((item) => item.modelVersion).filter(Boolean))]
+
+    return {
+      modelName: modelNames.length === 1 ? modelNames[0] : null,
+      modelVersion: modelVersions.length === 1 ? modelVersions[0] : null,
+    }
+  }, [currentModelVersion, selectedEqpItems])
 
   useEffect(() => {
     if (selectedEqpIds.length === 0 || registerTargetItems.length === 0) {
@@ -308,118 +470,266 @@ export function DeployRegisterPanel() {
     setScenarioDialogState({
       isOpen: false,
       selectedScenarioCode: '',
-      message: '',
+      preview: null,
     })
   }
 
-  const openScenarioDialog = (
-    message: string,
-    selectedScenarioCode?: string,
-  ) => {
-    const trimmedCode = selectedScenarioCode?.trim()
-    const fallbackScenarioCode = trimmedCode && trimmedCode.length > 0
-      ? trimmedCode
-      : scenarioDialogState.selectedScenarioCode
-    const selectedCode = availableScenarios.find((scenario) => scenario.code === fallbackScenarioCode)?.code
-      ?? availableScenarios[0]?.code
-      ?? ''
+  const closeDeployDialog = () => {
+    setDeployDialogState(null)
+  }
 
-    setScenarioDialogState({
-      isOpen: true,
-      selectedScenarioCode: selectedCode,
-      message,
+  const moveToNextMode = (nextMode: 'deploy' | 'history', deployKey: number | null) => {
+    resetMonitorFilters()
+    resetMonitorListOffsets()
+    setActiveDeployKey(deployKey)
+    setMode(nextMode)
+    closeDeployDialog()
+  }
+
+  const loadCreatedDeploySnapshot = async (deployKey: number) => {
+    let lastSummaryError: unknown = null
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const summary = await deployApi.getDeploySummary(deployKey)
+        const targetsPage = await deployApi.getDeployTargets(deployKey, 0, 50)
+
+        return {
+          summary,
+          targets: targetsPage.targets,
+        }
+      } catch (error) {
+        lastSummaryError = error
+
+        if (attempt < 2) {
+          await delay(350)
+        }
+      }
+    }
+
+    throw lastSummaryError
+  }
+
+  const buildCommonUiMessage = () => {
+    const uiMessage: Record<string, unknown> = {}
+
+    if (currentModelVersion) {
+      uiMessage.modelInfo = {
+        modelVersionKey: currentModelVersion.modelVersionKey,
+        modelName: currentModelVersion.modelName,
+        modelVersion: currentModelVersion.modelVersion,
+        modelKey: currentModelVersion.modelKey,
+      }
+    }
+
+    if (selectedBusinessJarOption) {
+      uiMessage.businessJar = {
+        jarRef: selectedBusinessJarOption.jarRef,
+        jarFileName: selectedBusinessJarOption.jarFileName,
+      }
+    }
+
+    return uiMessage
+  }
+
+  const buildTargetRequests = (
+    eqpItems: DeployRegisterTargetItem[] = selectedEqpItems,
+  ): Array<{
+    eqpId: string
+    uiMessageOverride?: Record<string, unknown> | null
+  }> =>
+    eqpItems.map((item) => {
+      const resolvedEqpParamVersion =
+        selectedEqpParamVersions[item.eqpId] ?? item.appliedParamVersion ?? null
+
+      return {
+        eqpId: item.eqpId,
+        ...(resolvedEqpParamVersion
+          ? {
+              uiMessageOverride: {
+                eqpParams: {
+                  version: resolvedEqpParamVersion,
+                },
+              },
+            }
+          : {}),
+      }
     })
-  }
 
-  const isScenarioRequiredError = (error: unknown): boolean => {
-    const message = getErrorMessage(error, '')
-    if (message.includes('resolvedScenarioCode')) {
-      return true
-    }
-
-    if (error instanceof DeployApiError) {
-      return error.payload.errorCode === 'INVALID_REQUEST' && message.includes('시나리오')
-    }
-
-    return message.includes('시나리오')
-  }
-
-  const buildDeployRequest = (resolvedScenarioCode?: string): DeployCreateRequest => {
+  const buildScenarioPreviewRequest = (): DeployRegisterScenarioPreviewRequest => {
     if (!selectedInterfaceType) {
       throw new Error('Deploy interfaceType 이 선택되지 않았습니다.')
     }
 
-    const resolvedScenarioPayload =
-      resolvedScenarioCode && resolvedScenarioCode !== EMPTY_SELECT_VALUE ? { resolvedScenarioCode } : {}
+    return {
+      commonRequest: {
+        interfaceType: selectedInterfaceType,
+        uiMessage: buildCommonUiMessage(),
+      },
+      targets: buildTargetRequests(),
+    }
+  }
+
+  const buildDeployRequest = (resolvedScenarioCode: string): DeployCreateRequest => {
+    if (!selectedInterfaceType) {
+      throw new Error('Deploy interfaceType 이 선택되지 않았습니다.')
+    }
 
     return {
-      deployName: createDeployName(currentModelVersion?.modelName ?? '', currentModelVersion?.modelVersion ?? ''),
+      deployName: createDeployName(deployNameContext.modelName, deployNameContext.modelVersion),
       eventType: DEPLOY_EVENT_TYPE,
       executionPolicy: 'BEST_EFFORT',
       commonRequest: {
         interfaceType: selectedInterfaceType,
-        uiMessage: {
-          modelInfo: {
-            modelVersionKey: currentModelVersion?.modelVersionKey,
-            modelName: currentModelVersion?.modelName,
-            modelVersion: currentModelVersion?.modelVersion,
-            modelKey: currentModelVersion?.modelKey,
-          },
-          ...(selectedBusinessJarOption
-            ? {
-                businessJar: {
-                  jarRef: selectedBusinessJarOption.jarRef,
-                  jarFileName: selectedBusinessJarOption.jarFileName,
-                },
-              }
-            : {}),
-        },
-        ...resolvedScenarioPayload,
+        uiMessage: buildCommonUiMessage(),
+        resolvedScenarioCode,
       },
-      targets: selectedEqpItems.map((item) => {
-        const resolvedEqpParamVersion =
-          selectedEqpParamVersions[item.eqpId] ?? item.appliedParamVersion ?? null
-
-        return {
-          eqpId: item.eqpId,
-          ...(resolvedEqpParamVersion
-            ? {
-                uiMessageOverride: {
-                  eqpParams: {
-                    version: resolvedEqpParamVersion,
-                  },
-                },
-              }
-            : {}),
-        }
-      }),
+      targets: buildTargetRequests(),
     }
   }
 
   const handleDeploy = async () => {
-    await executeDeploy()
+    if (selectedEqpItems.length === 0) {
+      setFeedbackMessage('설비를 먼저 선택해 주세요.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '설비를 먼저 선택해 주세요.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+      return
+    }
+
+    if (!selectedInterfaceType) {
+      setFeedbackMessage('서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+      return
+    }
+
+    if (selectedModelVersionKey !== null && !currentModelVersion) {
+      setFeedbackMessage('선택한 Model Version 정보를 확인할 수 없습니다.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '선택한 Model Version 정보를 확인할 수 없습니다.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+      return
+    }
+
+    try {
+      const preview = await previewScenarioMutation.mutateAsync(buildScenarioPreviewRequest())
+
+      if (preview.removedEqpIds.length > 0) {
+        removeSelectedEqps(preview.removedEqpIds)
+      }
+
+      if (preview.remainingEqpIds.length === 0) {
+        const emptyMessage = preview.recommendedReason || '변경 사항이 있는 설비가 없습니다.'
+        setFeedbackMessage(emptyMessage)
+        openDeployDialog({
+          isSuccess: false,
+          title: 'Deploy 생성 실패',
+          message: emptyMessage,
+          detail: null,
+          nextMode: null,
+          nextDeployKey: null,
+        })
+        return
+      }
+
+      const selectedScenarioCode =
+        preview.recommendedScenarioCode ?? preview.scenarios[0]?.code ?? ''
+
+      setScenarioDialogState({
+        isOpen: true,
+        selectedScenarioCode,
+        preview,
+      })
+      setFeedbackMessage(
+        preview.removedEqpIds.length > 0
+          ? `변경이 없는 설비 ${preview.removedEqpIds.length}대를 Selected Equipments에서 제외했습니다.`
+          : null,
+      )
+    } catch (error) {
+      const errorMessage = getErrorMessage(error, '시나리오 preview를 생성하지 못했습니다.')
+      setFeedbackMessage(errorMessage)
+      openDeployDialog({
+        isSuccess: false,
+        title: '시나리오 Preview 실패',
+        message: errorMessage,
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+    }
   }
 
   const handleDeployWithScenario = async () => {
     await executeDeploy(scenarioDialogState.selectedScenarioCode)
   }
 
-  const executeDeploy = async (resolvedScenarioCode?: string) => {
-    if (selectedEqpItems.length === 0 || selectedModelVersionKey === null) {
-      setFeedbackMessage('설비와 새 Model Version 을 모두 선택해 주세요.')
-      openDeployDialog(false, '설비와 새 Model Version 을 모두 선택해 주세요.')
+  const executeDeploy = async (resolvedScenarioCode: string) => {
+    if (selectedEqpItems.length === 0) {
+      setFeedbackMessage('변경 사항이 있는 설비가 없습니다.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '변경 사항이 있는 설비가 없습니다.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
       return
     }
 
     if (!selectedInterfaceType) {
       setFeedbackMessage('서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.')
-      openDeployDialog(false, '서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
       return
     }
 
-    if (!currentModelVersion) {
+    if (selectedModelVersionKey !== null && !currentModelVersion) {
       setFeedbackMessage('선택한 Model Version 정보를 확인할 수 없습니다.')
-      openDeployDialog(false, '선택한 Model Version 정보를 확인할 수 없습니다.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: '선택한 Model Version 정보를 확인할 수 없습니다.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+      return
+    }
+
+    if (!resolvedScenarioCode) {
+      setFeedbackMessage('Deploy 에 사용할 시나리오를 먼저 선택해 주세요.')
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: 'Deploy 에 사용할 시나리오를 먼저 선택해 주세요.',
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
       return
     }
 
@@ -427,34 +737,112 @@ export function DeployRegisterPanel() {
 
     try {
       const result = await createDeployMutation.mutateAsync(request)
-      setScenarioDialogState({
-        isOpen: false,
-        selectedScenarioCode: '',
-        message: '',
-      })
+      let resolvedSummary: DeploySummary | null = null
+      let resolvedTargets: DeployTargetItem[] = []
+      let snapshotLookupError: unknown = null
+
+      try {
+        const snapshot = await loadCreatedDeploySnapshot(result.deployKey)
+        resolvedSummary = snapshot.summary
+        resolvedTargets = snapshot.targets
+      } catch (error) {
+        snapshotLookupError = error
+      }
+
+      closeScenarioDialog()
       createServerDeployBridge({
         deployKey: result.deployKey,
-        deployStatus: result.deployStatus,
+        deployStatus: resolvedSummary?.deployStatus ?? result.deployStatus,
         requestedBy: meQuery.data?.userId?.trim() || 'SYSTEM',
-        selectedModelVersion: currentModelVersion.modelVersion,
+        selectedModelName: deployNameContext.modelName,
+        selectedModelVersion: deployNameContext.modelVersion,
         selectedBusinessJarName: selectedBusinessJarOption?.jarFileName ?? null,
+        eventType: DEPLOY_EVENT_TYPE,
+        targetCount: selectedEqpItems.length,
+        eqpIds: selectedEqpItems.map((item) => item.eqpId),
+        activateMode: false,
       })
-      const successMessage =
-        result.resultMessage?.message?.trim() ||
-        `${createDeployName(currentModelVersion.modelName, currentModelVersion.modelVersion)} 배포 요청이 생성되었습니다.`
-      resetRegisterLayouts()
-      openDeployDialog(true, successMessage)
-    } catch (error) {
-      const errorMessage = getErrorMessage(error, 'Deploy 생성에 실패했습니다.')
 
-      if (isScenarioRequiredError(error)) {
-        openScenarioDialog(errorMessage, resolvedScenarioCode)
-        setFeedbackMessage(errorMessage)
+      if (resolvedSummary) {
+        queryClient.setQueryData(deployQueryKeys.summary(result.deployKey), resolvedSummary)
+      }
+
+      if (resolvedTargets.length > 0) {
+        const targetsPayload = {
+          deployKey: result.deployKey,
+          page: 0,
+          size: 50,
+          totalElements: resolvedTargets.length,
+          totalPages: 1,
+          targets: resolvedTargets,
+        }
+        queryClient.setQueryData(deployQueryKeys.targets(result.deployKey, 0, 50), targetsPayload)
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: deployQueryKeys.all,
+        refetchType: 'active',
+      })
+
+      resetRegisterLayouts()
+
+      if (resolvedSummary && isFailedDeployOutcome(resolvedSummary, resolvedTargets)) {
+        const failureMessage =
+          resolvedSummary.resultMessage?.message?.trim() || 'Deploy 처리 중 오류가 발생했습니다.'
+        const failureDetail = resolveFailureDetail(resolvedTargets)
+
+        openDeployDialog({
+          isSuccess: false,
+          title: 'Deploy 처리 실패',
+          message: failureMessage,
+          detail: formatDeployDetail(result.deployKey, resolvedSummary.deployStatus, failureDetail),
+          nextMode: 'deploy',
+          nextDeployKey: result.deployKey,
+        })
         return
       }
 
+      if (snapshotLookupError) {
+        const acceptedMessage =
+          result.resultMessage?.message?.trim() || 'Deploy 탭에서 실행해 주세요.'
+
+        openDeployDialog({
+          isSuccess: true,
+          title: 'Deploy 생성 완료',
+          message: acceptedMessage,
+          detail: formatDeployDetail(
+            result.deployKey,
+            result.deployStatus,
+            '생성 직후 상세 조회에 실패했습니다. Deploy 탭에서 상태를 확인해 주세요.',
+          ),
+          nextMode: 'deploy',
+          nextDeployKey: result.deployKey,
+        })
+        return
+      }
+
+      openDeployDialog({
+        isSuccess: true,
+        title: 'Deploy 생성 완료',
+        message: result.resultMessage?.message?.trim() || 'Deploy 탭에서 실행해 주세요.',
+        detail: formatDeployDetail(
+          result.deployKey,
+          resolvedSummary?.deployStatus ?? result.deployStatus,
+        ),
+        nextMode: 'deploy',
+        nextDeployKey: result.deployKey,
+      })
+    } catch (error) {
+      const errorMessage = getErrorMessage(error, 'Deploy 생성에 실패했습니다.')
       setFeedbackMessage(errorMessage)
-      openDeployDialog(false, errorMessage)
+      openDeployDialog({
+        isSuccess: false,
+        title: 'Deploy 생성 실패',
+        message: errorMessage,
+        detail: getDeployErrorDetail(error),
+        nextMode: null,
+        nextDeployKey: null,
+      })
     }
   }
 
@@ -479,6 +867,10 @@ export function DeployRegisterPanel() {
   }
 
   const handleToggleSearchSelection = (eqpId: string) => {
+    if (registerTargetMap.get(eqpId)?.blockedByActiveDeploy) {
+      return
+    }
+
     setSearchSelectionIds((currentIds) =>
       currentIds.includes(eqpId)
         ? currentIds.filter((currentId) => currentId !== eqpId)
@@ -492,13 +884,17 @@ export function DeployRegisterPanel() {
       return
     }
 
-    const candidateItems = searchSelectionIds
-      .map((eqpId) => registerTargetMap.get(eqpId))
-      .filter((item): item is DeployRegisterTargetItem => Boolean(item))
+    if (addableSearchItems.length === 0) {
+      setSearchSelectionIds([])
+      setFeedbackMessage('active Deploy에 포함된 설비는 Selected Equipments에 추가할 수 없습니다.')
+      return
+    }
 
-    addSelectedEqps(candidateItems)
+    addSelectedEqps(addableSearchItems)
     setSearchSelectionIds([])
-    setFeedbackMessage('선택한 설비를 Selected Equipments에 추가했습니다. 중복 설비는 한 번만 유지됩니다.')
+    setFeedbackMessage(
+      '선택한 설비를 Selected Equipments에 추가했습니다. active 설비와 중복 설비는 제외됩니다.',
+    )
   }
 
   const handleChangeSelectedModelName = (nextModelName: string) => {
@@ -549,8 +945,8 @@ export function DeployRegisterPanel() {
     closeScenarioDialog()
   }
 
-  const openDeployDialog = (isSuccess: boolean, message: string) => {
-    setDeployDialogState({ isSuccess, message })
+  const openDeployDialog = (state: DeployDialogState) => {
+    setDeployDialogState(state)
   }
 
   return (
@@ -559,16 +955,14 @@ export function DeployRegisterPanel() {
         open={deployDialogState !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setDeployDialogState(null)
+            closeDeployDialog()
           }
         }}
       >
         {deployDialogState ? (
           <DialogContent className="max-w-[460px]">
             <DialogHeader>
-              <DialogTitle>
-                {deployDialogState.isSuccess ? 'Deploy 생성 성공' : 'Deploy 생성 실패'}
-              </DialogTitle>
+              <DialogTitle>{deployDialogState.title}</DialogTitle>
               <DialogDescription
                 className={
                   deployDialogState.isSuccess ? 'text-[#2D6B56]' : 'text-[#B33A33]'
@@ -577,13 +971,35 @@ export function DeployRegisterPanel() {
                 {deployDialogState.message}
               </DialogDescription>
             </DialogHeader>
+            {deployDialogState.detail ? (
+              <div className="rounded-xl bg-[#F6F9F7] px-4 py-3 text-sm whitespace-pre-line text-[#4D5D55]">
+                {deployDialogState.detail}
+              </div>
+            ) : null}
             <DialogFooter className="gap-2 sm:justify-end">
+              {deployDialogState.nextMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 rounded-full border-[#D8E1DB] bg-white px-4 text-[#54635D]"
+                  onClick={closeDeployDialog}
+                >
+                  닫기
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 className="h-9 rounded-full bg-[#243E33] px-4 text-white hover:bg-[#1D332B]"
-                onClick={() => setDeployDialogState(null)}
+                onClick={() =>
+                  deployDialogState.nextMode
+                    ? moveToNextMode(
+                        deployDialogState.nextMode,
+                        deployDialogState.nextDeployKey,
+                      )
+                    : closeDeployDialog()
+                }
               >
-                확인
+                {deployDialogState.nextMode ? 'Deploy 탭으로 이동' : '확인'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -598,78 +1014,123 @@ export function DeployRegisterPanel() {
           }
         }}
       >
-        <DialogContent className="max-w-[640px] rounded-2xl p-0">
+        <DialogContent className="max-w-[920px] rounded-2xl p-0">
           <div className="border-b border-[#EDF1EE] px-6 py-5">
             <DialogHeader className="p-0">
               <DialogTitle>시나리오 선택</DialogTitle>
               <DialogDescription className="text-[#56635C]">
-                변경 건에 맞는 시나리오를 선택하면 Deploy 가 생성됩니다.
+                권장 시나리오를 확인한 뒤 원하는 시나리오를 선택하면 Deploy 가 생성됩니다.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="space-y-4 px-6 py-5">
-            <p className="rounded-xl bg-[#F6F9F7] px-3 py-2 text-xs leading-5 text-[#47605C]">
-              {scenarioDialogState.message || '시나리오를 선택해 주세요.'}
-            </p>
+            {scenarioDialogState.preview ? (
+              <>
+                <div className="grid gap-3 rounded-xl bg-[#F6F9F7] p-4 text-sm text-[#47605C] md:grid-cols-2">
+                  <div>
+                    <p className="font-semibold text-[#243129]">배포 대상</p>
+                    <p className="mt-1">
+                      {scenarioDialogState.preview.remainingEqpIds.length}대
+                      {scenarioDialogState.preview.removedEqpIds.length > 0
+                        ? ` · 변경 없음 ${scenarioDialogState.preview.removedEqpIds.length}대 제외`
+                        : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#243129]">감지된 변경</p>
+                    <p className="mt-1">
+                      {formatChangeKinds(scenarioDialogState.preview.unionChangeKinds)}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="font-semibold text-[#243129]">권장 시나리오</p>
+                    <p className="mt-1">
+                      {scenarioDialogState.preview.recommendedScenarioCode ?? '권장 시나리오 없음'}
+                    </p>
+                    <p className="mt-1 text-xs text-[#5B6963]">
+                      {scenarioDialogState.preview.recommendedReason}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              {deployScenariosQuery.isLoading ? (
-                <div className="flex items-center justify-center rounded-xl border border-[#E5EDE9] bg-[#FAFCFB] py-10 text-sm text-[#62716A]">
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                  시나리오 목록을 불러오는 중입니다.
-                </div>
-              ) : deployScenariosQuery.isError ? (
-                <div className="rounded-xl border border-[#E5EDE9] bg-[#FFFAFA] p-3 text-sm text-[#B33A33]">
-                  {getErrorMessage(
-                    deployScenariosQuery.error,
-                    '시나리오 목록을 불러오지 못했습니다.',
-                  )}
-                </div>
-              ) : availableScenarios.length === 0 ? (
-                <div className="rounded-xl border border-[#E5EDE9] bg-[#F8FAF9] p-3 text-sm text-[#67716C]">
-                  사용 가능한 시나리오가 없습니다.
-                </div>
-              ) : (
-                availableScenarios.map((scenario: DeployScenarioSummary) => (
-                  <button
-                    key={scenario.code}
-                    type="button"
-                    onClick={() =>
-                      setScenarioDialogState((currentState) => ({
-                        ...currentState,
-                        selectedScenarioCode: scenario.code,
-                      }))
-                    }
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                      scenario.code === scenarioDialogState.selectedScenarioCode
-                        ? 'border-[#1B7A57] bg-[#ECF5F0]'
-                        : 'border-[#E3EAE6] bg-[#FFFFFF] hover:border-[#A9B9B1] hover:bg-[#F6FAF7]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-[#243129]">{scenario.name}</p>
-                        <p className="text-xs text-[#68726C]">
-                          {scenario.code} · v{scenario.version} · {scenario.stepCount}단계
-                        </p>
-                      </div>
-                      <span
-                        className={`ml-3 inline-flex size-5 items-center justify-center rounded-full border ${
-                          scenario.code === scenarioDialogState.selectedScenarioCode
-                            ? 'border-[#1B7A57] bg-[#1B7A57] text-white'
-                            : 'border-[#C4CEC8] text-transparent'
-                        }`}
-                        aria-hidden="true"
-                      >
-                        <Check className="size-3" />
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-[#5D6A63]">{scenario.summary}</p>
-                  </button>
-                ))
-              )}
-            </div>
+                {scenarioDialogState.preview.scenarios.length === 0 ? (
+                  <div className="rounded-xl border border-[#E5EDE9] bg-[#F8FAF9] p-3 text-sm text-[#67716C]">
+                    선택 가능한 시나리오가 없습니다.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-[14px] border border-[#E5EDE9]">
+                    <Table>
+                      <TableHeader className="bg-[#F6F8F6]">
+                        <TableRow className="hover:bg-[#F6F8F6]">
+                          <TableHead className="w-16 text-center">선택</TableHead>
+                          <TableHead className="w-20 text-center">권장</TableHead>
+                          <TableHead>시나리오명</TableHead>
+                          <TableHead>코드</TableHead>
+                          <TableHead>포함 변경</TableHead>
+                          <TableHead className="text-center">단계 수</TableHead>
+                          <TableHead>설명</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {scenarioDialogState.preview.scenarios.map((scenario) => (
+                          <TableRow
+                            key={scenario.code}
+                            className={
+                              scenario.code === scenarioDialogState.selectedScenarioCode
+                                ? 'bg-[#ECF5F0]'
+                                : undefined
+                            }
+                          >
+                            <TableCell className="text-center">
+                              <input
+                                type="radio"
+                                name="deploy-register-scenario"
+                                checked={scenario.code === scenarioDialogState.selectedScenarioCode}
+                                onChange={() =>
+                                  setScenarioDialogState((currentState) => ({
+                                    ...currentState,
+                                    selectedScenarioCode: scenario.code,
+                                  }))
+                                }
+                                className="size-4 accent-[#1C7F59]"
+                                aria-label={`${scenario.code} 선택`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {scenario.recommended ? (
+                                <span className="rounded-full bg-[#E8F3EC] px-2 py-1 text-xs font-medium text-[#1B7A57]">
+                                  권장
+                                </span>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium text-[#243129]">{scenario.name}</TableCell>
+                            <TableCell className="text-xs text-[#68726C]">{scenario.code}</TableCell>
+                            <TableCell className="text-xs text-[#52635C]">
+                              {formatChangeKinds(scenario.coversChangeKinds)}
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-[#52635C]">
+                              {scenario.stepCount}
+                            </TableCell>
+                            <TableCell className="text-xs text-[#5D6A63]">
+                              <p>{scenario.summary}</p>
+                              <p className="mt-1 text-[#7B8781]">{scenario.reason}</p>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center rounded-xl border border-[#E5EDE9] bg-[#FAFCFB] py-10 text-sm text-[#62716A]">
+                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                시나리오 preview 결과를 준비하고 있습니다.
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 border-t border-[#EDF1EE] px-6 py-4">
@@ -809,17 +1270,39 @@ export function DeployRegisterPanel() {
                   </TableRow>
                 ) : (
                   registerTargetItems.map((item) => (
-                    <TableRow key={item.eqpId}>
+                    <TableRow
+                      key={item.eqpId}
+                      className={item.blockedByActiveDeploy ? 'bg-[#FFF8EA]' : undefined}
+                    >
                       <TableCell className="text-center">
                         <input
                           type="checkbox"
-                          checked={searchSelectionIds.includes(item.eqpId)}
+                          checked={
+                            !item.blockedByActiveDeploy && searchSelectionIds.includes(item.eqpId)
+                          }
                           onChange={() => handleToggleSearchSelection(item.eqpId)}
+                          disabled={item.blockedByActiveDeploy}
                           className="size-4 accent-[#1C7F59]"
                           aria-label={`${item.eqpId} 선택`}
                         />
                       </TableCell>
-                      <TableCell>{item.eqpId}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{item.eqpId}</span>
+                          {item.blockedByActiveDeploy ? (
+                            <Badge variant="warning">
+                              {item.activeDeployStatus
+                                ? `ACTIVE ${item.activeDeployStatus}`
+                                : 'ACTIVE'}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {item.blockedByActiveDeploy ? (
+                          <p className="mt-1 text-xs text-[#A66518]">
+                            {formatActiveDeployHint(item) ?? '이미 active Deploy에 포함된 설비입니다.'}
+                          </p>
+                        ) : null}
+                      </TableCell>
                       <TableCell>{item.modelName ?? '-'}</TableCell>
                       <TableCell>
                         {item.modelVersion && item.modelStatus
@@ -844,6 +1327,7 @@ export function DeployRegisterPanel() {
               type="button"
               variant="outline"
               onClick={handleAddSelected}
+              disabled={addableSearchItems.length === 0}
               className="rounded-full border-[#D8E1DB] bg-white px-5 text-[#405149]"
             >
               Add to Selected
@@ -858,6 +1342,24 @@ export function DeployRegisterPanel() {
         <div className="border-b border-[#EDF1EE] px-6 py-4">
           <h2 className="text-sm font-semibold text-[#243129]">Selected Equipments</h2>
         </div>
+
+        {blockedSelectedEqpItems.length > 0 ? (
+          <div className="px-6 pt-5">
+            <div className="rounded-xl border border-[#F0D7A6] bg-[#FFF7E8] px-4 py-3 text-sm text-[#8A5A18]">
+              이미 active Deploy에 포함된 설비가 Selected Equipments에 남아 있습니다.
+              {' '}
+              서버에서 최종 차단되므로 제거 후 다시 시도해 주세요.
+              <ul className="mt-2 space-y-1 text-xs text-[#9A6520]">
+                {blockedSelectedEqpItems.map((item) => (
+                  <li key={`blocked-selected-${item.eqpId}`}>
+                    {item.eqpId}
+                    {formatActiveDeployHint(item) ? ` · ${formatActiveDeployHint(item)}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
 
         <div className="overflow-x-auto px-6 py-5">
           <Table>
@@ -904,13 +1406,17 @@ export function DeployRegisterPanel() {
               onClick={() => void handleDeploy()}
               disabled={
                 createDeployMutation.isPending ||
+                previewScenarioMutation.isPending ||
                 selectedEqpItems.length === 0 ||
-                selectedInterfaceType === null ||
-                selectedModelVersionKey === null
+                selectedInterfaceType === null
               }
               className="h-10 rounded-xl bg-[#243E33] px-5 text-white hover:bg-[#1D332B]"
             >
-              {createDeployMutation.isPending ? 'Deploy 중...' : 'Deploy'}
+              {previewScenarioMutation.isPending
+                ? '시나리오 확인 중...'
+                : createDeployMutation.isPending
+                  ? 'Deploy 중...'
+                  : 'Deploy'}
             </Button>
             <Button
               type="button"

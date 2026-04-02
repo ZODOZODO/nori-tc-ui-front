@@ -1,18 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { deployApi } from '../api/deploy.api'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
+import type { DeployStatus } from '../types/deploy.types'
 
 /**
  * 활성 Deploy summary를 polling 합니다.
  */
-export function useDeploySummary(deployKey: number | null, enabled = true) {
+export function useDeploySummary(
+  deployKey: number | null,
+  enabled = true,
+  activeDeployStatus: DeployStatus | null = null,
+) {
   return useQuery({
     queryKey: deployKey === null ? deployQueryKeys.all : deployQueryKeys.summary(deployKey),
     queryFn: () => deployApi.getDeploySummary(deployKey as number),
     enabled: enabled && deployKey !== null,
     refetchInterval: (query) => {
       const summary = query.state.data
-      if (!summary || summary.terminal) {
+      const resolvedStatus = summary?.deployStatus ?? activeDeployStatus
+
+      if (!enabled || !resolvedStatus || resolvedStatus !== 'RUNNING' || summary?.terminal) {
         return false
       }
       return 3000

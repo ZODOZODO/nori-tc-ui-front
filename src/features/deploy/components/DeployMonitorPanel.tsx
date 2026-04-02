@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -22,9 +31,10 @@ import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployHistoryList } from '../hooks/useDeployHistoryList'
 import { useDeploySummary } from '../hooks/useDeploySummary'
 import { useDeployTargets } from '../hooks/useDeployTargets'
-import { useCancelDeploy } from '../hooks/useCancelDeploy'
 import { useDeleteDeploy } from '../hooks/useDeleteDeploy'
+import { useHoldDeploy } from '../hooks/useHoldDeploy'
 import { useRedeployDeploy } from '../hooks/useRedeployDeploy'
+import { useStartDeploy } from '../hooks/useStartDeploy'
 import { useMe, useUsers } from '@/features/profile/hooks/useProfile'
 import { createDefaultMonitorFilters, useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployHistoryItem, DeployStatus } from '../types/deploy.types'
@@ -34,6 +44,11 @@ interface DeployMonitorPanelProps {
 }
 
 type FeedbackTone = 'info' | 'success' | 'error'
+type DeleteDialogState = {
+  deployKey: number
+  deployName: string
+  deleteHistory: boolean
+} | null
 
 const cardClassName =
   'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
@@ -92,6 +107,12 @@ const isTerminalHistoryItem = (item: DeployHistoryItem): boolean =>
   item.deployStatus === 'PARTIAL_FAILED' ||
   item.deployStatus === 'FAILED' ||
   item.deployStatus === 'CANCELED'
+
+const isServerDeleteAllowed = (item: DeployHistoryItem | null): boolean =>
+  item !== null &&
+  (item.deployStatus === 'PLANNING' ||
+    item.deployStatus === 'READY' ||
+    isTerminalHistoryItem(item))
 
 const matchesMonitorFilters = (
   item: DeployHistoryItem,
@@ -169,6 +190,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const deployListOffset = useDeployUiStore((state) => state.deployListOffset)
   const historyListOffset = useDeployUiStore((state) => state.historyListOffset)
   const serverBackedDeployKeys = useDeployUiStore((state) => state.serverBackedDeployKeys)
+  const localTargetsByDeployKey = useDeployUiStore((state) => state.localTargetsByDeployKey)
   const monitorFilters = useDeployUiStore((state) => state.monitorFilters)
   const setMonitorFilters = useDeployUiStore((state) => state.setMonitorFilters)
   const resetMonitorFilters = useDeployUiStore((state) => state.resetMonitorFilters)
@@ -187,7 +209,8 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const meQuery = useMe(true)
   const monitorOptionsQuery = useDeployRegisterOptions()
   const userListQuery = useUsers(true)
-  const cancelDeployMutation = useCancelDeploy()
+  const startDeployMutation = useStartDeploy()
+  const holdDeployMutation = useHoldDeploy()
   const redeployDeployMutation = useRedeployDeploy()
   const deleteDeployMutation = useDeleteDeploy()
 
@@ -197,6 +220,8 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const [draftToDate, setDraftToDate] = useState(monitorFilters.toDate)
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>('info')
+  const [commentDeployKey, setCommentDeployKey] = useState<number | null>(null)
+  const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState>(null)
 
   const modelOptions = useMemo(() => {
     const mergedModelVersionOptions = mergeModelOptions(
@@ -301,14 +326,48 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const isServerBackedRow = (deployKey: number) =>
     serverHistoryKeySet.has(deployKey) || serverBackedDeployKeys.includes(deployKey)
 
+  const commentHistoryItem = useMemo(
+    () => resolvedHistoryItems.find((item) => item.deployKey === commentDeployKey) ?? null,
+    [commentDeployKey, resolvedHistoryItems],
+  )
+  const isCommentServerBacked =
+    commentHistoryItem !== null && isServerBackedRow(commentHistoryItem.deployKey)
+  const commentTargetPageSize = Math.max(commentHistoryItem?.targetSummary.total ?? 0, 50)
+
   const isActiveServerDeploy =
     activeDeployKey !== null &&
     isServerBackedRow(activeDeployKey) &&
     !historyOnly &&
     !activeHistoryItem?.terminal
 
-  const deploySummaryQuery = useDeploySummary(activeDeployKey, isActiveServerDeploy)
-  const deployTargetsQuery = useDeployTargets(activeDeployKey, isActiveServerDeploy)
+  const deploySummaryQuery = useDeploySummary(
+    activeDeployKey,
+    isActiveServerDeploy,
+    activeHistoryItem?.deployStatus ?? null,
+  )
+  const deployTargetsQuery = useDeployTargets(
+    activeDeployKey,
+    isActiveServerDeploy,
+    0,
+    50,
+    null,
+    null,
+    activeHistoryItem?.deployStatus ?? null,
+  )
+  const commentSummaryQuery = useDeploySummary(
+    commentDeployKey,
+    commentDeployKey !== null && isCommentServerBacked,
+    commentHistoryItem?.deployStatus ?? null,
+  )
+  const commentTargetsQuery = useDeployTargets(
+    commentDeployKey,
+    commentDeployKey !== null && isCommentServerBacked,
+    0,
+    commentTargetPageSize,
+    null,
+    null,
+    commentHistoryItem?.deployStatus ?? null,
+  )
 
   useEffect(() => {
     if (deployHistoryQuery.isSuccess) {
@@ -396,6 +455,46 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     userListQuery.isError && userListQuery.error instanceof Error
       ? userListQuery.error.message
       : null
+  const commentSummaryErrorMessage =
+    commentSummaryQuery.isError && commentSummaryQuery.error instanceof Error
+      ? commentSummaryQuery.error.message
+      : commentSummaryQuery.isError
+        ? 'Deploy 상세 정보를 조회하지 못했습니다.'
+        : null
+  const commentTargetsErrorMessage =
+    commentTargetsQuery.isError && commentTargetsQuery.error instanceof Error
+      ? commentTargetsQuery.error.message
+      : commentTargetsQuery.isError
+        ? 'Deploy 실패 상세를 조회하지 못했습니다.'
+        : null
+  const commentTargets = useMemo(() => {
+    if (commentDeployKey === null) {
+      return []
+    }
+
+    if (isCommentServerBacked) {
+      return commentTargetsQuery.data?.targets ?? []
+    }
+
+    return localTargetsByDeployKey[commentDeployKey] ?? []
+  }, [commentDeployKey, commentTargetsQuery.data?.targets, isCommentServerBacked, localTargetsByDeployKey])
+  const commentFailureTargets = useMemo(
+    () =>
+      [...commentTargets]
+        .filter(
+          (target) =>
+            target.targetStatus === 'FAILED' ||
+            target.targetStatus === 'COMPENSATION_FAILED' ||
+            Boolean(target.lastErrorCode) ||
+            Boolean(target.lastErrorMessage),
+        )
+        .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)),
+    [commentTargets],
+  )
+  const commentResultMessage = commentSummaryQuery.data?.resultMessage?.message?.trim() ?? null
+  const commentResultTitle = commentSummaryQuery.data?.resultMessage?.title?.trim() ?? null
+  const isCommentLoading =
+    isCommentServerBacked && (commentSummaryQuery.isPending || commentTargetsQuery.isPending)
 
   const serverTotalCount = deployHistoryQuery.data?.count ?? 0
   const displayTotalCount = serverTotalCount + bridgeHistoryItems.length
@@ -455,15 +554,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           interfaceType: sourceHistoryItem?.interfaceType ?? null,
           targetCount: sourceHistoryItem?.targetSummary.total ?? 0,
         })
-        setMode(
-          result.deployStatus === 'COMPLETED' ||
-            result.deployStatus === 'PARTIAL_FAILED' ||
-            result.deployStatus === 'FAILED' ||
-            result.deployStatus === 'CANCELED'
-            ? 'history'
-            : 'deploy',
+        setMode('deploy')
+        setFeedbackMessage(
+          result.resultMessage?.message || '새 Deploy를 생성했습니다. Deploy 탭에서 실행해 주세요.',
         )
-        setFeedbackMessage(result.resultMessage?.message || '선택한 Deploy를 다시 실행했습니다.')
         setFeedbackTone('success')
       } catch (error) {
         setFeedbackMessage(
@@ -482,19 +576,49 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       return
     }
 
-    setFeedbackMessage(`Deploy #${nextDeployKey} 를 로컬 항목으로 다시 생성했습니다.`)
+    setMode('deploy')
+    setFeedbackMessage(`Deploy #${nextDeployKey} 를 대기 상태 로컬 항목으로 다시 생성했습니다.`)
     setFeedbackTone('success')
   }
 
-  const handleDelete = async (deployKey: number) => {
-    if (isServerBackedRow(deployKey)) {
-      if (!historyOnly) {
-        setFeedbackMessage('진행 중 Deploy 는 삭제할 수 없습니다.')
-        setFeedbackTone('error')
-        return
-      }
+  const handleRequestDelete = (deployKey: number) => {
+    const targetHistoryItem =
+      resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
 
-      if (!window.confirm('선택한 Deploy 이력을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+    if (targetHistoryItem === null) {
+      setFeedbackMessage('선택한 Deploy 정보를 찾을 수 없습니다.')
+      setFeedbackTone('error')
+      return
+    }
+
+    if (isServerBackedRow(deployKey) && !isServerDeleteAllowed(targetHistoryItem)) {
+      setFeedbackMessage('실행 중 Deploy 는 삭제할 수 없습니다.')
+      setFeedbackTone('error')
+      return
+    }
+
+    setDeleteDialogState({
+      deployKey,
+      deployName: targetHistoryItem.deployName,
+      deleteHistory: historyOnly || targetHistoryItem.terminal,
+    })
+  }
+
+  const handleDelete = async () => {
+    if (deleteDialogState === null) {
+      return
+    }
+
+    const deployKey = deleteDialogState.deployKey
+
+    if (isServerBackedRow(deployKey)) {
+      const targetHistoryItem =
+        resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
+
+      if (targetHistoryItem === null) {
+        setFeedbackMessage('선택한 Deploy 정보를 찾을 수 없습니다.')
+        setFeedbackTone('error')
+        setDeleteDialogState(null)
         return
       }
 
@@ -504,12 +628,11 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         if (activeDeployKey === deployKey) {
           setActiveDeployKey(null)
         }
-        setFeedbackMessage(result.resultMessage?.message || `Deploy #${deployKey} 이력을 삭제했습니다.`)
+        setFeedbackMessage(result.resultMessage?.message || `Deploy #${deployKey} 항목을 삭제했습니다.`)
         setFeedbackTone('success')
+        setDeleteDialogState(null)
       } catch (error) {
-        setFeedbackMessage(
-          error instanceof Error ? error.message : 'Deploy 이력 삭제에 실패했습니다.',
-        )
+        setFeedbackMessage(error instanceof Error ? error.message : 'Deploy 삭제에 실패했습니다.')
         setFeedbackTone('error')
       }
       return
@@ -518,26 +641,41 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     deleteLocalDeploy(deployKey)
     setFeedbackMessage(`Deploy #${deployKey} 항목을 목록에서 제거했습니다.`)
     setFeedbackTone('success')
+    setDeleteDialogState(null)
   }
 
-  const handleCancel = async (deployKey: number) => {
+  const handleStart = async (deployKey: number) => {
     if (!isServerBackedRow(deployKey) || historyOnly) {
       return
     }
 
-    if (!window.confirm('진행 중 Deploy를 취소하시겠습니까?')) {
+    try {
+      const result = await startDeployMutation.mutateAsync(deployKey)
+      if (result.deployStatus) {
+        markDeployStatus(deployKey, result.deployStatus, result.pauseRequested ?? false)
+      }
+      setFeedbackMessage(result.resultMessage?.message || 'Deploy를 시작했습니다.')
+      setFeedbackTone('success')
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : 'Deploy 실행에 실패했습니다.')
+      setFeedbackTone('error')
+    }
+  }
+
+  const handleHold = async (deployKey: number) => {
+    if (!isServerBackedRow(deployKey) || historyOnly) {
       return
     }
 
     try {
-      const result = await cancelDeployMutation.mutateAsync(deployKey)
+      const result = await holdDeployMutation.mutateAsync(deployKey)
       if (result.deployStatus) {
-        markDeployStatus(deployKey, result.deployStatus)
+        markDeployStatus(deployKey, result.deployStatus, result.pauseRequested ?? true)
       }
-      setFeedbackMessage(result.resultMessage?.message || 'Deploy를 취소했습니다.')
+      setFeedbackMessage(result.resultMessage?.message || 'Hold 요청이 접수되었습니다.')
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : 'Deploy 취소에 실패했습니다.')
+      setFeedbackMessage(error instanceof Error ? error.message : 'Deploy hold 요청에 실패했습니다.')
       setFeedbackTone('error')
     }
   }
@@ -546,8 +684,175 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setMonitorListOffset(historyOnly, nextOffset)
   }
 
+  const handleOpenComment = (deployKey: number) => {
+    setActiveDeployKey(deployKey)
+    setCommentDeployKey(deployKey)
+  }
+
   return (
     <div className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6">
+      <ConfirmDialog
+        open={deleteDialogState !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialogState(null)
+          }
+        }}
+        title={
+          deleteDialogState?.deleteHistory
+            ? 'Deploy 이력을 삭제하시겠습니까?'
+            : 'Deploy 를 삭제하시겠습니까?'
+        }
+        description={
+          deleteDialogState
+            ? `${deleteDialogState.deployName} (#${deleteDialogState.deployKey}) 항목이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
+            : undefined
+        }
+        confirmText="삭제"
+        cancelText="취소"
+        confirmVariant="destructive"
+        isConfirming={deleteDeployMutation.isPending}
+        onConfirm={() => void handleDelete()}
+      />
+
+      <Dialog
+        open={commentDeployKey !== null && commentHistoryItem !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCommentDeployKey(null)
+          }
+        }}
+      >
+        {commentHistoryItem ? (
+          <DialogContent className="max-h-[85vh] max-w-[920px] overflow-hidden rounded-2xl p-0">
+            <div className="flex max-h-[85vh] flex-col">
+              <DialogHeader className="border-b border-[#EDF1EE] px-6 py-5">
+                <DialogTitle className="flex flex-wrap items-center gap-2 text-[#243129]">
+                  <span>Deploy Comment</span>
+                  <span className="text-sm font-medium text-[#607067]">#{commentHistoryItem.deployKey}</span>
+                  <Badge variant={resolveStatusVariant(commentHistoryItem.deployStatus)}>
+                    {commentHistoryItem.deployStatus}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-sm text-[#56635C]">
+                  선택한 deploy의 실패 사유와 target 상세를 확인합니다.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">Deploy</p>
+                    <p className="mt-2 text-base font-semibold text-[#243129]">
+                      {commentHistoryItem.deployName}
+                    </p>
+                    <div className="mt-3 space-y-1 text-sm text-[#526058]">
+                      <p>요청자: {commentHistoryItem.requestedBy}</p>
+                      <p>생성 시각: {formatDateTime(commentHistoryItem.createdAt)}</p>
+                      <p>시작 시각: {formatDateTime(commentHistoryItem.startedAt)}</p>
+                      <p>종료 시각: {formatDateTime(commentHistoryItem.finishedAt)}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">요약</p>
+                    <div className="mt-3 grid gap-2 text-sm text-[#526058] sm:grid-cols-2">
+                      <p>전체 대상: {commentHistoryItem.targetSummary.total}대</p>
+                      <p>완료: {commentHistoryItem.targetSummary.completed}대</p>
+                      <p>실패: {commentHistoryItem.targetSummary.failed}대</p>
+                      <p>보상 실패: {commentHistoryItem.targetSummary.compensationFailed}대</p>
+                    </div>
+                    {commentHistoryItem.selectedModelName || commentHistoryItem.selectedModelVersion ? (
+                      <p className="mt-3 text-sm text-[#526058]">
+                        모델: {commentHistoryItem.selectedModelName ?? '-'} /{' '}
+                        {commentHistoryItem.selectedModelVersion ?? '-'}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {isCommentLoading ? (
+                  <div className="mt-4 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
+                    실패 상세를 불러오고 있습니다.
+                  </div>
+                ) : null}
+                {commentSummaryErrorMessage ? (
+                  <div className="mt-4 rounded-2xl border border-[#F4D5D2] bg-[#FFF7F6] px-4 py-3 text-sm text-[#B33A33]">
+                    {commentSummaryErrorMessage}
+                  </div>
+                ) : null}
+                {commentTargetsErrorMessage ? (
+                  <div className="mt-4 rounded-2xl border border-[#F4D5D2] bg-[#FFF7F6] px-4 py-3 text-sm text-[#B33A33]">
+                    {commentTargetsErrorMessage}
+                  </div>
+                ) : null}
+                {commentResultMessage || commentResultTitle || commentSummaryQuery.data?.resultCode ? (
+                  <div className="mt-4 rounded-2xl border border-[#E3EADF] bg-[#F8FBF9] p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">배포 결과</p>
+                    <div className="mt-2 space-y-1 text-sm text-[#425149]">
+                      {commentResultTitle ? <p className="font-semibold text-[#243129]">{commentResultTitle}</p> : null}
+                      {commentSummaryQuery.data?.resultCode ? (
+                        <p>결과 코드: {commentSummaryQuery.data.resultCode}</p>
+                      ) : null}
+                      {commentResultMessage ? (
+                        <p className="whitespace-pre-wrap break-words">{commentResultMessage}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#243129]">실패 대상 상세</p>
+                    <p className="text-xs text-[#6C7B72]">{commentFailureTargets.length}건</p>
+                  </div>
+
+                  {commentFailureTargets.length === 0 ? (
+                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
+                      확인 가능한 실패 사유가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {commentFailureTargets.map((target) => (
+                        <div
+                          key={target.deployTargetKey}
+                          className="rounded-2xl border border-[#E7EDE8] bg-white p-4 shadow-[0_10px_24px_-24px_rgba(30,54,40,0.35)]"
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-[#243129]">{target.eqpId}</p>
+                              <Badge variant="warning">{target.targetStatus}</Badge>
+                              {target.currentStepStatus ? (
+                                <Badge variant="secondary">{target.currentStepStatus}</Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-[#6C7B72]">갱신: {formatDateTime(target.updatedAt)}</p>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 text-sm text-[#526058]">
+                            <p>현재 Step: {target.currentStepCode}</p>
+                            <p>오류 코드: {target.lastErrorCode || '-'}</p>
+                            <p className="whitespace-pre-wrap break-words">
+                              오류 메시지: {target.lastErrorMessage || '상세 메시지가 기록되지 않았습니다.'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-[#EDF1EE] px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setCommentDeployKey(null)}>
+                  닫기
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
       <section className={cardClassName}>
         <div className="border-b border-[#EDF1EE] px-6 py-4">
           <h2 className="text-sm font-semibold text-[#243129]">
@@ -669,10 +974,15 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                 <Badge variant={resolveStatusVariant(activeHistoryItem.deployStatus)}>
                   {activeHistoryItem.deployStatus}
                 </Badge>
+                {activeHistoryItem.pauseRequested ? (
+                  <Badge variant="warning">Hold 요청됨</Badge>
+                ) : null}
                 <Badge variant={isServerBackedRow(activeHistoryItem.deployKey) ? 'info' : 'secondary'}>
                   {isServerBackedRow(activeHistoryItem.deployKey) ? 'SERVER' : 'LOCAL'}
                 </Badge>
-                {isServerBackedRow(activeHistoryItem.deployKey) && !activeHistoryItem.terminal ? (
+                {isServerBackedRow(activeHistoryItem.deployKey) &&
+                !activeHistoryItem.terminal &&
+                activeHistoryItem.deployStatus === 'RUNNING' ? (
                   <span>
                     {deploySummaryQuery.isFetching || deployTargetsQuery.isFetching
                       ? '실시간 상태 동기화 중...'
@@ -739,7 +1049,12 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                       </TableCell>
                       <TableCell>{item.eventType}</TableCell>
                       <TableCell>
-                        <Badge variant={resolveStatusVariant(item.deployStatus)}>{item.deployStatus}</Badge>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={resolveStatusVariant(item.deployStatus)}>{item.deployStatus}</Badge>
+                          {item.pauseRequested ? (
+                            <Badge variant="warning">Hold 요청됨</Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>{item.targetSummary.total}</TableCell>
                       <TableCell>{item.targetSummary.completed}</TableCell>
@@ -755,24 +1070,49 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                       <ContextMenuContent className="w-40">
                         {historyOnly ? (
                           <>
+                            <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                              Comment
+                            </ContextMenuItem>
                             <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
                               Redeploy
                             </ContextMenuItem>
                             <ContextMenuItem
                               variant="destructive"
-                              onSelect={() => void handleDelete(item.deployKey)}
+                              onSelect={() => handleRequestDelete(item.deployKey)}
                             >
                               Delete
                             </ContextMenuItem>
                           </>
                         ) : isServerBackedRow(item.deployKey) ? (
-                          <ContextMenuItem
-                            disabled={item.terminal}
-                            variant="destructive"
-                            onSelect={() => void handleCancel(item.deployKey)}
-                          >
-                            Cancel
-                          </ContextMenuItem>
+                          item.deployStatus === 'READY' ? (
+                            <>
+                              <ContextMenuItem onSelect={() => void handleStart(item.deployKey)}>
+                                Deploy
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                variant="destructive"
+                                onSelect={() => handleRequestDelete(item.deployKey)}
+                              >
+                                Delete
+                              </ContextMenuItem>
+                            </>
+                          ) : item.deployStatus === 'PLANNING' ? (
+                            <ContextMenuItem
+                              variant="destructive"
+                              onSelect={() => handleRequestDelete(item.deployKey)}
+                            >
+                              Delete
+                            </ContextMenuItem>
+                          ) : item.deployStatus === 'RUNNING' ? (
+                            <ContextMenuItem
+                              disabled={item.pauseRequested}
+                              onSelect={() => void handleHold(item.deployKey)}
+                            >
+                              {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
+                            </ContextMenuItem>
+                          ) : (
+                            <ContextMenuItem disabled>동작 없음</ContextMenuItem>
+                          )
                         ) : (
                           <>
                             <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
@@ -780,7 +1120,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                             </ContextMenuItem>
                             <ContextMenuItem
                               variant="destructive"
-                              onSelect={() => void handleDelete(item.deployKey)}
+                              onSelect={() => handleRequestDelete(item.deployKey)}
                             >
                               Delete
                             </ContextMenuItem>

@@ -41,6 +41,8 @@ export const deployQueryKeys = {
     ] as const,
   summary: (deployKey: number) => ['deploy', 'summary', deployKey] as const,
   scenarios: (eventType: string) => ['deploy', 'scenarios', eventType] as const,
+  registerScenarioPreview: (eqpIds: string[], interfaceType: string | null) =>
+    ['deploy', 'register-scenario-preview', interfaceType, ...eqpIds] as const,
   targets: (
     deployKey: number,
     page = 0,
