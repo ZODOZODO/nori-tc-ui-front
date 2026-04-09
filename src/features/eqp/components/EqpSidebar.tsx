@@ -17,16 +17,21 @@ import { groupEqpItems } from '../utils/eqp-group.util'
 interface EqpSidebarProps {
   eqpItems: EqpInfo[]
   selectedEqpId: string | null
+  isGatewaySelected: boolean
+  isBusinessSelected: boolean
+  selectedBusinessGroupIndex: number | null
   selectedGroupIndex: number | null
   sidebarOpen: boolean
   sidebarWidth: number
   isLoading: boolean
   errorMessage: string | null
   onSelectEqp: (eqpId: string) => void
+  onSelectGatewayAll: () => void
+  onSelectBusinessAll: () => void
   onSelectGatewayGroup: (groupIndex: number) => void
+  onSelectBusinessGroup: (groupIndex: number) => void
   onOpenEqpInfoUpdate: (eqpId: string) => void
   onOpenEqpModelBinding: (eqpId: string) => void
-  onOpenEqpParamVersion: (eqpId: string) => void
   onOpenEqpDelete: (eqpId: string) => void
   onOpenEqpCreate: (interfaceType: ProtocolType) => void
   onToggleSidebar: () => void
@@ -37,23 +42,28 @@ interface EqpSidebarProps {
  * design.pen의 EqpSidebarExpanded/Collapsed 구조를 기반으로 만든 사이드바입니다.
  * 실제 EQP 데이터는 useEqpList 결과를 사용하고, 검색은 eqpId 기준으로 필터링합니다.
  *
- * gateway_app 그룹명은 클릭 가능한 버튼으로 표시되며, 클릭 시 onSelectGatewayGroup 콜백을 호출합니다.
+ * Gateway / gateway_app 그룹명은 클릭 가능한 버튼으로 표시됩니다.
  * 그룹화 로직은 eqp-group.util.ts의 groupEqpItems 함수를 사용합니다.
  * self-stretch를 통해 부모 flex 컨테이너 높이 전체를 항상 채웁니다.
  */
 export function EqpSidebar({
   eqpItems,
   selectedEqpId,
+  isGatewaySelected,
+  isBusinessSelected,
+  selectedBusinessGroupIndex,
   selectedGroupIndex,
   sidebarOpen,
   sidebarWidth,
   isLoading,
   errorMessage,
   onSelectEqp,
+  onSelectGatewayAll,
+  onSelectBusinessAll,
   onSelectGatewayGroup,
+  onSelectBusinessGroup,
   onOpenEqpInfoUpdate,
   onOpenEqpModelBinding,
-  onOpenEqpParamVersion,
   onOpenEqpDelete,
   onOpenEqpCreate,
   onToggleSidebar,
@@ -75,7 +85,7 @@ export function EqpSidebar({
    * 검색 필터 후 groupEqpItems 유틸로 그룹화합니다.
    * 검색 결과 기준으로 그룹이 재계산됩니다.
    */
-  const { gatewayGroups, unassignedEqpItems } = useMemo(
+  const { gatewayGroups, businessGroups } = useMemo(
     () => groupEqpItems(filteredEqpItems),
     [filteredEqpItems],
   )
@@ -113,9 +123,6 @@ export function EqpSidebar({
           </ContextMenuItem>
           <ContextMenuItem onSelect={() => onOpenEqpModelBinding(eqp.eqpId)}>
             Model Info Update
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => onOpenEqpParamVersion(eqp.eqpId)}>
-            Eqp Parameter Update
           </ContextMenuItem>
           <ContextMenuItem variant="destructive" onSelect={() => onOpenEqpDelete(eqp.eqpId)}>
             Eqp Delete
@@ -178,49 +185,86 @@ export function EqpSidebar({
 
           <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-3">
             <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
-              <div className="mb-1 text-xs font-semibold text-[#315343]">Business</div>
+              <button
+                type="button"
+                onClick={onSelectBusinessAll}
+                className={cn(
+                  'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                  isBusinessSelected
+                    ? 'bg-[#EAF5EE] text-[#1F2D26]'
+                    : 'text-[#315343] hover:bg-[#F1F6F3]',
+                )}
+              >
+                Business
+              </button>
               <div className="space-y-1 pl-2">
-                {unassignedEqpItems.length === 0 ? (
-                  <p className="py-1 text-[11px] text-[#97A39C]">표시할 설비가 없습니다.</p>
+                {businessGroups.length === 0 ? (
+                  <p className="py-1 text-[11px] text-[#97A39C]">표시할 비즈니스 그룹이 없습니다.</p>
                 ) : (
-                  unassignedEqpItems.map((eqp) => renderEqpNode(eqp, `business-${eqp.eqpId}`))
+                  businessGroups.map((group) => (
+                    <div key={group.appName} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelectBusinessGroup(group.appIndex)}
+                        className={cn(
+                          'w-full rounded-md px-2 py-1 text-left text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                          selectedBusinessGroupIndex === group.appIndex
+                            ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
+                            : 'text-[#51605A] hover:bg-[#F1F6F3]',
+                        )}
+                      >
+                        {group.appName}
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </section>
 
             <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
-                  <div className="mb-1 text-xs font-semibold text-[#315343]">Gateway</div>
-                  <div className="space-y-1 pl-2">
-                    {gatewayGroups.length === 0 ? (
-                      <p className="py-1 text-[11px] text-[#97A39C]">표시할 게이트웨이 그룹이 없습니다.</p>
-                    ) : (
-                      gatewayGroups.map((group) => (
-                        <div key={group.appName} className="space-y-1">
-                          <button
-                            type="button"
-                            onClick={() => onSelectGatewayGroup(group.appIndex)}
-                            className={cn(
-                              'w-full rounded-md px-2 py-1 text-left text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
-                              selectedGroupIndex === group.appIndex
-                                ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
-                                : 'text-[#51605A] hover:bg-[#F1F6F3]',
-                            )}
-                          >
-                            {group.appName}
-                          </button>
-                          <div className="space-y-1 pl-3">
-                            {group.items.map((eqp) =>
-                              renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                            )}
-                          </div>
-                        </div>
-                      ))
+              <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
+                <ContextMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onSelectGatewayAll}
+                    className={cn(
+                      'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                      isGatewaySelected
+                        ? 'bg-[#EAF5EE] text-[#1F2D26]'
+                        : 'text-[#315343] hover:bg-[#F1F6F3]',
                     )}
-                  </div>
-                </section>
-              </ContextMenuTrigger>
+                  >
+                    Gateway
+                  </button>
+                </ContextMenuTrigger>
+                <div className="space-y-1 pl-2">
+                  {gatewayGroups.length === 0 ? (
+                    <p className="py-1 text-[11px] text-[#97A39C]">표시할 게이트웨이 그룹이 없습니다.</p>
+                  ) : (
+                    gatewayGroups.map((group) => (
+                      <div key={group.appName} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => onSelectGatewayGroup(group.appIndex)}
+                          className={cn(
+                            'w-full rounded-md px-2 py-1 text-left text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                            selectedGroupIndex === group.appIndex
+                              ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
+                              : 'text-[#51605A] hover:bg-[#F1F6F3]',
+                          )}
+                        >
+                          {group.appName}
+                        </button>
+                        <div className="space-y-1 pl-3">
+                          {group.items.map((eqp) =>
+                            renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel>Gateway</ContextMenuLabel>
                 <ContextMenuSeparator />

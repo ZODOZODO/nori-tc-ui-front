@@ -71,6 +71,11 @@ interface WorkflowTextEditorState {
   columnName: string
 }
 
+interface WorkflowMessageOption {
+  value: string
+  label: string
+}
+
 interface ModelDetailPanelProps {
   openedTabs: ModelOpenedTab[]
   activeTab: number | null
@@ -656,11 +661,33 @@ export function ModelDetailPanel({
     () => mesMessageQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
     [mesMessageQuery.data?.rows],
   )
-  // SECS/Socket Message 이름과 MES Message 이름을 합친 드롭다운 옵션
-  const allMessageOptions = useMemo(
-    () => [...workflowMessageOptions, ...mesMessageOptions],
-    [workflowMessageOptions, mesMessageOptions],
-  )
+  // 동일 message 이름이 여러 출처에 있으면 저장값은 그대로 두고 라벨만 병합해 보여 줍니다.
+  const allMessageOptions = useMemo<WorkflowMessageOption[]>(() => {
+    const sortedWorkflowMessageOptions = [...workflowMessageOptions].sort((firstItem, secondItem) =>
+      firstItem.localeCompare(secondItem),
+    )
+    const sortedMesMessageOptions = [...mesMessageOptions].sort((firstItem, secondItem) =>
+      firstItem.localeCompare(secondItem),
+    )
+    const sourceSetByName = new Map<string, Set<string>>()
+
+    sortedWorkflowMessageOptions.forEach((messageName) => {
+      const existingSourceSet = sourceSetByName.get(messageName) ?? new Set<string>()
+      existingSourceSet.add(isSocketModel ? 'Socket Message' : 'SECS Message')
+      sourceSetByName.set(messageName, existingSourceSet)
+    })
+
+    sortedMesMessageOptions.forEach((messageName) => {
+      const existingSourceSet = sourceSetByName.get(messageName) ?? new Set<string>()
+      existingSourceSet.add('MES Message')
+      sourceSetByName.set(messageName, existingSourceSet)
+    })
+
+    return [...sourceSetByName.entries()].map(([value, sourceSet]) => ({
+      value,
+      label: `${value} [${[...sourceSet].join(', ')}]`,
+    }))
+  }, [isSocketModel, mesMessageOptions, workflowMessageOptions])
 
   // SECS 모델 workflow / dcop-itemes 편집 시 EventId 정합성을 위해 eventides 데이터를 조회합니다.
   // (SOCKET 모델이거나 읽기 전용 상태에서는 조회하지 않음)
@@ -866,7 +893,7 @@ export function ModelDetailPanel({
     <>
       <section
         className={cn(
-          'flex h-full min-h-0 flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4',
+          'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4',
           isEditMode && !isLockedByOtherUser ? 'border-[#7C9082]' : null,
         )}
       >
@@ -1033,7 +1060,7 @@ export function ModelDetailPanel({
                   onChange={handleUploadFileChange}
                 />
 
-                <div className="min-h-0 flex-1 space-y-3 overflow-auto pr-1">
+                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto pr-1">
                   {isDetailLoading ? (
                     <p className="text-sm text-[#647169]">MDF 데이터를 불러오는 중입니다.</p>
                   ) : null}
@@ -1047,12 +1074,18 @@ export function ModelDetailPanel({
                   ) : null}
 
                   {mdfContents.map((content) => (
-                    <div key={content.id} className="flex min-h-[340px] flex-col space-y-1">
+                    <div
+                      key={content.id}
+                      className={cn(
+                        'flex min-h-0 flex-col space-y-1',
+                        mdfContents.length === 1 ? 'flex-1' : null,
+                      )}
+                    >
                       <p className="text-xs font-medium text-[#44544D]">{`DEFAULT: ${content.name || 'MDF'}`}</p>
                       <textarea
                         readOnly
                         value={content.xml}
-                        className="min-h-[320px] w-full flex-1 resize-none rounded-lg border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-xs text-[#22322B] focus-visible:outline-none"
+                        className="min-h-0 w-full flex-1 resize-none rounded-lg border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-xs text-[#22322B] focus-visible:outline-none"
                       />
                     </div>
                   ))}
@@ -1081,13 +1114,9 @@ export function ModelDetailPanel({
                 <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   <Table className={MODEL_DETAIL_TABLE_CLASS}>
                     <TableHeader>
-                      <TableRow className="bg-[#F6F9F7]">
+                        <TableRow className="bg-[#F6F9F7]">
                         {normalizedDetailColumns.map((columnName) => (
-                          <TableHead
-                            key={columnName}
-                          >
-                            {columnName}
-                          </TableHead>
+                          <TableHead key={columnName}>{columnName}</TableHead>
                         ))}
                         {canEditTableRows ? <TableHead className="w-[92px]">작업</TableHead> : null}
                       </TableRow>
@@ -1143,7 +1172,7 @@ export function ModelDetailPanel({
                               return (
                                 <TableCell
                                   key={`${row.id}-${columnIndex}`}
-                                  className="overflow-hidden"
+                                  className="max-w-0 overflow-hidden"
                                 >
                                   {isReadOnly ? (
                                     <span
@@ -1192,16 +1221,17 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !allMessageOptions.includes(rawValue) && (
+                                      {rawValue &&
+                                        !allMessageOptions.some((option) => option.value === rawValue) && (
                                         <option value={rawValue}>{rawValue}</option>
                                       )}
-                                      {allMessageOptions.map((name) => (
-                                        <option key={name} value={name}>
-                                          {name}
+                                      {allMessageOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
                                         </option>
                                       ))}
                                     </select>
@@ -1212,7 +1242,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1232,7 +1262,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1252,7 +1282,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1273,7 +1303,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
                                         <option key={rule} value={rule}>
@@ -1289,7 +1319,7 @@ export function ModelDetailPanel({
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
                                       className={cn(
-                                        'h-8',
+                                        'h-8 min-w-0 max-w-full',
                                         isDuplicate
                                           ? 'border-[#C5534B] focus-visible:ring-[#C5534B]/30'
                                           : null,

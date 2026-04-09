@@ -317,10 +317,7 @@ export const createLocalDeployHistoryItem = (
   const selectedJar = resolveJarOption(jarRef)
   const targets = createLocalDeployTargets(deployKey, eqpIds)
   const deployStatus = resolveDeployStatusFromTargets(targets)
-  const deployName = createDeployName(
-    modelVersionOption?.modelName ?? null,
-    modelVersionOption?.modelVersion ?? null,
-  )
+  const deployName = createDeployName({ eventType: 'EQP_BUSINESS_JARFILE_UPDATE' })
 
   return {
     historyItem: {

@@ -58,6 +58,7 @@ interface DeployUiState {
   setActiveDeployKey: (deployKey: number | null) => void
   createServerDeployBridge: (summary: {
     deployKey: number
+    deployName?: string | null
     deployStatus: DeployHistoryItem['deployStatus']
     requestedBy: string
     selectedModelName?: string | null
@@ -256,6 +257,7 @@ const createPlaceholderTargetSummary = (
 
 const createServerBridgeHistoryItem = (input: {
   deployKey: number
+  deployName?: string | null
   deployStatus: DeployHistoryItem['deployStatus']
   requestedBy: string
   selectedModelName: string | null
@@ -270,7 +272,8 @@ const createServerBridgeHistoryItem = (input: {
 
   return {
     deployKey: input.deployKey,
-    deployName: createDeployName(input.selectedModelName, input.selectedModelVersion),
+    deployName:
+      input.deployName?.trim() || createDeployName({ eventType: input.eventType }),
     eventType: input.eventType,
     deployStatus: input.deployStatus,
     pauseRequested: false,
@@ -439,6 +442,7 @@ export const useDeployUiStore = create<DeployUiState>()(
       setActiveDeployKey: (deployKey) => set({ activeDeployKey: deployKey }),
       createServerDeployBridge: ({
         deployKey,
+        deployName,
         deployStatus,
         requestedBy,
         selectedModelName,
@@ -460,6 +464,7 @@ export const useDeployUiStore = create<DeployUiState>()(
         )
         const historyItem = createServerBridgeHistoryItem({
           deployKey,
+          deployName,
           deployStatus,
           requestedBy,
           selectedModelName: selectedModelName ?? state.selectedModelName,
@@ -586,7 +591,7 @@ export const useDeployUiStore = create<DeployUiState>()(
         const deployStatus = resolveDeployStatusFromTargets(targets)
         const historyItem: DeployHistoryItem = {
           deployKey,
-          deployName: createDeployName(state.selectedModelName, selectedModelVersion),
+          deployName: createDeployName({ eventType: 'EQP_BUSINESS_JARFILE_UPDATE' }),
           eventType: 'EQP_BUSINESS_JARFILE_UPDATE',
           deployStatus,
           pauseRequested: false,

@@ -9,17 +9,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 
 interface ModelCheckInModalProps {
   open: boolean
   isPending: boolean
   errorMessage: string | null
-  initialVersion?: string
   onOpenChange: (open: boolean) => void
   onCancel: () => void
   onUndo: () => void | Promise<void>
-  onSave: (version: string, description: string) => void | Promise<void>
+  onSave: (description: string) => void | Promise<void>
 }
 
 /**
@@ -32,13 +30,12 @@ export function ModelCheckInModal({
   open,
   isPending,
   errorMessage,
-  initialVersion = '',
   onOpenChange,
   onCancel,
   onUndo,
   onSave,
 }: ModelCheckInModalProps) {
-  const formKey = `${open ? 'open' : 'closed'}:${initialVersion}`
+  const formKey = open ? 'open' : 'closed'
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => {
@@ -50,7 +47,6 @@ export function ModelCheckInModal({
       {open ? (
         <ModelCheckInModalBody
           key={formKey}
-          initialVersion={initialVersion}
           isPending={isPending}
           errorMessage={errorMessage}
           onCancel={onCancel}
@@ -63,12 +59,11 @@ export function ModelCheckInModal({
 }
 
 interface ModelCheckInModalBodyProps {
-  initialVersion: string
   isPending: boolean
   errorMessage: string | null
   onCancel: () => void
   onUndo: () => void | Promise<void>
-  onSave: (version: string, description: string) => void | Promise<void>
+  onSave: (description: string) => void | Promise<void>
 }
 
 /**
@@ -77,21 +72,16 @@ interface ModelCheckInModalBodyProps {
  * props -> state 동기화 effect를 두지 않고, open 시점 remount로 초기값을 재설정합니다.
  */
 function ModelCheckInModalBody({
-  initialVersion,
   isPending,
   errorMessage,
   onCancel,
   onUndo,
   onSave,
 }: ModelCheckInModalBodyProps) {
-  const [version, setVersion] = useState(initialVersion)
   const [description, setDescription] = useState('')
 
   const handleSave = async () => {
-    if (!version.trim()) {
-      return
-    }
-    await onSave(version.trim(), description.trim())
+    await onSave(description.trim())
   }
 
   const handleUndo = async () => {
@@ -106,20 +96,6 @@ function ModelCheckInModalBody({
       </DialogHeader>
 
       <div className="grid gap-3">
-        <div className="grid gap-1.5">
-          <label htmlFor="model-checkin-version" className="text-xs font-semibold text-[#1E3D33]">
-            Version <span className="text-[#C5534B]">*</span>
-          </label>
-          <Input
-            id="model-checkin-version"
-            value={version}
-            onChange={(event) => setVersion(event.target.value)}
-            placeholder="예: v2.2.0"
-            disabled={isPending}
-            className="h-9"
-          />
-        </div>
-
         <div className="grid gap-1.5">
           <label htmlFor="model-checkin-description" className="text-xs font-semibold text-[#1E3D33]">
             Description
@@ -165,7 +141,7 @@ function ModelCheckInModalBody({
           type="button"
           className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
           onClick={() => void handleSave()}
-          disabled={isPending || !version.trim()}
+          disabled={isPending}
         >
           {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
           Save

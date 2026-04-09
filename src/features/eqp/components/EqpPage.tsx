@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleUserRound, Loader2, LogOut, RotateCcw } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AppTopBar } from '@/shared/components/AppTopBar'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
+import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
 import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
 import { EqpInfoTable } from './EqpInfoTable'
+import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
+import { EqpLifecycleResultDialog } from './EqpLifecycleResultDialog'
 import { EqpManageFormModal } from './EqpManageFormModal'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
 import { EqpParamTable } from './EqpParamTable'
-import { EqpParamVersionModal } from './EqpParamVersionModal'
 import { EqpSidebar } from './EqpSidebar'
 import { GatewayGroupTable } from './GatewayGroupTable'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
-import { authApi } from '@/features/auth/api/auth.api'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
+import { eqpApi } from '../api/eqp.api'
 import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
 import { useEqpModelInfo } from '../hooks/useEqpModelInfo'
@@ -42,9 +44,10 @@ import {
 import { groupEqpItems } from '../utils/eqp-group.util'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
+import { useModelList } from '@/features/model/hooks/useModelList'
+import { modelQueryKeys } from '@/features/model/lib/model-query-keys'
+import type { ModelInfo } from '@/features/model/types/model.types'
 
-const LOGIN_ROUTE = '/login'
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const EMPTY_VERSION_VALUE = ''
 const NO_VERSION_OPTION_LABEL = '버전 없음'
 
@@ -59,12 +62,27 @@ type EqpManagementDialogState =
   | { type: 'create'; interfaceType: ProtocolType }
   | { type: 'info'; eqpId: string }
   | { type: 'model'; eqpId: string }
-  | { type: 'param'; eqpId: string }
   | { type: 'delete'; eqpId: string }
 
 interface EqpDeleteResultDialogState {
   open: boolean
   status: 'success' | 'failure'
+  eqpId: string | null
+  message: string | null
+}
+
+type EqpLifecycleAction = 'start' | 'end' | 'restart'
+
+interface EqpLifecycleDialogState {
+  open: boolean
+  action: EqpLifecycleAction
+  eqp: EqpInfo | null
+}
+
+interface EqpLifecycleResultDialogState {
+  open: boolean
+  status: 'success' | 'failure'
+  action: EqpLifecycleAction
   eqpId: string | null
   message: string | null
 }
@@ -76,6 +94,20 @@ const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
   eqpId: null,
   message: null,
 }
+const EMPTY_EQP_LIFECYCLE_DIALOG_STATE: EqpLifecycleDialogState = {
+  open: false,
+  action: 'start',
+  eqp: null,
+}
+const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
+  open: false,
+  status: 'success',
+  action: 'start',
+  eqpId: null,
+  message: null,
+}
+const EQP_ASYNC_POLL_INTERVAL_MS = 1000
+const EQP_ASYNC_MAX_ATTEMPTS = 60
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -96,17 +128,6 @@ const toEditableParamRow = (row: EqpParamRow): EditableEqpParamRow => ({
   rowId: createEditableParamRowId(),
   ...row,
 })
-
-/**
- * 상단 네비게이션 메뉴 구성입니다.
- */
-const TOP_NAVIGATION_ITEMS = [
-  { name: 'Eqp', subLabel: 'Eqp Info', route: '/eqp' },
-  { name: 'Model', subLabel: 'Model Info', route: '/model' },
-  { name: 'Deploy', subLabel: 'Eqp Deploy / Model Deploy', route: '/deploy' },
-  { name: 'Dlq', subLabel: 'Gateway Dlq / Business Dlq', route: null },
-  { name: 'User', subLabel: 'User Info / Group Info', route: null },
-] as const
 
 /**
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
@@ -151,16 +172,6 @@ const resolveEqpItems = (payload: unknown): EqpInfo[] => {
 }
 
 /**
- * 브라우저에서 접근 가능한 CSRF 쿠키를 삭제합니다.
- */
-const clearCsrfCookie = () => {
-  if (typeof document === 'undefined') {
-    return
-  }
-  document.cookie = `${CSRF_COOKIE_NAME}=; Max-Age=0; path=/`
-}
-
-/**
  * EQP Info 메인 페이지입니다.
  * DB 기반 Check Out / Save / Check In 흐름을 처리합니다.
  *
@@ -168,18 +179,22 @@ const clearCsrfCookie = () => {
  *
  * 선택 상태:
  * - none: 초기 진입 / 선택 없음 → 가운데 영역 비어있음
+ * - gateway_all: Gateway 클릭 → 전체 게이트웨이 설비 목록 테이블 표시
  * - gateway_group: gateway_app 그룹 클릭 → 해당 그룹 설비 목록 테이블 표시
+ * - business_group: business_app 그룹 클릭 → 해당 그룹 설비가 참조하는 모델 목록 테이블 표시
  * - eqp: 개별 설비 클릭 → 설비 정보 + ResizableDivider + 파라미터/Checkout 영역 표시
  */
 export function EqpPage() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const selection = useEqpUiStore((state) => state.selection)
   const isEditMode = useEqpUiStore((state) => state.isEditMode)
   const isProfileModalOpen = useEqpUiStore((state) => state.isProfileModalOpen)
   const selectEqp = useEqpUiStore((state) => state.selectEqp)
+  const selectGatewayAll = useEqpUiStore((state) => state.selectGatewayAll)
+  const selectBusinessAll = useEqpUiStore((state) => state.selectBusinessAll)
   const selectGatewayGroup = useEqpUiStore((state) => state.selectGatewayGroup)
+  const selectBusinessGroup = useEqpUiStore((state) => state.selectBusinessGroup)
   const clearSelection = useEqpUiStore((state) => state.clearSelection)
   const setEditMode = useEqpUiStore((state) => state.setEditMode)
   const setProfileModalOpen = useEqpUiStore((state) => state.setProfileModalOpen)
@@ -198,6 +213,7 @@ export function EqpPage() {
   const currentUserId = meQuery.data?.userId ?? null
 
   const eqpListQuery = useEqpList()
+  const modelListQuery = useModelList()
   const eqpDetailQuery = useEqpDetail(selectedEqpId)
   const eqpParamVersionsQuery = useEqpParamVersions(selectedEqpId)
   const eqpRuntimeStateQuery = useEqpRuntimeState(selectedEqpId)
@@ -206,6 +222,7 @@ export function EqpPage() {
       ? eqpDetailQuery.data.modelVersionKey
       : null,
   )
+  const selectedEqpManageDetailQuery = useEqpManageDetail(selectedEqpId, Boolean(selectedEqpId))
 
   const checkoutStatusQuery = useEqpCheckoutStatus(selectedEqpId)
 
@@ -226,7 +243,6 @@ export function EqpPage() {
   const [localEditRows, setLocalEditRows] = useState<EditableEqpParamRow[]>([])
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
   const [checkInErrorMessage, setCheckInErrorMessage] = useState<string | null>(null)
-  const [isLogoutPending, setIsLogoutPending] = useState(false)
   const [managementDialog, setManagementDialog] = useState<EqpManagementDialogState>(
     EMPTY_MANAGEMENT_DIALOG_STATE,
   )
@@ -234,6 +250,13 @@ export function EqpPage() {
   const [deleteResultDialog, setDeleteResultDialog] = useState<EqpDeleteResultDialogState>(
     EMPTY_EQP_DELETE_RESULT_DIALOG_STATE,
   )
+  const [lifecycleDialog, setLifecycleDialog] = useState<EqpLifecycleDialogState>(
+    EMPTY_EQP_LIFECYCLE_DIALOG_STATE,
+  )
+  const [lifecycleResultDialog, setLifecycleResultDialog] = useState<EqpLifecycleResultDialogState>(
+    EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE,
+  )
+  const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null)
 
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
@@ -241,7 +264,13 @@ export function EqpPage() {
   const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false)
   const isCheckoutSubmittingRef = useRef(false)
 
-  const { createEqpMutation, updateEqpMutation, deleteEqpMutation } = useEqpMutations()
+  const {
+    createEqpMutation,
+    updateEqpMutation,
+    deleteEqpMutation,
+    startEqpMutation,
+    endEqpMutation,
+  } = useEqpMutations()
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
   const eqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data as unknown), [eqpListQuery.data])
@@ -278,8 +307,14 @@ export function EqpPage() {
     return checkoutStatus.checkedOutBy === currentUserId
   }, [checkoutStatus.checkedOutBy, checkoutStatus.isCheckedOut, currentUserId])
 
-  // 전체 eqpItems 기준으로 그룹화 (gateway_group 선택 시 설비 목록 조회용)
-  const { gatewayGroups } = useMemo(() => groupEqpItems(eqpItems), [eqpItems])
+  // 전체 eqpItems 기준으로 그룹화 (Gateway/gateway_group 선택 시 설비 목록 조회용)
+  const { gatewayGroups, businessGroups } = useMemo(() => groupEqpItems(eqpItems), [eqpItems])
+
+  // Gateway 선택 시 표시할 전체 게이트웨이 설비 목록입니다.
+  const gatewayAllItems = useMemo(
+    () => gatewayGroups.flatMap((group) => group.items),
+    [gatewayGroups],
+  )
 
   // gateway_group 선택 시 해당 그룹의 설비 목록 파생
   const gatewayGroupItems = useMemo(() => {
@@ -290,18 +325,51 @@ export function EqpPage() {
     return group?.items ?? []
   }, [selection, gatewayGroups])
 
+  const businessGroupItems = useMemo(() => {
+    if (selection.type !== 'business_group') {
+      return []
+    }
+    const group = businessGroups.find((g) => g.appIndex === selection.groupIndex)
+    return group?.items ?? []
+  }, [businessGroups, selection])
+
+  const businessAllItems = useMemo(
+    () => businessGroups.flatMap((group) => group.items),
+    [businessGroups],
+  )
+
+  const businessGroupModels = useMemo(() => {
+    if (selection.type !== 'business_group' && selection.type !== 'business_all') {
+      return []
+    }
+
+    const modelItems = modelListQuery.data?.items ?? []
+    const modelVersionKeySet = new Set(
+      (selection.type === 'business_all' ? businessAllItems : businessGroupItems)
+        .map((eqp) => eqp.modelVersionKey)
+        .filter((modelVersionKey) => typeof modelVersionKey === 'number' && modelVersionKey > 0),
+    )
+
+    const uniqueModels = new Map<number, ModelInfo>()
+    modelItems.forEach((model) => {
+      if (modelVersionKeySet.has(model.modelVersionKey)) {
+        uniqueModels.set(model.modelVersionKey, model)
+      }
+    })
+
+    return Array.from(uniqueModels.values())
+  }, [businessAllItems, businessGroupItems, modelListQuery.data?.items, selection])
+
   const managementTargetEqpId =
     managementDialog.type === 'info' ||
     managementDialog.type === 'model' ||
-    managementDialog.type === 'param' ||
     managementDialog.type === 'delete'
       ? managementDialog.eqpId
       : null
 
   const needsManageDetail =
     managementDialog.type === 'info' ||
-    managementDialog.type === 'model' ||
-    managementDialog.type === 'param'
+    managementDialog.type === 'model'
   const needsManageOptions =
     managementDialog.type === 'create' ||
     managementDialog.type === 'info' ||
@@ -310,8 +378,47 @@ export function EqpPage() {
   const eqpManageDetailQuery = useEqpManageDetail(managementTargetEqpId, needsManageDetail)
   const eqpManageOptionsQuery = useEqpManageOptions(needsManageOptions)
 
-  // gateway_group 선택 시 그룹명 파생
+  const appliedParamSummary = useMemo(() => {
+    if (!selectedEqpId) {
+      return { version: '—', description: '—' }
+    }
+
+    if (selectedEqpManageDetailQuery.isLoading && !selectedEqpManageDetailQuery.data) {
+      return { version: '불러오는 중...', description: '불러오는 중...' }
+    }
+
+    if (selectedEqpManageDetailQuery.error) {
+      return { version: '확인 불가', description: '확인 불가' }
+    }
+
+    const appliedVersion = selectedEqpManageDetailQuery.data?.appliedParamVersion?.trim()
+    const appliedDescription = selectedEqpManageDetailQuery.data?.appliedParamDescription?.trim()
+
+    return {
+      version: appliedVersion && appliedVersion.length > 0 ? appliedVersion : '미적용',
+      description: appliedDescription && appliedDescription.length > 0 ? appliedDescription : '설명 없음',
+    }
+  }, [
+    selectedEqpId,
+    selectedEqpManageDetailQuery.data,
+    selectedEqpManageDetailQuery.error,
+    selectedEqpManageDetailQuery.isLoading,
+  ])
+
+  // Gateway/gateway_group 선택 시 표시할 이름입니다.
   const selectedGroupName = useMemo(() => {
+    if (selection.type === 'gateway_all') {
+      return 'Gateway'
+    }
+
+    if (selection.type === 'business_all') {
+      return 'Business'
+    }
+
+    if (selection.type === 'business_group') {
+      return `business_app${selection.groupIndex}`
+    }
+
     if (selection.type !== 'gateway_group') {
       return ''
     }
@@ -347,15 +454,25 @@ export function EqpPage() {
     setManagementDialog({ type: 'model', eqpId })
   }, [])
 
-  const openEqpParamDialog = useCallback((eqpId: string) => {
-    setManagementErrorMessage(null)
-    setManagementDialog({ type: 'param', eqpId })
-  }, [])
-
   const openEqpDeleteDialog = useCallback((eqpId: string) => {
     setManagementErrorMessage(null)
     setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
     setManagementDialog({ type: 'delete', eqpId })
+  }, [])
+
+  const openLifecycleDialog = useCallback((eqp: EqpInfo, action: EqpLifecycleAction) => {
+    setLifecycleErrorMessage(null)
+    setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
+    setLifecycleDialog({
+      open: true,
+      action,
+      eqp,
+    })
+  }, [])
+
+  const closeLifecycleDialog = useCallback(() => {
+    setLifecycleDialog(EMPTY_EQP_LIFECYCLE_DIALOG_STATE)
+    setLifecycleErrorMessage(null)
   }, [])
 
   /**
@@ -380,8 +497,26 @@ export function EqpPage() {
       if (!existsSelectedGroup) {
         resetSelectionTransientStates()
       }
+      return
     }
-  }, [eqpListQuery.isSuccess, selection, eqpItems, gatewayGroups, resetSelectionTransientStates])
+
+    if (selection.type === 'business_group') {
+      const existsSelectedGroup = businessGroups.some((group) => group.appIndex === selection.groupIndex)
+      if (!existsSelectedGroup) {
+        resetSelectionTransientStates()
+      }
+      return
+    }
+
+    if (selection.type === 'business_all' && businessGroups.length === 0) {
+      resetSelectionTransientStates()
+      return
+    }
+
+    if (selection.type === 'gateway_all' && gatewayGroups.length === 0) {
+      resetSelectionTransientStates()
+    }
+  }, [eqpListQuery.isSuccess, selection, eqpItems, gatewayGroups, businessGroups, resetSelectionTransientStates])
 
   useEffect(() => {
     if (!eqpListQuery.isSuccess || !managementTargetEqpId) {
@@ -482,6 +617,35 @@ export function EqpPage() {
     selectGatewayGroup(groupIndex)
   }, [queryClient, selectGatewayGroup])
 
+  /**
+   * business_app 그룹 선택 처리.
+   * 선택 시 eqp/model 목록 캐시를 무효화해 최신 데이터를 반영합니다.
+   */
+  const handleSelectBusinessGroup = useCallback((groupIndex: number) => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    selectBusinessGroup(groupIndex)
+  }, [queryClient, selectBusinessGroup])
+
+  /**
+   * Business 전체 선택 처리.
+   * 선택 시 eqp/model 목록 캐시를 무효화해 최신 데이터를 반영합니다.
+   */
+  const handleSelectBusinessAll = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    selectBusinessAll()
+  }, [queryClient, selectBusinessAll])
+
+  /**
+   * Gateway 전체 선택 처리.
+   * 선택 시 eqpList 캐시를 무효화해 최신 설비 목록을 반영합니다.
+   */
+  const handleSelectGatewayAll = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    selectGatewayAll()
+  }, [queryClient, selectGatewayAll])
+
   const handleSaveCreateEqp = async (request: EqpCreateRequest) => {
     try {
       setManagementErrorMessage(null)
@@ -543,6 +707,96 @@ export function EqpPage() {
       })
     }
   }
+
+  const waitForEqpAsyncCompletion = useCallback(
+    async (traceId: string, fallbackMessage: string) => {
+      for (let attempt = 0; attempt < EQP_ASYNC_MAX_ATTEMPTS; attempt += 1) {
+        const result = await eqpApi.getAsyncResult(traceId)
+
+        if (result.status === 'PASS') {
+          return
+        }
+
+        if (result.status === 'FAIL' || result.status === 'TIMEOUT') {
+          throw new Error(result.errorMsg ?? fallbackMessage)
+        }
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, EQP_ASYNC_POLL_INTERVAL_MS)
+        })
+      }
+
+      throw new Error(fallbackMessage)
+    },
+    [],
+  )
+
+  const executeLifecycleAction = useCallback(
+    async (eqp: EqpInfo, action: EqpLifecycleAction) => {
+      const request = {
+        interfaceType: eqp.commInterface,
+        uiMessage: null,
+      } as const
+
+      if (action === 'start') {
+        const traceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
+        await waitForEqpAsyncCompletion(traceId, '설비 시작 응답 대기 시간이 초과되었습니다.')
+        return
+      }
+
+      if (action === 'end') {
+        const traceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
+        await waitForEqpAsyncCompletion(traceId, '설비 종료 응답 대기 시간이 초과되었습니다.')
+        return
+      }
+
+      const endTraceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
+      await waitForEqpAsyncCompletion(endTraceId, '설비 종료 응답 대기 시간이 초과되었습니다.')
+
+      const startTraceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
+      await waitForEqpAsyncCompletion(startTraceId, '설비 시작 응답 대기 시간이 초과되었습니다.')
+    },
+    [endEqpMutation, startEqpMutation, waitForEqpAsyncCompletion],
+  )
+
+  const handleConfirmLifecycleAction = useCallback(async () => {
+    const targetEqp = lifecycleDialog.eqp
+    const action = lifecycleDialog.action
+
+    if (!targetEqp) {
+      setLifecycleErrorMessage('선택된 설비 정보가 없어 작업을 진행할 수 없습니다.')
+      return
+    }
+
+    try {
+      setLifecycleErrorMessage(null)
+      await executeLifecycleAction(targetEqp, action)
+      closeLifecycleDialog()
+      setLifecycleResultDialog({
+        open: true,
+        status: 'success',
+        action,
+        eqpId: targetEqp.eqpId,
+        message: null,
+      })
+    } catch (error) {
+      const resolvedMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : resolveErrorMessage(error, '설비 lifecycle 작업에 실패했습니다.')
+
+      closeLifecycleDialog()
+      setLifecycleResultDialog({
+        open: true,
+        status: 'failure',
+        action,
+        eqpId: targetEqp.eqpId,
+        message: resolvedMessage,
+      })
+    }
+  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog])
+
+  const isLifecyclePending = startEqpMutation.isPending || endEqpMutation.isPending
 
   /**
    * ResizableDivider 드래그 처리.
@@ -793,31 +1047,6 @@ export function EqpPage() {
     }
   }
 
-  /**
-   * 로그아웃 API 호출 후 로컬 UI 상태/캐시를 정리하고 로그인 페이지로 이동합니다.
-   */
-  const handleLogout = async () => {
-    if (isLogoutPending) {
-      return
-    }
-
-    setIsLogoutPending(true)
-
-    try {
-      await authApi.logout()
-    } catch (error) {
-      console.warn('[EqpPage] logout request failed, continuing with local cleanup', error)
-    } finally {
-      clearDeployUiSessionState()
-      setProfileModalOpen(false)
-      resetSelectionTransientStates()
-      closeManagementDialog()
-      queryClient.clear()
-      clearCsrfCookie()
-      navigate(LOGIN_ROUTE, { replace: true })
-    }
-  }
-
   // 현재 파라미터 테이블에 표시할 행
   const displayParamRows = useMemo(() => {
     if (isEditMode) {
@@ -879,83 +1108,20 @@ export function EqpPage() {
 
   // 사이드바에 전달할 선택된 그룹 인덱스
   const selectedGroupIndex = selection.type === 'gateway_group' ? selection.groupIndex : null
-  const handleNavigateMenu = (route: string | null) => {
-    if (!route || route === '/eqp') {
-      return
-    }
-    navigate(route)
-  }
-
+  const selectedBusinessGroupIndex = selection.type === 'business_group' ? selection.groupIndex : null
+  const isGatewaySelected = selection.type === 'gateway_all'
   return (
     <div className="flex min-h-screen w-screen flex-col bg-[#F7FAF8]">
-      <header className="relative flex h-[52px] items-center justify-between bg-white px-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[#d95d39]">
-            <span className="font-fraunces text-sm font-medium text-white">N</span>
-          </div>
-          <span className="font-fraunces text-lg text-[#2D2D2D]">Nori-TC</span>
-        </div>
-
-        {/* topbar nav는 사이드바 폭에 관계없이 항상 헤더 중앙에 고정됩니다.
-            좌우 여백을 동일하게(164px) 설정하여 버튼 영역과 겹치지 않도록 합니다. */}
-        <div
-          className="pointer-events-none absolute inset-y-0 hidden items-center justify-center md:flex"
-          style={{ left: '164px', right: '164px' }}
-        >
-          <nav className="pointer-events-auto flex max-w-full items-center gap-6 overflow-hidden whitespace-nowrap">
-            {TOP_NAVIGATION_ITEMS.map((menuItem) => {
-              const isCurrentMenu = menuItem.name === 'Eqp'
-              return (
-                <button
-                  key={menuItem.name}
-                  type="button"
-                  onClick={() => handleNavigateMenu(menuItem.route)}
-                  className={`group relative inline-flex h-[38px] items-center px-2 text-[14px] font-medium tracking-[0.01em] transition-colors ${
-                    isCurrentMenu
-                      ? 'text-[#173f31]'
-                      : 'text-[#6A7971] hover:text-[#2B4A3F]'
-                  }`}
-                >
-                  <span>{menuItem.name}</span>
-                  <span
-                    className={`pointer-events-none absolute -bottom-px left-0 right-0 h-[2px] rounded-full transition-opacity ${
-                      isCurrentMenu
-                        ? 'bg-[#1C7F59] opacity-100'
-                        : 'bg-[#1C7F59] opacity-0 group-hover:opacity-35'
-                    }`}
-                  />
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-[38px] rounded-full border-[#DCE5E0] px-3.5 text-sm font-medium text-[#4B5A52]"
-            onClick={() => void handleLogout()}
-            disabled={isLogoutPending}
-            aria-label="로그아웃"
-          >
-            {isLogoutPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
-            로그아웃
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="size-[38px] rounded-full border border-[#DCE5E0] text-[#4B5A52]"
-            onClick={() => setProfileModalOpen(true)}
-            aria-label="사용자 프로필 열기"
-            disabled={isLogoutPending}
-          >
-            <CircleUserRound className="size-[18px]" />
-          </Button>
-        </div>
-      </header>
-
+      <AppTopBar
+        currentMenu="eqp"
+        onOpenProfile={() => setProfileModalOpen(true)}
+        onAfterLogout={() => {
+          clearDeployUiSessionState()
+          setProfileModalOpen(false)
+          resetSelectionTransientStates()
+          closeManagementDialog()
+        }}
+      />
       <div className="h-px bg-[#E5ECE7]" />
 
       {/* main: flex-1로 남은 화면 전체 높이 차지, min-h-0으로 flex shrink 허용 */}
@@ -963,16 +1129,21 @@ export function EqpPage() {
         <EqpSidebar
           eqpItems={eqpItems}
           selectedEqpId={selectedEqpId}
+          isGatewaySelected={isGatewaySelected}
+          isBusinessSelected={selection.type === 'business_all'}
+          selectedBusinessGroupIndex={selectedBusinessGroupIndex}
           selectedGroupIndex={selectedGroupIndex}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           isLoading={eqpListQuery.isLoading}
           errorMessage={listErrorMessage}
           onSelectEqp={handleSelectEqp}
+          onSelectGatewayAll={handleSelectGatewayAll}
+          onSelectBusinessAll={handleSelectBusinessAll}
           onSelectGatewayGroup={handleSelectGatewayGroup}
+          onSelectBusinessGroup={handleSelectBusinessGroup}
           onOpenEqpInfoUpdate={openEqpInfoDialog}
           onOpenEqpModelBinding={openEqpModelDialog}
-          onOpenEqpParamVersion={openEqpParamDialog}
           onOpenEqpDelete={openEqpDeleteDialog}
           onOpenEqpCreate={openEqpCreateDialog}
           onToggleSidebar={toggleSidebar}
@@ -987,10 +1158,27 @@ export function EqpPage() {
               <div className="flex flex-1 items-center justify-center text-sm text-[#8A8A8A]">
                 설비 또는 게이트웨이 그룹을 선택해 주세요.
               </div>
-            ) : selection.type === 'gateway_group' ? (
-              /* gateway_app 그룹 선택: 설비 목록 테이블 (파라미터/Checkout 없음) */
+            ) : selection.type === 'gateway_all' || selection.type === 'gateway_group' ? (
+              /* Gateway 또는 gateway_app 그룹 선택: 설비 목록 테이블 (파라미터/Checkout 없음) */
               <section className="flex flex-1 flex-col p-3 md:p-4">
-                <GatewayGroupTable eqpItems={gatewayGroupItems} groupName={selectedGroupName} />
+                <GatewayGroupTable
+                  key={`${selection.type}-${selectedGroupName}`}
+                  eqpItems={selection.type === 'gateway_all' ? gatewayAllItems : gatewayGroupItems}
+                  groupName={selectedGroupName}
+                  isLifecyclePending={isLifecyclePending}
+                  onLifecycleAction={openLifecycleDialog}
+                />
+              </section>
+            ) : selection.type === 'business_all' || selection.type === 'business_group' ? (
+              /* Business 또는 business_app 그룹 선택: 해당 범위 설비가 참조하는 모델 목록 테이블 */
+              <section className="flex flex-1 flex-col p-3 md:p-4">
+                <BusinessGroupModelTable
+                  key={`business-${selection.type}-${selectedGroupName}`}
+                  groupName={selectedGroupName}
+                  models={businessGroupModels}
+                  isLoading={modelListQuery.isLoading}
+                  isFetching={modelListQuery.isFetching}
+                />
               </section>
             ) : (
               /* 개별 설비 선택: 설비 정보 테이블 + ResizableDivider + 파라미터/Checkout 섹션 */
@@ -1004,6 +1192,7 @@ export function EqpPage() {
                   className="overflow-auto p-3 pb-0 md:p-4 md:pb-0"
                 >
                   <EqpInfoTable
+                    key={selectedEqpId ?? 'eqp-info'}
                     eqp={eqpDetailQuery.data ?? null}
                     modelInfo={eqpModelInfoQuery.data ?? null}
                     runtimeState={eqpRuntimeStateQuery.data ?? null}
@@ -1011,6 +1200,8 @@ export function EqpPage() {
                     isFetching={
                       eqpDetailQuery.isFetching || eqpRuntimeStateQuery.isFetching || eqpModelInfoQuery.isFetching
                     }
+                    isLifecyclePending={isLifecyclePending}
+                    onLifecycleAction={openLifecycleDialog}
                   />
                 </div>
 
@@ -1108,6 +1299,22 @@ export function EqpPage() {
                       </div>
                     </div>
 
+                    <div className="mt-2 rounded-xl border border-[#E4EAE6] bg-[#F7FAF8] px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#6D7F76]">
+                        Current Applied Eqp Parameter
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-[#1E3D33]">
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="font-semibold text-[#5A6D63]">Version</span>
+                          <span>{appliedParamSummary.version}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="font-semibold text-[#5A6D63]">Desc</span>
+                          <span>{appliedParamSummary.description}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Mode 텍스트 영역: 읽기 모드는 첫 파라미터 description, 편집 모드는 "누구님이 편집 중" */}
                     <div className="mt-2 flex items-center gap-1 text-xs">
                       <span className={`${isEditMode ? 'font-medium text-[#7C9082]' : 'text-[#8A8A8A]'}`}>
@@ -1129,6 +1336,7 @@ export function EqpPage() {
 
                     <div className="mt-3 min-h-0 flex-1 border-t border-[#E4EAE6] pt-3">
                       <EqpParamTable
+                        key={`${selectedEqpId ?? 'eqp-param'}-${appliedVersion}-${isEditMode ? 'edit' : 'read'}`}
                         rows={displayParamRows}
                         isEditMode={isEditMode}
                         isLoading={isEditMode ? editParamsQuery.isLoading : readParamsQuery.isLoading}
@@ -1198,20 +1406,6 @@ export function EqpPage() {
         onSubmit={handleSaveEqpUpdate}
       />
 
-      <EqpParamVersionModal
-        open={managementDialog.type === 'param'}
-        detail={managementDialog.type === 'param' ? eqpManageDetailQuery.data ?? null : null}
-        isLoading={eqpManageDetailQuery.isLoading}
-        isPending={updateEqpMutation.isPending}
-        errorMessage={managementModalErrorMessage}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeManagementDialog()
-          }
-        }}
-        onSubmit={handleSaveEqpUpdate}
-      />
-
       <EqpDeleteConfirmDialog
         open={managementDialog.type === 'delete'}
         eqpId={managementDialog.type === 'delete' ? managementDialog.eqpId : null}
@@ -1233,6 +1427,33 @@ export function EqpPage() {
         onOpenChange={(open) => {
           if (!open) {
             setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
+          }
+        }}
+      />
+
+      <EqpLifecycleActionDialog
+        open={lifecycleDialog.open}
+        action={lifecycleDialog.action}
+        eqpId={lifecycleDialog.eqp?.eqpId ?? null}
+        isPending={isLifecyclePending}
+        errorMessage={lifecycleErrorMessage}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeLifecycleDialog()
+          }
+        }}
+        onConfirm={handleConfirmLifecycleAction}
+      />
+
+      <EqpLifecycleResultDialog
+        open={lifecycleResultDialog.open}
+        status={lifecycleResultDialog.status}
+        action={lifecycleResultDialog.action}
+        eqpId={lifecycleResultDialog.eqpId}
+        message={lifecycleResultDialog.message}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
           }
         }}
       />

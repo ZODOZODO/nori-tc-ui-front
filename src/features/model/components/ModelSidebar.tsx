@@ -17,10 +17,12 @@ import type { ModelInfo, ProtocolType } from '../types/model.types'
 interface ModelSidebarProps {
   modelItems: ModelInfo[]
   selectedModelVersionKey: number | null
+  selectedInterfaceGroup: ProtocolType | null
   sidebarOpen: boolean
   sidebarWidth: number
   isLoading: boolean
   errorMessage: string | null
+  onSelectInterfaceGroup: (interfaceType: ProtocolType) => void
   onSelectModel: (model: ModelInfo) => void
   onOpenRootCreate: (interfaceType: ProtocolType) => void
   onOpenRootUpdate: (model: ModelInfo) => void
@@ -42,6 +44,8 @@ interface SectionProps {
   interfaceType: ProtocolType
   nodes: ModelTreeNode[]
   selectedModelName: string | null
+  isSelected: boolean
+  onSelectInterfaceGroup: (interfaceType: ProtocolType) => void
   onSelectModel: (model: ModelInfo) => void
   onOpenRootCreate: (interfaceType: ProtocolType) => void
   onOpenRootUpdate: (model: ModelInfo) => void
@@ -74,7 +78,10 @@ function TreeNode({
   isDeprecatedBranchDeleteDisabled,
   isBranchCommitDisabled,
   isBranchDeleteDisabled,
-}: Omit<SectionProps, 'title' | 'interfaceType' | 'nodes' | 'onOpenRootCreate'> & {
+}: Omit<
+  SectionProps,
+  'title' | 'interfaceType' | 'nodes' | 'isSelected' | 'onSelectInterfaceGroup' | 'onOpenRootCreate'
+> & {
   node: ModelTreeNode
   depth: number
 }) {
@@ -196,6 +203,8 @@ function InterfaceSection({
   interfaceType,
   nodes,
   selectedModelName,
+  isSelected,
+  onSelectInterfaceGroup,
   onSelectModel,
   onOpenRootCreate,
   onOpenRootUpdate,
@@ -213,7 +222,18 @@ function InterfaceSection({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
-          <div className="mb-1 text-xs font-semibold text-[#315343]">{title}</div>
+          <button
+            type="button"
+            onClick={() => onSelectInterfaceGroup(interfaceType)}
+            className={cn(
+              'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+              isSelected
+                ? 'bg-[#EAF5EE] text-[#1F2D26]'
+                : 'text-[#315343] hover:bg-[#F1F6F3]',
+            )}
+          >
+            {title}
+          </button>
           <div className="space-y-2 pl-1">
             {nodes.length === 0 ? (
               <p className="py-1 text-[11px] text-[#97A39C]">표시할 모델이 없습니다.</p>
@@ -259,10 +279,12 @@ function InterfaceSection({
 export function ModelSidebar({
   modelItems,
   selectedModelVersionKey,
+  selectedInterfaceGroup,
   sidebarOpen,
   sidebarWidth,
   isLoading,
   errorMessage,
+  onSelectInterfaceGroup,
   onSelectModel,
   onOpenRootCreate,
   onOpenRootUpdate,
@@ -347,6 +369,8 @@ export function ModelSidebar({
               interfaceType="SECS"
               nodes={secsRoots}
               selectedModelName={selectedModel?.modelName ?? null}
+              isSelected={selectedInterfaceGroup === 'SECS'}
+              onSelectInterfaceGroup={onSelectInterfaceGroup}
               onSelectModel={onSelectModel}
               onOpenRootCreate={onOpenRootCreate}
               onOpenRootUpdate={onOpenRootUpdate}
@@ -366,6 +390,8 @@ export function ModelSidebar({
               interfaceType="SOCKET"
               nodes={socketRoots}
               selectedModelName={selectedModel?.modelName ?? null}
+              isSelected={selectedInterfaceGroup === 'SOCKET'}
+              onSelectInterfaceGroup={onSelectInterfaceGroup}
               onSelectModel={onSelectModel}
               onOpenRootCreate={onOpenRootCreate}
               onOpenRootUpdate={onOpenRootUpdate}

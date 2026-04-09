@@ -78,7 +78,12 @@ export function ModelCreateOrUpdateModal({
         }
       }}
     >
-      <DialogContent className="max-w-[560px]">
+      <DialogContent
+        className="max-w-[560px]"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>

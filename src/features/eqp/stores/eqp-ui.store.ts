@@ -17,7 +17,10 @@ interface EqpUiState {
   /** 상하 패널 분리 핸들의 상단 패널 높이 비율(%) */
   topPanelHeightPercent: number
   selectEqp: (eqpId: string) => void
+  selectGatewayAll: () => void
+  selectBusinessAll: () => void
   selectGatewayGroup: (groupIndex: number) => void
+  selectBusinessGroup: (groupIndex: number) => void
   clearSelection: () => void
   setSidebarOpen: (open: boolean) => void
   setSidebarWidth: (width: number) => void
@@ -45,7 +48,7 @@ const EQP_UI_SELECTION_STORAGE_KEY = 'eqp-ui-selection'
 /**
  * EQP 화면 전역 UI 상태 저장소입니다.
  * - 사이드바 확장/축소
- * - 선택 상태 (없음/gateway_group/개별 설비)
+ * - 선택 상태 (없음/gateway 전체/gateway_group/business_group/개별 설비)
  * - 편집 모드
  * - 프로필 모달 오픈 상태를 한 곳에서 관리합니다.
  */
@@ -61,8 +64,14 @@ export const useEqpUiStore = create<EqpUiState>()(
       topPanelHeightPercent: EQP_PANEL_INITIAL_TOP_PERCENT,
       // 개별 설비 선택
       selectEqp: (eqpId) => set({ selection: { type: 'eqp', eqpId } }),
+      // Gateway 전체 선택
+      selectGatewayAll: () => set({ selection: { type: 'gateway_all' } }),
+      // Business 전체 선택
+      selectBusinessAll: () => set({ selection: { type: 'business_all' } }),
       // gateway_app 그룹 선택
       selectGatewayGroup: (groupIndex) => set({ selection: { type: 'gateway_group', groupIndex } }),
+      // business_app 그룹 선택
+      selectBusinessGroup: (groupIndex) => set({ selection: { type: 'business_group', groupIndex } }),
       // 선택 초기화
       clearSelection: () => set({ selection: { type: 'none' } }),
       setSidebarOpen: (open) =>

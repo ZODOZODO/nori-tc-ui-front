@@ -1,7 +1,18 @@
 import { Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { EqpInfo, EqpModelInfo, EqpRuntimeState } from '../types/eqp.types'
+import { resolveBusinessAppName } from '../utils/eqp-group.util'
+
+type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
 interface EqpInfoTableProps {
   eqp: EqpInfo | null
@@ -9,6 +20,8 @@ interface EqpInfoTableProps {
   runtimeState: EqpRuntimeState | null
   isLoading: boolean
   isFetching: boolean
+  isLifecyclePending?: boolean
+  onLifecycleAction?: (eqp: EqpInfo, action: EqpLifecycleAction) => void
 }
 
 type EquipmentVisualState = 'inactive' | 'ready' | 'attention'
@@ -90,6 +103,8 @@ export function EqpInfoTable({
   runtimeState,
   isLoading,
   isFetching,
+  isLifecyclePending = false,
+  onLifecycleAction,
 }: EqpInfoTableProps) {
   const commInterfaceBadgeVariant =
     eqp?.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'
@@ -105,6 +120,7 @@ export function EqpInfoTable({
           <TableHeader>
             <TableRow className="bg-[#F6F9F7]">
               <TableHead>EQPID</TableHead>
+              <TableHead>Business App</TableHead>
               <TableHead>Comm Interface</TableHead>
               <TableHead>Comm Mode</TableHead>
               <TableHead>Route Partition</TableHead>
@@ -120,7 +136,7 @@ export function EqpInfoTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     설비 상세 정보를 불러오는 중입니다.
@@ -128,28 +144,57 @@ export function EqpInfoTable({
                 </TableCell>
               </TableRow>
             ) : eqp ? (
-              <TableRow data-state="selected">
-                <TableCell>{eqp.eqpId}</TableCell>
-                <TableCell>
-                  <Badge variant={commInterfaceBadgeVariant}>{eqp.commInterface}</Badge>
-                </TableCell>
-                <TableCell>{eqp.commMode}</TableCell>
-                <TableCell>{eqp.routePartition ?? '—'}</TableCell>
-                <TableCell>{eqp.eqpIp}</TableCell>
-                <TableCell>{eqp.eqpPort}</TableCell>
-                <TableCell>
-                  <EquipmentStatusIndicator
-                    status={resolveEquipmentVisualState(eqp, runtimeState)}
-                  />
-                </TableCell>
-                <TableCell>{modelInfo?.modelName ?? '—'}</TableCell>
-                <TableCell>{modelInfo?.modelVersion ?? '—'}</TableCell>
-                <TableCell>—</TableCell>
-                <TableCell>—</TableCell>
-              </TableRow>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      data-state="selected"
+                    >
+                    <TableCell>{eqp.eqpId}</TableCell>
+                    <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={commInterfaceBadgeVariant}>{eqp.commInterface}</Badge>
+                    </TableCell>
+                    <TableCell>{eqp.commMode}</TableCell>
+                    <TableCell>{eqp.routePartition ?? '—'}</TableCell>
+                    <TableCell>{eqp.eqpIp}</TableCell>
+                    <TableCell>{eqp.eqpPort}</TableCell>
+                    <TableCell>
+                      <EquipmentStatusIndicator
+                        status={resolveEquipmentVisualState(eqp, runtimeState)}
+                      />
+                    </TableCell>
+                    <TableCell>{modelInfo?.modelName ?? '—'}</TableCell>
+                    <TableCell>{modelInfo?.modelVersion ?? '—'}</TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell>—</TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-44">
+                  <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    disabled={isLifecyclePending}
+                    onSelect={() => onLifecycleAction?.(eqp, 'start')}
+                  >
+                    Eqp Start
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    disabled={isLifecyclePending}
+                    onSelect={() => onLifecycleAction?.(eqp, 'end')}
+                  >
+                    Eqp End
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    disabled={isLifecyclePending}
+                    onSelect={() => onLifecycleAction?.(eqp, 'restart')}
+                  >
+                    Eqp Restart
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ) : (
               <TableRow>
-                <TableCell colSpan={11} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
                   표시할 설비를 선택해 주세요.
                 </TableCell>
               </TableRow>

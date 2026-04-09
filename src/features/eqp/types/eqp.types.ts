@@ -62,12 +62,18 @@ export interface EqpRuntimeState {
 /**
  * EQP 페이지의 선택 상태를 표현하는 유니온 타입입니다.
  * - none: 초기 진입 또는 선택 없음
+ * - gateway_all: Gateway 전체 선택 (전체 게이트웨이 설비 목록 테이블 표시)
+ * - business_all: Business 전체 선택 (전체 비즈니스 앱의 모델 목록 테이블 표시)
  * - gateway_group: gateway_app 그룹 선택 (해당 그룹의 설비 목록 테이블 표시)
+ * - business_group: business_app 그룹 선택 (해당 그룹 설비가 참조하는 모델 목록 표시)
  * - eqp: 개별 설비 선택 (설비 정보 + 파라미터/Checkout 영역 표시)
  */
 export type EqpSelection =
   | { type: 'none' }
+  | { type: 'gateway_all' }
+  | { type: 'business_all' }
   | { type: 'gateway_group'; groupIndex: number }
+  | { type: 'business_group'; groupIndex: number }
   | { type: 'eqp'; eqpId: string }
 
 // =========================================================================
@@ -80,6 +86,17 @@ export type EqpSelection =
  * 예: [0,1] → gateway_app1, [2,3] → gateway_app2
  */
 export interface GatewayAppGroup {
+  appIndex: number
+  appName: string
+  items: EqpInfo[]
+}
+
+/**
+ * business_app 그룹 모델입니다.
+ * route_partition을 6개씩 묶어 그룹화합니다.
+ * 예: [0..5] → business_app1, [6..11] → business_app2
+ */
+export interface BusinessAppGroup {
   appIndex: number
   appName: string
   items: EqpInfo[]

@@ -741,6 +741,8 @@ export function EqpManageFormModal({
               keepAliveEnabled: formState.keepAliveEnabled,
             }
           : null,
+      }, {
+        includeAppliedParamVersion: false,
       })
 
       await onSubmit(request)

@@ -90,6 +90,7 @@ const cloneSocketSettings = (
 export const buildEqpUpdateRequest = (
   detail: EqpManageDetail,
   override: Partial<EqpUpdateRequest> = {},
+  options: { includeAppliedParamVersion?: boolean } = {},
 ): EqpUpdateRequest => ({
   commMode: override.commMode ?? detail.commMode,
   isDev: override.isDev ?? detail.isDev,
@@ -98,7 +99,9 @@ export const buildEqpUpdateRequest = (
   eqpPort: override.eqpPort ?? detail.eqpPort,
   modelVersionKey: override.modelVersionKey ?? detail.modelBinding?.modelVersionKey ?? 0,
   appliedParamVersion:
-    override.appliedParamVersion !== undefined
+    options.includeAppliedParamVersion === false
+      ? override.appliedParamVersion
+      : override.appliedParamVersion !== undefined
       ? override.appliedParamVersion
       : detail.appliedParamVersion ?? null,
   gatewayJarRef:

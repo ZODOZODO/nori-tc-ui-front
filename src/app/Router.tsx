@@ -21,6 +21,11 @@ const DeployPage = lazy(async () => {
   return { default: module.DeployPage }
 })
 
+const LiveMapPage = lazy(async () => {
+  const module = await import('@/features/live-map/components/LiveMapPage')
+  return { default: module.LiveMapPage }
+})
+
 function RouteLoadingFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] px-6 text-sm text-[#4B5A52]">
@@ -36,6 +41,7 @@ export function Router() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/eqp" element={<EqpPage />} />
+        <Route path="/eqp/live-map" element={<LiveMapPage />} />
         <Route path="/model" element={<ModelPage />} />
         <Route path="/deploy" element={<DeployPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

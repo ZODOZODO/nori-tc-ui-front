@@ -1,30 +1,146 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { EqpInfo } from '../types/eqp.types'
+import { eqpApi } from '../api/eqp.api'
+import { eqpQueryKeys } from '../lib/eqp-query-keys'
+import type { EqpInfo, EqpManageDetail, EqpRuntimeState } from '../types/eqp.types'
+import { resolveBusinessAppName } from '../utils/eqp-group.util'
+
+type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
 interface GatewayGroupTableProps {
   /** 표시할 그룹의 설비 목록 */
   eqpItems: EqpInfo[]
   /** 그룹명 (예: gateway_app1) */
   groupName: string
+  isLifecyclePending?: boolean
+  onLifecycleAction?: (eqp: EqpInfo, action: EqpLifecycleAction) => void
+}
+
+type EquipmentVisualState = 'inactive' | 'ready' | 'attention'
+
+const CONNECTED_STATE_SET = new Set(['CONNECTED', 'CONNECT', 'ONLINE', 'UP'])
+
+/**
+ * enabled + runtime 상태를 조합해 설비 상태 아이콘 색상을 결정합니다.
+ */
+const resolveEquipmentVisualState = (
+  eqp: EqpInfo,
+  runtimeState: EqpRuntimeState | null,
+): EquipmentVisualState => {
+  if (!eqp.enabled) {
+    return 'inactive'
+  }
+
+  const controlState = runtimeState?.controlState?.trim().toUpperCase() ?? ''
+  const connectionState = runtimeState?.connectionState?.trim().toUpperCase() ?? ''
+
+  const isGreenByControlState = controlState === 'REMOTE' || controlState === 'LOCAL'
+  const isGreenByConnectionState = CONNECTED_STATE_SET.has(connectionState)
+
+  if (isGreenByControlState || isGreenByConnectionState) {
+    return 'ready'
+  }
+
+  return 'attention'
 }
 
 /**
- * gateway_app 그룹 선택 시 해당 그룹의 설비 목록을 다중 행 테이블로 표시합니다.
- *
- * 단건 설비 선택(EqpInfoTable)과 달리 runtimeState/modelInfo를 표시하지 않습니다.
- * 이유: 다건 조회 시 N+1 비용이 크므로 기본 설비 정보(enabled 포함)만 표시합니다.
+ * 상태를 원형 네온 점 아이콘으로 렌더링합니다.
+ */
+function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) {
+  if (status === 'inactive') {
+    return (
+      <span
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-300/80"
+        title="비활성"
+        aria-label="비활성"
+      >
+        <span className="inline-flex size-2 rounded-full bg-slate-500" />
+      </span>
+    )
+  }
+
+  if (status === 'ready') {
+    return (
+      <span
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-emerald-100/90 ring-2 ring-emerald-300/80 shadow-[0_0_10px_rgba(16,185,129,0.35)]"
+        title="활성(정상)"
+        aria-label="활성(정상)"
+      >
+        <span className="absolute inline-flex size-4 rounded-full bg-emerald-300/35 motion-safe:animate-ping" />
+        <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500" />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="relative inline-flex size-4 items-center justify-center rounded-full bg-amber-100/90 ring-2 ring-amber-300/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+      title="활성(주의)"
+      aria-label="활성(주의)"
+    >
+      <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
+      <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
+    </span>
+  )
+}
+
+/**
+ * Gateway / gateway_app 선택 시 해당 설비 목록을
+ * 설비 정보 테이블과 동일한 컬럼 구조로 다중 행 표시합니다.
  *
  * @param eqpItems 해당 그룹에 속한 설비 목록
  * @param groupName 그룹명 (헤더에 표시)
  */
-export function GatewayGroupTable({ eqpItems, groupName }: GatewayGroupTableProps) {
+export function GatewayGroupTable({
+  eqpItems,
+  groupName,
+  isLifecyclePending = false,
+  onLifecycleAction,
+}: GatewayGroupTableProps) {
+  const [selectedEqpId, setSelectedEqpId] = useState<string | null>(null)
+
   // EQPID(첫 번째 열 = 이름) 기준 오름차순 정렬
   const sortedEqpItems = useMemo(
     () => [...eqpItems].sort((a, b) => a.eqpId.localeCompare(b.eqpId)),
     [eqpItems],
   )
+  const effectiveSelectedEqpId = selectedEqpId ?? sortedEqpItems[0]?.eqpId ?? null
+  const detailQueries = useQueries({
+    queries: sortedEqpItems.map((eqp) => ({
+      queryKey: eqpQueryKeys.manage(eqp.eqpId),
+      queryFn: () => eqpApi.getEqpManageDetail(eqp.eqpId),
+      staleTime: 0,
+    })),
+  })
+
+  const detailByEqpId = useMemo(() => {
+    const mapped = new Map<string, EqpManageDetail>()
+
+    sortedEqpItems.forEach((eqp, index) => {
+      const detail = detailQueries[index]?.data
+      if (detail) {
+        mapped.set(eqp.eqpId, detail)
+      }
+    })
+
+    return mapped
+  }, [detailQueries, sortedEqpItems])
+
+  const isInitialLoading = sortedEqpItems.length > 0 && detailQueries.every((query) => query.isLoading)
+  const isFetching = detailQueries.some((query) => query.isFetching)
+  const hasDetailError = detailQueries.some((query) => query.isError)
 
   return (
     <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4">
@@ -34,64 +150,107 @@ export function GatewayGroupTable({ eqpItems, groupName }: GatewayGroupTableProp
       </div>
 
       <div className="overflow-auto">
-        <Table className="min-w-[760px]">
+        <Table className="min-w-[1180px]">
           <TableHeader>
             <TableRow className="bg-[#F6F9F7]">
               <TableHead>EQPID</TableHead>
+              <TableHead>Business App</TableHead>
               <TableHead>Comm Interface</TableHead>
               <TableHead>Comm Mode</TableHead>
               <TableHead>Route Partition</TableHead>
               <TableHead>IP</TableHead>
               <TableHead>Port</TableHead>
               <TableHead>Enabled</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead>Model Version</TableHead>
+              <TableHead>Gateway Jarfile</TableHead>
+              <TableHead>Business Jarfile</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedEqpItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
                   이 그룹에 속한 설비가 없습니다.
+                </TableCell>
+              </TableRow>
+            ) : isInitialLoading ? (
+              <TableRow>
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    설비 상세 정보를 불러오는 중입니다.
+                  </span>
                 </TableCell>
               </TableRow>
             ) : (
               sortedEqpItems.map((eqp) => (
-                <TableRow key={eqp.eqpId}>
-                  <TableCell>{eqp.eqpId}</TableCell>
-                  <TableCell>
-                    <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
-                      {eqp.commInterface}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{eqp.commMode}</TableCell>
-                  <TableCell>{eqp.routePartition ?? '—'}</TableCell>
-                  <TableCell>{eqp.eqpIp}</TableCell>
-                  <TableCell>{eqp.eqpPort}</TableCell>
-                  <TableCell>
-                    {/* runtimeState 없이 enabled 필드 기준만 표시 */}
-                    <span
-                      className={`inline-flex size-4 items-center justify-center rounded-full ${
-                        eqp.enabled
-                          ? 'bg-emerald-100/90 ring-2 ring-emerald-300/80'
-                          : 'bg-slate-100 ring-2 ring-slate-300/80'
-                      }`}
-                      title={eqp.enabled ? '활성' : '비활성'}
-                      aria-label={eqp.enabled ? '활성' : '비활성'}
+                <ContextMenu key={eqp.eqpId}>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
+                      onClick={() => setSelectedEqpId(eqp.eqpId)}
+                      onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
                     >
-                      <span
-                        className={`inline-flex size-2 rounded-full ${
-                          eqp.enabled
-                            ? 'bg-gradient-to-br from-emerald-400 to-teal-500'
-                            : 'bg-slate-500'
-                        }`}
-                      />
-                    </span>
-                  </TableCell>
-                </TableRow>
+                      <TableCell>{eqp.eqpId}</TableCell>
+                      <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
+                          {eqp.commInterface}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{eqp.commMode}</TableCell>
+                      <TableCell>{eqp.routePartition ?? '—'}</TableCell>
+                      <TableCell>{eqp.eqpIp}</TableCell>
+                      <TableCell>{eqp.eqpPort}</TableCell>
+                      <TableCell>
+                        <EquipmentStatusIndicator
+                          status={resolveEquipmentVisualState(eqp, detailByEqpId.get(eqp.eqpId)?.runtimeState ?? null)}
+                        />
+                      </TableCell>
+                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.modelBinding?.modelName ?? '—'}</TableCell>
+                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.modelBinding?.modelVersion ?? '—'}</TableCell>
+                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.jars?.gatewayJarFileName ?? '—'}</TableCell>
+                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.jars?.businessJarFileName ?? '—'}</TableCell>
+                    </TableRow>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-44">
+                    <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      disabled={isLifecyclePending}
+                      onSelect={() => onLifecycleAction?.(eqp, 'start')}
+                    >
+                      Eqp Start
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={isLifecyclePending}
+                      onSelect={() => onLifecycleAction?.(eqp, 'end')}
+                    >
+                      Eqp End
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={isLifecyclePending}
+                      onSelect={() => onLifecycleAction?.(eqp, 'restart')}
+                    >
+                      Eqp Restart
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      {isFetching && !isInitialLoading ? (
+        <p className="mt-2 text-xs text-[#7A8680]">설비 상세 데이터를 동기화 중입니다.</p>
+      ) : null}
+      {hasDetailError ? (
+        <p className="mt-2 text-xs text-[#C5534B]">
+          일부 설비의 모델 또는 Jar 정보를 불러오지 못해 빈 값으로 표시했습니다.
+        </p>
+      ) : null}
     </section>
   )
 }

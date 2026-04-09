@@ -32,7 +32,6 @@ interface CheckoutModelVariables {
 
 interface CheckinModelVariables {
   editModel: ModelInfo
-  newVersion: string
   description: string
   currentUserId: string | null
 }
@@ -164,20 +163,7 @@ export function useModelMutations() {
   })
 
   const checkinModelMutation = useMutation({
-    mutationFn: async ({ editModel, newVersion, description, currentUserId }: CheckinModelVariables) => {
-      const normalizedVersion = newVersion.trim()
-      if (!normalizedVersion) {
-        throw new ModelApiError(
-          createModelFailResponse({
-            success: false,
-            data: null,
-            errorCode: 'INVALID_REQUEST',
-            errorMsg: '저장할 버전을 입력해 주세요.',
-          }),
-          400,
-        )
-      }
-
+    mutationFn: async ({ editModel, description, currentUserId }: CheckinModelVariables) => {
       const lockOwner = resolveLockOwner(editModel)
       if (
         isEditVersion(editModel.modelVersion) &&
@@ -187,7 +173,6 @@ export function useModelMutations() {
         throw createCheckoutConflictError(lockOwner)
       }
       return modelApi.checkinModelVersion(editModel.modelVersionKey, {
-        newVersion: normalizedVersion,
         description: description.trim(),
       })
     },

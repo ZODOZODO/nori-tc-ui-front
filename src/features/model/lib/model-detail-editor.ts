@@ -265,10 +265,10 @@ const summarizeActionField = (
   field: ActionDataIndexFieldDraft,
   mdfTemplateName: string,
 ): string => {
-  const summaryParts = [
-    `mdfTemplateName=${mdfTemplateName}`,
-    ` / ${fieldName} {from=${field.from}, path=${field.path}`,
-  ]
+  const normalizedTemplateName = normalizeText(mdfTemplateName)
+  const summaryParts = normalizedTemplateName
+    ? [`mdfTemplateName=${normalizedTemplateName}`, ` / ${fieldName} {from=${field.from}, path=${field.path}`]
+    : [`${fieldName} {from=${field.from}, path=${field.path}`]
 
   const transforms = serializeTransforms(field.transforms)
   if (transforms.length > 0) {

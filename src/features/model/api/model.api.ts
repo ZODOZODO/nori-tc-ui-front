@@ -376,7 +376,7 @@ export const modelApi = {
    */
   checkinModelVersion: async (
     modelVersionKey: number,
-    request: { newVersion: string; description: string },
+    request: { description: string },
   ): Promise<ModelInfo> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>

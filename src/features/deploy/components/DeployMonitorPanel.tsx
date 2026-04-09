@@ -29,6 +29,7 @@ import {
 import type { EqpModelOption } from '@/features/eqp/types/eqp.types'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployHistoryList } from '../hooks/useDeployHistoryList'
+import { useDeployScenarios } from '../hooks/useDeployScenarios'
 import { useDeploySummary } from '../hooks/useDeploySummary'
 import { useDeployTargets } from '../hooks/useDeployTargets'
 import { useDeleteDeploy } from '../hooks/useDeleteDeploy'
@@ -36,6 +37,7 @@ import { useHoldDeploy } from '../hooks/useHoldDeploy'
 import { useRedeployDeploy } from '../hooks/useRedeployDeploy'
 import { useStartDeploy } from '../hooks/useStartDeploy'
 import { useMe, useUsers } from '@/features/profile/hooks/useProfile'
+import { resolveDeployTaskLabel } from '../lib/deploy-utils'
 import { createDefaultMonitorFilters, useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployHistoryItem, DeployStatus } from '../types/deploy.types'
 
@@ -69,6 +71,41 @@ const resolveStatusVariant = (status: DeployStatus) => {
       return 'secondary'
     default:
       return 'default'
+  }
+}
+
+const resolveTargetResultLabel = (targetStatus: string) => {
+  switch (targetStatus) {
+    case 'COMPLETED':
+    case 'NO_CHANGE':
+      return 'PASS'
+    case 'FAILED':
+    case 'COMPENSATION_FAILED':
+      return 'FAIL'
+    case 'ROLLING_BACK':
+    case 'ROLLED_BACK':
+      return 'ROLLBACK'
+    case 'RUNNING':
+      return 'RUNNING'
+    case 'CANCELED':
+      return 'CANCELED'
+    default:
+      return 'PENDING'
+  }
+}
+
+const resolveTargetResultVariant = (targetStatus: string) => {
+  switch (targetStatus) {
+    case 'FAILED':
+    case 'COMPENSATION_FAILED':
+      return 'warning'
+    case 'RUNNING':
+      return 'info'
+    case 'COMPLETED':
+    case 'NO_CHANGE':
+      return 'default'
+    default:
+      return 'secondary'
   }
 }
 
@@ -368,6 +405,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     null,
     commentHistoryItem?.deployStatus ?? null,
   )
+  const commentScenarioCatalogQuery = useDeployScenarios(
+    commentSummaryQuery.data?.eventType ?? commentHistoryItem?.eventType ?? 'EQP_REGISTER_DEPLOY',
+    commentDeployKey !== null && commentHistoryItem !== null,
+  )
 
   useEffect(() => {
     if (deployHistoryQuery.isSuccess) {
@@ -493,8 +534,83 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   )
   const commentResultMessage = commentSummaryQuery.data?.resultMessage?.message?.trim() ?? null
   const commentResultTitle = commentSummaryQuery.data?.resultMessage?.title?.trim() ?? null
+  const commentTaskTypeLabel = useMemo(
+    () =>
+      resolveDeployTaskLabel(
+        commentSummaryQuery.data?.resolvedScenarioCode ?? null,
+        commentSummaryQuery.data?.eventType ?? commentHistoryItem?.eventType ?? null,
+      ),
+    [
+      commentHistoryItem?.eventType,
+      commentSummaryQuery.data?.eventType,
+      commentSummaryQuery.data?.resolvedScenarioCode,
+    ],
+  )
+  const commentScenario = useMemo(() => {
+    const resolvedScenarioCode = commentSummaryQuery.data?.resolvedScenarioCode?.trim()
+    if (!resolvedScenarioCode) {
+      return null
+    }
+
+    return (
+      commentScenarioCatalogQuery.data?.scenarios.find((scenario) => scenario.code === resolvedScenarioCode) ?? null
+    )
+  }, [commentScenarioCatalogQuery.data?.scenarios, commentSummaryQuery.data?.resolvedScenarioCode])
   const isCommentLoading =
-    isCommentServerBacked && (commentSummaryQuery.isPending || commentTargetsQuery.isPending)
+    isCommentServerBacked &&
+    (commentSummaryQuery.isPending ||
+      commentTargetsQuery.isPending ||
+      commentScenarioCatalogQuery.isPending)
+  const commentToBeLines = useMemo(() => {
+    const lines: string[] = []
+
+    if (commentHistoryItem?.selectedModelName || commentHistoryItem?.selectedModelVersion) {
+      lines.push(
+        `모델: ${commentHistoryItem?.selectedModelName ?? '-'} / ${commentHistoryItem?.selectedModelVersion ?? '-'}`,
+      )
+    }
+
+    if (commentHistoryItem?.selectedBusinessJarName) {
+      lines.push(`Business JAR: ${commentHistoryItem.selectedBusinessJarName}`)
+    }
+
+    if (commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode) {
+      lines.push(
+        `시나리오: ${commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}`,
+      )
+    }
+
+    return lines
+  }, [
+    commentHistoryItem?.selectedBusinessJarName,
+    commentHistoryItem?.selectedModelName,
+    commentHistoryItem?.selectedModelVersion,
+    commentScenario?.name,
+    commentSummaryQuery.data?.resolvedScenarioCode,
+  ])
+  const commentAsIsLines = useMemo(() => {
+    const lines: string[] = []
+    const asIsState = commentSummaryQuery.data?.asIsState
+
+    if (!asIsState) {
+      return lines
+    }
+
+    if (asIsState.interfaceType) {
+      lines.push(`인터페이스: ${asIsState.interfaceType}`)
+    }
+    if (asIsState.modelName || asIsState.modelVersion) {
+      lines.push(`모델: ${asIsState.modelName ?? '-'} / ${asIsState.modelVersion ?? '-'}`)
+    }
+    if (asIsState.businessJarName) {
+      lines.push(`Business JAR: ${asIsState.businessJarName}`)
+    }
+    if (asIsState.eqpParamVersion) {
+      lines.push(`EQP PARAM: ${asIsState.eqpParamVersion}`)
+    }
+
+    return lines
+  }, [commentSummaryQuery.data?.asIsState])
 
   const serverTotalCount = deployHistoryQuery.data?.count ?? 0
   const displayTotalCount = serverTotalCount + bridgeHistoryItems.length
@@ -728,32 +844,94 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
             <div className="flex max-h-[85vh] flex-col">
               <DialogHeader className="border-b border-[#EDF1EE] px-6 py-5">
                 <DialogTitle className="flex flex-wrap items-center gap-2 text-[#243129]">
-                  <span>Deploy Comment</span>
+                  <span>Deploy View</span>
                   <span className="text-sm font-medium text-[#607067]">#{commentHistoryItem.deployKey}</span>
                   <Badge variant={resolveStatusVariant(commentHistoryItem.deployStatus)}>
                     {commentHistoryItem.deployStatus}
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-sm text-[#56635C]">
-                  선택한 deploy의 실패 사유와 target 상세를 확인합니다.
+                  선택한 deploy의 작업 유형, 시나리오, 대상별 진행 현황을 확인합니다.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto px-6 py-5">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
-                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">Deploy</p>
-                    <p className="mt-2 text-base font-semibold text-[#243129]">
-                      {commentHistoryItem.deployName}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#243129]">대상별 진행 현황</p>
+                    <p className="text-xs text-[#6C7B72]">
+                      전체 {commentTargets.length}건 · 실패 {commentFailureTargets.length}건
                     </p>
-                    <div className="mt-3 space-y-1 text-sm text-[#526058]">
-                      <p>요청자: {commentHistoryItem.requestedBy}</p>
-                      <p>생성 시각: {formatDateTime(commentHistoryItem.createdAt)}</p>
-                      <p>시작 시각: {formatDateTime(commentHistoryItem.startedAt)}</p>
-                      <p>종료 시각: {formatDateTime(commentHistoryItem.finishedAt)}</p>
-                    </div>
                   </div>
 
+                  {isCommentLoading ? (
+                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
+                      대상별 진행 현황을 불러오고 있습니다.
+                    </div>
+                  ) : commentTargets.length === 0 ? (
+                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
+                      확인 가능한 대상 정보가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="mt-3 overflow-hidden rounded-2xl border border-[#E7EDE8] bg-white">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>EQP ID</TableHead>
+                            <TableHead>작업</TableHead>
+                            <TableHead>결과</TableHead>
+                            <TableHead>상세 상태</TableHead>
+                            <TableHead>현재 Step</TableHead>
+                            <TableHead>Step 상태</TableHead>
+                            <TableHead>오류 요약</TableHead>
+                            <TableHead className="text-right">갱신 시각</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {commentTargets.map((target) => (
+                            <TableRow key={target.deployTargetKey}>
+                              <TableCell className="font-medium text-[#243129]">{target.eqpId}</TableCell>
+                              <TableCell>
+                                <div className="min-w-[180px]">
+                                  <p className="font-medium text-[#243129]">{commentTaskTypeLabel}</p>
+                                  <p className="text-xs text-[#6C7B72]">
+                                    {commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
+                                  {resolveTargetResultLabel(target.targetStatus)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
+                                  {target.targetStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{target.currentStepCode || '-'}</TableCell>
+                              <TableCell>
+                                {target.currentStepStatus ? (
+                                  <Badge variant="secondary">{target.currentStepStatus}</Badge>
+                                ) : (
+                                  '-'
+                                )}
+                              </TableCell>
+                              <TableCell className="max-w-[280px] whitespace-pre-wrap break-words text-xs text-[#526058]">
+                                {target.lastErrorMessage || target.lastErrorCode || '-'}
+                              </TableCell>
+                              <TableCell className="text-right text-xs text-[#6C7B72]">
+                                {formatDateTime(target.updatedAt)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 space-y-3">
                   <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
                     <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">요약</p>
                     <div className="mt-3 grid gap-2 text-sm text-[#526058] sm:grid-cols-2">
@@ -768,12 +946,71 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                         {commentHistoryItem.selectedModelVersion ?? '-'}
                       </p>
                     ) : null}
+                    {commentHistoryItem.selectedBusinessJarName ? (
+                      <p className="mt-2 text-sm text-[#526058]">
+                        Business JAR: {commentHistoryItem.selectedBusinessJarName}
+                      </p>
+                    ) : null}
+                    {commentResultTitle || commentSummaryQuery.data?.resultCode || commentResultMessage ? (
+                      <div className="mt-3 rounded-xl border border-[#E3EADF] bg-white px-3 py-3 text-sm text-[#425149]">
+                        {commentResultTitle ? (
+                          <p className="font-semibold text-[#243129]">{commentResultTitle}</p>
+                        ) : null}
+                        {commentSummaryQuery.data?.resultCode ? (
+                          <p className="mt-1">결과 코드: {commentSummaryQuery.data.resultCode}</p>
+                        ) : null}
+                        {commentResultMessage ? (
+                          <p className="mt-1 whitespace-pre-wrap break-words">{commentResultMessage}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">작업</p>
+                    <p className="mt-2 text-base font-semibold text-[#243129]">
+                      {commentTaskTypeLabel}
+                    </p>
+                    <div className="mt-3 space-y-3 text-sm text-[#526058]">
+                      <div>
+                        <p className="font-semibold text-[#243129]">AS-IS</p>
+                        <div className="mt-1 space-y-1">
+                          {commentAsIsLines.length > 0 ? (
+                            commentAsIsLines.map((line) => <p key={line}>{line}</p>)
+                          ) : (
+                            <>
+                              <p>변경 전 상세 값을 확인할 수 없습니다.</p>
+                              <p>이 deploy는 AS-IS snapshot이 없거나 아직 생성 전 상태입니다.</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[#243129]">TO-BE</p>
+                        <div className="mt-1 space-y-1">
+                          {commentToBeLines.length > 0 ? (
+                            commentToBeLines.map((line) => <p key={line}>{line}</p>)
+                          ) : (
+                            <p>변경 예정 정보가 없습니다.</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1 border-t border-[#E3EADF] pt-3">
+                        <p>작업명: {commentHistoryItem.deployName}</p>
+                        <p>시나리오 코드: {commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}</p>
+                        {commentScenario?.summary ? <p>시나리오 설명: {commentScenario.summary}</p> : null}
+                        <p>요청자: {commentHistoryItem.requestedBy}</p>
+                        <p>생성 시각: {formatDateTime(commentHistoryItem.createdAt)}</p>
+                        <p>시작 시각: {formatDateTime(commentHistoryItem.startedAt)}</p>
+                        <p>종료 시각: {formatDateTime(commentHistoryItem.finishedAt)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {isCommentLoading ? (
                   <div className="mt-4 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
-                    실패 상세를 불러오고 있습니다.
+                    상세 정보를 불러오고 있습니다.
                   </div>
                 ) : null}
                 {commentSummaryErrorMessage ? (
@@ -786,61 +1023,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                     {commentTargetsErrorMessage}
                   </div>
                 ) : null}
-                {commentResultMessage || commentResultTitle || commentSummaryQuery.data?.resultCode ? (
-                  <div className="mt-4 rounded-2xl border border-[#E3EADF] bg-[#F8FBF9] p-4">
-                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">배포 결과</p>
-                    <div className="mt-2 space-y-1 text-sm text-[#425149]">
-                      {commentResultTitle ? <p className="font-semibold text-[#243129]">{commentResultTitle}</p> : null}
-                      {commentSummaryQuery.data?.resultCode ? (
-                        <p>결과 코드: {commentSummaryQuery.data.resultCode}</p>
-                      ) : null}
-                      {commentResultMessage ? (
-                        <p className="whitespace-pre-wrap break-words">{commentResultMessage}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
 
-                <div className="mt-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#243129]">실패 대상 상세</p>
-                    <p className="text-xs text-[#6C7B72]">{commentFailureTargets.length}건</p>
-                  </div>
-
-                  {commentFailureTargets.length === 0 ? (
-                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
-                      확인 가능한 실패 사유가 없습니다.
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-3">
-                      {commentFailureTargets.map((target) => (
-                        <div
-                          key={target.deployTargetKey}
-                          className="rounded-2xl border border-[#E7EDE8] bg-white p-4 shadow-[0_10px_24px_-24px_rgba(30,54,40,0.35)]"
-                        >
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-[#243129]">{target.eqpId}</p>
-                              <Badge variant="warning">{target.targetStatus}</Badge>
-                              {target.currentStepStatus ? (
-                                <Badge variant="secondary">{target.currentStepStatus}</Badge>
-                              ) : null}
-                            </div>
-                            <p className="text-xs text-[#6C7B72]">갱신: {formatDateTime(target.updatedAt)}</p>
-                          </div>
-
-                          <div className="mt-3 grid gap-2 text-sm text-[#526058]">
-                            <p>현재 Step: {target.currentStepCode}</p>
-                            <p>오류 코드: {target.lastErrorCode || '-'}</p>
-                            <p className="whitespace-pre-wrap break-words">
-                              오류 메시지: {target.lastErrorMessage || '상세 메시지가 기록되지 않았습니다.'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
 
               <DialogFooter className="border-t border-[#EDF1EE] px-6 py-4">
@@ -989,6 +1172,14 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                       : '실시간 상태를 반영하고 있습니다.'}
                   </span>
                 ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 rounded-lg border-[#D8E1DB] bg-white px-3 text-xs text-[#425149]"
+                  onClick={() => handleOpenComment(activeHistoryItem.deployKey)}
+                >
+                  View
+                </Button>
               </div>
             ) : null}
           </div>
@@ -1071,7 +1262,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                         {historyOnly ? (
                           <>
                             <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                              Comment
+                              View
                             </ContextMenuItem>
                             <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
                               Redeploy
@@ -1086,6 +1277,9 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                         ) : isServerBackedRow(item.deployKey) ? (
                           item.deployStatus === 'READY' ? (
                             <>
+                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                                View
+                              </ContextMenuItem>
                               <ContextMenuItem onSelect={() => void handleStart(item.deployKey)}>
                                 Deploy
                               </ContextMenuItem>
@@ -1097,24 +1291,42 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                               </ContextMenuItem>
                             </>
                           ) : item.deployStatus === 'PLANNING' ? (
-                            <ContextMenuItem
-                              variant="destructive"
-                              onSelect={() => handleRequestDelete(item.deployKey)}
-                            >
-                              Delete
-                            </ContextMenuItem>
+                            <>
+                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                                View
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                variant="destructive"
+                                onSelect={() => handleRequestDelete(item.deployKey)}
+                              >
+                                Delete
+                              </ContextMenuItem>
+                            </>
                           ) : item.deployStatus === 'RUNNING' ? (
-                            <ContextMenuItem
-                              disabled={item.pauseRequested}
-                              onSelect={() => void handleHold(item.deployKey)}
-                            >
-                              {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
-                            </ContextMenuItem>
+                            <>
+                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                                View
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                disabled={item.pauseRequested}
+                                onSelect={() => void handleHold(item.deployKey)}
+                              >
+                                {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
+                              </ContextMenuItem>
+                            </>
                           ) : (
-                            <ContextMenuItem disabled>동작 없음</ContextMenuItem>
+                            <>
+                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                                View
+                              </ContextMenuItem>
+                              <ContextMenuItem disabled>동작 없음</ContextMenuItem>
+                            </>
                           )
                         ) : (
                           <>
+                            <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                              View
+                            </ContextMenuItem>
                             <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
                               Deploy
                             </ContextMenuItem>

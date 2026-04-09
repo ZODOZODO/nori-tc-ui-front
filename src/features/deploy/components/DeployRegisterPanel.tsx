@@ -71,6 +71,9 @@ const mergeModelOptions = (developModelOptions: EqpModelOption[], operateModelOp
   return [...mergedOptionMap.values()]
 }
 
+const compareModelNames = (left: string, right: string) =>
+  left.localeCompare(right, 'en', { numeric: true, sensitivity: 'base' })
+
 const toUniqueModelOptions = (modelOptions: EqpModelOption[]) => {
   const uniqueModelMap = new Map<string, EqpModelOption>()
 
@@ -80,7 +83,9 @@ const toUniqueModelOptions = (modelOptions: EqpModelOption[]) => {
     }
   }
 
-  return [...uniqueModelMap.values()]
+  return [...uniqueModelMap.values()].sort((left, right) =>
+    compareModelNames(left.modelName, right.modelName),
+  )
 }
 
 interface SelectedEquipmentRowProps {
@@ -387,8 +392,12 @@ export function DeployRegisterPanel() {
   }, [mergedModelVersionOptions, selectedInterfaceType])
 
   const availableModelVersionOptions = useMemo(
-    () =>
-      mergedModelVersionOptions.filter((option) => {
+    () => {
+      if (!selectedModelName) {
+        return []
+      }
+
+      return mergedModelVersionOptions.filter((option) => {
         if (selectedModelName && option.modelName !== selectedModelName) {
           return false
         }
@@ -398,7 +407,8 @@ export function DeployRegisterPanel() {
         }
 
         return true
-      }),
+      })
+    },
     [mergedModelVersionOptions, selectedInterfaceType, selectedModelName],
   )
 
@@ -576,7 +586,10 @@ export function DeployRegisterPanel() {
     }
 
     return {
-      deployName: createDeployName(deployNameContext.modelName, deployNameContext.modelVersion),
+      deployName: createDeployName({
+        resolvedScenarioCode,
+        eventType: DEPLOY_EVENT_TYPE,
+      }),
       eventType: DEPLOY_EVENT_TYPE,
       executionPolicy: 'BEST_EFFORT',
       commonRequest: {
@@ -752,6 +765,7 @@ export function DeployRegisterPanel() {
       closeScenarioDialog()
       createServerDeployBridge({
         deployKey: result.deployKey,
+        deployName: request.deployName,
         deployStatus: resolvedSummary?.deployStatus ?? result.deployStatus,
         requestedBy: meQuery.data?.userId?.trim() || 'SYSTEM',
         selectedModelName: deployNameContext.modelName,
@@ -1451,8 +1465,8 @@ export function DeployRegisterPanel() {
             value={selectedModelVersionKey ? String(selectedModelVersionKey) : EMPTY_SELECT_VALUE}
             onValueChange={handleChangeModelVersionKey}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="New Model Version 선택" />
+            <SelectTrigger disabled={!selectedModelName}>
+              <SelectValue placeholder={selectedModelName ? 'New Model Version 선택' : 'Model 먼저 선택'} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={EMPTY_SELECT_VALUE}>New Model Version 선택</SelectItem>

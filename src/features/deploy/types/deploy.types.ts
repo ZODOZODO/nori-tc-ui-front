@@ -146,8 +146,8 @@ export interface DeployTargetItem {
   eqpId: string
   modelName?: string
   targetStatus: DeployTargetStatus
-  currentStepOrder: number
-  currentStepCode: string
+  currentStepOrder: number | null
+  currentStepCode: string | null
   currentStepStatus: DeployStepStatus | null
   rollbackRequired: boolean
   lastErrorCode?: string | null
@@ -275,6 +275,14 @@ export interface DeploySummary {
   deployKey: number
   deployName: string
   eventType: DeployEventType
+  resolvedScenarioCode: string | null
+  asIsState: {
+    interfaceType: string | null
+    modelName: string | null
+    modelVersion: string | null
+    businessJarName: string | null
+    eqpParamVersion: string | null
+  } | null
   deployStatus: DeployStatus
   pauseRequested: boolean
   executionPolicy: DeployExecutionPolicy

@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { authApi } from '@/features/auth/api/auth.api'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
+import { AppTopBar } from '@/shared/components/AppTopBar'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { useModelDetail } from '../hooks/useModelDetail'
@@ -44,23 +40,9 @@ import { ModelInfoTable } from './ModelInfoTable'
 import { ModelSidebar } from './ModelSidebar'
 import { ParentModelCommitModal } from './ParentModelCommitModal'
 
-const LOGIN_ROUTE = '/login'
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
 const PANEL_MAX_PERCENT = 85
-
-/**
- * 상단 네비게이션 메뉴 구성입니다.
- */
-const TOP_NAVIGATION_ITEMS = [
-  { name: 'Eqp', subLabel: 'Eqp Info', route: '/eqp' },
-  { name: 'Model', subLabel: 'Model Info', route: '/model' },
-  { name: 'Deploy', subLabel: 'Eqp Deploy / Model Deploy', route: '/deploy' },
-  { name: 'Dlq', subLabel: 'Gateway Dlq / Business Dlq', route: null },
-  { name: 'User', subLabel: 'User Info / Group Info', route: null },
-] as const
 
 /**
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
@@ -79,16 +61,6 @@ const resolveErrorMessage = (error: unknown, fallbackMessage: string): string =>
  */
 const sortDetailRowsByFirstColumn = (rows: ModelDetailRow[]): ModelDetailRow[] =>
   [...rows].sort((a, b) => (a.values[0] ?? '').localeCompare(b.values[0] ?? ''))
-
-/**
- * 브라우저에서 접근 가능한 CSRF 쿠키를 삭제합니다.
- */
-const clearCsrfCookie = () => {
-  if (typeof document === 'undefined') {
-    return
-  }
-  document.cookie = `${CSRF_COOKIE_NAME}=; Max-Age=0; path=/`
-}
 
 /**
  * updatedAt 기준 최신순으로 모델 목록을 정렬합니다.
@@ -210,9 +182,6 @@ const collectCascadeDeletedVersionKeys = (
  * Model Info 메인 페이지입니다.
  */
 export function ModelPage() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-
   const selectedModelVersionKey = useModelUiStore((state) => state.selectedModelVersionKey)
   const openedTabs = useModelUiStore((state) => state.openedTabs)
   const activeTab = useModelUiStore((state) => state.activeTab)
@@ -261,7 +230,6 @@ export function ModelPage() {
   const [isCheckInDiffModalOpen, setIsCheckInDiffModalOpen] = useState(false)
   const [isCheckInDiffLoading, setIsCheckInDiffLoading] = useState(false)
   const [checkInDiffSections, setCheckInDiffSections] = useState<ModelDiffSection[]>([])
-  const [isLogoutPending, setIsLogoutPending] = useState(false)
   const [detailColumnsByContext, setDetailColumnsByContext] = useState<Record<string, string[]>>({})
   const [detailRowsByContext, setDetailRowsByContext] = useState<Record<string, ModelDetailRow[]>>({})
   const [detailMdfByContext, setDetailMdfByContext] = useState<Record<string, ModelMdfContent[]>>({})
@@ -296,6 +264,7 @@ export function ModelPage() {
   })
   const [deleteDialogErrorMessage, setDeleteDialogErrorMessage] = useState<string | null>(null)
   const [explicitCheckoutModelVersionKey, setExplicitCheckoutModelVersionKey] = useState<number | null>(null)
+  const [selectedInterfaceGroup, setSelectedInterfaceGroup] = useState<ProtocolType | null>(null)
 
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
@@ -335,6 +304,24 @@ export function ModelPage() {
 
     return sortByUpdatedAtDesc(modelItems.filter((item) => item.modelName === selectedModel.modelName))
   }, [modelItems, selectedModel])
+
+  const interfaceGroupRows = useMemo(() => {
+    if (!selectedInterfaceGroup) {
+      return []
+    }
+
+    const latestRepresentativeByName = new Map<string, ModelInfo>()
+
+    sortByUpdatedAtDesc(
+      modelItems.filter((item) => item.commInterface.toUpperCase() === selectedInterfaceGroup.toUpperCase()),
+    ).forEach((item) => {
+      if (!latestRepresentativeByName.has(item.modelName)) {
+        latestRepresentativeByName.set(item.modelName, item)
+      }
+    })
+
+    return sortByUpdatedAtDesc([...latestRepresentativeByName.values()])
+  }, [modelItems, selectedInterfaceGroup])
 
   const branchCreateSourceVersions = useMemo(() => {
     if (!branchCreateTargetModel) {
@@ -767,6 +754,7 @@ export function ModelPage() {
    * Sidebar에서 모델명 선택 시 Model 정보 테이블 화면으로 전환합니다.
    */
   const handleSelectModel = (model: ModelInfo) => {
+    setSelectedInterfaceGroup(null)
     if (openedTabs.length === 0) {
       setActiveTab(null)
     }
@@ -780,6 +768,7 @@ export function ModelPage() {
    * Model 정보 row 더블 클릭 시 Version 화면 탭을 엽니다.
    */
   const handleOpenModelDetail = (model: ModelInfo) => {
+    setSelectedInterfaceGroup(null)
     openModelTab(model)
     setSelectedModelVersionKey(model.modelVersionKey)
     setActiveTab(model.modelVersionKey)
@@ -791,10 +780,23 @@ export function ModelPage() {
   }
 
   const handleSelectTab = (modelVersionKey: number) => {
+    setSelectedInterfaceGroup(null)
     setActiveTab(modelVersionKey)
     setSelectedModelVersionKey(modelVersionKey)
     setCheckInErrorMessage(null)
   }
+
+  const handleSelectInterfaceGroup = useCallback(
+    (interfaceType: ProtocolType) => {
+      setSelectedInterfaceGroup(interfaceType)
+      setSelectedModelVersionKey(null)
+      setActiveTab(null)
+      setEditMode(false)
+      setCheckInModalOpen(false)
+      setCheckInErrorMessage(null)
+    },
+    [setActiveTab, setCheckInModalOpen, setEditMode, setSelectedModelVersionKey],
+  )
 
   const handleCloseTab = (modelVersionKey: number) => {
     closeModelTab(modelVersionKey)
@@ -1212,7 +1214,7 @@ export function ModelPage() {
   }
 
   /**
-   * diff 미리보기 모달에서 OK 클릭 시 version/description 입력 모달로 이동합니다.
+   * diff 미리보기 모달에서 OK 클릭 시 설명 입력 모달로 이동합니다.
    */
   const handleCheckInDiffOk = () => {
     setIsCheckInDiffModalOpen(false)
@@ -1269,7 +1271,7 @@ export function ModelPage() {
     }
   }
 
-  const handleSaveCheckIn = async (version: string, description: string) => {
+  const handleSaveCheckIn = async (description: string) => {
     if (!activeTabModel || activeTabModel.modelVersion.trim().toUpperCase() !== 'EDIT') {
       setCheckInErrorMessage('체크인할 EDIT 모델이 없어 저장할 수 없습니다.')
       return
@@ -1279,7 +1281,6 @@ export function ModelPage() {
       setCheckInErrorMessage(null)
       const createdModel = await checkinModelMutation.mutateAsync({
         editModel: activeTabModel,
-        newVersion: version,
         description,
         currentUserId,
       })
@@ -1302,128 +1303,40 @@ export function ModelPage() {
     }
   }
 
-  /**
-   * 로그아웃 API 호출 후 로컬 상태/캐시를 정리하고 로그인 페이지로 이동합니다.
-   */
-  const handleLogout = async () => {
-    if (isLogoutPending) {
-      return
-    }
-
-    setIsLogoutPending(true)
-
-    try {
-      await authApi.logout()
-    } catch {
-      // 로그아웃 API 실패 시에도 로컬 세션 정리를 우선합니다.
-    } finally {
-      clearDeployUiSessionState()
-      // resetUiState()가 store의 reset()을 호출하므로 topPanelHeightPercent도 함께 초기화됩니다.
-      resetUiState()
-      setCheckInErrorMessage(null)
-      setExplicitCheckoutModelVersionKey(null)
-      setDetailColumnsByContext({})
-      setDetailRowsByContext({})
-      setDetailMdfByContext({})
-      queryClient.clear()
-      clearCsrfCookie()
-      navigate(LOGIN_ROUTE, { replace: true })
-    }
-  }
-
   const listErrorMessage = modelListQuery.error
     ? resolveErrorMessage(modelListQuery.error, '모델 목록을 불러오지 못했습니다.')
     : null
 
   const isVersionFrame = activeTab !== null && openedTabs.length > 0
 
-  const handleNavigateMenu = (route: string | null) => {
-    if (!route || route === '/model') {
-      return
-    }
-    navigate(route)
-  }
-
   return (
-    <div className="flex min-h-screen w-screen flex-col overflow-hidden bg-[#F7FAF8]">
-      <header className="relative flex h-[52px] items-center justify-between bg-white px-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[#d95d39]">
-            <span className="font-fraunces text-sm font-medium text-white">N</span>
-          </div>
-          <span className="font-fraunces text-lg text-[#2D2D2D]">Nori-TC</span>
-        </div>
-
-        {/* topbar nav는 사이드바 폭에 관계없이 항상 헤더 중앙에 고정됩니다.
-            좌우 여백을 동일하게(164px) 설정하여 버튼 영역과 겹치지 않도록 합니다. */}
-        <div
-          className="pointer-events-none absolute inset-y-0 hidden items-center justify-center md:flex"
-          style={{ left: '164px', right: '164px' }}
-        >
-          <nav className="pointer-events-auto flex max-w-full items-center gap-6 overflow-hidden whitespace-nowrap">
-            {TOP_NAVIGATION_ITEMS.map((menuItem) => {
-              const isCurrentMenu = menuItem.name === 'Model'
-              return (
-                <button
-                  key={menuItem.name}
-                  type="button"
-                  onClick={() => handleNavigateMenu(menuItem.route)}
-                  className={`group relative inline-flex h-[38px] items-center px-2 text-[14px] font-medium tracking-[0.01em] transition-colors ${
-                    isCurrentMenu
-                      ? 'text-[#173f31]'
-                      : 'text-[#6A7971] hover:text-[#2B4A3F]'
-                  }`}
-                >
-                  <span>{menuItem.name}</span>
-                  <span
-                    className={`pointer-events-none absolute -bottom-px left-0 right-0 h-[2px] rounded-full transition-opacity ${
-                      isCurrentMenu
-                        ? 'bg-[#1C7F59] opacity-100'
-                        : 'bg-[#1C7F59] opacity-0 group-hover:opacity-35'
-                    }`}
-                  />
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-[38px] rounded-full border-[#DCE5E0] px-3.5 text-sm font-medium text-[#4B5A52]"
-            onClick={() => void handleLogout()}
-            disabled={isLogoutPending}
-            aria-label="로그아웃"
-          >
-            {isLogoutPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
-            로그아웃
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="size-[38px] rounded-full border border-[#DCE5E0] text-[#4B5A52]"
-            onClick={() => setProfileModalOpen(true)}
-            aria-label="사용자 프로필 열기"
-            disabled={isLogoutPending}
-          >
-            <CircleUserRound className="size-[18px]" />
-          </Button>
-        </div>
-      </header>
-
+    <div className="flex h-screen min-h-screen w-screen flex-col overflow-hidden bg-[#F7FAF8]">
+      <AppTopBar
+        currentMenu="model"
+        onOpenProfile={() => setProfileModalOpen(true)}
+        onAfterLogout={() => {
+          clearDeployUiSessionState()
+          resetUiState()
+          setCheckInErrorMessage(null)
+          setExplicitCheckoutModelVersionKey(null)
+          setDetailColumnsByContext({})
+          setDetailRowsByContext({})
+          setDetailMdfByContext({})
+          setProfileModalOpen(false)
+        }}
+      />
       <div className="h-px bg-[#E5ECE7]" />
 
       <main className="flex flex-1 min-h-0">
         <ModelSidebar
           modelItems={modelItems}
           selectedModelVersionKey={selectedModelVersionKey}
+          selectedInterfaceGroup={selectedInterfaceGroup}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           isLoading={modelListQuery.isLoading}
           errorMessage={listErrorMessage}
+          onSelectInterfaceGroup={handleSelectInterfaceGroup}
           onSelectModel={handleSelectModel}
           onOpenRootCreate={handleOpenRootCreate}
           onOpenRootUpdate={handleOpenRootUpdate}
@@ -1442,9 +1355,26 @@ export function ModelPage() {
           onResizeSidebar={handleSidebarDrag}
         />
 
-        <section className="flex min-w-0 flex-1 flex-col">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {selectedModelVersionKey === null ? (
+            {selectedInterfaceGroup !== null ? (
+              <section className="flex flex-1 flex-col p-3 md:p-4">
+                <ModelInfoTable
+                  models={interfaceGroupRows}
+                  selectedModelVersionKey={null}
+                  isLoading={modelListQuery.isLoading}
+                  isFetching={modelListQuery.isFetching}
+                  onSelectRow={(modelVersionKey) => {
+                    const targetModel =
+                      interfaceGroupRows.find((item) => item.modelVersionKey === modelVersionKey) ?? null
+                    if (targetModel) {
+                      handleSelectModel(targetModel)
+                    }
+                  }}
+                  onOpenDetail={handleOpenModelDetail}
+                />
+              </section>
+            ) : selectedModelVersionKey === null ? (
               <div className="flex flex-1" />
             ) : !isVersionFrame ? (
               <section className="flex flex-1 flex-col p-3 md:p-4">
@@ -1458,10 +1388,10 @@ export function ModelPage() {
                 />
               </section>
             ) : (
-              <div ref={centerContainerRef} className="flex flex-1 flex-col overflow-hidden">
+              <div ref={centerContainerRef} className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  style={{ height: `${topPanelHeightPercent}%` }}
-                  className="min-h-0 overflow-auto p-3 pb-0 md:p-4 md:pb-0"
+                  style={{ flexBasis: `${topPanelHeightPercent}%` }}
+                  className="min-h-0 shrink-0 overflow-auto p-3 pb-0 md:p-4 md:pb-0"
                 >
                   <ModelInfoTable
                     models={selectedModelRows}
@@ -1477,8 +1407,8 @@ export function ModelPage() {
                 <ResizableDivider onDrag={handleDividerDrag} />
 
                 <div
-                  style={{ height: `${100 - topPanelHeightPercent}%` }}
-                  className="min-h-0 overflow-hidden p-3 pt-0 md:p-4 md:pt-0"
+                  style={{ flexBasis: `${100 - topPanelHeightPercent}%` }}
+                  className="min-h-0 shrink-0 overflow-hidden p-3 pt-0 md:p-4 md:pt-0"
                 >
                   <ModelDetailPanel
                     openedTabs={openedTabs}
@@ -1534,7 +1464,7 @@ export function ModelPage() {
         onOpenChange={setCheckInModalOpen}
         onCancel={() => setCheckInModalOpen(false)}
         onUndo={() => void handleUndoCheckIn()}
-        onSave={(version, description) => void handleSaveCheckIn(version, description)}
+        onSave={(description) => void handleSaveCheckIn(description)}
       />
 
       <ModelCreateOrUpdateModal

@@ -1,55 +1,80 @@
-import type { EqpInfo, GatewayAppGroup } from '../types/eqp.types'
+import type { BusinessAppGroup, EqpInfo, GatewayAppGroup } from '../types/eqp.types'
 
 /**
- * EQP 목록을 route_partition 기준으로 gateway_app 그룹과 미할당 항목으로 분류합니다.
+ * route_partition 기준으로 연결된 business app 이름을 계산합니다.
+ *
+ * 규칙: route_partition 6개씩 묶어 business_app{N} 구성
+ * 예: [0..5] → business_app1, [6..11] → business_app2
+ */
+export function resolveBusinessAppName(routePartition: number | null | undefined): string | null {
+  if (typeof routePartition !== 'number' || routePartition < 0) {
+    return null
+  }
+
+  return `business_app${Math.floor(routePartition / 6) + 1}`
+}
+
+/**
+ * EQP 목록을 route_partition 기준으로 gateway_app / business_app 그룹으로 분류합니다.
  *
  * 그룹화 규칙: route_partition 2개씩 묶어 gateway_app{N} 그룹 구성
  * 예: [0,1] → gateway_app1, [2,3] → gateway_app2, [4,5] → gateway_app3
  *
- * route_partition이 null이거나 0 미만이면 unassigned로 분류합니다.
- *
  * @param eqpItems 그룹화할 EQP 목록
- * @returns gatewayGroups(그룹 목록), unassignedEqpItems(미할당 목록)
+ * @returns gatewayGroups(2개 단위), businessGroups(6개 단위)
  */
 export function groupEqpItems(eqpItems: EqpInfo[]): {
   gatewayGroups: GatewayAppGroup[]
-  unassignedEqpItems: EqpInfo[]
+  businessGroups: BusinessAppGroup[]
 } {
-  const groupedByApp = new Map<number, EqpInfo[]>()
-  const unassigned: EqpInfo[] = []
+  const groupedGatewayApps = new Map<number, EqpInfo[]>()
+  const groupedBusinessApps = new Map<number, EqpInfo[]>()
 
   eqpItems.forEach((eqp) => {
     const partition = eqp.routePartition
     if (typeof partition !== 'number' || partition < 0) {
-      unassigned.push(eqp)
       return
     }
 
-    const appIndex = Math.floor(partition / 2) + 1
-    const currentGroup = groupedByApp.get(appIndex) ?? []
-    currentGroup.push(eqp)
-    groupedByApp.set(appIndex, currentGroup)
+    const gatewayAppIndex = Math.floor(partition / 2) + 1
+    const currentGatewayGroup = groupedGatewayApps.get(gatewayAppIndex) ?? []
+    currentGatewayGroup.push(eqp)
+    groupedGatewayApps.set(gatewayAppIndex, currentGatewayGroup)
+
+    const businessAppIndex = Math.floor(partition / 6) + 1
+    const currentBusinessGroup = groupedBusinessApps.get(businessAppIndex) ?? []
+    currentBusinessGroup.push(eqp)
+    groupedBusinessApps.set(businessAppIndex, currentBusinessGroup)
   })
 
-  const gatewayGroups: GatewayAppGroup[] = Array.from(groupedByApp.entries())
+  const sortGroupItems = (items: EqpInfo[]) =>
+    [...items].sort((left, right) => {
+      const leftPartition = left.routePartition ?? Number.MAX_SAFE_INTEGER
+      const rightPartition = right.routePartition ?? Number.MAX_SAFE_INTEGER
+      if (leftPartition !== rightPartition) {
+        return leftPartition - rightPartition
+      }
+      return left.eqpId.localeCompare(right.eqpId)
+    })
+
+  const gatewayGroups: GatewayAppGroup[] = Array.from(groupedGatewayApps.entries())
     .sort((left, right) => left[0] - right[0])
     .map(([appIndex, items]) => ({
       appIndex,
       appName: `gateway_app${appIndex}`,
-      items: [...items].sort((left, right) => {
-        const leftPartition = left.routePartition ?? Number.MAX_SAFE_INTEGER
-        const rightPartition = right.routePartition ?? Number.MAX_SAFE_INTEGER
-        if (leftPartition !== rightPartition) {
-          return leftPartition - rightPartition
-        }
-        return left.eqpId.localeCompare(right.eqpId)
-      }),
+      items: sortGroupItems(items),
+    }))
+
+  const businessGroups: BusinessAppGroup[] = Array.from(groupedBusinessApps.entries())
+    .sort((left, right) => left[0] - right[0])
+    .map(([appIndex, items]) => ({
+      appIndex,
+      appName: `business_app${appIndex}`,
+      items: sortGroupItems(items),
     }))
 
   return {
     gatewayGroups,
-    unassignedEqpItems: [...unassigned].sort((left, right) =>
-      left.eqpId.localeCompare(right.eqpId),
-    ),
+    businessGroups,
   }
 }

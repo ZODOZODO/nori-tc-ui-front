@@ -57,9 +57,42 @@ const DEPLOY_STATUS_VALUES = [
   'CANCELED',
 ] as const satisfies readonly DeployStatus[]
 
+const DEPLOY_TARGET_STATUS_VALUES = [
+  'PENDING',
+  'NO_CHANGE',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'ROLLING_BACK',
+  'ROLLED_BACK',
+  'COMPENSATION_FAILED',
+  'CANCELED',
+] as const
+
+const DEPLOY_STEP_STATUS_VALUES = [
+  'PENDING',
+  'SKIPPED',
+  'RUNNING',
+  'WAITING_REPLY',
+  'COMPLETED',
+  'FAILED',
+  'ROLLING_BACK',
+  'ROLLED_BACK',
+  'COMPENSATION_FAILED',
+  'CANCELED',
+] as const
+
 const isDeployStatus = (value: unknown): value is DeployStatus =>
   typeof value === 'string' &&
   DEPLOY_STATUS_VALUES.includes(value as (typeof DEPLOY_STATUS_VALUES)[number])
+
+const isDeployTargetStatus = (value: unknown): value is DeployTargetItem['targetStatus'] =>
+  typeof value === 'string' &&
+  DEPLOY_TARGET_STATUS_VALUES.includes(value as (typeof DEPLOY_TARGET_STATUS_VALUES)[number])
+
+const isDeployStepStatus = (value: unknown): value is DeployTargetItem['currentStepStatus'] =>
+  typeof value === 'string' &&
+  DEPLOY_STEP_STATUS_VALUES.includes(value as (typeof DEPLOY_STEP_STATUS_VALUES)[number])
 
 const DEPLOY_EXECUTION_POLICY_VALUES = ['BEST_EFFORT', 'FAIL_FAST'] as const
 
@@ -225,13 +258,31 @@ const normalizeDeployRegisterTargetItem = (
   }
 }
 
-const isDeployTargetItem = (value: unknown): value is DeployTargetItem =>
+const isDeployTargetItemPayload = (value: unknown): value is Record<string, unknown> =>
   isRecord(value) &&
   typeof value.deployTargetKey === 'number' &&
   typeof value.eqpId === 'string' &&
   typeof value.targetStatus === 'string' &&
-  typeof value.currentStepCode === 'string' &&
   typeof value.updatedAt === 'string'
+
+const normalizeDeployTargetItem = (value: unknown): DeployTargetItem | null => {
+  if (!isDeployTargetItemPayload(value)) {
+    return null
+  }
+
+  return {
+    deployTargetKey: value.deployTargetKey as number,
+    eqpId: value.eqpId as string,
+    targetStatus: isDeployTargetStatus(value.targetStatus) ? value.targetStatus : 'PENDING',
+    currentStepOrder: typeof value.currentStepOrder === 'number' ? value.currentStepOrder : null,
+    currentStepCode: typeof value.currentStepCode === 'string' ? value.currentStepCode : null,
+    currentStepStatus: isDeployStepStatus(value.currentStepStatus) ? value.currentStepStatus : null,
+    rollbackRequired: typeof value.rollbackRequired === 'boolean' ? value.rollbackRequired : false,
+    lastErrorCode: typeof value.lastErrorCode === 'string' ? value.lastErrorCode : null,
+    lastErrorMessage: typeof value.lastErrorMessage === 'string' ? value.lastErrorMessage : null,
+    updatedAt: value.updatedAt as string,
+  }
+}
 
 const isDeployScenarioSummary = (value: unknown): value is DeployScenarioSummary =>
   isRecord(value) &&
@@ -407,7 +458,9 @@ const normalizeDeployTargetPage = (
         ? payload.totalElements
         : payload.targets.length,
     totalPages: typeof payload.totalPages === 'number' ? payload.totalPages : 1,
-    targets: payload.targets.filter(isDeployTargetItem),
+    targets: payload.targets
+      .map((target) => normalizeDeployTargetItem(target))
+      .filter((target): target is DeployTargetItem => target !== null),
   }
 }
 
@@ -448,6 +501,21 @@ const normalizeDeploySummary = (payload: unknown): DeploySummary => {
     deployKey: payload.deployKey,
     deployName: payload.deployName,
     eventType: typeof payload.eventType === 'string' ? payload.eventType : 'EQP_REGISTER_DEPLOY',
+    resolvedScenarioCode:
+      typeof payload.resolvedScenarioCode === 'string' ? payload.resolvedScenarioCode : null,
+    asIsState: isRecord(payload.asIsState)
+      ? {
+          interfaceType:
+            typeof payload.asIsState.interfaceType === 'string' ? payload.asIsState.interfaceType : null,
+          modelName: typeof payload.asIsState.modelName === 'string' ? payload.asIsState.modelName : null,
+          modelVersion:
+            typeof payload.asIsState.modelVersion === 'string' ? payload.asIsState.modelVersion : null,
+          businessJarName:
+            typeof payload.asIsState.businessJarName === 'string' ? payload.asIsState.businessJarName : null,
+          eqpParamVersion:
+            typeof payload.asIsState.eqpParamVersion === 'string' ? payload.asIsState.eqpParamVersion : null,
+        }
+      : null,
     deployStatus: isDeployStatus(payload.deployStatus) ? payload.deployStatus : 'PLANNING',
     pauseRequested: typeof payload.pauseRequested === 'boolean' ? payload.pauseRequested : false,
     executionPolicy:

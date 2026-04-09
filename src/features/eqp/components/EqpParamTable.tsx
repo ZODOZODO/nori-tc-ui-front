@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +32,9 @@ export function EqpParamTable({
   onAddRow,
   onDeleteRow,
 }: EqpParamTableProps) {
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const effectiveSelectedRowId = selectedRowId ?? (rows[0] ? (rows[0].rowId ?? rows[0].paramName) : null)
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex items-center justify-between">
@@ -85,7 +89,12 @@ export function EqpParamTable({
               </TableRow>
             ) : (
               rows.map((row) => (
-                <TableRow key={row.rowId ?? row.paramName}>
+                <TableRow
+                  key={row.rowId ?? row.paramName}
+                  data-state={effectiveSelectedRowId === (row.rowId ?? row.paramName) ? 'selected' : undefined}
+                  onClick={() => setSelectedRowId(row.rowId ?? row.paramName)}
+                  onContextMenu={() => setSelectedRowId(row.rowId ?? row.paramName)}
+                >
                   <TableCell className="min-w-[240px]">
                     {isEditMode && row.rowId ? (
                       <Input
