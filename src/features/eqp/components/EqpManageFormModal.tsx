@@ -292,6 +292,7 @@ const resolveOptionalText = (value: string): string | null => {
 
 const createInitialFormState = (
   mode: EqpManageFormMode,
+  interfaceType: ProtocolType,
   detail: EqpManageDetail | null,
 ): EqpManageFormState => {
   if (mode === 'create') {
@@ -300,7 +301,7 @@ const createInitialFormState = (
       commMode: '',
       isDev: false,
       routePartition: '0',
-      eqpIp: '',
+      eqpIp: interfaceType === 'SOCKET' ? '127.0.0.1' : '',
       eqpPort: '',
       modelName: '',
       modelVersionKey: '',
@@ -453,7 +454,7 @@ export function EqpManageFormModal({
   onSubmit,
 }: EqpManageFormModalProps) {
   const [formState, setFormState] = useState<EqpManageFormState>(() =>
-    createInitialFormState(mode, detail),
+    createInitialFormState(mode, interfaceType, detail),
   )
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
 
@@ -511,9 +512,9 @@ export function EqpManageFormModal({
       return
     }
 
-    setFormState(createInitialFormState(mode, detail))
+    setFormState(createInitialFormState(mode, interfaceType, detail))
     setFormErrorMessage(null)
-  }, [open, mode, detail])
+  }, [open, mode, interfaceType, detail])
 
   useEffect(() => {
     if (!open || mode !== 'create') {

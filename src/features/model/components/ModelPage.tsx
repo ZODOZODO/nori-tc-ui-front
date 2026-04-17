@@ -349,6 +349,17 @@ export function ModelPage() {
     return branchCreateTargetModel.modelVersionKey
   }, [branchCreateTargetModel, selectedModel])
 
+  const parentCommitParentVersions = useMemo(() => {
+    const parentModelName =
+      parentCommitPreviewResult?.parentModelName ?? parentCommitTargetModel?.parentModel ?? ''
+
+    if (!parentModelName) {
+      return []
+    }
+
+    return modelItems.filter((item) => item.modelName === parentModelName)
+  }, [modelItems, parentCommitPreviewResult?.parentModelName, parentCommitTargetModel?.parentModel])
+
   const activeTabModel = useMemo(() => {
     if (activeTab === null) {
       return null
@@ -1497,6 +1508,7 @@ export function ModelPage() {
         key={`${parentCommitTargetModel?.modelKey ?? 'none'}-${isParentCommitModalOpen ? 'open' : 'closed'}`}
         open={isParentCommitModalOpen}
         branchModel={parentCommitTargetModel}
+        parentVersions={parentCommitParentVersions}
         previewResult={parentCommitPreviewResult}
         isPreviewLoading={previewParentCommitMutation.isPending}
         isCommitPending={commitParentModelMutation.isPending}

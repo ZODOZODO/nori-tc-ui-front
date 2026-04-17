@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -339,6 +339,7 @@ export function DeployRegisterPanel() {
   )
   const [draftEqpId, setDraftEqpId] = useState(registerFilters.eqpId)
   const [searchSelectionIds, setSearchSelectionIds] = useState<string[]>([])
+  const searchSelectAllRef = useRef<HTMLInputElement>(null)
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const [deployDialogState, setDeployDialogState] = useState<DeployDialogState | null>(null)
   const [scenarioDialogState, setScenarioDialogState] = useState<ScenarioDialogState>({
@@ -446,6 +447,26 @@ export function DeployRegisterPanel() {
         .filter((item): item is DeployRegisterTargetItem => Boolean(item)),
     [registerTargetMap, searchSelectionIds],
   )
+  const selectableSearchItemIds = useMemo(
+    () =>
+      registerTargetItems
+        .filter((item) => !item.blockedByActiveDeploy)
+        .map((item) => item.eqpId),
+    [registerTargetItems],
+  )
+  const selectedSearchItemIdSet = useMemo(
+    () => new Set(searchSelectionIds),
+    [searchSelectionIds],
+  )
+  const selectedSelectableSearchCount = useMemo(
+    () => selectableSearchItemIds.filter((eqpId) => selectedSearchItemIdSet.has(eqpId)).length,
+    [selectableSearchItemIds, selectedSearchItemIdSet],
+  )
+  const isAllSearchSelected =
+    selectableSearchItemIds.length > 0 &&
+    selectedSelectableSearchCount === selectableSearchItemIds.length
+  const isPartiallySearchSelected =
+    selectedSelectableSearchCount > 0 && !isAllSearchSelected
   const addableSearchItems = useMemo(
     () => selectedSearchItems.filter((item) => !item.blockedByActiveDeploy),
     [selectedSearchItems],
@@ -475,6 +496,14 @@ export function DeployRegisterPanel() {
 
     syncSelectedEqpTargets(registerTargetItems.filter((item) => selectedEqpIds.includes(item.eqpId)))
   }, [registerTargetItems, selectedEqpIds, syncSelectedEqpTargets])
+
+  useEffect(() => {
+    if (!searchSelectAllRef.current) {
+      return
+    }
+
+    searchSelectAllRef.current.indeterminate = isPartiallySearchSelected
+  }, [isPartiallySearchSelected])
 
   const closeScenarioDialog = () => {
     setScenarioDialogState({
@@ -892,6 +921,22 @@ export function DeployRegisterPanel() {
     )
   }
 
+  const handleToggleAllSearchSelections = () => {
+    if (selectableSearchItemIds.length === 0) {
+      return
+    }
+
+    setSearchSelectionIds((currentIds) => {
+      const selectableSearchItemIdSet = new Set(selectableSearchItemIds)
+
+      if (isAllSearchSelected) {
+        return currentIds.filter((eqpId) => !selectableSearchItemIdSet.has(eqpId))
+      }
+
+      return [...new Set([...currentIds, ...selectableSearchItemIds])]
+    })
+  }
+
   const handleAddSelected = () => {
     if (searchSelectionIds.length === 0) {
       setFeedbackMessage('추가할 설비를 먼저 선택해 주세요.')
@@ -1246,7 +1291,21 @@ export function DeployRegisterPanel() {
             <Table>
               <TableHeader className="bg-[#F6F8F6]">
                 <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-                  <TableHead className="w-14 text-center">Select</TableHead>
+                  <TableHead className="w-14 text-center">
+                    <input
+                      ref={searchSelectAllRef}
+                      type="checkbox"
+                      checked={isAllSearchSelected}
+                      onChange={handleToggleAllSearchSelections}
+                      disabled={selectableSearchItemIds.length === 0}
+                      className="size-4 accent-[#1C7F59]"
+                      aria-label={
+                        isAllSearchSelected
+                          ? '검색 결과 전체 선택 해제'
+                          : '검색 결과 전체 선택'
+                      }
+                    />
+                  </TableHead>
                   <TableHead>Eqp ID</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Model Version / Status</TableHead>

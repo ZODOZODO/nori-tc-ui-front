@@ -19,10 +19,12 @@ import {
   type ModelInfo,
   type ModelParentCommitResult,
 } from '../types/model.types'
+import { createNextDailyModelVersion } from '../lib/model-version'
 
 interface ParentModelCommitModalProps {
   open: boolean
   branchModel: ModelInfo | null
+  parentVersions: ModelInfo[]
   previewResult: ModelParentCommitResult | null
   isPreviewLoading: boolean
   isCommitPending: boolean
@@ -38,6 +40,7 @@ interface DiffTableProps {
   mode: DiffTableMode
   columns: string[]
   items: ModelDiffItem[]
+  hiddenColumns?: readonly string[]
 }
 
 /**
@@ -50,53 +53,112 @@ const resolveSectionLabel = (section: ModelDiffSection): string =>
 /**
  * diff 테이블 컬럼명을 mode에 맞게 생성합니다.
  */
-const resolveDiffTableColumns = (columns: string[], mode: DiffTableMode): string[] => {
+const normalizeColumnName = (columnName: string): string => columnName.trim().toLowerCase()
+
+const resolveVisibleColumnIndexes = (
+  columns: string[],
+  hiddenColumns: readonly string[],
+): number[] => {
   const normalizedColumns = columns.length > 0 ? columns : ['Value']
+  const hiddenColumnSet = new Set(hiddenColumns.map(normalizeColumnName))
+
+  return normalizedColumns.flatMap((columnName, index) =>
+    hiddenColumnSet.has(normalizeColumnName(columnName)) ? [] : [index],
+  )
+}
+
+const resolveDiffTableColumns = (
+  columns: string[],
+  mode: DiffTableMode,
+  visibleColumnIndexes: number[],
+): string[] => {
+  const normalizedColumns = columns.length > 0 ? columns : ['Value']
+  const visibleColumns = visibleColumnIndexes.map((index) => normalizedColumns[index] ?? 'Value')
 
   if (mode === 'changed') {
     return [
-      '식별자',
-      ...normalizedColumns.map((columnName) => `Parent ${columnName}`),
-      ...normalizedColumns.map((columnName) => `Branch ${columnName}`),
+      '항목',
+      ...visibleColumns.map((columnName) => `Parent ${columnName}`),
+      ...visibleColumns.map((columnName) => `Branch ${columnName}`),
     ]
   }
 
-  return ['식별자', ...normalizedColumns]
+  return ['항목', ...visibleColumns]
 }
 
 /**
  * diff 항목을 테이블 행 문자열 집합으로 정규화합니다.
  */
-const resolveDiffTableRows = (items: ModelDiffItem[], mode: DiffTableMode): string[][] =>
+const resolveDiffTableRows = (
+  items: ModelDiffItem[],
+  mode: DiffTableMode,
+  visibleColumnIndexes: number[],
+): string[][] =>
   items.map((item) => {
+    const parentValues = visibleColumnIndexes.map((index) => item.parentValues[index] ?? '')
+    const branchValues = visibleColumnIndexes.map((index) => item.branchValues[index] ?? '')
+
     if (mode === 'added') {
-      return [item.identity, ...item.branchValues]
+      return [item.identity, ...branchValues]
     }
 
     if (mode === 'deleted') {
-      return [item.identity, ...item.parentValues]
+      return [item.identity, ...parentValues]
     }
 
-    return [item.identity, ...item.parentValues, ...item.branchValues]
+    return [item.identity, ...parentValues, ...branchValues]
   })
+
+const resolveDiffTableTone = (
+  mode: DiffTableMode,
+): {
+  badgeClassName: string
+  rowClassName: string
+  valueClassName: string
+} => {
+  if (mode === 'added') {
+    return {
+      badgeClassName: 'bg-[#D1F5E7] text-[#1C7F59]',
+      rowClassName: 'bg-[#F0FFF7] hover:bg-[#F0FFF7]',
+      valueClassName: 'text-[#22322B]',
+    }
+  }
+
+  if (mode === 'changed') {
+    return {
+      badgeClassName: 'bg-[#FFF0C0] text-[#7A5800]',
+      rowClassName: 'bg-[#FFFDF0] hover:bg-[#FFFDF0]',
+      valueClassName: 'text-[#22322B]',
+    }
+  }
+
+  return {
+    badgeClassName: 'bg-[#FAD9D7] text-[#B4483F]',
+    rowClassName: 'bg-[#FFF7F7] hover:bg-[#FFF7F7]',
+    valueClassName: 'text-[#97A39C] line-through',
+  }
+}
 
 /**
  * diff 테이블 단일 블록입니다.
  */
-function DiffTable({ title, mode, columns, items }: DiffTableProps) {
+function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTableProps) {
   if (items.length === 0) {
     return null
   }
 
-  const tableColumns = resolveDiffTableColumns(columns, mode)
-  const tableRows = resolveDiffTableRows(items, mode)
+  const visibleColumnIndexes = resolveVisibleColumnIndexes(columns, hiddenColumns)
+  const tableColumns = resolveDiffTableColumns(columns, mode, visibleColumnIndexes)
+  const tableRows = resolveDiffTableRows(items, mode, visibleColumnIndexes)
+  const tone = resolveDiffTableTone(mode)
+  const diffValueColumnCount = visibleColumnIndexes.length
 
   return (
     <div className="rounded-xl border border-[#E4EAE6] bg-white">
       <div className="border-b border-[#EEF3F0] px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-[#22322B]">{title}</p>
-          <Badge variant={mode === 'deleted' ? 'warning' : mode === 'changed' ? 'info' : 'default'}>
+          <Badge variant="secondary" className={tone.badgeClassName}>
             {items.length}건
           </Badge>
         </div>
@@ -113,9 +175,20 @@ function DiffTable({ title, mode, columns, items }: DiffTableProps) {
           </TableHeader>
           <TableBody>
             {tableRows.map((row, rowIndex) => (
-              <TableRow key={`${title}-${rowIndex}`}>
+              <TableRow key={`${title}-${rowIndex}`} className={tone.rowClassName}>
                 {tableColumns.map((_, columnIndex) => (
-                  <TableCell key={`${title}-${rowIndex}-${columnIndex}`}>
+                  <TableCell
+                    key={`${title}-${rowIndex}-${columnIndex}`}
+                    className={
+                      mode !== 'changed'
+                        ? tone.valueClassName
+                        : columnIndex > diffValueColumnCount
+                          ? 'font-medium text-[#1C7F59]'
+                          : columnIndex > 0
+                            ? 'text-[#97A39C] line-through'
+                            : 'text-[#22322B]'
+                    }
+                  >
                     {row[columnIndex] || '—'}
                   </TableCell>
                 ))}
@@ -134,6 +207,7 @@ function DiffTable({ title, mode, columns, items }: DiffTableProps) {
 export function ParentModelCommitModal({
   open,
   branchModel,
+  parentVersions,
   previewResult,
   isPreviewLoading,
   isCommitPending,
@@ -141,7 +215,11 @@ export function ParentModelCommitModal({
   onOpenChange,
   onCommit,
 }: ParentModelCommitModalProps) {
-  const [newParentVersion, setNewParentVersion] = useState('')
+  const defaultNewParentVersion = useMemo(() => {
+    const parentModelName = previewResult?.parentModelName ?? branchModel?.parentModel ?? ''
+    return createNextDailyModelVersion(parentModelName, parentVersions)
+  }, [branchModel?.parentModel, parentVersions, previewResult?.parentModelName])
+  const [newParentVersion, setNewParentVersion] = useState(defaultNewParentVersion)
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
 
   const hasDiffItems = useMemo(
@@ -222,7 +300,7 @@ export function ParentModelCommitModal({
                 <Input
                   value={newParentVersion}
                   onChange={(event) => setNewParentVersion(event.target.value)}
-                  placeholder="예: V1.2.0"
+                  placeholder={defaultNewParentVersion}
                 />
               </div>
             </section>
@@ -272,6 +350,7 @@ export function ParentModelCommitModal({
                 }
 
                 const sectionLabel = resolveSectionLabel(section)
+                const hiddenDiffColumns = section.detailNode === 'mdf' ? ['MDF Name'] : []
 
                 return (
                   <section
@@ -294,18 +373,21 @@ export function ParentModelCommitModal({
                         mode="added"
                         columns={section.columns}
                         items={section.added}
+                        hiddenColumns={hiddenDiffColumns}
                       />
                       <DiffTable
                         title="변경 항목"
                         mode="changed"
                         columns={section.columns}
                         items={section.changed}
+                        hiddenColumns={hiddenDiffColumns}
                       />
                       <DiffTable
                         title="삭제 항목"
                         mode="deleted"
                         columns={section.columns}
                         items={section.deleted}
+                        hiddenColumns={hiddenDiffColumns}
                       />
                     </div>
                   </section>

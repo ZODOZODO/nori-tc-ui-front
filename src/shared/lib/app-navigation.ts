@@ -10,9 +10,9 @@ export interface AppTopNavigationItem {
 }
 
 export const APP_TOP_NAVIGATION_ITEMS: readonly AppTopNavigationItem[] = [
+  { key: 'dash', label: 'Dash', route: '/eqp/live-map', requiredPermission: DASH_READ_PERMISSION },
   { key: 'eqp', label: 'Eqp', route: '/eqp' },
   { key: 'model', label: 'Model', route: '/model' },
-  { key: 'dash', label: 'Dash', route: '/eqp/live-map', requiredPermission: DASH_READ_PERMISSION },
   { key: 'deploy', label: 'Deploy', route: '/deploy' },
   { key: 'dlq', label: 'Dlq', route: null },
   { key: 'user', label: 'User', route: null },

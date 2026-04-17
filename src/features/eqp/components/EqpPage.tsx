@@ -6,6 +6,7 @@ import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
+import type { EqpParamDiffRow } from './CheckInModal'
 import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
 import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
@@ -171,6 +172,98 @@ const resolveEqpItems = (payload: unknown): EqpInfo[] => {
   return []
 }
 
+const normalizeParamText = (value: string | null | undefined): string => value ?? ''
+
+const computeEqpParamDiffRows = (
+  branchRows: readonly EqpParamRow[],
+  parentRows: readonly EqpParamRow[],
+): EqpParamDiffRow[] => {
+  const parentByName = new Map<string, EqpParamRow>()
+  const branchByName = new Map<string, EqpParamRow>()
+
+  parentRows.forEach((row) => {
+    const paramName = row.paramName.trim()
+    if (paramName) {
+      parentByName.set(paramName, {
+        ...row,
+        paramName,
+        paramValue: normalizeParamText(row.paramValue),
+        description: normalizeParamText(row.description),
+      })
+    }
+  })
+
+  branchRows.forEach((row) => {
+    const paramName = row.paramName.trim()
+    if (paramName) {
+      branchByName.set(paramName, {
+        ...row,
+        paramName,
+        paramValue: normalizeParamText(row.paramValue),
+        description: normalizeParamText(row.description),
+      })
+    }
+  })
+
+  const diffRows: EqpParamDiffRow[] = []
+
+  branchByName.forEach((branchRow, paramName) => {
+    const parentRow = parentByName.get(paramName)
+
+    if (!parentRow) {
+      diffRows.push({
+        status: 'added',
+        paramName,
+        parentValue: '',
+        branchValue: branchRow.paramValue,
+        parentDescription: '',
+        branchDescription: branchRow.description,
+      })
+      return
+    }
+
+    if (
+      parentRow.paramValue !== branchRow.paramValue ||
+      parentRow.description !== branchRow.description
+    ) {
+      diffRows.push({
+        status: 'changed',
+        paramName,
+        parentValue: parentRow.paramValue,
+        branchValue: branchRow.paramValue,
+        parentDescription: parentRow.description,
+        branchDescription: branchRow.description,
+      })
+    }
+  })
+
+  parentByName.forEach((parentRow, paramName) => {
+    if (branchByName.has(paramName)) {
+      return
+    }
+
+    diffRows.push({
+      status: 'deleted',
+      paramName,
+      parentValue: parentRow.paramValue,
+      branchValue: '',
+      parentDescription: parentRow.description,
+      branchDescription: '',
+    })
+  })
+
+  const statusOrder: Record<EqpParamDiffRow['status'], number> = {
+    added: 0,
+    changed: 1,
+    deleted: 2,
+  }
+
+  return diffRows.sort((left, right) => {
+    const statusCompare = statusOrder[left.status] - statusOrder[right.status]
+    return statusCompare === 0 ? left.paramName.localeCompare(right.paramName) : statusCompare
+  })
+}
+
 /**
  * EQP Info 메인 페이지입니다.
  * DB 기반 Check Out / Save / Check In 흐름을 처리합니다.
@@ -237,6 +330,10 @@ export function EqpPage() {
   const editParamsQuery = useEqpParams(
     selectedEqpId,
     isEditMode ? 'EDIT' : null,
+  )
+  const checkInBaseParamsQuery = useEqpParams(
+    selectedEqpId,
+    isEditMode && appliedVersion ? appliedVersion : null,
   )
 
   // 편집 중 로컬 상태 (편집 내용을 임시 보관)
@@ -1048,6 +1145,21 @@ export function EqpPage() {
   }
 
   // 현재 파라미터 테이블에 표시할 행
+  const checkInBaseParamRows = useMemo(
+    () =>
+      (checkInBaseParamsQuery.data ?? []).map((param) => ({
+        paramName: param.paramName,
+        paramValue: param.paramValue ?? '',
+        description: param.description ?? '',
+      })),
+    [checkInBaseParamsQuery.data],
+  )
+
+  const checkInDiffRows = useMemo(
+    () => computeEqpParamDiffRows(localEditRows, checkInBaseParamRows),
+    [checkInBaseParamRows, localEditRows],
+  )
+
   const displayParamRows = useMemo(() => {
     if (isEditMode) {
       return localEditRows
@@ -1355,6 +1467,8 @@ export function EqpPage() {
       <CheckInModal
         open={isCheckInModalOpen}
         isPending={checkinMutation.isPending}
+        isDiffLoading={checkInBaseParamsQuery.isLoading}
+        diffRows={checkInDiffRows}
         errorMessage={checkInErrorMessage}
         onOpenChange={setIsCheckInModalOpen}
         onSave={(description) => void handleCheckInSave(description)}

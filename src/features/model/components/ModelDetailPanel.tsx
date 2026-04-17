@@ -1401,7 +1401,10 @@ export function ModelDetailPanel({
           }
         }}
       >
-        <DialogContent className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 overflow-hidden p-0 md:!left-6 md:!right-6 md:!top-6 md:!bottom-6">
+        <DialogContent
+          className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 overflow-hidden p-0 md:!left-6 md:!right-6 md:!top-6 md:!bottom-6"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+        >
           <div className="flex h-full min-h-0 flex-col">
             <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
             <DialogTitle>{workflowEditorTitle || 'Workflow 편집'}</DialogTitle>

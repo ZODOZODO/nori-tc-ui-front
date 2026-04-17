@@ -9,10 +9,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
+
+export interface EqpParamDiffRow {
+  status: EqpParamDiffStatus
+  paramName: string
+  parentValue: string
+  branchValue: string
+  parentDescription: string
+  branchDescription: string
+}
 
 interface CheckInModalProps {
   open: boolean
   isPending: boolean
+  isDiffLoading: boolean
+  diffRows: EqpParamDiffRow[]
   errorMessage: string | null
   onOpenChange: (open: boolean) => void
   onSave: (description: string) => void
@@ -26,12 +40,15 @@ interface CheckInModalProps {
 export function CheckInModal({
   open,
   isPending,
+  isDiffLoading,
+  diffRows,
   errorMessage,
   onOpenChange,
   onSave,
   onCancel,
 }: CheckInModalProps) {
   const [description, setDescription] = useState('')
+  const hasDiff = diffRows.length > 0
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!isPending) {
@@ -49,7 +66,7 @@ export function CheckInModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="z-[60] max-w-[460px] rounded-2xl" showCloseButton={!isPending}>
+      <DialogContent className="z-[60] max-w-4xl rounded-2xl" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle>Check In</DialogTitle>
           <DialogDescription>
@@ -57,7 +74,48 @@ export function CheckInModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
+        <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <section className="mb-4 overflow-hidden rounded-2xl border border-[#E4EAE6]">
+            <div className="flex items-center justify-between bg-[#F6F9F7] px-4 py-2.5">
+              <span className="text-sm font-semibold text-[#1E3D33]">Diff Preview</span>
+              <span className="text-xs text-[#647169]">
+                Add {diffRows.filter((row) => row.status === 'added').length} / Change{' '}
+                {diffRows.filter((row) => row.status === 'changed').length} / Delete{' '}
+                {diffRows.filter((row) => row.status === 'deleted').length}
+              </span>
+            </div>
+
+            {isDiffLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-[#647169]">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                diff를 불러오는 중입니다.
+              </div>
+            ) : !hasDiff ? (
+              <p className="py-10 text-center text-sm text-[#647169]">
+                이전 버전과 비교하여 변경된 설비 파라미터가 없습니다.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table className="min-w-[760px]">
+                  <TableHeader>
+                    <TableRow className="bg-[#FAFCFB] hover:bg-[#FAFCFB]">
+                      <TableHead className="w-24">구분</TableHead>
+                      <TableHead className="w-48">Param Name</TableHead>
+                      <TableHead>Param Value</TableHead>
+                      <TableHead>Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {diffRows.map((row) => (
+                      <EqpParamDiffTableRow key={`${row.status}-${row.paramName}`} row={row} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
+
+          <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-[#1E3D33]">
               Version
@@ -81,6 +139,7 @@ export function CheckInModal({
               className="rounded-lg border border-[#97A8A1] bg-white px-3 py-2 text-xs text-[#1E3D33] placeholder-[#8A8A8A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30 disabled:cursor-not-allowed disabled:bg-[#F5F8F6] resize-none"
             />
           </div>
+          </div>
         </div>
 
         {errorMessage ? (
@@ -103,7 +162,7 @@ export function CheckInModal({
             type="button"
             className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || isDiffLoading}
           >
             {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
             Save
@@ -112,4 +171,109 @@ export function CheckInModal({
       </DialogContent>
     </Dialog>
   )
+}
+
+function EqpParamDiffTableRow({ row }: { row: EqpParamDiffRow }) {
+  const tone = resolveDiffTone(row.status)
+
+  return (
+    <TableRow className={`${tone.rowClassName} ${tone.hoverClassName}`}>
+      <TableCell>
+        <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${tone.badgeClassName}`}>
+          {tone.label}
+        </span>
+      </TableCell>
+      <TableCell className={row.status === 'deleted' ? 'text-xs text-[#97A39C] line-through' : 'text-xs text-[#22322B]'}>
+        {row.paramName || '-'}
+      </TableCell>
+      <TableCell className="text-xs">
+        <DiffValuePair
+          status={row.status}
+          parentValue={row.parentValue}
+          branchValue={row.branchValue}
+        />
+      </TableCell>
+      <TableCell className="text-xs">
+        <DiffValuePair
+          status={row.status}
+          parentValue={row.parentDescription}
+          branchValue={row.branchDescription}
+        />
+      </TableCell>
+    </TableRow>
+  )
+}
+
+function DiffValuePair({
+  status,
+  parentValue,
+  branchValue,
+}: {
+  status: EqpParamDiffStatus
+  parentValue: string
+  branchValue: string
+}) {
+  if (status === 'added') {
+    return <DiffCellValue value={branchValue} className="text-[#22322B]" />
+  }
+
+  if (status === 'deleted') {
+    return <DiffCellValue value={parentValue} className="text-[#97A39C] line-through" />
+  }
+
+  if (parentValue === branchValue) {
+    return <DiffCellValue value={branchValue} className="text-[#22322B]" />
+  }
+
+  return (
+    <div className="space-y-1">
+      <DiffCellValue value={parentValue} className="text-[#97A39C] line-through" />
+      <DiffCellValue value={branchValue} className="font-medium text-[#1C7F59]" />
+    </div>
+  )
+}
+
+function DiffCellValue({ value, className }: { value: string; className: string }) {
+  if (!value) {
+    return <span className={className}>-</span>
+  }
+
+  const maxLength = 100
+  if (value.length <= maxLength) {
+    return <span className={className}>{value}</span>
+  }
+
+  return (
+    <span className={className} title={value}>
+      {value.slice(0, maxLength)}
+      <span className="text-[#97A39C]">...</span>
+    </span>
+  )
+}
+
+function resolveDiffTone(status: EqpParamDiffStatus) {
+  if (status === 'added') {
+    return {
+      label: 'Add',
+      rowClassName: 'bg-[#F0FFF7]',
+      hoverClassName: 'hover:bg-[#F0FFF7]',
+      badgeClassName: 'bg-[#D1F5E7] text-[#1C7F59]',
+    }
+  }
+
+  if (status === 'changed') {
+    return {
+      label: 'Change',
+      rowClassName: 'bg-[#FFFDF0]',
+      hoverClassName: 'hover:bg-[#FFFDF0]',
+      badgeClassName: 'bg-[#FFF0C0] text-[#7A5800]',
+    }
+  }
+
+  return {
+    label: 'Delete',
+    rowClassName: 'bg-[#FFF7F7]',
+    hoverClassName: 'hover:bg-[#FFF7F7]',
+    badgeClassName: 'bg-[#FAD9D7] text-[#B4483F]',
+  }
 }
