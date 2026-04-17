@@ -1,4 +1,4 @@
-const LOOKUP_SOURCE_OPTIONS = ['data', 'metadata'] as const
+const LOOKUP_SOURCE_OPTIONS = ['data', 'metadata', 'param'] as const
 const WORKFLOW_COMPARISON_OPTIONS = [
   'equals',
   'not_equals',
@@ -116,7 +116,7 @@ const validateAllowedKeys = (
 
 const parseLookupSource = (value: unknown, label: string): WorkflowLookupSource => {
   const normalized = normalizeText(typeof value === 'string' ? value : '')
-  if (normalized !== 'data' && normalized !== 'metadata') {
+  if (normalized !== 'data' && normalized !== 'metadata' && normalized !== 'param') {
     throw new Error(label)
   }
   return normalized
@@ -124,7 +124,11 @@ const parseLookupSource = (value: unknown, label: string): WorkflowLookupSource 
 
 const parseRelativePath = (value: unknown, label: string): string => {
   const normalized = normalizeText(typeof value === 'string' ? value : '')
-  if (normalized.startsWith('data.') || normalized.startsWith('metadata.')) {
+  if (
+    normalized.startsWith('data.')
+    || normalized.startsWith('metadata.')
+    || normalized.startsWith('param.')
+  ) {
     throw new Error(label)
   }
   return normalized
@@ -295,7 +299,7 @@ const parseWorkflowConditionDraft = (candidate: Record<string, unknown>): Workfl
     nodeType: 'condition',
     from: parseLookupSource(
       candidate.from,
-      'workflow_filter 조건의 from은 data 또는 metadata만 허용됩니다.',
+      'workflow_filter 조건의 from은 data, metadata 또는 param만 허용됩니다.',
     ),
     path: parseRelativePath(
       candidate.path,
@@ -391,7 +395,7 @@ const parseActionDataIndexFieldDraft = (
     fieldName,
     from: parseLookupSource(
       candidate.from,
-      `action_data_index 필드 ${fieldName}의 from은 data 또는 metadata만 허용됩니다.`,
+      `action_data_index 필드 ${fieldName}의 from은 data, metadata 또는 param만 허용됩니다.`,
     ),
     path: parseRelativePath(
       candidate.path,

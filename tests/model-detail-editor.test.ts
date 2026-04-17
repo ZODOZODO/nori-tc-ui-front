@@ -162,3 +162,52 @@ test('action_data_index 구계약 입력은 raw fallback으로 보존합니다',
   assert.equal(editor.mode, 'raw')
   assert.equal(buildActionDataIndexValue(editor), legacyActionDataIndex.trim())
 })
+
+test('workflow_filter는 param from을 structured parse/build/summarize에 포함합니다', () => {
+  const workflowWithParam = `{
+  "and": [
+    {
+      "from": "param",
+      "path": "recipeId",
+      "comparison": "equals",
+      "expected": "RCP-01"
+    }
+  ]
+}`
+
+  const editor = parseWorkflowFilterEditor(workflowWithParam)
+
+  assert.equal(editor.mode, 'structured')
+  const condition = editor.rootGroup.children[0]
+  assert.equal(condition.nodeType, 'condition')
+  assert.equal(condition.from, 'param')
+  assert.equal(condition.path, 'recipeId')
+  assert.deepEqual(JSON.parse(buildWorkflowFilterValue(editor)), JSON.parse(workflowWithParam))
+  assert.equal(
+    summarizeWorkflowFilterValue(workflowWithParam),
+    'and(param.recipeId{comparison=equals, expected="RCP-01"})',
+  )
+})
+
+test('action_data_index는 param from을 structured parse/build/summarize에 포함합니다', () => {
+  const actionDataIndexWithParam = `{
+  "mdfTemplateName": "TOOL_CONDITION_REPLY_MES",
+  "fields": {
+    "RECIPE_ID": {
+      "from": "param",
+      "path": "recipeId"
+    }
+  }
+}`
+
+  const editor = parseActionDataIndexEditor(actionDataIndexWithParam)
+
+  assert.equal(editor.mode, 'structured')
+  assert.equal(editor.fields[0].from, 'param')
+  assert.equal(editor.fields[0].path, 'recipeId')
+  assert.deepEqual(JSON.parse(buildActionDataIndexValue(editor)), JSON.parse(actionDataIndexWithParam))
+  assert.equal(
+    summarizeActionDataIndexValue(actionDataIndexWithParam),
+    'mdfTemplateName=TOOL_CONDITION_REPLY_MES / RECIPE_ID {from=param, path=recipeId}',
+  )
+})

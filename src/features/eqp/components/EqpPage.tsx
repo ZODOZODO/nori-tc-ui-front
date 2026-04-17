@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppTopBar } from '@/shared/components/AppTopBar'
+import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
@@ -1111,19 +1111,16 @@ export function EqpPage() {
   const selectedBusinessGroupIndex = selection.type === 'business_group' ? selection.groupIndex : null
   const isGatewaySelected = selection.type === 'gateway_all'
   return (
-    <div className="flex min-h-screen w-screen flex-col bg-[#F7FAF8]">
-      <AppTopBar
-        currentMenu="eqp"
-        onOpenProfile={() => setProfileModalOpen(true)}
-        onAfterLogout={() => {
-          clearDeployUiSessionState()
-          setProfileModalOpen(false)
-          resetSelectionTransientStates()
-          closeManagementDialog()
-        }}
-      />
-      <div className="h-px bg-[#E5ECE7]" />
-
+    <AppPageShell
+      currentMenu="eqp"
+      onOpenProfile={() => setProfileModalOpen(true)}
+      onAfterLogout={() => {
+        clearDeployUiSessionState()
+        setProfileModalOpen(false)
+        resetSelectionTransientStates()
+        closeManagementDialog()
+      }}
+    >
       {/* main: flex-1로 남은 화면 전체 높이 차지, min-h-0으로 flex shrink 허용 */}
       <main className="flex flex-1 min-h-0">
         <EqpSidebar
@@ -1459,6 +1456,6 @@ export function EqpPage() {
       />
 
       <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </div>
+    </AppPageShell>
   )
 }

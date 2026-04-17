@@ -1076,7 +1076,7 @@ export function DeployRegisterPanel() {
                   <div className="overflow-x-auto rounded-[14px] border border-[#E5EDE9]">
                     <Table>
                       <TableHeader className="bg-[#F6F8F6]">
-                        <TableRow className="hover:bg-[#F6F8F6]">
+                        <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
                           <TableHead className="w-16 text-center">선택</TableHead>
                           <TableHead className="w-20 text-center">권장</TableHead>
                           <TableHead>시나리오명</TableHead>
@@ -1245,7 +1245,7 @@ export function DeployRegisterPanel() {
           <div className="overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
             <Table>
               <TableHeader className="bg-[#F6F8F6]">
-                <TableRow className="hover:bg-[#F6F8F6]">
+                <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
                   <TableHead className="w-14 text-center">Select</TableHead>
                   <TableHead>Eqp ID</TableHead>
                   <TableHead>Model</TableHead>
@@ -1378,7 +1378,7 @@ export function DeployRegisterPanel() {
         <div className="overflow-x-auto px-6 py-5">
           <Table>
             <TableHeader className="bg-[#F6F8F6]">
-              <TableRow className="hover:bg-[#F6F8F6]">
+              <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
                 <TableHead>Eqp ID</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>Selected Version</TableHead>

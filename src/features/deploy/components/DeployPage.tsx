@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
-import { AppTopBar } from '@/shared/components/AppTopBar'
+import { AppPageShell } from '@/shared/components/AppPageShell'
 import { DeployHistoryPanel } from './DeployHistoryPanel'
 import { DeployMonitorPanel } from './DeployMonitorPanel'
 import { DeployRegisterPanel } from './DeployRegisterPanel'
@@ -34,17 +34,14 @@ export function DeployPage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen min-w-0 w-full flex-col overflow-x-hidden bg-[#F7FAF8]">
-      <AppTopBar
-        currentMenu="deploy"
-        onOpenProfile={() => setProfileModalOpen(true)}
-        onAfterLogout={() => {
-          clearDeployUiSessionState()
-          setProfileModalOpen(false)
-        }}
-      />
-      <div className="h-px bg-[#E5ECE7]" />
-
+    <AppPageShell
+      currentMenu="deploy"
+      onOpenProfile={() => setProfileModalOpen(true)}
+      onAfterLogout={() => {
+        clearDeployUiSessionState()
+        setProfileModalOpen(false)
+      }}
+    >
       <main className="flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
         <DeploySidebar mode={mode} onChangeMode={setMode} />
 
@@ -54,6 +51,6 @@ export function DeployPage() {
       </main>
 
       <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </div>
+    </AppPageShell>
   )
 }

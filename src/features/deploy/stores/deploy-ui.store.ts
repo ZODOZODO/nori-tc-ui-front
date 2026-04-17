@@ -6,6 +6,7 @@ import {
   isTerminalDeployStatus,
   resolveDeployStatusFromTargets,
 } from '../lib/deploy-utils'
+import { resolveInterfaceType } from '../lib/deploy-register-selection'
 import type {
   CreateLocalDeployInput,
   DeployEventType,
@@ -133,27 +134,6 @@ const createInitialDeployUiDataState = () => ({
   selectedBusinessJarRef: null as number | null,
   isProfileModalOpen: false,
 })
-const resolveInterfaceType = (
-  eqpIds: string[],
-  selectedEqpTargetsById: Record<string, DeployRegisterTargetItem>,
-): DeployRegisterTargetItem['commInterface'] | null => {
-  if (eqpIds.length === 0) {
-    return null
-  }
-
-  const interfaceTypes = [
-    ...new Set(
-      eqpIds
-        .map((eqpId) => selectedEqpTargetsById[eqpId]?.commInterface)
-        .filter(
-          (commInterface): commInterface is DeployRegisterTargetItem['commInterface'] =>
-            typeof commInterface === 'string',
-        ),
-    ),
-  ]
-
-  return interfaceTypes.length === 1 && interfaceTypes.length === eqpIds.length ? interfaceTypes[0] : null
-}
 
 const nextDeployKey = (history: DeployHistoryItem[]): number =>
   history.reduce((maxKey, item) => Math.max(maxKey, item.deployKey), 7100) + 1

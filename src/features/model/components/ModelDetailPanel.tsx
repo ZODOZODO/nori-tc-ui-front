@@ -308,6 +308,7 @@ const buildMdfMessageOptions = (
 interface WorkflowNodeEditorProps {
   node: WorkflowNodeDraft
   depth: number
+  readOnly: boolean
   onUpdateNode: (
     targetId: string,
     patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
@@ -320,6 +321,7 @@ interface WorkflowNodeEditorProps {
 function WorkflowNodeEditor({
   node,
   depth,
+  readOnly,
   onUpdateNode,
   onAddCondition,
   onAddGroup,
@@ -344,6 +346,7 @@ function WorkflowNodeEditor({
             size="icon-sm"
             className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
             onClick={() => onRemoveNode(node.id)}
+            disabled={readOnly}
             aria-label="조건 삭제"
           >
             <Trash2 className="size-4" aria-hidden="true" />
@@ -366,6 +369,7 @@ function WorkflowNodeEditor({
                 )
               }
               className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              disabled={readOnly}
             >
               {LOOKUP_SOURCE_OPTIONS.map((source) => (
                 <option key={source} value={source}>
@@ -390,6 +394,7 @@ function WorkflowNodeEditor({
                 )
               }
               placeholder="status"
+              readOnly={readOnly}
             />
           </div>
 
@@ -408,6 +413,7 @@ function WorkflowNodeEditor({
                 )
               }
               className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              disabled={readOnly}
             >
               {WORKFLOW_COMPARISON_OPTIONS.map((comparison) => (
                 <option key={comparison} value={comparison}>
@@ -432,6 +438,7 @@ function WorkflowNodeEditor({
                 )
               }
               placeholder='예: "PASS", 4, true, ["A", "B"]'
+              readOnly={readOnly}
             />
           </div>
         </div>
@@ -458,6 +465,7 @@ function WorkflowNodeEditor({
                     : targetNode,
                 )
               }
+              disabled={readOnly}
             >
               <Plus className="size-3.5" aria-hidden="true" />
               transform 추가
@@ -485,12 +493,16 @@ function WorkflowNodeEditor({
                       )
                     }
                     placeholder="trim"
+                    readOnly={readOnly}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                    className={cn(
+                      'size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]',
+                      readOnly ? 'hidden' : null,
+                    )}
                     onClick={() =>
                       onUpdateNode(node.id, (targetNode) =>
                         targetNode.nodeType === 'condition'
@@ -503,6 +515,7 @@ function WorkflowNodeEditor({
                           : targetNode,
                       )
                     }
+                    disabled={readOnly}
                     aria-label="transform 삭제"
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
@@ -542,20 +555,39 @@ function WorkflowNodeEditor({
               )
             }
             className="h-9 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+            disabled={readOnly}
           >
             <option value="and">and</option>
             <option value="or">or</option>
           </select>
-          <Button type="button" variant="outline" size="sm" onClick={() => onAddCondition(node.id)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onAddCondition(node.id)}
+            disabled={readOnly}
+          >
             <Plus className="size-3.5" aria-hidden="true" />
             조건 추가
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => onAddGroup(node.id)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onAddGroup(node.id)}
+            disabled={readOnly}
+          >
             <Plus className="size-3.5" aria-hidden="true" />
             그룹 추가
           </Button>
           {depth > 0 ? (
-            <Button type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveNode(node.id)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onRemoveNode(node.id)}
+              disabled={readOnly}
+            >
               <Trash2 className="size-4" aria-hidden="true" />
             </Button>
           ) : null}
@@ -568,6 +600,7 @@ function WorkflowNodeEditor({
             key={childNode.id}
             node={childNode}
             depth={depth + 1}
+            readOnly={readOnly}
             onUpdateNode={onUpdateNode}
             onAddCondition={onAddCondition}
             onAddGroup={onAddGroup}
@@ -632,8 +665,7 @@ export function ModelDetailPanel({
   const isDeprecatedBranch =
     isBranchModel && activeModel?.status.trim().toUpperCase() === 'DEPRECATED'
   const isReadOnly = !isEditMode || isLockedByOtherUser
-  const isWorkflowEditorOpen =
-    workflowTextEditor !== null && !isReadOnly && normalizedDetailNode === 'workflow'
+  const isWorkflowEditorOpen = workflowTextEditor !== null && normalizedDetailNode === 'workflow'
   const canEditTableRows = !isReadOnly && !isMdfNode
 
   // SOCKET 모델 여부 판단
@@ -837,7 +869,7 @@ export function ModelDetailPanel({
     columnIndex: number,
   ) => {
     const columnName = normalizedDetailColumns[columnIndex]
-    if (!isWorkflowModalEditableColumn(normalizedDetailNode, columnName) || isReadOnly) {
+    if (!isWorkflowModalEditableColumn(normalizedDetailNode, columnName)) {
       return
     }
 
@@ -862,7 +894,7 @@ export function ModelDetailPanel({
   }
 
   const handleSaveWorkflowTextEditor = () => {
-    if (!workflowTextEditor) {
+    if (!workflowTextEditor || isReadOnly) {
       return
     }
 
@@ -1174,17 +1206,7 @@ export function ModelDetailPanel({
                                   key={`${row.id}-${columnIndex}`}
                                   className="max-w-0 overflow-hidden"
                                 >
-                                  {isReadOnly ? (
-                                    <span
-                                      className={cn(
-                                        'block max-w-full truncate text-sm text-[#22322B]',
-                                        displayValue ? null : 'text-[#8A8A8A]',
-                                      )}
-                                      title={displayValue || rawValue}
-                                    >
-                                      {displayValue || '—'}
-                                    </span>
-                                  ) : isWorkflowModalEditableColumn(
+                                  {isWorkflowModalEditableColumn(
                                       normalizedDetailNode,
                                       columnName,
                                     ) ? (
@@ -1214,6 +1236,16 @@ export function ModelDetailPanel({
                                         <MoreHorizontal className="size-3.5" />
                                       </button>
                                     </div>
+                                  ) : isReadOnly ? (
+                                    <span
+                                      className={cn(
+                                        'block max-w-full truncate text-sm text-[#22322B]',
+                                        displayValue ? null : 'text-[#8A8A8A]',
+                                      )}
+                                      title={displayValue || rawValue}
+                                    >
+                                      {displayValue || '—'}
+                                    </span>
                                   ) : isWorkflowNode && isMessageNameColumn(columnName) ? (
                                     // Message Name: secs-message / socket-message 목록 드롭다운
                                     <select
@@ -1369,17 +1401,19 @@ export function ModelDetailPanel({
           }
         }}
       >
-        <DialogContent className="max-w-6xl">
-          <DialogHeader>
+        <DialogContent className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 overflow-hidden p-0 md:!left-6 md:!right-6 md:!top-6 md:!bottom-6">
+          <div className="flex h-full min-h-0 flex-col">
+            <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
             <DialogTitle>{workflowEditorTitle || 'Workflow 편집'}</DialogTitle>
             <DialogDescription>
               {isFilterColumn(workflowTextEditor?.columnName)
                 ? 'workflow_filter를 canonical group/condition 구조로 편집합니다.'
                 : 'action_data_index를 mdfTemplateName과 field 매핑 기준으로 편집합니다.'}
             </DialogDescription>
-          </DialogHeader>
+            </DialogHeader>
 
-          <div className="space-y-3">
+            <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
+              <div className="flex h-full min-h-0 flex-col gap-3">
             {workflowEditorErrorMessage ? (
               <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
                 {workflowEditorErrorMessage}
@@ -1388,7 +1422,7 @@ export function ModelDetailPanel({
 
             {isFilterColumn(workflowTextEditor?.columnName) ? (
               workflowFilterDraft.mode === 'raw' ? (
-                <div className="space-y-3">
+                <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <p className="text-sm text-[#C5534B]">
                     현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
                   </p>
@@ -1400,11 +1434,12 @@ export function ModelDetailPanel({
                         rawValue: event.target.value,
                       }))
                     }
-                    className="min-h-[360px] w-full resize-y rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                    readOnly={isReadOnly}
                   />
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <div className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-3">
                     <p className="text-sm font-semibold text-[#1E3D33]">
                       root group와 하위 condition을 조합해 `and` / `or` 식을 구성합니다.
@@ -1414,10 +1449,11 @@ export function ModelDetailPanel({
                     </p>
                   </div>
 
-                  <div className="max-h-[60vh] overflow-y-auto pr-1">
+                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                     <WorkflowNodeEditor
                       node={workflowFilterDraft.rootGroup}
                       depth={0}
+                      readOnly={isReadOnly}
                       onUpdateNode={handleUpdateWorkflowNode}
                       onAddCondition={handleAddWorkflowCondition}
                       onAddGroup={handleAddWorkflowGroup}
@@ -1427,7 +1463,7 @@ export function ModelDetailPanel({
                 </div>
               )
             ) : actionDataIndexDraft.mode === 'raw' ? (
-              <div className="space-y-3">
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <p className="text-sm text-[#C5534B]">
                   현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
                 </p>
@@ -1439,16 +1475,18 @@ export function ModelDetailPanel({
                       rawValue: event.target.value,
                     }))
                   }
-                  className="min-h-[360px] w-full resize-y rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                  className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                  readOnly={isReadOnly}
                 />
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="grid gap-4 rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
                   <div className="space-y-2.5">
                     <label className="text-xs font-semibold text-[#1E3D33]">MDF Message</label>
                     <Select
                       value={actionDataIndexDraft.mdfTemplateName || EMPTY_MDF_TEMPLATE_VALUE}
+                      disabled={isReadOnly}
                       onValueChange={(nextValue) =>
                         setActionDataIndexDraft((previousDraft) => ({
                           ...previousDraft,
@@ -1459,7 +1497,7 @@ export function ModelDetailPanel({
                         }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger disabled={isReadOnly}>
                         <SelectValue placeholder="MDF message를 선택해 주세요." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1519,13 +1557,14 @@ export function ModelDetailPanel({
                         fields: [...previousDraft.fields, createEmptyActionDataIndexField()],
                       }))
                     }
+                    disabled={isReadOnly}
                   >
                     <Plus className="size-3" aria-hidden="true" />
                     field 추가
                   </Button>
                 </div>
 
-                <div className="max-h-[52vh] overflow-y-auto rounded-2xl border border-[#E4EAE6]">
+                <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[#E4EAE6]">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-[#F6F9F7]">
                       <TableRow className="bg-[#F6F9F7]">
@@ -1555,6 +1594,7 @@ export function ModelDetailPanel({
                                 }))
                               }
                               placeholder="EQPID"
+                              readOnly={isReadOnly}
                             />
                           </TableCell>
                           <TableCell>
@@ -1573,6 +1613,7 @@ export function ModelDetailPanel({
                                 }))
                               }
                               className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                              disabled={isReadOnly}
                             >
                               {LOOKUP_SOURCE_OPTIONS.map((source) => (
                                 <option key={source} value={source}>
@@ -1597,6 +1638,7 @@ export function ModelDetailPanel({
                                 }))
                               }
                               placeholder="eqpId"
+                              readOnly={isReadOnly}
                             />
                           </TableCell>
                           <TableCell>
@@ -1625,6 +1667,7 @@ export function ModelDetailPanel({
                                         }))
                                       }
                                       placeholder="trim"
+                                      readOnly={isReadOnly}
                                     />
                                     <Button
                                       type="button"
@@ -1645,6 +1688,7 @@ export function ModelDetailPanel({
                                           ),
                                         }))
                                       }
+                                      disabled={isReadOnly}
                                       aria-label="transform 삭제"
                                     >
                                       <Trash2 className="size-4" aria-hidden="true" />
@@ -1668,6 +1712,7 @@ export function ModelDetailPanel({
                                     ),
                                   }))
                                 }
+                                disabled={isReadOnly}
                               >
                                 <Plus className="size-3.5" aria-hidden="true" />
                                 transform 추가
@@ -1689,6 +1734,7 @@ export function ModelDetailPanel({
                                       : [createEmptyActionDataIndexField()],
                                 }))
                               }
+                              disabled={isReadOnly}
                               aria-label="field 삭제"
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
@@ -1701,14 +1747,16 @@ export function ModelDetailPanel({
                 </div>
               </div>
             )}
-          </div>
+              </div>
+            </div>
 
-          <DialogFooter>
+            <DialogFooter className="shrink-0 border-t border-[#EEF3F0] px-6 py-4">
             <Button variant="outline" onClick={handleCloseWorkflowTextEditor}>
               취소
             </Button>
-            <Button onClick={handleSaveWorkflowTextEditor}>적용</Button>
-          </DialogFooter>
+            {!isReadOnly ? <Button onClick={handleSaveWorkflowTextEditor}>적용</Button> : null}
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </>

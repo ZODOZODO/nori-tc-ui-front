@@ -15,6 +15,7 @@ interface AppTopBarProps {
 }
 
 const LOGIN_ROUTE = '/login'
+export const APP_TOP_BAR_OFFSET_CLASS = 'pt-[53px]'
 
 /**
  * 주요 페이지들이 공유하는 상단 앱 헤더입니다.
@@ -58,7 +59,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="sticky top-0 z-40 grid min-h-[52px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-[#E5ECE7] bg-white px-5">
+    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-[#E5ECE7] bg-white px-5">
       <div className="flex items-center gap-2.5">
         <div className="flex size-7 items-center justify-center rounded-md bg-[#d95d39]">
           <span className="font-fraunces text-sm font-medium text-white">N</span>

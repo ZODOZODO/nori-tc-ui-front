@@ -6,7 +6,13 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
-  return <thead data-slot="table-header" className={cn('[&_tr]:border-b', className)} {...props} />
+  return (
+    <thead
+      data-slot="table-header"
+      className={cn('[&_tr]:border-b [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-inherit', className)}
+      {...props}
+    />
+  )
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {

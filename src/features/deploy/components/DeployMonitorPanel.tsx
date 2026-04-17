@@ -1202,7 +1202,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         <div className="overflow-x-auto px-6 py-5">
           <Table>
             <TableHeader className="bg-[#F6F8F6]">
-              <TableRow className="hover:bg-[#F6F8F6]">
+              <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
                 <TableHead>Deploy Name</TableHead>
                 <TableHead>Event Type</TableHead>
                 <TableHead>Status</TableHead>

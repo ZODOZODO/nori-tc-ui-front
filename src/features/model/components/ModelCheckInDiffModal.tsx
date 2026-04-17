@@ -94,7 +94,8 @@ export function ModelCheckInDiffModal({
                     </span>
                   </div>
 
-                  <Table>
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-max">
                     <TableHeader>
                       <TableRow className="bg-[#FAFCFB]">
                         <TableHead className="w-24">구분</TableHead>
@@ -176,7 +177,8 @@ export function ModelCheckInDiffModal({
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                    </Table>
+                  </div>
                 </div>
               )
             })

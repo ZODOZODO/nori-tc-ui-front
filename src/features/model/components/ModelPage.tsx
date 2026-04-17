@@ -3,7 +3,7 @@ import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.st
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
-import { AppTopBar } from '@/shared/components/AppTopBar'
+import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { useModelDetail } from '../hooks/useModelDetail'
@@ -1310,23 +1310,20 @@ export function ModelPage() {
   const isVersionFrame = activeTab !== null && openedTabs.length > 0
 
   return (
-    <div className="flex h-screen min-h-screen w-screen flex-col overflow-hidden bg-[#F7FAF8]">
-      <AppTopBar
-        currentMenu="model"
-        onOpenProfile={() => setProfileModalOpen(true)}
-        onAfterLogout={() => {
-          clearDeployUiSessionState()
-          resetUiState()
-          setCheckInErrorMessage(null)
-          setExplicitCheckoutModelVersionKey(null)
-          setDetailColumnsByContext({})
-          setDetailRowsByContext({})
-          setDetailMdfByContext({})
-          setProfileModalOpen(false)
-        }}
-      />
-      <div className="h-px bg-[#E5ECE7]" />
-
+    <AppPageShell
+      currentMenu="model"
+      onOpenProfile={() => setProfileModalOpen(true)}
+      onAfterLogout={() => {
+        clearDeployUiSessionState()
+        resetUiState()
+        setCheckInErrorMessage(null)
+        setExplicitCheckoutModelVersionKey(null)
+        setDetailColumnsByContext({})
+        setDetailRowsByContext({})
+        setDetailMdfByContext({})
+        setProfileModalOpen(false)
+      }}
+    >
       <main className="flex flex-1 min-h-0">
         <ModelSidebar
           modelItems={modelItems}
@@ -1519,6 +1516,6 @@ export function ModelPage() {
       />
 
       <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </div>
+    </AppPageShell>
   )
 }

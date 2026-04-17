@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
-import { AppTopBar } from '@/shared/components/AppTopBar'
+import { AppPageShell } from '@/shared/components/AppPageShell'
 import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapDemoModal } from './LiveMapDemoModal'
 import { LiveMapHeader } from './LiveMapHeader'
@@ -152,15 +152,12 @@ export function LiveMapPage() {
   }
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col bg-[#F7FAF8]">
-      <AppTopBar
-        currentMenu="dash"
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        onAfterLogout={handleAfterLogout}
-      />
-      <div className="h-px bg-[#E5ECE7]" />
-
-      <main className="flex-1 overflow-y-auto">
+    <AppPageShell
+      currentMenu="dash"
+      onOpenProfile={() => setIsProfileModalOpen(true)}
+      onAfterLogout={handleAfterLogout}
+    >
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex w-full flex-col gap-4 px-6 py-6">
           <LiveMapHeader summary={summary} />
           <LiveMapToolbar
@@ -213,6 +210,6 @@ export function LiveMapPage() {
         clusterItems={clusterItems}
         onClose={() => setIsDemoModalOpen(false)}
       />
-    </div>
+    </AppPageShell>
   )
 }
