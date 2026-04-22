@@ -43,6 +43,7 @@ import {
   type ProtocolType,
 } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
+import { isActiveEquipment } from '../utils/eqp-runtime-state.util'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useModelList } from '@/features/model/hooks/useModelList'
@@ -109,6 +110,7 @@ const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
 }
 const EQP_ASYNC_POLL_INTERVAL_MS = 1000
 const EQP_ASYNC_MAX_ATTEMPTS = 60
+const PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE = 'PASSIVE 설비는 Start/End/Restart 명령 대상이 아닙니다.'
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -560,6 +562,16 @@ export function EqpPage() {
   const openLifecycleDialog = useCallback((eqp: EqpInfo, action: EqpLifecycleAction) => {
     setLifecycleErrorMessage(null)
     setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
+    if (!isActiveEquipment(eqp)) {
+      setLifecycleResultDialog({
+        open: true,
+        status: 'failure',
+        action,
+        eqpId: eqp.eqpId,
+        message: PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE,
+      })
+      return
+    }
     setLifecycleDialog({
       open: true,
       action,
@@ -830,6 +842,10 @@ export function EqpPage() {
 
   const executeLifecycleAction = useCallback(
     async (eqp: EqpInfo, action: EqpLifecycleAction) => {
+      if (!isActiveEquipment(eqp)) {
+        throw new Error(PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE)
+      }
+
       const request = {
         interfaceType: eqp.commInterface,
         uiMessage: null,

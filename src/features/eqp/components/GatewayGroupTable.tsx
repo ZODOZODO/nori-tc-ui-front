@@ -13,8 +13,13 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
-import type { EqpInfo, EqpManageDetail, EqpRuntimeState } from '../types/eqp.types'
+import type { EqpInfo, EqpManageDetail } from '../types/eqp.types'
 import { resolveBusinessAppName } from '../utils/eqp-group.util'
+import {
+  type EquipmentVisualState,
+  resolveEquipmentVisualState,
+  resolveLifecycleCommandVisibility,
+} from '../utils/eqp-runtime-state.util'
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
@@ -27,56 +32,28 @@ interface GatewayGroupTableProps {
   onLifecycleAction?: (eqp: EqpInfo, action: EqpLifecycleAction) => void
 }
 
-type EquipmentVisualState = 'inactive' | 'ready' | 'attention'
-
-const CONNECTED_STATE_SET = new Set(['CONNECTED', 'CONNECT', 'ONLINE', 'UP'])
-
-/**
- * enabled + runtime 상태를 조합해 설비 상태 아이콘 색상을 결정합니다.
- */
-const resolveEquipmentVisualState = (
-  eqp: EqpInfo,
-  runtimeState: EqpRuntimeState | null,
-): EquipmentVisualState => {
-  if (!eqp.enabled) {
-    return 'inactive'
-  }
-
-  const controlState = runtimeState?.controlState?.trim().toUpperCase() ?? ''
-  const connectionState = runtimeState?.connectionState?.trim().toUpperCase() ?? ''
-
-  const isGreenByControlState = controlState === 'REMOTE' || controlState === 'LOCAL'
-  const isGreenByConnectionState = CONNECTED_STATE_SET.has(connectionState)
-
-  if (isGreenByControlState || isGreenByConnectionState) {
-    return 'ready'
-  }
-
-  return 'attention'
-}
-
 /**
  * 상태를 원형 네온 점 아이콘으로 렌더링합니다.
  */
 function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) {
-  if (status === 'inactive') {
+  if (status === 'offline') {
     return (
       <span
         className="relative inline-flex size-4 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-300/80"
-        title="비활성"
-        aria-label="비활성"
+        title="오프라인"
+        aria-label="오프라인"
       >
         <span className="inline-flex size-2 rounded-full bg-slate-500" />
       </span>
     )
   }
 
-  if (status === 'ready') {
+  if (status === 'run') {
     return (
       <span
         className="relative inline-flex size-4 items-center justify-center rounded-full bg-emerald-100/90 ring-2 ring-emerald-300/80 shadow-[0_0_10px_rgba(16,185,129,0.35)]"
-        title="활성(정상)"
-        aria-label="활성(정상)"
+        title="RUN"
+        aria-label="RUN"
       >
         <span className="absolute inline-flex size-4 rounded-full bg-emerald-300/35 motion-safe:animate-ping" />
         <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500" />
@@ -84,11 +61,23 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
     )
   }
 
+  if (status === 'idle') {
+    return (
+      <span
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-sky-100/90 ring-2 ring-sky-300/80 shadow-[0_0_10px_rgba(14,165,233,0.3)]"
+        title="IDLE"
+        aria-label="IDLE"
+      >
+        <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-sky-400 to-blue-500" />
+      </span>
+    )
+  }
+
   return (
     <span
       className="relative inline-flex size-4 items-center justify-center rounded-full bg-amber-100/90 ring-2 ring-amber-300/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-      title="활성(주의)"
-      aria-label="활성(주의)"
+      title="주의 상태"
+      aria-label="주의 상태"
     >
       <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
       <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
@@ -184,60 +173,80 @@ export function GatewayGroupTable({
                 </TableCell>
               </TableRow>
             ) : (
-              sortedEqpItems.map((eqp) => (
-                <ContextMenu key={eqp.eqpId}>
-                  <ContextMenuTrigger asChild>
-                    <TableRow
-                      data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
-                      onClick={() => setSelectedEqpId(eqp.eqpId)}
-                      onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
-                    >
-                      <TableCell>{eqp.eqpId}</TableCell>
-                      <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
-                          {eqp.commInterface}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{eqp.commMode}</TableCell>
-                      <TableCell>{eqp.routePartition ?? '—'}</TableCell>
-                      <TableCell>{eqp.eqpIp}</TableCell>
-                      <TableCell>{eqp.eqpPort}</TableCell>
-                      <TableCell>
-                        <EquipmentStatusIndicator
-                          status={resolveEquipmentVisualState(eqp, detailByEqpId.get(eqp.eqpId)?.runtimeState ?? null)}
-                        />
-                      </TableCell>
-                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.modelBinding?.modelName ?? '—'}</TableCell>
-                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.modelBinding?.modelVersion ?? '—'}</TableCell>
-                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.jars?.gatewayJarFileName ?? '—'}</TableCell>
-                      <TableCell>{detailByEqpId.get(eqp.eqpId)?.jars?.businessJarFileName ?? '—'}</TableCell>
-                    </TableRow>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="w-44">
-                    <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      disabled={isLifecyclePending}
-                      onSelect={() => onLifecycleAction?.(eqp, 'start')}
-                    >
-                      Eqp Start
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      disabled={isLifecyclePending}
-                      onSelect={() => onLifecycleAction?.(eqp, 'end')}
-                    >
-                      Eqp End
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      disabled={isLifecyclePending}
-                      onSelect={() => onLifecycleAction?.(eqp, 'restart')}
-                    >
-                      Eqp Restart
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ))
+              sortedEqpItems.map((eqp) => {
+                const detail = detailByEqpId.get(eqp.eqpId)
+                const runtimeState = detail?.runtimeState ?? null
+                const lifecycleCommandVisibility = resolveLifecycleCommandVisibility(eqp, runtimeState)
+                const hasLifecycleCommand =
+                  lifecycleCommandVisibility.canStart
+                  || lifecycleCommandVisibility.canEnd
+                  || lifecycleCommandVisibility.canRestart
+
+                return (
+                  <ContextMenu key={eqp.eqpId}>
+                    <ContextMenuTrigger asChild>
+                      <TableRow
+                        data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
+                        onClick={() => setSelectedEqpId(eqp.eqpId)}
+                        onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
+                      >
+                        <TableCell>{eqp.eqpId}</TableCell>
+                        <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
+                            {eqp.commInterface}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{eqp.commMode}</TableCell>
+                        <TableCell>{eqp.routePartition ?? '—'}</TableCell>
+                        <TableCell>{eqp.eqpIp}</TableCell>
+                        <TableCell>{eqp.eqpPort}</TableCell>
+                        <TableCell>
+                          <EquipmentStatusIndicator
+                            status={resolveEquipmentVisualState(runtimeState)}
+                          />
+                        </TableCell>
+                        <TableCell>{detail?.modelBinding?.modelName ?? '—'}</TableCell>
+                        <TableCell>{detail?.modelBinding?.modelVersion ?? '—'}</TableCell>
+                        <TableCell>{detail?.jars?.gatewayJarFileName ?? '—'}</TableCell>
+                        <TableCell>{detail?.jars?.businessJarFileName ?? '—'}</TableCell>
+                      </TableRow>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-44">
+                      <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
+                      {hasLifecycleCommand ? (
+                        <>
+                          <ContextMenuSeparator />
+                          {lifecycleCommandVisibility.canStart ? (
+                            <ContextMenuItem
+                              disabled={isLifecyclePending}
+                              onSelect={() => onLifecycleAction?.(eqp, 'start')}
+                            >
+                              Eqp Start
+                            </ContextMenuItem>
+                          ) : null}
+                          {lifecycleCommandVisibility.canEnd ? (
+                            <ContextMenuItem
+                              disabled={isLifecyclePending}
+                              onSelect={() => onLifecycleAction?.(eqp, 'end')}
+                            >
+                              Eqp End
+                            </ContextMenuItem>
+                          ) : null}
+                          {lifecycleCommandVisibility.canRestart ? (
+                            <ContextMenuItem
+                              disabled={isLifecyclePending}
+                              onSelect={() => onLifecycleAction?.(eqp, 'restart')}
+                            >
+                              Eqp Restart
+                            </ContextMenuItem>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </ContextMenuContent>
+                  </ContextMenu>
+                )
+              })
             )}
           </TableBody>
         </Table>
