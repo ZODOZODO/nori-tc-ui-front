@@ -1,6 +1,17 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { useModelNodeDetail } from '../hooks/useModelNodeDetail'
-import { Loader2, MoreHorizontal, Plus, RotateCcw, Trash2, Upload, X } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  GripVertical,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -61,7 +72,10 @@ const EMPTY_MDF_TEMPLATE_VALUE = '__empty__'
  * 모든 model 상세 테이블이 동일한 가시 프레임을 유지하도록 공통 최소 폭을 강제합니다.
  * 내용이 길어도 바깥 패널이 아니라 테이블 viewport 내부에서만 스크롤되도록 고정합니다.
  */
-const MODEL_DETAIL_TABLE_CLASS = 'w-full min-w-[1120px] table-fixed'
+const MODEL_DETAIL_TABLE_CLASS = 'min-w-max table-auto'
+const MODEL_DETAIL_TEXT_FIELD_MIN_WIDTH_CH = 26
+const MODEL_DETAIL_TEXT_FIELD_PADDING_CH = 14
+const MODEL_DETAIL_MODAL_PREVIEW_WIDTH = '180px'
 
 interface WorkflowTextEditorState {
   rowId: string
@@ -195,6 +209,27 @@ const updateActionDataIndexDraftRow = (
   patch: Partial<ActionDataIndexFieldDraft>,
 ): ActionDataIndexFieldDraft[] =>
   rows.map((row) => (row.id === targetId ? { ...row, ...patch } : row))
+
+const moveActionDataIndexDraftRow = (
+  rows: ActionDataIndexFieldDraft[],
+  sourceId: string,
+  targetIndex: number,
+): ActionDataIndexFieldDraft[] => {
+  const sourceIndex = rows.findIndex((row) => row.id === sourceId)
+  if (
+    sourceIndex < 0 ||
+    targetIndex < 0 ||
+    targetIndex >= rows.length ||
+    sourceIndex === targetIndex
+  ) {
+    return rows
+  }
+
+  const nextRows = [...rows]
+  const [movedRow] = nextRows.splice(sourceIndex, 1)
+  nextRows.splice(targetIndex, 0, movedRow)
+  return nextRows
+}
 
 const updateTransforms = (
   transforms: TransformDraft[],
@@ -653,6 +688,7 @@ export function ModelDetailPanel({
   const [actionDataIndexDraft, setActionDataIndexDraft] = useState<ActionDataIndexEditorDraft>(() =>
     parseActionDataIndexEditor(''),
   )
+  const [draggingActionDataIndexFieldId, setDraggingActionDataIndexFieldId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const detailNodes = resolveDetailNodes(activeModel)
@@ -778,6 +814,27 @@ export function ModelDetailPanel({
     return names.length !== new Set(names).size
   }, [isWorkflowNode, detailRows])
 
+  const detailColumnWidths = normalizedDetailColumns.map((columnName, columnIndex) => {
+    if (isWorkflowModalEditableColumn(normalizedDetailNode, columnName)) {
+      return MODEL_DETAIL_MODAL_PREVIEW_WIDTH
+    }
+
+    const maxValueLength = detailRows.reduce((maxLength, row) => {
+      const rawValue = row.values[columnIndex] ?? ''
+      const displayValue =
+        isWorkflowNode && isMessageNameColumn(columnName)
+          ? (allMessageOptions.find((option) => option.value === rawValue)?.label ?? rawValue)
+          : rawValue
+
+      return Math.max(maxLength, displayValue.length)
+    }, columnName.length)
+
+    return `${Math.max(
+      maxValueLength + MODEL_DETAIL_TEXT_FIELD_PADDING_CH,
+      MODEL_DETAIL_TEXT_FIELD_MIN_WIDTH_CH,
+    )}ch`
+  })
+
   const saveDisabled =
     isDetailLoading ||
     isDetailSavePending ||
@@ -891,6 +948,7 @@ export function ModelDetailPanel({
 
   const handleCloseWorkflowTextEditor = () => {
     setWorkflowTextEditor(null)
+    setDraggingActionDataIndexFieldId(null)
   }
 
   const handleSaveWorkflowTextEditor = () => {
@@ -904,6 +962,72 @@ export function ModelDetailPanel({
 
     onChangeDetailValue(workflowTextEditor.rowId, workflowTextEditor.columnIndex, nextValue)
     handleCloseWorkflowTextEditor()
+  }
+
+  const handleMoveActionDataIndexField = (fieldId: string, targetIndex: number) => {
+    if (isReadOnly) {
+      return
+    }
+
+    setActionDataIndexDraft((previousDraft) => ({
+      ...previousDraft,
+      fields: moveActionDataIndexDraftRow(previousDraft.fields, fieldId, targetIndex),
+    }))
+  }
+
+  const handleActionDataIndexFieldDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    fieldId: string,
+  ) => {
+    if (isReadOnly) {
+      event.preventDefault()
+      return
+    }
+
+    setDraggingActionDataIndexFieldId(fieldId)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', fieldId)
+  }
+
+  const handleActionDataIndexFieldDragOver = (
+    event: DragEvent<HTMLTableRowElement>,
+    targetFieldId: string,
+  ) => {
+    if (isReadOnly || !draggingActionDataIndexFieldId || draggingActionDataIndexFieldId === targetFieldId) {
+      return
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleActionDataIndexFieldDrop = (
+    event: DragEvent<HTMLTableRowElement>,
+    targetFieldId: string,
+  ) => {
+    if (isReadOnly) {
+      return
+    }
+
+    event.preventDefault()
+    const sourceId = event.dataTransfer.getData('text/plain') || draggingActionDataIndexFieldId
+    if (!sourceId || sourceId === targetFieldId) {
+      setDraggingActionDataIndexFieldId(null)
+      return
+    }
+
+    setActionDataIndexDraft((previousDraft) => {
+      const targetIndex = previousDraft.fields.findIndex((field) => field.id === targetFieldId)
+      return {
+        ...previousDraft,
+        fields: moveActionDataIndexDraftRow(previousDraft.fields, sourceId, targetIndex),
+      }
+    })
+    setDraggingActionDataIndexFieldId(null)
+  }
+
+  const handleActionDataIndexFieldDragEnd = () => {
+    setDraggingActionDataIndexFieldId(null)
   }
 
   const handleTriggerUpload = () => {
@@ -1145,12 +1269,58 @@ export function ModelDetailPanel({
 
                 <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   <Table className={MODEL_DETAIL_TABLE_CLASS}>
+                    <colgroup>
+                      {normalizedDetailColumns.map((columnName, columnIndex) => {
+                        const isModalEditableColumn = isWorkflowModalEditableColumn(
+                          normalizedDetailNode,
+                          columnName,
+                        )
+                        const columnWidth = detailColumnWidths[columnIndex]
+
+                        return (
+                          <col
+                            key={columnName}
+                            style={{
+                              width: columnWidth,
+                              minWidth: columnWidth,
+                              maxWidth: isModalEditableColumn ? columnWidth : undefined,
+                            }}
+                          />
+                        )
+                      })}
+                      {canEditTableRows ? <col style={{ width: '92px', minWidth: '92px' }} /> : null}
+                    </colgroup>
                     <TableHeader>
                         <TableRow className="bg-[#F6F9F7]">
-                        {normalizedDetailColumns.map((columnName) => (
-                          <TableHead key={columnName}>{columnName}</TableHead>
+                        {normalizedDetailColumns.map((columnName, columnIndex) => (
+                          <TableHead
+                            key={columnName}
+                            className={cn(
+                              'whitespace-nowrap',
+                              columnIndex === 0
+                                ? 'sticky left-0 z-30 bg-[#F6F9F7] shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                                : null,
+                            )}
+                            style={{
+                              width: detailColumnWidths[columnIndex],
+                              minWidth: detailColumnWidths[columnIndex],
+                              maxWidth: isWorkflowModalEditableColumn(normalizedDetailNode, columnName)
+                                ? detailColumnWidths[columnIndex]
+                                : undefined,
+                              ...(columnIndex === 0
+                                ? {
+                                    left: 0,
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 40,
+                                  }
+                                : {}),
+                            }}
+                          >
+                            {columnName}
+                          </TableHead>
                         ))}
-                        {canEditTableRows ? <TableHead className="w-[92px]">작업</TableHead> : null}
+                        {canEditTableRows ? <TableHead className="w-[92px] whitespace-nowrap">작업</TableHead> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1188,10 +1358,11 @@ export function ModelDetailPanel({
                           <TableRow key={row.id}>
                             {normalizedDetailColumns.map((columnName, columnIndex) => {
                               const rawValue = row.values[columnIndex] ?? ''
-                              const displayValue = isWorkflowModalEditableColumn(
+                              const isModalEditable = isWorkflowModalEditableColumn(
                                 normalizedDetailNode,
                                 columnName,
                               )
+                              const displayValue = isModalEditable
                                 ? resolveWorkflowPreviewValue(row, columnIndex, columnName)
                                 : rawValue
 
@@ -1204,14 +1375,32 @@ export function ModelDetailPanel({
                               return (
                                 <TableCell
                                   key={`${row.id}-${columnIndex}`}
-                                  className="max-w-0 overflow-hidden"
+                                  className={cn(
+                                    columnIndex === 0
+                                      ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                                      : null,
+                                    isModalEditable
+                                      ? 'overflow-hidden'
+                                      : 'whitespace-nowrap',
+                                  )}
+                                  style={{
+                                    width: detailColumnWidths[columnIndex],
+                                    minWidth: detailColumnWidths[columnIndex],
+                                    maxWidth: isModalEditable
+                                      ? detailColumnWidths[columnIndex]
+                                      : undefined,
+                                    ...(columnIndex === 0
+                                      ? {
+                                          left: 0,
+                                          position: 'sticky',
+                                          zIndex: 20,
+                                        }
+                                      : {}),
+                                  }}
                                 >
-                                  {isWorkflowModalEditableColumn(
-                                      normalizedDetailNode,
-                                      columnName,
-                                    ) ? (
+                                  {isModalEditable ? (
                                     <div
-                                      className="group flex min-h-8 min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-[#DCE5E0] bg-white px-2 py-1.5"
+                                      className="group flex min-h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-[#DCE5E0] bg-white px-2 py-1.5"
                                       onDoubleClick={() =>
                                         handleOpenWorkflowTextEditor(row, rowIndex, columnIndex)
                                       }
@@ -1239,7 +1428,7 @@ export function ModelDetailPanel({
                                   ) : isReadOnly ? (
                                     <span
                                       className={cn(
-                                        'block max-w-full truncate text-sm text-[#22322B]',
+                                        'inline-block whitespace-nowrap text-sm text-[#22322B]',
                                         displayValue ? null : 'text-[#8A8A8A]',
                                       )}
                                       title={displayValue || rawValue}
@@ -1253,7 +1442,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1274,7 +1463,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1294,7 +1483,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1314,7 +1503,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
@@ -1335,7 +1524,7 @@ export function ModelDetailPanel({
                                       onChange={(event) =>
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
-                                      className="h-8 w-full min-w-0 max-w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
                                     >
                                       {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
                                         <option key={rule} value={rule}>
@@ -1351,7 +1540,7 @@ export function ModelDetailPanel({
                                         onChangeDetailValue(row.id, columnIndex, event.target.value)
                                       }
                                       className={cn(
-                                        'h-8 min-w-0 max-w-full',
+                                        'h-8 w-full min-w-0',
                                         isDuplicate
                                           ? 'border-[#C5534B] focus-visible:ring-[#C5534B]/30'
                                           : null,
@@ -1368,7 +1557,7 @@ export function ModelDetailPanel({
                             })}
 
                             {canEditTableRows ? (
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1571,6 +1760,7 @@ export function ModelDetailPanel({
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-[#F6F9F7]">
                       <TableRow className="bg-[#F6F9F7]">
+                        <TableHead className="w-[112px]">순서</TableHead>
                         <TableHead>Field</TableHead>
                         <TableHead>from</TableHead>
                         <TableHead>path</TableHead>
@@ -1579,8 +1769,58 @@ export function ModelDetailPanel({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {actionDataIndexDraft.fields.map((field) => (
-                        <TableRow key={field.id} className="align-top">
+                      {actionDataIndexDraft.fields.map((field, fieldIndex) => (
+                        <TableRow
+                          key={field.id}
+                          className={cn(
+                            'align-top',
+                            draggingActionDataIndexFieldId === field.id && 'bg-[#EEF7F1] opacity-70',
+                          )}
+                          onDragOver={(event) => handleActionDataIndexFieldDragOver(event, field.id)}
+                          onDrop={(event) => handleActionDataIndexFieldDrop(event, field.id)}
+                        >
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-8 cursor-grab rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] active:cursor-grabbing"
+                                draggable={!isReadOnly}
+                                onDragStart={(event) => handleActionDataIndexFieldDragStart(event, field.id)}
+                                onDragEnd={handleActionDataIndexFieldDragEnd}
+                                disabled={isReadOnly}
+                                aria-label={`${field.fieldName || 'field'} 순서 드래그`}
+                                title="드래그해서 순서 변경"
+                              >
+                                <GripVertical className="size-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
+                                onClick={() => handleMoveActionDataIndexField(field.id, fieldIndex - 1)}
+                                disabled={isReadOnly || fieldIndex === 0}
+                                aria-label={`${field.fieldName || 'field'} 위로 이동`}
+                                title="위로 이동"
+                              >
+                                <ArrowUp className="size-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
+                                onClick={() => handleMoveActionDataIndexField(field.id, fieldIndex + 1)}
+                                disabled={isReadOnly || fieldIndex === actionDataIndexDraft.fields.length - 1}
+                                aria-label={`${field.fieldName || 'field'} 아래로 이동`}
+                                title="아래로 이동"
+                              >
+                                <ArrowDown className="size-4" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Input
                               value={field.fieldName}
