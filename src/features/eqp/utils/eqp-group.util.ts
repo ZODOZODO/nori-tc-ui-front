@@ -47,15 +47,10 @@ export function groupEqpItems(eqpItems: EqpInfo[]): {
     groupedBusinessApps.set(businessAppIndex, currentBusinessGroup)
   })
 
+  // route_partition 변경 시 그룹 내 위치가 바뀌지 않도록 eqpId 기준으로만 정렬합니다.
+  // route_partition은 그룹 분류 기준으로만 사용하며 그룹 내 순서에는 영향을 주지 않습니다.
   const sortGroupItems = (items: EqpInfo[]) =>
-    [...items].sort((left, right) => {
-      const leftPartition = left.routePartition ?? Number.MAX_SAFE_INTEGER
-      const rightPartition = right.routePartition ?? Number.MAX_SAFE_INTEGER
-      if (leftPartition !== rightPartition) {
-        return leftPartition - rightPartition
-      }
-      return left.eqpId.localeCompare(right.eqpId)
-    })
+    [...items].sort((left, right) => left.eqpId.localeCompare(right.eqpId))
 
   const gatewayGroups: GatewayAppGroup[] = Array.from(groupedGatewayApps.entries())
     .sort((left, right) => left[0] - right[0])

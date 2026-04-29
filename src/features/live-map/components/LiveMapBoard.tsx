@@ -352,7 +352,7 @@ export function LiveMapBoard({
                   transformOrigin: 'top left',
                 }}
               >
-                {[64, 244, 424, 604].map((yPosition) => (
+                {[64, 464].map((yPosition) => (
                   <div
                     key={yPosition}
                     className="absolute left-[30px] h-px w-[1278px] bg-[#20262D]"

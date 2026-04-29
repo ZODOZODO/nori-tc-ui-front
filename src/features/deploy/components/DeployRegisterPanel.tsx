@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Table,
@@ -31,6 +32,7 @@ import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployRegisterScenarioPreview } from '../hooks/useDeployRegisterScenarioPreview'
 import { useDeployRegisterTargets } from '../hooks/useDeployRegisterTargets'
 import { useDeployUiStore } from '../stores/deploy-ui.store'
+import { useEqpList } from '@/features/eqp/hooks/useEqpList'
 import type {
   DeployCreateRequest,
   DeployStatus,
@@ -211,25 +213,25 @@ function SelectedEquipmentRow({
   const paramVersionsQuery = useDeployEqpParamVersions(item.eqpId)
 
   const paramVersionOptions = useMemo(() => {
-    const versionSet = new Set<string>()
+    const apiVersions = paramVersionsQuery.data ?? []
+    const versionSet = new Set<string>(apiVersions)
 
-    if (selectedEqpParamVersion) {
+    // 현재 선택된 버전이 API 목록에 없더라도 드롭다운에 유지합니다.
+    if (selectedEqpParamVersion && !versionSet.has(selectedEqpParamVersion)) {
       versionSet.add(selectedEqpParamVersion)
     }
 
-    if (item.appliedParamVersion) {
-      versionSet.add(item.appliedParamVersion)
-    }
+    // API 순서(백엔드 정렬: createdAt 최신순)를 유지합니다.
+    return apiVersions.filter(v => versionSet.has(v)).concat(
+      selectedEqpParamVersion && !paramVersionsQuery.data?.includes(selectedEqpParamVersion)
+        ? [selectedEqpParamVersion]
+        : []
+    )
+  }, [paramVersionsQuery.data, selectedEqpParamVersion])
 
-    for (const version of paramVersionsQuery.data ?? []) {
-      versionSet.add(version)
-    }
-
-    return [...versionSet]
-  }, [item.appliedParamVersion, paramVersionsQuery.data, selectedEqpParamVersion])
-
+  const apiVersionSet = new Set(paramVersionsQuery.data ?? [])
   const resolvedParamVersionValue =
-    selectedEqpParamVersion ?? item.appliedParamVersion ?? EMPTY_SELECT_VALUE
+    selectedEqpParamVersion ?? (item.appliedParamVersion && apiVersionSet.has(item.appliedParamVersion) ? item.appliedParamVersion : null) ?? EMPTY_SELECT_VALUE
 
   return (
       <TableRow>
@@ -338,6 +340,8 @@ export function DeployRegisterPanel() {
     registerFilters.modelVersionKey ? String(registerFilters.modelVersionKey) : EMPTY_SELECT_VALUE,
   )
   const [draftEqpId, setDraftEqpId] = useState(registerFilters.eqpId)
+  const [eqpDropdownOpen, setEqpDropdownOpen] = useState(false)
+  const eqpSearchContainerRef = useRef<HTMLDivElement>(null)
   const [searchSelectionIds, setSearchSelectionIds] = useState<string[]>([])
   const searchSelectAllRef = useRef<HTMLInputElement>(null)
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
@@ -354,6 +358,7 @@ export function DeployRegisterPanel() {
     registerSearchRevision,
   )
   const registerOptionsQuery = useDeployRegisterOptions()
+  const eqpListQuery = useEqpList()
   const meQuery = useMe(true)
   const createDeployMutation = useCreateDeploy()
   const previewScenarioMutation = useDeployRegisterScenarioPreview()
@@ -369,6 +374,16 @@ export function DeployRegisterPanel() {
     () => new Map(registerTargetItems.map((item) => [item.eqpId, item])),
     [registerTargetItems],
   )
+  const filteredEqpSuggestions = useMemo(() => {
+    const keyword = draftEqpId.trim()
+    if (!keyword) {
+      return []
+    }
+    const allItems = eqpListQuery.data?.items ?? []
+    return allItems
+      .filter((item) => item.eqpId.toLowerCase().includes(keyword.toLowerCase()))
+      .slice(0, 30)
+  }, [eqpListQuery.data?.items, draftEqpId])
 
   const mergedModelVersionOptions = useMemo(
     () =>
@@ -504,6 +519,16 @@ export function DeployRegisterPanel() {
 
     searchSelectAllRef.current.indeterminate = isPartiallySearchSelected
   }, [isPartiallySearchSelected])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (eqpSearchContainerRef.current && !eqpSearchContainerRef.current.contains(e.target as Node)) {
+        setEqpDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const closeScenarioDialog = () => {
     setScenarioDialogState({
@@ -1255,19 +1280,43 @@ export function DeployRegisterPanel() {
               </SelectContent>
             </Select>
 
-            <Select value={draftEqpId || EMPTY_SELECT_VALUE} onValueChange={setDraftEqpId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Eqp ID 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY_SELECT_VALUE}>전체 Eqp</SelectItem>
-                {registerTargetItems.map((item) => (
-                  <SelectItem key={item.eqpId} value={item.eqpId}>
-                    {item.eqpId}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div ref={eqpSearchContainerRef} className="relative">
+              <Input
+                value={draftEqpId}
+                onChange={(e) => {
+                  setDraftEqpId(e.target.value)
+                  setEqpDropdownOpen(true)
+                }}
+                onFocus={() => setEqpDropdownOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setEqpDropdownOpen(false)
+                    handleSearch()
+                  } else if (e.key === 'Escape') {
+                    setEqpDropdownOpen(false)
+                  }
+                }}
+                placeholder="Eqp ID 검색..."
+              />
+              {eqpDropdownOpen && filteredEqpSuggestions.length > 0 && (
+                <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-[#D8E1DB] bg-white shadow-md">
+                  {filteredEqpSuggestions.map((item) => (
+                    <button
+                      key={item.eqpId}
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm text-[#243129] hover:bg-[#F6F8F6]"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setDraftEqpId(item.eqpId)
+                        setEqpDropdownOpen(false)
+                      }}
+                    >
+                      {item.eqpId}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <Button
               type="button"
@@ -1287,7 +1336,7 @@ export function DeployRegisterPanel() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
+          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
             <Table>
               <TableHeader className="bg-[#F6F8F6]">
                 <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
@@ -1434,39 +1483,41 @@ export function DeployRegisterPanel() {
           </div>
         ) : null}
 
-        <div className="overflow-x-auto px-6 py-5">
-          <Table>
-            <TableHeader className="bg-[#F6F8F6]">
-              <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-                <TableHead>Eqp ID</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Selected Version</TableHead>
-                <TableHead>Business Jar File</TableHead>
-                <TableHead>Interface</TableHead>
-                <TableHead className="min-w-[180px]">Eqp Param Version</TableHead>
-                <TableHead className="w-16 text-center">Remove</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {selectedEqpItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-[#7B8781]">
-                    아직 선택된 설비가 없습니다.
-                  </TableCell>
+        <div className="px-6 py-5">
+          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
+            <Table>
+              <TableHeader className="bg-[#F6F8F6]">
+                <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+                  <TableHead>Eqp ID</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Selected Version</TableHead>
+                  <TableHead>Business Jar File</TableHead>
+                  <TableHead>Interface</TableHead>
+                  <TableHead className="min-w-[180px]">Eqp Param Version</TableHead>
+                  <TableHead className="w-16 text-center">Remove</TableHead>
                 </TableRow>
-              ) : (
-                selectedEqpItems.map((item) => (
-                  <SelectedEquipmentRow
-                    key={item.eqpId}
-                    item={item}
-                    selectedEqpParamVersion={selectedEqpParamVersions[item.eqpId]}
-                    onChangeEqpParamVersion={setSelectedEqpParamVersion}
-                    onRemove={removeSelectedEqp}
-                  />
-                ))
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {selectedEqpItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-sm text-[#7B8781]">
+                      아직 선택된 설비가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  selectedEqpItems.map((item) => (
+                    <SelectedEquipmentRow
+                      key={item.eqpId}
+                      item={item}
+                      selectedEqpParamVersion={selectedEqpParamVersions[item.eqpId]}
+                      onChangeEqpParamVersion={setSelectedEqpParamVersion}
+                      onRemove={removeSelectedEqp}
+                    />
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </section>
 

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -106,46 +107,66 @@ export function GatewayGroupTable({
     [eqpItems],
   )
   const effectiveSelectedEqpId = selectedEqpId ?? sortedEqpItems[0]?.eqpId ?? null
-  const detailQueries = useQueries({
-    queries: sortedEqpItems.map((eqp) => ({
-      queryKey: eqpQueryKeys.manage(eqp.eqpId),
-      queryFn: () => eqpApi.getEqpManageDetail(eqp.eqpId),
-      staleTime: 0,
-    })),
+
+  // 그룹 화면은 N대의 설비 상세를 한 번에 보여줘야 합니다.
+  // 과거에는 useQueries로 N개 HTTP 호출을 fan-out 했고, 일부가 일시 실패하면 그 행만 '—'로 박혔습니다.
+  // 단일 batch 엔드포인트(GET /eqp/manage?eqpIds=...)로 1회 호출하여 부분 실패 자체를 제거하고,
+  // 호출 전체가 실패하면 지수 백오프로 자동 재시도합니다.
+  const eqpIdList = useMemo(() => sortedEqpItems.map((eqp) => eqp.eqpId), [sortedEqpItems])
+
+  const detailBatchQuery = useQuery({
+    queryKey: eqpQueryKeys.manageBatch(eqpIdList),
+    queryFn: () => eqpApi.getEqpManageDetailBatch(eqpIdList),
+    enabled: eqpIdList.length > 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 3,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
 
   const detailByEqpId = useMemo(() => {
     const mapped = new Map<string, EqpManageDetail>()
-
-    sortedEqpItems.forEach((eqp, index) => {
-      const detail = detailQueries[index]?.data
-      if (detail) {
-        mapped.set(eqp.eqpId, detail)
-      }
+    detailBatchQuery.data?.items.forEach((detail) => {
+      mapped.set(detail.eqpId, detail)
     })
-
     return mapped
-  }, [detailQueries, sortedEqpItems])
+  }, [detailBatchQuery.data])
 
-  const isInitialLoading = sortedEqpItems.length > 0 && detailQueries.every((query) => query.isLoading)
-  const isFetching = detailQueries.some((query) => query.isFetching)
-  const hasDetailError = detailQueries.some((query) => query.isError)
+  // 백엔드가 200을 줬지만 일부 eqpId가 DB에 없어 빠진 경우 (정상 응답 + missing 표기).
+  // HTTP 에러가 아니므로 사용자에게는 별도 경고가 아닌 "삭제됐을 수 있음" 안내로 다룹니다.
+  const missingEqpIdSet = useMemo(
+    () => new Set(detailBatchQuery.data?.missingEqpIds ?? []),
+    [detailBatchQuery.data?.missingEqpIds],
+  )
+  const missingEqpIds = useMemo(
+    () => detailBatchQuery.data?.missingEqpIds ?? [],
+    [detailBatchQuery.data?.missingEqpIds],
+  )
+
+  const isInitialLoading = eqpIdList.length > 0 && detailBatchQuery.isLoading
+  const isFetching = detailBatchQuery.isFetching
+  const hasDetailError = detailBatchQuery.isError
+
+  const handleRetry = useCallback(() => {
+    void detailBatchQuery.refetch()
+  }, [detailBatchQuery])
 
   return (
-    <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold text-[#213028]">{groupName}</h2>
         <span className="text-xs text-[#7A8680]">설비 {eqpItems.length}개</span>
       </div>
 
-      <div className="overflow-auto">
-        <Table className="min-w-[1180px]">
+      <div className="flex-1 min-h-0 overflow-auto">
+        <Table className="min-w-[1280px]">
           <TableHeader>
             <TableRow className="bg-[#F6F9F7]">
               <TableHead>EQPID</TableHead>
               <TableHead>Business App</TableHead>
               <TableHead>Comm Interface</TableHead>
               <TableHead>Comm Mode</TableHead>
+              <TableHead>Socket Protocol</TableHead>
               <TableHead>Route Partition</TableHead>
               <TableHead>IP</TableHead>
               <TableHead>Port</TableHead>
@@ -159,13 +180,13 @@ export function GatewayGroupTable({
           <TableBody>
             {sortedEqpItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={13} className="py-10 text-center text-sm text-[#647169]">
                   이 그룹에 속한 설비가 없습니다.
                 </TableCell>
               </TableRow>
             ) : isInitialLoading ? (
               <TableRow>
-                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={13} className="py-10 text-center text-sm text-[#647169]">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     설비 상세 정보를 불러오는 중입니다.
@@ -181,16 +202,27 @@ export function GatewayGroupTable({
                   lifecycleCommandVisibility.canStart
                   || lifecycleCommandVisibility.canEnd
                   || lifecycleCommandVisibility.canRestart
+                const isMissingFromBatch = missingEqpIdSet.has(eqp.eqpId)
 
                 return (
                   <ContextMenu key={eqp.eqpId}>
                     <ContextMenuTrigger asChild>
                       <TableRow
                         data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
+                        className={isMissingFromBatch ? 'bg-[#FFF7F6]' : undefined}
                         onClick={() => setSelectedEqpId(eqp.eqpId)}
                         onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
                       >
-                        <TableCell>{eqp.eqpId}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{eqp.eqpId}</span>
+                            {isMissingFromBatch ? (
+                              <Badge variant="warning" title="DB에서 설비를 찾을 수 없음 (삭제되었을 수 있음)">
+                                미확인
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
                         <TableCell>
                           <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
@@ -198,6 +230,7 @@ export function GatewayGroupTable({
                           </Badge>
                         </TableCell>
                         <TableCell>{eqp.commMode}</TableCell>
+                        <TableCell>{detail?.socketSettings?.socketProtocolType ?? '—'}</TableCell>
                         <TableCell>{eqp.routePartition ?? '—'}</TableCell>
                         <TableCell>{eqp.eqpIp}</TableCell>
                         <TableCell>{eqp.eqpPort}</TableCell>
@@ -252,12 +285,35 @@ export function GatewayGroupTable({
         </Table>
       </div>
 
-      {isFetching && !isInitialLoading ? (
+      {isFetching && !isInitialLoading && !hasDetailError ? (
         <p className="mt-2 text-xs text-[#7A8680]">설비 상세 데이터를 동기화 중입니다.</p>
       ) : null}
       {hasDetailError ? (
-        <p className="mt-2 text-xs text-[#C5534B]">
-          일부 설비의 모델 또는 Jar 정보를 불러오지 못해 빈 값으로 표시했습니다.
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#F2D3D0] bg-[#FFF7F6] px-3 py-2">
+          <p className="text-xs text-[#C5534B]">
+            설비 상세 정보를 불러오지 못했습니다. 자동 재시도가 모두 실패했습니다.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isFetching}
+            onClick={handleRetry}
+            className="ml-auto h-7 gap-1 border-[#E0BFBC] bg-white px-2 text-xs text-[#A03A33] hover:bg-[#FFF1EF]"
+          >
+            {isFetching ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw className="size-3" aria-hidden="true" />
+            )}
+            다시 시도
+          </Button>
+        </div>
+      ) : null}
+      {!hasDetailError && missingEqpIds.length > 0 ? (
+        <p className="mt-2 text-xs text-[#A66518]">
+          DB에서 찾을 수 없는 설비 {missingEqpIds.length}대 ({missingEqpIds.join(', ')})는 빈 값으로 표시되었습니다.
+          최근 삭제되었을 수 있으니 새로고침으로 목록을 갱신해 주세요.
         </p>
       ) : null}
     </section>

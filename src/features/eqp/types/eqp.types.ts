@@ -281,6 +281,22 @@ export interface EqpManageOptions {
 export type EqpManageDetailResponse = ApiResponse<EqpManageDetail>
 
 /**
+ * EQP 관리 상세 일괄 조회 데이터 모델입니다.
+ *
+ * - items: 요청한 eqpId 중 실제로 조회된 항목들의 상세 (입력 순서 보존)
+ * - missingEqpIds: 요청에는 있었으나 DB에 존재하지 않아 결과에 빠진 eqpId 목록
+ */
+export interface EqpManageDetailBatch {
+  items: EqpManageDetail[]
+  missingEqpIds: string[]
+}
+
+/**
+ * EQP 관리 상세 일괄 조회 응답 타입입니다.
+ */
+export type EqpManageDetailBatchApiResponse = ApiResponse<EqpManageDetailBatch>
+
+/**
  * EQP 관리 화면 옵션 조회 응답 타입입니다.
  */
 export type EqpManageOptionsResponse = ApiResponse<EqpManageOptions>

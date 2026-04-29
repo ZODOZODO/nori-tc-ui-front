@@ -9,6 +9,7 @@ export const eqpQueryKeys = {
   list: () => ['eqp', 'list'] as const,
   detail: (eqpId: string | null) => ['eqp', 'detail', eqpId] as const,
   manage: (eqpId: string | null) => ['eqp', 'manage', eqpId] as const,
+  manageBatch: (eqpIds: readonly string[]) => ['eqp', 'manage-batch', [...eqpIds].sort()] as const,
   manageOptions: () => ['eqp', 'manage-options'] as const,
   modelInfo: (modelVersionKey: number | null) => ['eqp', 'modelInfo', modelVersionKey] as const,
   runtimeState: (eqpId: string | null) => ['eqp', 'runtimeState', eqpId] as const,

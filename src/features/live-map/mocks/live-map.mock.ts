@@ -10,7 +10,7 @@ import type {
 } from '../types/live-map.types'
 
 export const LIVE_MAP_BOARD_WIDTH = 1338
-export const LIVE_MAP_BOARD_HEIGHT = 724
+export const LIVE_MAP_BOARD_HEIGHT = 900
 
 export const LIVE_MAP_LINE_OPTIONS: readonly LiveMapLineOption[] = [
   { value: 'ALL', label: '전체 라인' },
@@ -59,7 +59,7 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     x: 34,
     y: 76,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#5FD08D',
     panelColor: '#141D1A',
     borderColor: '#203229',
@@ -76,7 +76,7 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     x: 290,
     y: 76,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#7FB8FF',
     panelColor: '#141A22',
     borderColor: '#233344',
@@ -93,7 +93,7 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     x: 546,
     y: 76,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#E4B95A',
     panelColor: '#201B12',
     borderColor: '#493D21',
@@ -110,7 +110,7 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     x: 802,
     y: 76,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#F08A6A',
     panelColor: '#211814',
     borderColor: '#4C3026',
@@ -127,7 +127,7 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     x: 1058,
     y: 76,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#7AD7D0',
     panelColor: '#111D1E',
     borderColor: '#224144',
@@ -142,9 +142,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     metricLabel: 'ALERT',
     metricValue: '1',
     x: 34,
-    y: 404,
+    y: 488,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#F26D7D',
     panelColor: '#1A181D',
     borderColor: '#352A31',
@@ -159,9 +159,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     metricLabel: 'IDLE',
     metricValue: '1',
     x: 290,
-    y: 404,
+    y: 488,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#90A7FF',
     panelColor: '#171A24',
     borderColor: '#2D3450',
@@ -176,9 +176,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     metricLabel: 'RUN',
     metricValue: '3',
     x: 546,
-    y: 404,
+    y: 488,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#B58DFF',
     panelColor: '#1B1825',
     borderColor: '#3A2F52',
@@ -193,9 +193,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     metricLabel: 'IDLE',
     metricValue: '1',
     x: 802,
-    y: 404,
+    y: 488,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#63D5A9',
     panelColor: '#14201B',
     borderColor: '#274437',
@@ -210,9 +210,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
     metricLabel: 'IDLE',
     metricValue: '1',
     x: 1058,
-    y: 404,
+    y: 488,
     width: 232,
-    height: 280,
+    height: 364,
     accentColor: '#B9C1CC',
     panelColor: '#1A1D21',
     borderColor: '#353A41',
@@ -223,9 +223,9 @@ export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
 ] as const
 
 const LIVE_MAP_PROCESS_NODE_OFFSETS: readonly [number, number][] = [
-  [28, 96],
-  [102, 96],
-  [176, 96],
+  [24, 86],  [76, 86],  [128, 86],  [180, 86],   // row 1
+  [24, 134], [76, 134], [128, 134], [180, 134],   // row 2
+  [24, 182], [76, 182], [128, 182], [180, 182],   // row 3
 ] as const
 
 const LIVE_MAP_CLUSTER_INDEX = Object.fromEntries(

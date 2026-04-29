@@ -1285,7 +1285,7 @@ export function EqpPage() {
               </div>
             ) : selection.type === 'gateway_all' || selection.type === 'gateway_group' ? (
               /* Gateway 또는 gateway_app 그룹 선택: 설비 목록 테이블 (파라미터/Checkout 없음) */
-              <section className="flex flex-1 flex-col p-3 md:p-4">
+              <section className="flex min-h-0 flex-1 flex-col p-3 md:p-4">
                 <GatewayGroupTable
                   key={`${selection.type}-${selectedGroupName}`}
                   eqpItems={selection.type === 'gateway_all' ? gatewayAllItems : gatewayGroupItems}
@@ -1553,7 +1553,9 @@ export function EqpPage() {
         message={deleteResultDialog.message}
         onOpenChange={(open) => {
           if (!open) {
-            setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
+            // Radix Dialog의 close 애니메이션 동안에도 직전 status/message를 유지해야 합니다.
+            // 전체 상태를 EMPTY로 초기화하면 status 기본값(success)이 잠깐 노출되어 실패 → 정상 팝업이 깜빡이는 버그가 발생합니다.
+            setDeleteResultDialog((prev) => ({ ...prev, open: false }))
           }
         }}
       />

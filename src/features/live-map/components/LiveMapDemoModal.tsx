@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useCancelLiveMapDemoJob } from '../hooks/useCancelLiveMapDemoJob'
 import { useCreateLiveMapDemoJobs } from '../hooks/useCreateLiveMapDemoJobs'
 import { useLiveMapDemoJobs } from '../hooks/useLiveMapDemoJobs'
 import { useLiveMapDemoScenarios } from '../hooks/useLiveMapDemoScenarios'
@@ -48,6 +49,7 @@ const DEMO_TEST_TYPE_OPTIONS: readonly { value: LiveMapDemoTestType; label: stri
   { value: 'MES_ONLY', label: 'MES만 연결' },
   { value: 'E2E', label: '모두 연결' },
 ] as const
+const TERMINAL_DEMO_JOB_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELED'])
 
 const TREE_NODE_STYLE_BY_DEPTH = {
   0: 'border-[#D4E1DA] bg-[#F5FBF7] text-[#1F3429]',
@@ -96,6 +98,7 @@ export function LiveMapDemoModal({
     refetch: refetchJobs,
   } = useLiveMapDemoJobs(open, ACTIVE_DEMO_JOB_STATES, 100)
   const createDemoJobsMutation = useCreateLiveMapDemoJobs()
+  const cancelDemoJobMutation = useCancelLiveMapDemoJob()
 
   const demoTree = useMemo(
     () => buildLiveMapDemoTree(equipmentNodes, clusterItems),
@@ -164,6 +167,7 @@ export function LiveMapDemoModal({
     setStartMessage(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
     createDemoJobsMutation.reset()
+    cancelDemoJobMutation.reset()
     onClose()
   }
 
@@ -210,6 +214,21 @@ export function LiveMapDemoModal({
       )
     } catch (error) {
       setStartMessage(error instanceof Error ? error.message : 'Demo 테스트 시작에 실패했습니다.')
+    }
+  }
+
+  const handleCancelJob = async (jobId: string, _testType: LiveMapDemoTestType) => {
+    void _testType
+    setStartMessage(null)
+    try {
+      await cancelDemoJobMutation.mutateAsync(jobId)
+      setStartMessage('\uC124\uBE44\uB9CC \uC5F0\uACB0 \uD14C\uC2A4\uD2B8 \uC885\uB8CC\uB97C \uC694\uCCAD\uD588\uC2B5\uB2C8\uB2E4.')
+    } catch (error) {
+      setStartMessage(
+        error instanceof Error
+          ? error.message
+          : '\uD14C\uC2A4\uD2B8 \uC885\uB8CC \uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',
+      )
     }
   }
 
@@ -465,7 +484,7 @@ export function LiveMapDemoModal({
 
               <div className="mt-4 overflow-hidden rounded-[18px] border border-[#E5ECE7]">
                 <div className="max-h-[360px] overflow-auto">
-                  <Table className="min-w-[1100px]">
+                  <Table className="min-w-[1180px]">
                     <TableHeader>
                       <TableRow className="bg-[#F6F9F7] hover:bg-[#F6F9F7]">
                         <TableHead>Eqp ID</TableHead>
@@ -475,12 +494,13 @@ export function LiveMapDemoModal({
                         <TableHead>현재 단계</TableHead>
                         <TableHead>상태</TableHead>
                         <TableHead className="min-w-[220px]">진행률</TableHead>
+                        <TableHead className="w-[96px] text-center">{'\uC885\uB8CC'}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {demoJobs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-12 text-center text-sm text-[#708078]">
+                          <TableCell colSpan={8} className="py-12 text-center text-sm text-[#708078]">
                             {isJobsLoading
                               ? 'Demo job 목록을 불러오는 중입니다.'
                               : '우상단에서 설비를 선택하고 시나리오를 지정한 뒤 테스트를 시작해 주세요.'}
@@ -514,6 +534,23 @@ export function LiveMapDemoModal({
                                   {job.progressPercent}%
                                 </span>
                               </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 rounded-[10px] border-[#D7E2DC] px-3 text-xs font-semibold text-[#33443B] hover:border-[#C95C5C] hover:bg-[#FFF5F5] hover:text-[#A73E3E] disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={
+                                  TERMINAL_DEMO_JOB_STATES.has(job.state) ||
+                                  cancelDemoJobMutation.isPending
+                                }
+                                onClick={() => {
+                                  void handleCancelJob(job.jobId, job.testType)
+                                }}
+                              >
+                                {'\uC885\uB8CC'}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))

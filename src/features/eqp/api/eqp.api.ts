@@ -17,6 +17,8 @@ import {
   type EqpInfoDetailResponse,
   type EqpInfoListResponse,
   type EqpManageDetail,
+  type EqpManageDetailBatch,
+  type EqpManageDetailBatchApiResponse,
   type EqpManageDetailResponse,
   type EqpManageOptions,
   type EqpManageOptionsResponse,
@@ -264,6 +266,40 @@ export const eqpApi = {
       )
     } catch (error) {
       throw normalizeEqpError(error, '설비 관리 상세 정보를 조회하지 못했습니다.')
+    }
+  },
+
+  /**
+   * 여러 설비의 관리 상세를 한 번에 조회합니다.
+   *
+   * 그룹 화면처럼 다건을 동시에 표시해야 할 때 N-fan-out HTTP 호출을 제거하기 위해 사용합니다.
+   * 백엔드 한도(현재 200건)를 초과하지 않도록 호출자가 분할 책임을 가집니다.
+   */
+  getEqpManageDetailBatch: async (eqpIds: readonly string[]): Promise<EqpManageDetailBatch> => {
+    if (eqpIds.length === 0) {
+      return { items: [], missingEqpIds: [] }
+    }
+
+    try {
+      const csv = eqpIds
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0)
+        .join(',')
+      const response = await apiClient.get<EqpManageDetailBatchApiResponse>(
+        '/eqp/manage-batch',
+        {
+          params: { eqpIds: csv },
+          withCredentials: true,
+        },
+      )
+
+      return resolveSuccessPayload<EqpManageDetailBatch>(
+        response.data,
+        response.status,
+        '설비 관리 상세 정보를 일괄 조회하지 못했습니다.',
+      )
+    } catch (error) {
+      throw normalizeEqpError(error, '설비 관리 상세 정보를 일괄 조회하지 못했습니다.')
     }
   },
 

@@ -2,11 +2,15 @@ import type { LiveMapEquipmentResponse } from '../api/live-map.api'
 import type { LiveMapClusterItem, LiveMapEquipmentNode, LiveMapEqpProcessingType } from '../types/live-map.types'
 
 const LIVE_MAP_CLUSTER_FALLBACK_ID = 'etc'
-const LIVE_MAP_GRID_COLUMNS = 5
-const LIVE_MAP_NODE_OFFSET_X = 22
-const LIVE_MAP_NODE_OFFSET_Y = 92
-const LIVE_MAP_NODE_GAP_X = 38
-const LIVE_MAP_NODE_GAP_Y = 60
+const LIVE_MAP_GRID_COLUMNS = 4
+// inner panel: inset-x-4(16px) + 좌우 패딩 8px → 첫 노드 시작 24px
+const LIVE_MAP_NODE_OFFSET_X = 24
+// inner panel top: top-[78px] + 상단 패딩 8px
+const LIVE_MAP_NODE_OFFSET_Y = 86
+// 노드 폭 28px + 간격 24px = 52px stride (inner panel 200px에 4열 균등 배치)
+const LIVE_MAP_NODE_GAP_X = 52
+// 노드 높이 40px + 간격 8px
+const LIVE_MAP_NODE_GAP_Y = 48
 
 const DEFAULT_EQUIPMENT_PROCESSING_TYPE: LiveMapEqpProcessingType = 'SINGLE'
 

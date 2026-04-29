@@ -157,7 +157,7 @@ export function EqpSidebar({
       className="flex flex-col self-stretch border-r border-[#E4EAE6] bg-white"
       style={{ width: `${sidebarWidth}px` }}
     >
-      <div className="flex min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[52px] items-center justify-between border-b border-[#E4EAE6] px-3">
             <span className="truncate text-sm font-semibold text-[#243129]">Eqp Info</span>
@@ -183,7 +183,7 @@ export function EqpSidebar({
             </div>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-3">
+          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto px-2 pb-3">
             <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
               <button
                 type="button"
