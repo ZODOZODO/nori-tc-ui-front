@@ -1,0 +1,123 @@
+stages:
+  - check
+  - package
+  - build
+  - deploy
+
+variables:
+  HARBOR_REGISTRY: harbor.nori.local
+  HARBOR_PROJECT: mes-services
+  IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/tc-ui-front
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  NAMESPACE: mes
+  HARBOR_USER: admin
+  HARBOR_PASSWORD: Harbor12345
+
+pipeline-ok:
+  stage: check
+  script:
+    - echo "no relevant changes"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+package:
+  stage: package
+  tags:
+    - norilab
+  image: harbor.nori.local/library/node:20-alpine
+  script:
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1h
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*
+
+build:
+  stage: build
+  needs: ["package"]
+  tags:
+    - norilab
+  image:
+    name: harbor.nori.local/library/kaniko:debug
+    entrypoint: [""]
+  before_script:
+    - export DOCKER_CONFIG=$CI_PROJECT_DIR/.docker
+    - mkdir -p $DOCKER_CONFIG
+    - echo "{\"auths\":{\"$HARBOR_REGISTRY\":{\"auth\":\"$(echo -n $HARBOR_USER:$HARBOR_PASSWORD | base64 | tr -d '\n')\"}}}" > $DOCKER_CONFIG/config.json
+  script:
+    - /kaniko/executor
+      --context $CI_PROJECT_DIR
+      --dockerfile $CI_PROJECT_DIR/Dockerfile
+      --destination $IMAGE_NAME:$IMAGE_TAG
+      --destination $IMAGE_NAME:latest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*
+
+deploy:
+  stage: deploy
+  needs: ["build"]
+  tags:
+    - norilab
+  image: harbor.nori.local/library/kubectl:1.32.2
+  script:
+    - helm upgrade --install $NAMESPACE-tc-ui-front ./helm
+      --namespace $NAMESPACE
+      --set app.imageTag=$IMAGE_TAG
+      -f ./helm/values.yaml
+      --wait
+      --timeout 300s
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*

@@ -1,0 +1,30 @@
+global:
+  registry: "harbor.nori.local"
+  namespace: "mes"
+  imagePullSecret: "harbor-pull-secret"
+
+common:
+  projectName: "mes-services"
+
+app:
+  name: "tc-ui-front"
+  imageTag: "latest"
+  imagePullPolicy: "Always"
+  replicaCount: 1
+  containerPort: 8080
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+service:
+  type: "ClusterIP"
+  port: 80
+
+gateway:
+  name: nori-gateway
+  namespace: envoy-gateway-system
+  hostname: nori-tc.nori.local
