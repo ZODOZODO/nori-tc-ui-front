@@ -49,6 +49,9 @@ spec:
             requests:
               memory: {{ .Values.app.resources.requests.memory | quote }}
               cpu: {{ .Values.app.resources.requests.cpu | quote }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /
@@ -65,3 +68,6 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
             timeoutSeconds: 3
+      volumes:
+        - name: tmp
+          emptyDir: {}
