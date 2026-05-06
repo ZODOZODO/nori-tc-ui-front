@@ -506,7 +506,7 @@ export function LiveMapBoard({
           </div>
         </div>
 
-        <div className="self-start">
+        <div className="h-full">
           <LiveMapTooltipCard equipment={selectedEquipment} />
         </div>
       </div>

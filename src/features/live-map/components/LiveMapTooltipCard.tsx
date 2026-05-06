@@ -3,6 +3,7 @@ import {
   LIVE_MAP_STATUS_THEME,
 } from '../lib/live-map-status-theme'
 import type { LiveMapEquipmentNode } from '../types/live-map.types'
+import { LiveMapCommLogPanel } from './LiveMapCommLogPanel'
 
 interface LiveMapTooltipCardProps {
   equipment: LiveMapEquipmentNode | null
@@ -29,7 +30,7 @@ export function LiveMapTooltipCard({ equipment }: LiveMapTooltipCardProps) {
           : '정상 가동 상태를 유지하고 있습니다.')
 
   return (
-    <div className="w-full rounded-[20px] border border-[#2B343D] bg-[#11161B] p-4 shadow-[0_14px_28px_rgba(2,4,6,0.5)]">
+    <div className="flex h-full w-full flex-col rounded-[20px] border border-[#2B343D] bg-[#11161B] p-4 shadow-[0_14px_28px_rgba(2,4,6,0.5)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-bold tracking-[0.08em] text-[#7E8892]">선택 설비</div>
@@ -68,12 +69,6 @@ export function LiveMapTooltipCard({ equipment }: LiveMapTooltipCardProps) {
             {equipment.processingTypeLabel}
           </div>
         </div>
-      </div>
-
-      <div className="mt-3 rounded-[12px] border border-[#212A32] bg-[#151B20] px-3 py-2">
-        <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">상태 메모</div>
-        <div className="mt-1 text-[11px] font-semibold text-[#E1E8EE]">{equipment.tooltipMeta}</div>
-        <div className="mt-1 text-[10px] text-[#91A0AC]">{equipment.tooltipStep}</div>
       </div>
 
       <div className="mt-3 rounded-[12px] border border-[#212A32] bg-[#151B20] px-3 py-3">
@@ -126,6 +121,10 @@ export function LiveMapTooltipCard({ equipment }: LiveMapTooltipCardProps) {
         }}
       >
         {statusMessage}
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <LiveMapCommLogPanel eqpId={equipment.eqpId} />
       </div>
     </div>
   )
