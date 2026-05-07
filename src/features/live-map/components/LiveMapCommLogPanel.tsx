@@ -17,7 +17,7 @@ function formatTime(timestampMs: number): string {
 function LogRow({ entry }: { entry: CommLogEntry }) {
   const isRecv = entry.direction === 'RECV'
   return (
-    <div className="flex gap-2 border-b border-[#1C2530] px-3 py-1.5 text-[10px]">
+    <div className="flex gap-3 border-b border-[#1C2530] px-3 py-1.5 text-[10px]">
       <span className="w-[72px] shrink-0 font-mono text-[#6B7A8A]">
         {formatTime(entry.timestampMs)}
       </span>
@@ -32,7 +32,10 @@ function LogRow({ entry }: { entry: CommLogEntry }) {
       <span className="w-[36px] shrink-0 font-semibold text-[#7E8892]">
         {entry.source}
       </span>
-      <span className="w-[96px] shrink-0 font-semibold text-[#C9D3DB]">
+      <span
+        className="w-[180px] shrink-0 truncate font-semibold text-[#C9D3DB]"
+        title={entry.messageName ?? undefined}
+      >
         {entry.messageName ?? '-'}
       </span>
       <span className="min-w-0 flex-1 break-all text-[#6B7A8A]">
