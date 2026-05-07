@@ -49,7 +49,7 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
   const { data: logs = [], isFetching } = useCommLog(eqpId, 'all')
 
   return (
-    <div className="mt-3 flex h-full flex-col rounded-[12px] border border-[#212A32] bg-[#151B20]">
+    <div className="mt-3 flex h-[280px] flex-col rounded-[12px] border border-[#212A32] bg-[#151B20]">
       <div className="flex items-center justify-between border-b border-[#212A32] px-3 py-2">
         <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">통신 로그</div>
         {isFetching && (
