@@ -506,7 +506,10 @@ export function LiveMapBoard({
           </div>
         </div>
 
-        <div className="h-full">
+        <div
+          className="min-h-0 overflow-hidden"
+          style={{ height: LIVE_MAP_BOARD_HEIGHT }}
+        >
           <LiveMapTooltipCard equipment={selectedEquipment} />
         </div>
       </div>
