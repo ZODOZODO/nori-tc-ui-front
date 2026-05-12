@@ -1,16 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { profileApi } from '../api/profile.api'
-import type { UserPasswordResetRequest, UserUpdateRequest } from '../types/profile.types'
-
-interface UpdateUserVariables {
-  userPk: number
-  request: UserUpdateRequest
-}
-
-interface ResetPasswordVariables {
-  userPk: number
-  request: UserPasswordResetRequest
-}
 
 /**
  * 인증 사용자 정보 조회 훅입니다.
@@ -24,50 +13,12 @@ export function useMe(enabled = true) {
 }
 
 /**
- * 사용자 상세 조회 훅입니다.
+ * 기존 호출처(UserProfileModal, DeployMonitorPanel) 호환을 위해 user 모듈 훅을 그대로 재노출합니다.
+ * 새 코드는 `@/features/user/hooks/...` 에서 직접 import 해 주세요.
+ *
+ * `useUsers` 는 구 동작(limit=500 자동 페이지네이션) 을 그대로 유지해야 하는
+ * 호출처(DeployMonitorPanel 의 멘션/필터 옵션) 호환용 alias 입니다.
+ * User 페이지 신규 코드는 `useUsers(offset, limit)` 또는 `useAllUsers()` 를 직접 호출합니다.
  */
-export function useUserDetail(userPk: number | null, enabled = true) {
-  return useQuery({
-    queryKey: ['user', userPk],
-    queryFn: () => profileApi.getUserDetail(userPk as number),
-    enabled: enabled && userPk !== null,
-  })
-}
-
-/**
- * 사용자 목록 조회 훅입니다.
- */
-export function useUsers(enabled = true) {
-  return useQuery({
-    queryKey: ['user', 'list'],
-    queryFn: () => profileApi.getAllUsers(),
-    enabled,
-    staleTime: 60_000,
-  })
-}
-
-/**
- * 사용자 저장 mutation 훅입니다.
- * 저장 성공 시 사용자 상세/현재 사용자 캐시를 갱신합니다.
- */
-export function useUpdateUser() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ userPk, request }: UpdateUserVariables) => profileApi.updateUser(userPk, request),
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['user', variables.userPk] })
-      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
-    },
-  })
-}
-
-/**
- * 비밀번호 변경 mutation 훅입니다.
- */
-export function useResetPassword() {
-  return useMutation({
-    mutationFn: ({ userPk, request }: ResetPasswordVariables) =>
-      profileApi.resetPassword(userPk, request),
-  })
-}
+export { useUserDetail, useAllUsers as useUsers } from '@/features/user/hooks/useUsers'
+export { useUpdateUser, useResetPassword } from '@/features/user/hooks/useUserMutations'
