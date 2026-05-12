@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { authApi } from '@/features/auth/api/auth.api'
+import { useMe } from '@/features/profile/hooks/useProfile'
 import type { AppTopNavigationKey } from '../lib/app-navigation'
-import { APP_TOP_NAVIGATION_ITEMS } from '../lib/app-navigation'
+import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
 import { clearCsrfCookie } from '../lib/session'
 
 interface AppTopBarProps {
@@ -24,7 +25,11 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [isLogoutPending, setIsLogoutPending] = useState(false)
-  const navigationItems = APP_TOP_NAVIGATION_ITEMS
+  const meQuery = useMe(true)
+  const navigationItems = useMemo(
+    () => resolveVisibleAppNavigationItems(meQuery.data?.permissionCodes),
+    [meQuery.data?.permissionCodes],
+  )
 
   const handleNavigateMenu = (route: string | null) => {
     if (!route) {

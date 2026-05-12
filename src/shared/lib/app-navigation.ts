@@ -1,6 +1,6 @@
-import { DASH_READ_PERMISSION, hasPermission } from './permission'
+import { DASH_READ_PERMISSION, hasPermission, USER_READ_PERMISSION } from './permission'
 
-export type AppTopNavigationKey = 'eqp' | 'model' | 'dash' | 'deploy' | 'dlq' | 'user'
+export type AppTopNavigationKey = 'eqp' | 'model' | 'dash' | 'deploy' | 'dlq' | 'user' | 'group'
 
 export interface AppTopNavigationItem {
   key: AppTopNavigationKey
@@ -15,7 +15,8 @@ export const APP_TOP_NAVIGATION_ITEMS: readonly AppTopNavigationItem[] = [
   { key: 'model', label: 'Model', route: '/model' },
   { key: 'deploy', label: 'Deploy', route: '/deploy' },
   { key: 'dlq', label: 'Dlq', route: null },
-  { key: 'user', label: 'User', route: null },
+  { key: 'user', label: 'User', route: '/user', requiredPermission: USER_READ_PERMISSION },
+  { key: 'group', label: 'Group', route: '/group', requiredPermission: USER_READ_PERMISSION },
 ] as const
 
 /**
