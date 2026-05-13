@@ -1,7 +1,8 @@
 /**
  * Dash Live Map 페이지 접근 권한 코드입니다.
+ * 운영 DB 의 권한 카탈로그는 'LIVE_MAP_READ' 로 등록되어 있어 이에 맞춤.
  */
-export const DASH_READ_PERMISSION = 'DASH_READ'
+export const DASH_READ_PERMISSION = 'LIVE_MAP_READ'
 
 /**
  * User / Group 관리 페이지 조회 권한 코드입니다.
