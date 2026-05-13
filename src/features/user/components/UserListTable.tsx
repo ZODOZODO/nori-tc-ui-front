@@ -1,6 +1,7 @@
 import { KeyRound, Pencil, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -11,6 +12,8 @@ import {
 } from '@/components/ui/table'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
+
+const USER_TABLE_COLUMN_COUNT = 8
 
 export const USER_PAGE_SIZE = 20
 
@@ -57,10 +60,20 @@ export function UserListTable({ onSelectUser }: UserListTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.length === 0 ? (
+            {userListQuery.isLoading && items.length === 0 ? (
+              Array.from({ length: USER_PAGE_SIZE }).map((_, rowIndex) => (
+                <TableRow key={`user-skeleton-${rowIndex}`} data-testid="user-row-skeleton">
+                  {Array.from({ length: USER_TABLE_COLUMN_COUNT }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-sm text-[#5D6963]">
-                  {userListQuery.isLoading ? '사용자 목록을 불러오는 중...' : '표시할 사용자가 없습니다.'}
+                <TableCell colSpan={USER_TABLE_COLUMN_COUNT} className="py-10 text-center text-sm text-[#5D6963]">
+                  표시할 사용자가 없습니다.
                 </TableCell>
               </TableRow>
             ) : (

@@ -1,9 +1,12 @@
 import { useMemo } from 'react'
-import { Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { ModelInfo } from '../types/model.types'
+
+const MODEL_INFO_COLUMN_COUNT = 6
+const MODEL_INFO_SKELETON_ROW_COUNT = 8
 
 interface ModelInfoTableProps {
   models: ModelInfo[]
@@ -97,17 +100,18 @@ export function ModelInfoTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-[#647169]">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    모델 정보를 불러오는 중입니다.
-                  </span>
-                </TableCell>
-              </TableRow>
+              Array.from({ length: MODEL_INFO_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow key={`model-info-skeleton-${rowIndex}`} data-testid="model-info-skeleton">
+                  {Array.from({ length: MODEL_INFO_COLUMN_COUNT }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : sortedModels.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-[#647169]">
+                <TableCell colSpan={MODEL_INFO_COLUMN_COUNT} className="py-10 text-center text-sm text-[#647169]">
                   표시할 모델이 없습니다.
                 </TableCell>
               </TableRow>

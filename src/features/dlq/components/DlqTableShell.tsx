@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface DlqTableShellProps {
   title: string
@@ -90,7 +91,16 @@ export function DlqTableShell({
 
         <div className="overflow-x-auto px-6 py-5">
           {isLoading ? (
-            <div className="py-8 text-center text-sm text-[#6C7B72]">불러오는 중입니다.</div>
+            <div
+              className="space-y-2 py-2"
+              data-testid={`${testId}-loading`}
+              role="status"
+              aria-label="목록을 불러오는 중입니다."
+            >
+              {Array.from({ length: 8 }).map((_, index) => (
+                <Skeleton key={index} className="h-9 w-full" />
+              ))}
+            </div>
           ) : isError ? (
             <div className="flex flex-col items-center gap-3 py-8 text-sm text-[#C5534B]">
               <span>{errorMessage ?? '목록을 조회하지 못했습니다.'}</span>
