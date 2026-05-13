@@ -7,6 +7,7 @@ import { DLQ_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { useDlqUiStore } from '../stores/dlq-ui.store'
 import type { DlqMode } from '../types/dlq.types'
 import { BusinessDlqPanel } from './BusinessDlqPanel'
+import { DashboardPanel } from './DashboardPanel'
 import { DlqSidebar } from './DlqSidebar'
 import { GatewayDlqPanel } from './GatewayDlqPanel'
 import { QuarantinePanel } from './QuarantinePanel'
@@ -16,6 +17,8 @@ const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 const renderPanel = (mode: DlqMode) => {
   switch (mode) {
+    case 'dashboard':
+      return <DashboardPanel />
     case 'gateway':
       return <GatewayDlqPanel />
     case 'business':

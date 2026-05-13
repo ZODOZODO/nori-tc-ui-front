@@ -236,7 +236,8 @@ test('사이드바 클릭 시 해당 mode 의 API 가 호출되고 응답 행이
 
   await page.goto('/dlq')
 
-  // 초기 진입 시 gateway 활성
+  // R3 이후 기본 mode 가 dashboard 로 변경됨 — gateway 패널 검증 전에 명시 전환 필요.
+  await page.getByTestId('dlq-sidebar-gateway').click()
   await expect(page.getByTestId('dlq-panel-gateway')).toBeVisible()
   await expect(page.getByTestId('dlq-row-gateway-GW-001')).toBeVisible()
   await expect(page.getByTestId('dlq-row-gateway-GW-001')).toContainText('EQ001')
@@ -283,4 +284,118 @@ test('DLQ_READ 미보유 사용자는 topbar Dlq 메뉴 미표시 + /dlq 직접 
 
   await page.goto('/dlq')
   await expect(page).toHaveURL(/\/login$/)
+})
+
+test('기본 진입 시 대시보드 패널이 렌더된다', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+
+  await page.goto('/dlq')
+
+  await expect(page.getByTestId('dlq-dashboard-panel')).toBeVisible()
+})
+
+test('KPI 카드 4개 카운트가 mock 데이터와 일치한다', async ({ page }) => {
+  const state = createDefaultMockState()
+  state.gateway = [
+    buildGateway({ dlqId: 'GW-001' }),
+    buildGateway({ dlqId: 'GW-002' }),
+  ]
+  state.business = [
+    buildBusiness({ dlqId: 'BZ-001' }),
+    buildBusiness({ dlqId: 'BZ-002' }),
+    buildBusiness({ dlqId: 'BZ-003' }),
+  ]
+  state.quarantine = [buildQuarantine({ equipmentId: 'EQ-Q-1' })]
+  state.repairTask = [
+    buildRepairTask({ taskId: 'TASK-1' }),
+    buildRepairTask({ taskId: 'TASK-2' }),
+    buildRepairTask({ taskId: 'TASK-3' }),
+    buildRepairTask({ taskId: 'TASK-4' }),
+  ]
+  await setupMocks(page, state)
+
+  await page.goto('/dlq')
+
+  await expect(page.getByTestId('dlq-dashboard-panel')).toBeVisible()
+  await expect(page.getByTestId('dlq-kpi-gateway')).toHaveAttribute(
+    'data-value',
+    String(state.gateway.length),
+  )
+  await expect(page.getByTestId('dlq-kpi-business')).toHaveAttribute(
+    'data-value',
+    String(state.business.length),
+  )
+  await expect(page.getByTestId('dlq-kpi-quarantine')).toHaveAttribute(
+    'data-value',
+    String(state.quarantine.length),
+  )
+  await expect(page.getByTestId('dlq-kpi-repair-task')).toHaveAttribute(
+    'data-value',
+    String(state.repairTask.length),
+  )
+})
+
+test('최근 장애 피드가 시간 역순으로 정렬된다', async ({ page }) => {
+  const state = createDefaultMockState()
+  state.gateway = [
+    buildGateway({ dlqId: 'GW-A', occurredAt: Date.parse('2025-05-10T01:00:00Z') }),
+    buildGateway({ dlqId: 'GW-B', occurredAt: Date.parse('2025-05-08T01:00:00Z') }),
+  ]
+  state.business = [
+    buildBusiness({ dlqId: 'BZ-A', occurredAt: Date.parse('2025-05-09T01:00:00Z') }),
+    buildBusiness({ dlqId: 'BZ-B', occurredAt: Date.parse('2025-05-07T01:00:00Z') }),
+  ]
+  state.quarantine = [
+    buildQuarantine({ equipmentId: 'EQ-Q-1', quarantinedAt: '2025-05-11T01:00:00Z' }),
+    buildQuarantine({ equipmentId: 'EQ-Q-2', quarantinedAt: '2025-05-06T01:00:00Z' }),
+  ]
+  state.repairTask = [
+    buildRepairTask({ taskId: 'TASK-A', createdAt: '2025-05-12T01:00:00Z' }),
+    buildRepairTask({ taskId: 'TASK-B', createdAt: '2025-05-05T01:00:00Z' }),
+  ]
+  await setupMocks(page, state)
+
+  await page.goto('/dlq')
+
+  await expect(page.getByTestId('dlq-dashboard-panel')).toBeVisible()
+  const rows = page.getByTestId('dlq-dashboard-feed-row')
+  await expect(rows).toHaveCount(8)
+
+  const timestamps = await rows.evaluateAll((nodes) =>
+    nodes.map((node) => Number(node.getAttribute('data-timestamp'))),
+  )
+  for (let i = 1; i < timestamps.length; i += 1) {
+    expect(timestamps[i - 1]).toBeGreaterThanOrEqual(timestamps[i])
+  }
+})
+
+test('새로고침 버튼 클릭 시 4 endpoint 재호출된다', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+
+  const dlqRequests: Request[] = []
+  page.on('request', (request) => {
+    if (request.url().match(/\/api\/dlq\/(gateway|business|quarantine|repair-task)/)) {
+      dlqRequests.push(request)
+    }
+  })
+
+  await page.goto('/dlq')
+  await expect(page.getByTestId('dlq-dashboard-panel')).toBeVisible()
+
+  const countFor = (slug: string) =>
+    dlqRequests.filter((req) => req.url().includes(`/api/dlq/${slug}`)).length
+
+  await expect.poll(() => countFor('gateway')).toBeGreaterThanOrEqual(1)
+  await expect.poll(() => countFor('business')).toBeGreaterThanOrEqual(1)
+  await expect.poll(() => countFor('quarantine')).toBeGreaterThanOrEqual(1)
+  await expect.poll(() => countFor('repair-task')).toBeGreaterThanOrEqual(1)
+
+  await page.getByTestId('dlq-dashboard-refresh').click()
+
+  await expect.poll(() => countFor('gateway')).toBeGreaterThanOrEqual(2)
+  await expect.poll(() => countFor('business')).toBeGreaterThanOrEqual(2)
+  await expect.poll(() => countFor('quarantine')).toBeGreaterThanOrEqual(2)
+  await expect.poll(() => countFor('repair-task')).toBeGreaterThanOrEqual(2)
 })

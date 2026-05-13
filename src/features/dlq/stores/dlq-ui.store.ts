@@ -9,7 +9,7 @@ interface DlqUiState {
 }
 
 export const useDlqUiStore = create<DlqUiState>((set) => ({
-  mode: 'gateway',
+  mode: 'dashboard',
   isProfileModalOpen: false,
   setMode: (mode) => set({ mode }),
   setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
