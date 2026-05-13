@@ -26,14 +26,9 @@ const LiveMapPage = lazy(async () => {
   return { default: module.LiveMapPage }
 })
 
-const UserPage = lazy(async () => {
-  const module = await import('@/features/user/components/UserPage')
-  return { default: module.UserPage }
-})
-
-const GroupPage = lazy(async () => {
-  const module = await import('@/features/group/components/GroupPage')
-  return { default: module.GroupPage }
+const UserManagementPage = lazy(async () => {
+  const module = await import('@/features/user-management/components/UserManagementPage')
+  return { default: module.UserManagementPage }
 })
 
 function RouteLoadingFallback() {
@@ -54,8 +49,7 @@ export function Router() {
         <Route path="/eqp/live-map" element={<LiveMapPage />} />
         <Route path="/model" element={<ModelPage />} />
         <Route path="/deploy" element={<DeployPage />} />
-        <Route path="/user" element={<UserPage />} />
-        <Route path="/group" element={<GroupPage />} />
+        <Route path="/user" element={<UserManagementPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Suspense>
