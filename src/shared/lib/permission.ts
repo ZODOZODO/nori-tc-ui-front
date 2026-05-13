@@ -15,6 +15,12 @@ export const USER_READ_PERMISSION = 'USER_READ'
 export const USER_WRITE_PERMISSION = 'USER_WRITE'
 
 /**
+ * DLQ / Quarantine / Repair Task 모니터링 페이지 조회 권한 코드입니다.
+ * DB seed 의 PREFIX `/api/dlq` 매칭이 신규 endpoint 도 자동 커버.
+ */
+export const DLQ_READ_PERMISSION = 'DLQ_READ'
+
+/**
  * 사용자가 특정 권한 코드를 보유하는지 확인합니다.
  */
 export const hasPermission = (
