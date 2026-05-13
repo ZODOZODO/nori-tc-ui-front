@@ -31,6 +31,11 @@ const UserManagementPage = lazy(async () => {
   return { default: module.UserManagementPage }
 })
 
+const DlqPage = lazy(async () => {
+  const module = await import('@/features/dlq/components/DlqPage')
+  return { default: module.DlqPage }
+})
+
 function RouteLoadingFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] px-6 text-sm text-[#4B5A52]">
@@ -49,6 +54,7 @@ export function Router() {
         <Route path="/eqp/live-map" element={<LiveMapPage />} />
         <Route path="/model" element={<ModelPage />} />
         <Route path="/deploy" element={<DeployPage />} />
+        <Route path="/dlq" element={<DlqPage />} />
         <Route path="/user" element={<UserManagementPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
