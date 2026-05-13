@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { deployApi } from '../api/deploy.api'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
 import type { DeployMonitorFilters } from '../types/deploy.types'
@@ -16,5 +16,6 @@ export function useDeployHistoryList(
     queryKey: deployQueryKeys.history(filters, terminalOnly, offset, limit),
     queryFn: () => deployApi.getDeployHistory(filters, terminalOnly, offset, limit),
     refetchInterval: terminalOnly ? false : 3000,
+    placeholderData: keepPreviousData,
   })
 }

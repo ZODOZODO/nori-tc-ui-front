@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { groupApi } from '../api/group.api'
 import { groupQueryKeys } from '../lib/group-query-keys'
 
@@ -11,6 +11,7 @@ export function useGroups(offset: number, limit: number, enabled = true) {
     queryFn: () => groupApi.getGroupList(offset, limit),
     enabled,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }
 

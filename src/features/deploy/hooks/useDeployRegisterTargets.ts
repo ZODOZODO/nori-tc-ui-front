@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { deployApi } from '../api/deploy.api'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
 import type { DeployRegisterFilters } from '../types/deploy.types'
@@ -19,5 +19,6 @@ export function useDeployRegisterTargets(
     queryFn: () => deployApi.getRegisterTargets(filters, offset, limit),
     enabled,
     staleTime: 0,
+    placeholderData: keepPreviousData,
   })
 }
