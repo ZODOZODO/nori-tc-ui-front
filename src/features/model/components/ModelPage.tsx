@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
@@ -35,10 +35,14 @@ import {
   ModelDeleteConfirmDialog,
   type ModelDeleteDialogMode,
 } from './ModelDeleteConfirmDialog'
-import { ModelDetailPanel } from './ModelDetailPanel'
 import { ModelInfoTable } from './ModelInfoTable'
 import { ModelSidebar } from './ModelSidebar'
 import { ParentModelCommitModal } from './ParentModelCommitModal'
+
+// 사용자가 모델 버전 frame 진입 시에만 mount. 2007 LOC 패널이라 페이지 초기 청크에서 제외.
+const ModelDetailPanel = lazy(() =>
+  import('./ModelDetailPanel').then((module) => ({ default: module.ModelDetailPanel })),
+)
 
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
@@ -1418,37 +1422,39 @@ export function ModelPage() {
                   style={{ flexBasis: `${100 - topPanelHeightPercent}%` }}
                   className="min-h-0 shrink-0 overflow-hidden p-3 pt-0 md:p-4 md:pt-0"
                 >
-                  <ModelDetailPanel
-                    openedTabs={openedTabs}
-                    activeTab={activeTab}
-                    activeModel={activeTabModel}
-                    detailNode={detailNode}
-                    detailColumns={detailColumns}
-                    detailRows={detailRows}
-                    mdfContents={detailMdfContents}
-                    workflowMdfContents={workflowMdfContents}
-                    isDetailLoading={detailNodeQuery.isLoading}
-                    detailErrorMessage={detailLoadErrorMessage}
-                    isEditMode={isEditMode}
-                    isLockedByOtherUser={isLockedByOtherUser}
-                    lockOwner={lockOwner}
-                    isCheckoutPending={checkoutModelMutation.isPending}
-                    isCheckinPending={checkinModelMutation.isPending}
-                    isDetailSavePending={saveDetailRowsMutation.isPending}
-                    isMdfUploadPending={uploadMdfMutation.isPending}
-                    actionErrorMessage={checkInErrorMessage}
-                    onSelectTab={handleSelectTab}
-                    onCloseTab={handleCloseTab}
-                    onSelectDetailNode={setDetailNode}
-                    onChangeDetailValue={handleDetailValueChange}
-                    onAddDetailRow={handleAddDetailRow}
-                    onDeleteDetailRow={handleDeleteDetailRow}
-                    onSaveDetailRows={() => void handleSaveDetailRows()}
-                    onUndo={() => void handleUndoCheckIn()}
-                    onUploadMdf={(file) => void handleUploadMdf(file)}
-                    onCheckOut={() => void handleCheckOut()}
-                    onRequestCheckIn={() => void handleRequestCheckIn()}
-                  />
+                  <Suspense fallback={null}>
+                    <ModelDetailPanel
+                      openedTabs={openedTabs}
+                      activeTab={activeTab}
+                      activeModel={activeTabModel}
+                      detailNode={detailNode}
+                      detailColumns={detailColumns}
+                      detailRows={detailRows}
+                      mdfContents={detailMdfContents}
+                      workflowMdfContents={workflowMdfContents}
+                      isDetailLoading={detailNodeQuery.isLoading}
+                      detailErrorMessage={detailLoadErrorMessage}
+                      isEditMode={isEditMode}
+                      isLockedByOtherUser={isLockedByOtherUser}
+                      lockOwner={lockOwner}
+                      isCheckoutPending={checkoutModelMutation.isPending}
+                      isCheckinPending={checkinModelMutation.isPending}
+                      isDetailSavePending={saveDetailRowsMutation.isPending}
+                      isMdfUploadPending={uploadMdfMutation.isPending}
+                      actionErrorMessage={checkInErrorMessage}
+                      onSelectTab={handleSelectTab}
+                      onCloseTab={handleCloseTab}
+                      onSelectDetailNode={setDetailNode}
+                      onChangeDetailValue={handleDetailValueChange}
+                      onAddDetailRow={handleAddDetailRow}
+                      onDeleteDetailRow={handleDeleteDetailRow}
+                      onSaveDetailRows={() => void handleSaveDetailRows()}
+                      onUndo={() => void handleUndoCheckIn()}
+                      onUploadMdf={(file) => void handleUploadMdf(file)}
+                      onCheckOut={() => void handleCheckOut()}
+                      onRequestCheckIn={() => void handleRequestCheckIn()}
+                    />
+                  </Suspense>
                 </div>
               </div>
             )}

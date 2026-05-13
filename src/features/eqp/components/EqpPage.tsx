@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,12 @@ import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
 import { EqpInfoTable } from './EqpInfoTable'
 import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
 import { EqpLifecycleResultDialog } from './EqpLifecycleResultDialog'
-import { EqpManageFormModal } from './EqpManageFormModal'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
+
+// 사용자가 "등록 / 정보" 누른 시점에만 mount. 1275 LOC 모달이라 페이지 초기 청크에서 제외.
+const EqpManageFormModal = lazy(() =>
+  import('./EqpManageFormModal').then((module) => ({ default: module.EqpManageFormModal })),
+)
 import { EqpParamTable } from './EqpParamTable'
 import { EqpSidebar } from './EqpSidebar'
 import { GatewayGroupTable } from './GatewayGroupTable'
@@ -1491,31 +1495,35 @@ export function EqpPage() {
         onCancel={() => setIsCheckInModalOpen(false)}
       />
 
-      <EqpManageFormModal
-        open={managementDialog.type === 'create' || managementDialog.type === 'info'}
-        mode={managementDialog.type === 'create' ? 'create' : 'update'}
-        interfaceType={
-          managementDialog.type === 'create'
-            ? managementDialog.interfaceType
-            : eqpManageDetailQuery.data?.commInterface ?? 'SECS'
-        }
-        detail={managementDialog.type === 'info' ? eqpManageDetailQuery.data ?? null : null}
-        options={eqpManageOptionsQuery.data ?? null}
-        isLoading={managementDialog.type === 'info' ? eqpManageDetailQuery.isLoading : false}
-        isOptionsLoading={eqpManageOptionsQuery.isLoading}
-        isPending={createEqpMutation.isPending || updateEqpMutation.isPending}
-        errorMessage={managementModalErrorMessage}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeManagementDialog()
-          }
-        }}
-        onSubmit={(request) =>
-          managementDialog.type === 'create'
-            ? handleSaveCreateEqp(request as EqpCreateRequest)
-            : handleSaveEqpUpdate(request as EqpUpdateRequest)
-        }
-      />
+      {(managementDialog.type === 'create' || managementDialog.type === 'info') && (
+        <Suspense fallback={null}>
+          <EqpManageFormModal
+            open
+            mode={managementDialog.type === 'create' ? 'create' : 'update'}
+            interfaceType={
+              managementDialog.type === 'create'
+                ? managementDialog.interfaceType
+                : eqpManageDetailQuery.data?.commInterface ?? 'SECS'
+            }
+            detail={managementDialog.type === 'info' ? eqpManageDetailQuery.data ?? null : null}
+            options={eqpManageOptionsQuery.data ?? null}
+            isLoading={managementDialog.type === 'info' ? eqpManageDetailQuery.isLoading : false}
+            isOptionsLoading={eqpManageOptionsQuery.isLoading}
+            isPending={createEqpMutation.isPending || updateEqpMutation.isPending}
+            errorMessage={managementModalErrorMessage}
+            onOpenChange={(open) => {
+              if (!open) {
+                closeManagementDialog()
+              }
+            }}
+            onSubmit={(request) =>
+              managementDialog.type === 'create'
+                ? handleSaveCreateEqp(request as EqpCreateRequest)
+                : handleSaveEqpUpdate(request as EqpUpdateRequest)
+            }
+          />
+        </Suspense>
+      )}
 
       <EqpModelBindingModal
         open={managementDialog.type === 'model'}
