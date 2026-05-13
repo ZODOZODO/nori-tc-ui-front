@@ -1,9 +1,10 @@
 /**
  * DLQ 모니터링 페이지 사이드바 모드 키입니다.
+ * `dashboard` 는 4 카테고리 통합 KPI + 최근 장애 피드를 표시하는 진입 패널,
  * `gateway` / `business` 는 Kafka 소비 실패 항목, `quarantine` 은 Gateway 격리 설비,
  * `repair-task` 는 EQP 보상 실패로 기록된 복구 과업입니다.
  */
-export type DlqMode = 'gateway' | 'business' | 'quarantine' | 'repair-task'
+export type DlqMode = 'dashboard' | 'gateway' | 'business' | 'quarantine' | 'repair-task'
 
 /**
  * Gateway DLQ 엔트리 — `GET /api/dlq/gateway` 응답 단위.

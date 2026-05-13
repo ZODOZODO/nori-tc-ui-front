@@ -9,6 +9,7 @@ interface DlqSidebarProps {
 }
 
 const SIDEBAR_ITEMS: ReadonlyArray<{ mode: DlqMode; label: string; testId: string }> = [
+  { mode: 'dashboard', label: '장애 대시보드', testId: 'dlq-sidebar-dashboard' },
   { mode: 'gateway', label: 'Gateway DLQ', testId: 'dlq-sidebar-gateway' },
   { mode: 'business', label: 'Business DLQ', testId: 'dlq-sidebar-business' },
   { mode: 'quarantine', label: '격리 설비', testId: 'dlq-sidebar-quarantine' },
