@@ -11,7 +11,6 @@ interface UserUiState {
   pendingDeleteUserPk: number | null
   isPasswordResetModalOpen: boolean
   passwordResetUserPk: number | null
-  isProfileModalOpen: boolean
   setListOffset: (offset: number) => void
   resetListOffset: () => void
   selectUser: (userPk: number | null) => void
@@ -22,7 +21,6 @@ interface UserUiState {
   closeDeleteDialog: () => void
   openPasswordResetModal: (userPk: number) => void
   closePasswordResetModal: () => void
-  setProfileModalOpen: (open: boolean) => void
 }
 
 export const useUserUiStore = create<UserUiState>((set) => ({
@@ -34,7 +32,6 @@ export const useUserUiStore = create<UserUiState>((set) => ({
   pendingDeleteUserPk: null,
   isPasswordResetModalOpen: false,
   passwordResetUserPk: null,
-  isProfileModalOpen: false,
   setListOffset: (offset) => set({ listOffset: Math.max(0, offset) }),
   resetListOffset: () => set({ listOffset: 0 }),
   selectUser: (userPk) => set({ activeUserPk: userPk }),
@@ -51,5 +48,4 @@ export const useUserUiStore = create<UserUiState>((set) => ({
     set({ isPasswordResetModalOpen: true, passwordResetUserPk: userPk }),
   closePasswordResetModal: () =>
     set({ isPasswordResetModalOpen: false, passwordResetUserPk: null }),
-  setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
 }))

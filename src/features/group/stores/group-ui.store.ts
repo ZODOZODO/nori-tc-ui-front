@@ -9,7 +9,6 @@ interface GroupUiState {
   upsertMode: GroupUpsertMode
   isDeleteDialogOpen: boolean
   pendingDeleteGroupId: number | null
-  isProfileModalOpen: boolean
   setListOffset: (offset: number) => void
   resetListOffset: () => void
   selectGroup: (groupId: number | null) => void
@@ -18,7 +17,6 @@ interface GroupUiState {
   closeUpsertModal: () => void
   openDeleteDialog: (groupId: number) => void
   closeDeleteDialog: () => void
-  setProfileModalOpen: (open: boolean) => void
 }
 
 export const useGroupUiStore = create<GroupUiState>((set) => ({
@@ -28,7 +26,6 @@ export const useGroupUiStore = create<GroupUiState>((set) => ({
   upsertMode: 'create',
   isDeleteDialogOpen: false,
   pendingDeleteGroupId: null,
-  isProfileModalOpen: false,
   setListOffset: (offset) => set({ listOffset: Math.max(0, offset) }),
   resetListOffset: () => set({ listOffset: 0 }),
   selectGroup: (groupId) => set({ activeGroupId: groupId }),
@@ -41,5 +38,4 @@ export const useGroupUiStore = create<GroupUiState>((set) => ({
     set({ isDeleteDialogOpen: true, pendingDeleteGroupId: groupId }),
   closeDeleteDialog: () =>
     set({ isDeleteDialogOpen: false, pendingDeleteGroupId: null }),
-  setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
 }))

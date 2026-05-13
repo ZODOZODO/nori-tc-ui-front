@@ -1,11 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * `/group` 페이지 e2e 시나리오 묶음.
+ * `/user` 페이지의 좌측 사이드바 Group 모드 e2e 시나리오 묶음.
  *
  * 모든 백엔드 응답은 `route.fulfill` 로 mock 합니다. user-page.spec.ts 의 mock 패턴과
  * 1:1 대칭으로 작성됩니다.
  */
+
+const navigateToGroupPanel = async (page: Page) => {
+  await page.goto('/user')
+  await page.getByTestId('user-management-sidebar-group').click()
+  await expect(page.getByRole('heading', { name: '그룹 관리' })).toBeVisible()
+}
 
 interface MockGroupRow {
   groupId: number
@@ -249,17 +255,18 @@ const createDefaultMockState = (): GroupApiMockState => ({
   removeMemberCalls: [],
 })
 
-// [Group-AC-1] Router.tsx 에 /group 라우트가 lazy 로 등록되어 있고 페이지 진입 시 헤딩이 보인다.
-test('Group-AC-1 / Group-AC-2: topbar Group 클릭 시 /group 으로 라우팅', async ({ page }) => {
+// [Group-AC-1] /user 진입 후 좌측 사이드바의 Group 항목 클릭으로 그룹 패널이 활성화된다.
+test('Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
 
   await page.goto('/eqp')
-  const groupMenu = page.locator('header button:has-text("Group")')
-  await expect(groupMenu).toBeVisible()
-  await groupMenu.click()
+  const userMenu = page.locator('header button:has-text("User")')
+  await expect(userMenu).toBeVisible()
+  await userMenu.click()
 
-  await expect(page).toHaveURL(/\/group$/)
+  await expect(page).toHaveURL(/\/user$/)
+  await page.getByTestId('user-management-sidebar-group').click()
   await expect(page.getByRole('heading', { name: '그룹 관리' })).toBeVisible()
 })
 
@@ -267,7 +274,7 @@ test('Group-AC-1 / Group-AC-2: topbar Group 클릭 시 /group 으로 라우팅',
 test('Group-AC-3: 그룹 목록 표시', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
-  await page.goto('/group')
+  await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-list-table')).toBeVisible()
   await expect(page.getByTestId('group-row-10')).toBeVisible()
@@ -280,7 +287,7 @@ test('Group-AC-3: 그룹 목록 표시', async ({ page }) => {
 test('Group-AC-4: 그룹 등록 성공', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
-  await page.goto('/group')
+  await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-list-table')).toBeVisible()
   await page.getByTestId('group-create-button').click()
@@ -303,7 +310,7 @@ test('Group-AC-4: 그룹 등록 성공', async ({ page }) => {
 test('Group-AC-5: 그룹 수정 성공', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
-  await page.goto('/group')
+  await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-row-10')).toBeVisible()
   await page.getByTestId('group-row-edit-10').click()
@@ -322,7 +329,7 @@ test('Group-AC-5: 그룹 수정 성공', async ({ page }) => {
 test('Group-AC-6: 그룹 삭제 성공', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
-  await page.goto('/group')
+  await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-row-11')).toBeVisible()
   await page.getByTestId('group-row-delete-11').click()
@@ -337,7 +344,7 @@ test('Group-AC-6: 그룹 삭제 성공', async ({ page }) => {
 test('Group-AC-7: 그룹 멤버 추가/제거', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
-  await page.goto('/group')
+  await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-row-10')).toBeVisible()
   await page.getByTestId('group-row-10').click()
@@ -356,22 +363,23 @@ test('Group-AC-7: 그룹 멤버 추가/제거', async ({ page }) => {
   await expect(page.getByTestId('group-member-chip-42')).toHaveCount(0)
 })
 
-// [Group-AC-8] USER_READ 없는 사용자에게 Group 메뉴 미표시 + /group 직접 접근 차단
-test('Group-AC-8a: 권한 없는 사용자는 Group 메뉴 미표시', async ({ page }) => {
+// [Group-AC-8] USER_READ 없는 사용자에게 User 메뉴 미표시 + /user 직접 접근 차단
+// 단일 topbar User 메뉴로 통합된 이후 Group 단독 메뉴는 존재하지 않으므로 User 메뉴 부재만 검증한다.
+test('Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)', async ({ page }) => {
   const state = createDefaultMockState()
   state.meResponse = { ...UNPERMISSIONED_ME }
   await setupMocks(page, state)
 
   await page.goto('/eqp')
   await expect(page.locator('header button:has-text("Eqp")')).toBeVisible()
-  expect(await page.locator('header button:has-text("Group")').count()).toBe(0)
+  expect(await page.locator('header button:has-text("User")').count()).toBe(0)
 })
 
-test('Group-AC-8b: /group 직접 접근 차단', async ({ page }) => {
+test('Group-AC-8b: 권한 없는 사용자가 /user 직접 접근 시 차단', async ({ page }) => {
   const state = createDefaultMockState()
   state.meResponse = { ...UNPERMISSIONED_ME }
   await setupMocks(page, state)
 
-  await page.goto('/group')
+  await page.goto('/user')
   await expect(page).toHaveURL(/\/(login|forbidden|eqp)/)
 })
