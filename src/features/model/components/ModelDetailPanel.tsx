@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
@@ -1325,14 +1326,15 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     </TableHeader>
                     <TableBody>
                       {isDetailLoading ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={normalizedDetailColumns.length + (canEditTableRows ? 1 : 0)}
-                            className="py-10 text-center text-sm text-[#647169]"
-                          >
-                            상세 데이터를 불러오는 중입니다.
-                          </TableCell>
-                        </TableRow>
+                        Array.from({ length: 8 }).map((_, rowIndex) => (
+                          <TableRow key={`model-detail-skeleton-${rowIndex}`} data-testid="model-detail-skeleton">
+                            {Array.from({ length: normalizedDetailColumns.length + (canEditTableRows ? 1 : 0) }).map((_, cellIndex) => (
+                              <TableCell key={cellIndex}>
+                                <Skeleton className="h-4 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
                       ) : detailErrorMessage ? (
                         <TableRow>
                           <TableCell

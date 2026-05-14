@@ -11,6 +11,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
@@ -23,6 +24,9 @@ import {
 } from '../utils/eqp-runtime-state.util'
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart'
+
+const GATEWAY_GROUP_COLUMN_COUNT = 13
+const GATEWAY_GROUP_SKELETON_ROW_COUNT = 8
 
 interface GatewayGroupTableProps {
   /** 표시할 그룹의 설비 목록 */
@@ -185,14 +189,15 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
                 </TableCell>
               </TableRow>
             ) : isInitialLoading ? (
-              <TableRow>
-                <TableCell colSpan={13} className="py-10 text-center text-sm text-[#647169]">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    설비 상세 정보를 불러오는 중입니다.
-                  </span>
-                </TableCell>
-              </TableRow>
+              Array.from({ length: GATEWAY_GROUP_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow key={`gateway-group-skeleton-${rowIndex}`} data-testid="gateway-group-skeleton">
+                  {Array.from({ length: GATEWAY_GROUP_COLUMN_COUNT }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : (
               sortedEqpItems.map((eqp) => {
                 const detail = detailByEqpId.get(eqp.eqpId)

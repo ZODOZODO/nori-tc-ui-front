@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -1214,7 +1215,17 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {resolvedHistoryItems.length === 0 ? (
+              {deployHistoryQuery.isLoading ? (
+                Array.from({ length: 8 }).map((_, rowIndex) => (
+                  <TableRow key={`deploy-monitor-history-skeleton-${rowIndex}`} data-testid="deploy-monitor-history-skeleton">
+                    {Array.from({ length: 8 }).map((_, cellIndex) => (
+                      <TableCell key={cellIndex}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : resolvedHistoryItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-sm text-[#7B8781]">
                     {historyOnly ? '완료된 Deploy 이력이 없습니다.' : '표시할 Deploy 데이터가 없습니다.'}

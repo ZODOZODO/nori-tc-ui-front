@@ -1,9 +1,12 @@
 import { memo, useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { EqpParamRow } from '../types/eqp.types'
+
+const EQP_PARAM_SKELETON_ROW_COUNT = 8
 
 type EqpParamTableRow = EqpParamRow & { rowId?: string }
 
@@ -65,17 +68,15 @@ export const EqpParamTable = memo(function EqpParamTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isEditMode ? 4 : 3}
-                  className="py-10 text-center text-sm text-[#647169]"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    설비 파라미터를 불러오는 중입니다.
-                  </span>
-                </TableCell>
-              </TableRow>
+              Array.from({ length: EQP_PARAM_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow key={`eqp-param-skeleton-${rowIndex}`} data-testid="eqp-param-skeleton">
+                  {Array.from({ length: isEditMode ? 4 : 3 }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell
