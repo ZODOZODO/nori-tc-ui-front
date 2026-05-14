@@ -7,6 +7,6 @@ export function useLiveMapDemoJobs(enabled = true, states?: string, limit = 100)
     queryFn: () => liveMapDemoApi.getJobs(states, limit),
     enabled,
     staleTime: 1_000,
-    refetchInterval: enabled ? 2_000 : false,
+    refetchInterval: enabled ? 5_000 : false,
   })
 }
