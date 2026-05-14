@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -65,7 +65,7 @@ const resolveStatusBadgeVariant = (status: string): 'default' | 'info' | 'warnin
  * - row click: 선택
  * - row double click: Version 화면(탭) 오픈
  */
-export function ModelInfoTable({
+export const ModelInfoTable = memo(function ModelInfoTable({
   models,
   selectedModelVersionKey,
   isLoading,
@@ -144,4 +144,4 @@ export function ModelInfoTable({
       ) : null}
     </section>
   )
-}
+})

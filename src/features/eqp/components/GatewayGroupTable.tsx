@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -93,7 +93,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
  * @param eqpItems 해당 그룹에 속한 설비 목록
  * @param groupName 그룹명 (헤더에 표시)
  */
-export function GatewayGroupTable({
+export const GatewayGroupTable = memo(function GatewayGroupTable({
   eqpItems,
   groupName,
   isLifecyclePending = false,
@@ -318,4 +318,4 @@ export function GatewayGroupTable({
       ) : null}
     </section>
   )
-}
+})

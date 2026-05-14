@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,7 @@ interface EqpParamTableProps {
  * EQP Parameter 테이블입니다.
  * 설비 정보 테이블과 동일한 스타일을 유지하면서 편집 모드에서는 행 추가/삭제와 인라인 수정을 지원합니다.
  */
-export function EqpParamTable({
+export const EqpParamTable = memo(function EqpParamTable({
   rows,
   isEditMode,
   isLoading,
@@ -155,4 +155,4 @@ export function EqpParamTable({
       </div>
     </div>
   )
-}
+})

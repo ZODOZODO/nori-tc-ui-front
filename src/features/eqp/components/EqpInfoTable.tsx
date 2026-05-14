@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import {
   ContextMenu,
@@ -88,7 +89,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
  * 선택된 설비의 단건 정보를 표시하는 상단 테이블입니다.
  * Check Out/Check In 버튼은 design.pen의 DetailLayout(version section)에서 제어합니다.
  */
-export function EqpInfoTable({
+export const EqpInfoTable = memo(function EqpInfoTable({
   eqp,
   modelInfo,
   runtimeState,
@@ -215,4 +216,4 @@ export function EqpInfoTable({
       ) : null}
     </section>
   )
-}
+})

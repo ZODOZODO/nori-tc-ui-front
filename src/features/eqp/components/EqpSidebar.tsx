@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import {
   ContextMenu,
@@ -46,7 +47,7 @@ interface EqpSidebarProps {
  * 그룹화 로직은 eqp-group.util.ts의 groupEqpItems 함수를 사용합니다.
  * self-stretch를 통해 부모 flex 컨테이너 높이 전체를 항상 채웁니다.
  */
-export function EqpSidebar({
+export const EqpSidebar = memo(function EqpSidebar({
   eqpItems,
   selectedEqpId,
   isGatewaySelected,
@@ -282,4 +283,4 @@ export function EqpSidebar({
       </div>
     </aside>
   )
-}
+})

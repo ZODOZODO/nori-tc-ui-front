@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { memo, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { useModelNodeDetail } from '../hooks/useModelNodeDetail'
 import {
   ArrowDown,
@@ -650,7 +650,7 @@ function WorkflowNodeEditor({
 /**
  * Model Version 상세 패널입니다.
  */
-export function ModelDetailPanel({
+export const ModelDetailPanel = memo(function ModelDetailPanel({
   openedTabs,
   activeTab,
   activeModel,
@@ -2004,4 +2004,4 @@ export function ModelDetailPanel({
       </Dialog>
     </>
   )
-}
+})

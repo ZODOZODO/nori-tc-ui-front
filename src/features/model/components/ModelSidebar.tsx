@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import {
   ContextMenu,
@@ -276,7 +276,7 @@ function InterfaceSection({
  * Model 페이지 좌측 Sidebar 컴포넌트입니다.
  * parent(root) → branch 구조를 항상 펼친 상태로 표시하고 각 노드에 관리 컨텍스트 메뉴를 연결합니다.
  */
-export function ModelSidebar({
+export const ModelSidebar = memo(function ModelSidebar({
   modelItems,
   selectedModelVersionKey,
   selectedInterfaceGroup,
@@ -415,4 +415,4 @@ export function ModelSidebar({
       </div>
     </aside>
   )
-}
+})

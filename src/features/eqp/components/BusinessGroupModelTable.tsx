@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -55,7 +55,7 @@ const formatDateTime = (isoDateTime: string): string => {
 /**
  * business_app 선택 시 메모리상 모델 정보와 동일한 형식의 모델 목록을 표시합니다.
  */
-export function BusinessGroupModelTable({
+export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   groupName,
   models,
   isLoading,
@@ -134,4 +134,4 @@ export function BusinessGroupModelTable({
       ) : null}
     </section>
   )
-}
+})
