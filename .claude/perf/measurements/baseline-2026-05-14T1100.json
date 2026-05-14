@@ -1,0 +1,548 @@
+{
+  "meta": {
+    "measuredAt": "2026-05-14T02:13:15.523Z",
+    "baseUrl": "http://127.0.0.1:3000",
+    "pages": [
+      "EqpPage",
+      "ModelPage",
+      "DeployPage",
+      "DlqPage",
+      "LiveMapPage"
+    ]
+  },
+  "perPage": {
+    "EqpPage": {
+      "cold": {
+        "apiTotalCount": 8,
+        "apiSlowestMs": 153,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 153
+          },
+          {
+            "method": "GET",
+            "path": "/api/model?(...)",
+            "status": 200,
+            "ms": 153
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/eqp/api/eqp.api.ts",
+            "status": 200,
+            "ms": 123
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 14
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 10
+          }
+        ],
+        "rowCounts": []
+      },
+      "warm": {
+        "apiTotalCount": 8,
+        "apiSlowestMs": 164,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/model?(...)",
+            "status": 200,
+            "ms": 164
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/eqp/api/eqp.api.ts",
+            "status": 200,
+            "ms": 85
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp?(...)",
+            "status": 200,
+            "ms": 19
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 18
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 5
+          }
+        ],
+        "rowCounts": []
+      },
+      "afterSidebarClick": {
+        "apiTotalCount": 7,
+        "apiSlowestMs": 190,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/eqp/CMP_001/param-versions",
+            "status": 200,
+            "ms": 190
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp/CMP_001/manage",
+            "status": 200,
+            "ms": 190
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp/CMP_001/runtime-state",
+            "status": 200,
+            "ms": 189
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp/CMP_001/checkout-status",
+            "status": 200,
+            "ms": 189
+          },
+          {
+            "method": "GET",
+            "path": "/api/model/61",
+            "status": 200,
+            "ms": 53
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "EQPID",
+              "Business App",
+              "Comm Interface",
+              "Comm Mode",
+              "Route Partition"
+            ],
+            "rowCount": 1
+          },
+          {
+            "tableIndex": 1,
+            "headerSample": [
+              "Param Name",
+              "Param Value",
+              "Description"
+            ],
+            "rowCount": 1
+          }
+        ]
+      }
+    },
+    "ModelPage": {
+      "cold": {
+        "apiTotalCount": 6,
+        "apiSlowestMs": 52,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 102
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 85
+          },
+          {
+            "method": "GET",
+            "path": "/api/model?(...)",
+            "status": 200,
+            "ms": 52
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 26
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/auth/api/auth.api.ts",
+            "status": 200,
+            "ms": 9
+          }
+        ],
+        "rowCounts": []
+      },
+      "warm": {
+        "apiTotalCount": 6,
+        "apiSlowestMs": 38,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 304,
+            "ms": 78
+          },
+          {
+            "method": "GET",
+            "path": "/api/model?(...)",
+            "status": 200,
+            "ms": 38
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 304,
+            "ms": 17
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 10
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/user/api/user.api.ts",
+            "status": 304,
+            "ms": 8
+          }
+        ],
+        "rowCounts": []
+      },
+      "afterSidebarClick": {
+        "apiTotalCount": 1,
+        "apiSlowestMs": 51,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/model/1",
+            "status": 200,
+            "ms": 51
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "Model Name",
+              "Model Version",
+              "status",
+              "description",
+              "updated_by"
+            ],
+            "rowCount": 1
+          }
+        ]
+      }
+    },
+    "DeployPage": {
+      "cold": {
+        "apiTotalCount": 8,
+        "apiSlowestMs": 25,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/src/features/deploy/api/deploy.api.ts",
+            "status": 200,
+            "ms": 32
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 25
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp/options",
+            "status": 200,
+            "ms": 25
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp?(...)",
+            "status": 200,
+            "ms": 24
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/auth/api/auth.api.ts",
+            "status": 200,
+            "ms": 23
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "",
+              "Eqp ID",
+              "Model",
+              "Model Version / Status",
+              "Business Jar File"
+            ],
+            "rowCount": 1
+          },
+          {
+            "tableIndex": 1,
+            "headerSample": [
+              "Eqp ID",
+              "Model",
+              "Selected Version",
+              "Business Jar File",
+              "Interface"
+            ],
+            "rowCount": 1
+          }
+        ]
+      },
+      "warm": {
+        "apiTotalCount": 8,
+        "apiSlowestMs": 36,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 53
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/eqp/api/eqp.api.ts",
+            "status": 200,
+            "ms": 52
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/deploy/api/deploy.api.ts",
+            "status": 200,
+            "ms": 48
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp/options",
+            "status": 200,
+            "ms": 36
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 35
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "",
+              "Eqp ID",
+              "Model",
+              "Model Version / Status",
+              "Business Jar File"
+            ],
+            "rowCount": 1
+          },
+          {
+            "tableIndex": 1,
+            "headerSample": [
+              "Eqp ID",
+              "Model",
+              "Selected Version",
+              "Business Jar File",
+              "Interface"
+            ],
+            "rowCount": 1
+          }
+        ]
+      }
+    },
+    "DlqPage": {
+      "cold": {
+        "apiTotalCount": 9,
+        "apiSlowestMs": 279,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/dlq/gateway",
+            "status": 200,
+            "ms": 279
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/quarantine",
+            "status": 200,
+            "ms": 41
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/repair-task",
+            "status": 200,
+            "ms": 41
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 27
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/business",
+            "status": 200,
+            "ms": 26
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "발생 시각",
+              "카테고리",
+              "설비",
+              "사유 코드",
+              "사유"
+            ],
+            "rowCount": 1
+          }
+        ]
+      },
+      "warm": {
+        "apiTotalCount": 9,
+        "apiSlowestMs": 184,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/dlq/gateway",
+            "status": 200,
+            "ms": 184
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/repair-task",
+            "status": 200,
+            "ms": 25
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/quarantine",
+            "status": 200,
+            "ms": 25
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 23
+          },
+          {
+            "method": "GET",
+            "path": "/api/dlq/business",
+            "status": 200,
+            "ms": 19
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "발생 시각",
+              "카테고리",
+              "설비",
+              "사유 코드",
+              "사유"
+            ],
+            "rowCount": 1
+          }
+        ]
+      }
+    },
+    "LiveMapPage": {
+      "cold": {
+        "apiTotalCount": 9,
+        "apiSlowestMs": 9417,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/live-map",
+            "status": 200,
+            "ms": 9417
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 103
+          },
+          {
+            "method": "GET",
+            "path": "/api/comm-logs/CMP_001?(...)",
+            "status": 200,
+            "ms": 42
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/auth/api/auth.api.ts",
+            "status": 200,
+            "ms": 27
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 24
+          }
+        ],
+        "rowCounts": []
+      },
+      "warm": {
+        "apiTotalCount": 9,
+        "apiSlowestMs": 5096,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/live-map",
+            "status": 200,
+            "ms": 5096
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/live-map/api/live-map.api.ts",
+            "status": 200,
+            "ms": 35
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 26
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 24
+          },
+          {
+            "method": "GET",
+            "path": "/api/comm-logs/CMP_001?(...)",
+            "status": 200,
+            "ms": 15
+          }
+        ],
+        "rowCounts": []
+      }
+    }
+  }
+}
