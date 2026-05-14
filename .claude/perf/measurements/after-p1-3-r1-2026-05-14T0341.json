@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "measuredAt": "2026-05-14T03:41:09.981Z",
+    "baseUrl": "http://127.0.0.1:3000",
+    "pages": [
+      "LiveMapPage"
+    ]
+  },
+  "perPage": {
+    "LiveMapPage": {
+      "cold": {
+        "apiTotalCount": 11,
+        "apiSlowestMs": 9439,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/live-map",
+            "status": 200,
+            "ms": 9439
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 227
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/user/api/user.api.ts",
+            "status": 200,
+            "ms": 64
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/eqp/api/eqp.api.ts",
+            "status": 200,
+            "ms": 57
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 56
+          }
+        ],
+        "rowCounts": []
+      },
+      "warm": {
+        "apiTotalCount": 11,
+        "apiSlowestMs": 4910,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/live-map",
+            "status": 200,
+            "ms": 4910
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/user/api/user.api.ts",
+            "status": 200,
+            "ms": 93
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 82
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 74
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/dlq/api/dlq.api.ts",
+            "status": 200,
+            "ms": 70
+          }
+        ],
+        "rowCounts": []
+      }
+    }
+  }
+}

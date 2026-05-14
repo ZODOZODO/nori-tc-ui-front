@@ -58,10 +58,10 @@ LiveMap 페이지와 Deploy Monitor 페이지에서 동시 폴링 fan-out 이 �
 각 기준은 **기계 검증 가능**해야 한다.
 
 ### R1 (LiveMap 위상 정렬)
-- [ ] `useLiveMapDemoJobs` 의 `refetchInterval: 2_000` → `5_000` (또는 결정된 값)
-- [ ] `useCommLog` 의 `refetchInterval` 유지 또는 정렬값으로 변경
-- [ ] Grep 확인: `Grep "refetchInterval" features/live-map/hooks` 결과가 SPEC 의 결정값과 정확히 일치
-- [ ] `npm run build` PASS
+- [x] `useLiveMapDemoJobs` 의 `refetchInterval: 2_000` → `5_000` (2026-05-14 적용, B안 권장값 채택)
+- [x] `useCommLog` 의 `refetchInterval` 유지 또는 정렬값으로 변경 (10_000 유지)
+- [x] Grep 확인: `Grep "refetchInterval" features/live-map/hooks` 결과가 SPEC 의 결정값과 정확히 일치
+- [x] `npm run build` PASS (9.10s, modules 2239)
 
 ### R2 (Deploy 통합 endpoint)
 - [ ] `nori-tc-ui-backend` 에 `GET /deploys/{deployKey}/monitor` 추가 (응답: `{ summary, targets: { items, total } }`)
