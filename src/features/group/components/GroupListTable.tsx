@@ -1,6 +1,7 @@
 import { Pencil, Trash2, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import { useGroups } from '../hooks/useGroups'
 import { useGroupUiStore } from '../stores/group-ui.store'
 
 export const GROUP_PAGE_SIZE = 20
+const GROUP_TABLE_COLUMN_COUNT = 6
 
 interface GroupListTableProps {
   onSelectGroup: (groupId: number) => void
@@ -54,10 +56,20 @@ export function GroupListTable({ onSelectGroup }: GroupListTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.length === 0 ? (
+            {groupListQuery.isLoading && items.length === 0 ? (
+              Array.from({ length: GROUP_PAGE_SIZE }).map((_, rowIndex) => (
+                <TableRow key={`group-skeleton-${rowIndex}`} data-testid="group-row-skeleton">
+                  {Array.from({ length: GROUP_TABLE_COLUMN_COUNT }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-[#5D6963]">
-                  {groupListQuery.isLoading ? '그룹 목록을 불러오는 중...' : '표시할 그룹이 없습니다.'}
+                <TableCell colSpan={GROUP_TABLE_COLUMN_COUNT} className="py-10 text-center text-sm text-[#5D6963]">
+                  표시할 그룹이 없습니다.
                 </TableCell>
               </TableRow>
             ) : (

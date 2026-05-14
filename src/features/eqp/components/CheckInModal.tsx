@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
@@ -86,9 +87,28 @@ export function CheckInModal({
             </div>
 
             {isDiffLoading ? (
-              <div className="flex items-center justify-center gap-2 py-10 text-sm text-[#647169]">
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                diff를 불러오는 중입니다.
+              <div className="overflow-x-auto">
+                <Table className="min-w-[760px]">
+                  <TableHeader>
+                    <TableRow className="bg-[#FAFCFB] hover:bg-[#FAFCFB]">
+                      <TableHead className="w-24">구분</TableHead>
+                      <TableHead className="w-48">Param Name</TableHead>
+                      <TableHead>Param Value</TableHead>
+                      <TableHead>Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, rowIndex) => (
+                      <TableRow key={`checkin-diff-skeleton-${rowIndex}`} data-testid="checkin-diff-skeleton">
+                        {Array.from({ length: 4 }).map((_, cellIndex) => (
+                          <TableCell key={cellIndex}>
+                            <Skeleton className="h-4 w-full" />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : !hasDiff ? (
               <p className="py-10 text-center text-sm text-[#647169]">

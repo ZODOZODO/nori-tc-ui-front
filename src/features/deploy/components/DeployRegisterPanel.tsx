@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -1370,11 +1371,15 @@ export function DeployRegisterPanel() {
                     </TableCell>
                   </TableRow>
                 ) : registerTargetsQuery.isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-[#7B8781]">
-                      대상 설비를 조회하고 있습니다.
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, rowIndex) => (
+                    <TableRow key={`deploy-register-skeleton-${rowIndex}`} data-testid="deploy-register-skeleton">
+                      {Array.from({ length: 6 }).map((_, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
                 ) : registerTargetsQuery.isError ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-sm text-[#C5534B]">

@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { memo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import {
   ContextMenu,
@@ -8,7 +8,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+const EQP_INFO_COLUMN_COUNT = 12
 import type { EqpInfo, EqpModelInfo, EqpRuntimeState } from '../types/eqp.types'
 import { resolveBusinessAppName } from '../utils/eqp-group.util'
 import {
@@ -86,7 +89,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
  * 선택된 설비의 단건 정보를 표시하는 상단 테이블입니다.
  * Check Out/Check In 버튼은 design.pen의 DetailLayout(version section)에서 제어합니다.
  */
-export function EqpInfoTable({
+export const EqpInfoTable = memo(function EqpInfoTable({
   eqp,
   modelInfo,
   runtimeState,
@@ -131,13 +134,12 @@ export function EqpInfoTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    설비 상세 정보를 불러오는 중입니다.
-                  </span>
-                </TableCell>
+              <TableRow data-testid="eqp-info-skeleton">
+                {Array.from({ length: EQP_INFO_COLUMN_COUNT }).map((_, cellIndex) => (
+                  <TableCell key={cellIndex}>
+                    <Skeleton className="h-4 w-full" />
+                  </TableCell>
+                ))}
               </TableRow>
             ) : eqp ? (
                 <ContextMenu>
@@ -214,4 +216,4 @@ export function EqpInfoTable({
       ) : null}
     </section>
   )
-}
+})

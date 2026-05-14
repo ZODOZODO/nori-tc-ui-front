@@ -24,5 +24,6 @@ export function useDeploySummary(
       }
       return 3000
     },
+    staleTime: 0,
   })
 }

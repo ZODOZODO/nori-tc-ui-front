@@ -1,11 +1,15 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { LiveMapBoard } from './LiveMapBoard'
-import { LiveMapDemoModal } from './LiveMapDemoModal'
 import { LiveMapHeader } from './LiveMapHeader'
 import { LiveMapToolbar } from './LiveMapToolbar'
+
+// 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
+const LiveMapDemoModal = lazy(() =>
+  import('./LiveMapDemoModal').then((module) => ({ default: module.LiveMapDemoModal })),
+)
 import {
   applyLiveMapClusterPositionDrafts,
   applyLiveMapEquipmentPositionDrafts,
@@ -204,12 +208,16 @@ export function LiveMapPage() {
       </main>
 
       <UserProfileModal open={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
-      <LiveMapDemoModal
-        open={isDemoModalOpen}
-        equipmentNodes={equipmentNodes}
-        clusterItems={clusterItems}
-        onClose={() => setIsDemoModalOpen(false)}
-      />
+      {isDemoModalOpen && (
+        <Suspense fallback={null}>
+          <LiveMapDemoModal
+            open
+            equipmentNodes={equipmentNodes}
+            clusterItems={clusterItems}
+            onClose={() => setIsDemoModalOpen(false)}
+          />
+        </Suspense>
+      )}
     </AppPageShell>
   )
 }

@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { memo, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { ModelInfo } from '@/features/model/types/model.types'
+
+const BUSINESS_GROUP_MODEL_COLUMN_COUNT = 6
+const BUSINESS_GROUP_MODEL_SKELETON_ROW_COUNT = 8
 
 interface BusinessGroupModelTableProps {
   groupName: string
@@ -55,7 +58,7 @@ const formatDateTime = (isoDateTime: string): string => {
 /**
  * business_app 선택 시 메모리상 모델 정보와 동일한 형식의 모델 목록을 표시합니다.
  */
-export function BusinessGroupModelTable({
+export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   groupName,
   models,
   isLoading,
@@ -90,14 +93,15 @@ export function BusinessGroupModelTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-[#647169]">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    모델 정보를 불러오는 중입니다.
-                  </span>
-                </TableCell>
-              </TableRow>
+              Array.from({ length: BUSINESS_GROUP_MODEL_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow key={`business-group-model-skeleton-${rowIndex}`} data-testid="business-group-model-skeleton">
+                  {Array.from({ length: BUSINESS_GROUP_MODEL_COLUMN_COUNT }).map((_, cellIndex) => (
+                    <TableCell key={cellIndex}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : sortedModels.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-[#647169]">
@@ -134,4 +138,4 @@ export function BusinessGroupModelTable({
       ) : null}
     </section>
   )
-}
+})

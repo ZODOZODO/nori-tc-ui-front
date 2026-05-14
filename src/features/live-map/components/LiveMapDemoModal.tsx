@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -498,12 +499,20 @@ export function LiveMapDemoModal({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {demoJobs.length === 0 ? (
+                      {isJobsLoading && demoJobs.length === 0 ? (
+                        Array.from({ length: 5 }).map((_, rowIndex) => (
+                          <TableRow key={`live-map-demo-jobs-skeleton-${rowIndex}`} data-testid="live-map-demo-jobs-skeleton">
+                            {Array.from({ length: 8 }).map((_, cellIndex) => (
+                              <TableCell key={cellIndex}>
+                                <Skeleton className="h-4 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : demoJobs.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="py-12 text-center text-sm text-[#708078]">
-                            {isJobsLoading
-                              ? 'Demo job 목록을 불러오는 중입니다.'
-                              : '우상단에서 설비를 선택하고 시나리오를 지정한 뒤 테스트를 시작해 주세요.'}
+                            우상단에서 설비를 선택하고 시나리오를 지정한 뒤 테스트를 시작해 주세요.
                           </TableCell>
                         </TableRow>
                       ) : (

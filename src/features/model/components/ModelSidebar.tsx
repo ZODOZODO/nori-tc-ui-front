@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { memo, useDeferredValue, useMemo, useState } from 'react'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import {
   ContextMenu,
@@ -276,7 +276,7 @@ function InterfaceSection({
  * Model 페이지 좌측 Sidebar 컴포넌트입니다.
  * parent(root) → branch 구조를 항상 펼친 상태로 표시하고 각 노드에 관리 컨텍스트 메뉴를 연결합니다.
  */
-export function ModelSidebar({
+export const ModelSidebar = memo(function ModelSidebar({
   modelItems,
   selectedModelVersionKey,
   selectedInterfaceGroup,
@@ -301,6 +301,8 @@ export function ModelSidebar({
   onResizeSidebar,
 }: ModelSidebarProps) {
   const [searchKeyword, setSearchKeyword] = useState('')
+  // 입력 자체는 즉시 반영, 트리 빌드는 deferred 로 — 큰 목록에서 입력 지연 완화.
+  const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
   const selectedModel = useMemo(
     () => modelItems.find((item) => item.modelVersionKey === selectedModelVersionKey) ?? null,
@@ -308,8 +310,8 @@ export function ModelSidebar({
   )
 
   const { secsRoots, socketRoots } = useMemo(
-    () => buildModelTreeGroups(modelItems, searchKeyword),
-    [modelItems, searchKeyword],
+    () => buildModelTreeGroups(modelItems, deferredSearchKeyword),
+    [modelItems, deferredSearchKeyword],
   )
 
   if (!sidebarOpen) {
@@ -415,4 +417,4 @@ export function ModelSidebar({
       </div>
     </aside>
   )
-}
+})

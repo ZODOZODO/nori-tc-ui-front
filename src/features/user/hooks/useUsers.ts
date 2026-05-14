@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { userApi } from '../api/user.api'
 import { userQueryKeys } from '../lib/user-query-keys'
 
@@ -11,6 +11,7 @@ export function useUsers(offset: number, limit: number, enabled = true) {
     queryFn: () => userApi.getUserList(offset, limit),
     enabled,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }
 
