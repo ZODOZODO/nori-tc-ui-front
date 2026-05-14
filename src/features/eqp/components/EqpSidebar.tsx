@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useDeferredValue, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import {
   ContextMenu,
@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import { cn } from '@/lib/utils'
 import type { EqpInfo, ProtocolType } from '../types/eqp.types'
-import { useMemo, useState } from 'react'
 import { groupEqpItems } from '../utils/eqp-group.util'
 
 interface EqpSidebarProps {
@@ -71,16 +70,18 @@ export const EqpSidebar = memo(function EqpSidebar({
   onResizeSidebar,
 }: EqpSidebarProps) {
   const [searchKeyword, setSearchKeyword] = useState('')
+  // 입력 자체는 즉시 반영, 필터링은 deferred 로 — 큰 목록에서 입력 지연 완화.
+  const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
   const filteredEqpItems = useMemo(() => {
-    const normalizedKeyword = searchKeyword.trim().toLowerCase()
+    const normalizedKeyword = deferredSearchKeyword.trim().toLowerCase()
 
     if (!normalizedKeyword) {
       return eqpItems
     }
 
     return eqpItems.filter((eqp) => eqp.eqpId.toLowerCase().includes(normalizedKeyword))
-  }, [eqpItems, searchKeyword])
+  }, [eqpItems, deferredSearchKeyword])
 
   /**
    * 검색 필터 후 groupEqpItems 유틸로 그룹화합니다.
