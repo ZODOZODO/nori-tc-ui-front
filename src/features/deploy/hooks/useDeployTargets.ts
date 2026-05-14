@@ -28,5 +28,6 @@ export function useDeployTargets(
       }
       return 3000
     },
+    staleTime: 0,
   })
 }

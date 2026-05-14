@@ -17,5 +17,6 @@ export function useDeployHistoryList(
     queryFn: () => deployApi.getDeployHistory(filters, terminalOnly, offset, limit),
     refetchInterval: terminalOnly ? false : 3000,
     placeholderData: keepPreviousData,
+    staleTime: 0,
   })
 }

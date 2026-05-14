@@ -9,6 +9,7 @@ export function useMe(enabled = true) {
     queryKey: ['auth', 'me'],
     queryFn: () => profileApi.getMe(),
     enabled,
+    staleTime: 5 * 60_000,
   })
 }
 

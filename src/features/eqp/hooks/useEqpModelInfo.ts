@@ -11,5 +11,6 @@ export function useEqpModelInfo(modelVersionKey: number | null) {
     queryKey: eqpQueryKeys.modelInfo(modelVersionKey),
     queryFn: () => eqpApi.getEqpModelInfoByVersionKey(modelVersionKey as number),
     enabled: typeof modelVersionKey === 'number' && modelVersionKey > 0,
+    staleTime: 0,
   })
 }
