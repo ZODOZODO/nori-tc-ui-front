@@ -308,17 +308,18 @@ export function LiveMapDemoModal({
     }
   }
 
-  const handleCancelJob = async (jobId: string, _testType: LiveMapDemoTestType) => {
-    void _testType
+  const handleCancelJob = async (jobId: string, testType: LiveMapDemoTestType) => {
+    const testTypeLabel =
+      DEMO_TEST_TYPE_OPTIONS.find((option) => option.value === testType)?.label ?? testType
     setStartMessage(null)
     try {
       await cancelDemoJobMutation.mutateAsync(jobId)
-      setStartMessage('설비만 연결 테스트 종료를 요청했습니다.')
+      setStartMessage(`${testTypeLabel} 테스트 종료를 요청했습니다.`)
     } catch (error) {
       setStartMessage(
         error instanceof Error
           ? error.message
-          : '테스트 종료 요청에 실패했습니다.',
+          : `${testTypeLabel} 테스트 종료 요청에 실패했습니다.`,
       )
     }
   }
