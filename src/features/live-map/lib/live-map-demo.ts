@@ -68,6 +68,7 @@ export const buildLiveMapDemoTree = (
               lineValue,
               clusterId: equipmentNode.clusterId,
               eqpId: equipmentNode.eqpId,
+              eqpName: equipmentNode.eqpName,
               children: [],
             })),
           }
@@ -76,38 +77,77 @@ export const buildLiveMapDemoTree = (
   })
 }
 
-export const collectLiveMapDemoSelectionEquipments = (
-  selectionNodeId: string | null,
+export const collectLiveMapDemoEquipmentsByEqpIds = (
+  eqpIds: readonly string[],
   equipmentNodes: readonly LiveMapEquipmentNode[],
 ): LiveMapDemoTargetEquipment[] => {
-  if (!selectionNodeId) {
+  if (eqpIds.length === 0) {
     return []
   }
 
-  if (selectionNodeId.startsWith('equipment:')) {
-    const eqpId = selectionNodeId.replace('equipment:', '')
-    const selectedEquipment = equipmentNodes.find((equipmentNode) => equipmentNode.eqpId === eqpId)
+  const wantedEqpIds = new Set(eqpIds)
 
-    return selectedEquipment ? [toDemoTargetEquipment(selectedEquipment)] : []
+  return equipmentNodes
+    .filter((equipmentNode) => wantedEqpIds.has(equipmentNode.eqpId))
+    .map(toDemoTargetEquipment)
+}
+
+export const collectLiveMapDemoTreeEqpIds = (node: LiveMapDemoTreeNode): string[] => {
+  if (node.type === 'EQUIPMENT') {
+    return node.eqpId ? [node.eqpId] : []
   }
 
-  if (selectionNodeId.startsWith('process:')) {
-    const clusterId = selectionNodeId.replace('process:', '')
+  return node.children.flatMap((childNode) => collectLiveMapDemoTreeEqpIds(childNode))
+}
 
-    return equipmentNodes
-      .filter((equipmentNode) => equipmentNode.clusterId === clusterId)
-      .map(toDemoTargetEquipment)
+export const filterLiveMapDemoTree = (
+  nodes: readonly LiveMapDemoTreeNode[],
+  searchKeyword: string,
+): LiveMapDemoTreeNode[] => {
+  const normalizedKeyword = searchKeyword.trim().toLowerCase()
+
+  if (normalizedKeyword === '') {
+    return nodes.map((node) => ({ ...node, children: filterLiveMapDemoTree(node.children, '') }))
   }
 
-  if (selectionNodeId.startsWith('line:')) {
-    const lineValue = selectionNodeId.replace('line:', '')
+  const matchedNodes: LiveMapDemoTreeNode[] = []
 
-    return equipmentNodes
-      .filter((equipmentNode) => equipmentNode.lineValue === lineValue)
-      .map(toDemoTargetEquipment)
-  }
+  nodes.forEach((node) => {
+    if (node.type === 'EQUIPMENT') {
+      const eqpIdMatched = node.label.toLowerCase().includes(normalizedKeyword)
+      const eqpNameMatched = (node.eqpName ?? '').toLowerCase().includes(normalizedKeyword)
 
-  return []
+      if (eqpIdMatched || eqpNameMatched) {
+        matchedNodes.push({ ...node, children: [] })
+      }
+      return
+    }
+
+    const filteredChildren = filterLiveMapDemoTree(node.children, searchKeyword)
+
+    if (filteredChildren.length > 0) {
+      matchedNodes.push({ ...node, children: filteredChildren })
+    }
+  })
+
+  return matchedNodes
+}
+
+export const collectLiveMapDemoExpandableNodeIds = (
+  nodes: readonly LiveMapDemoTreeNode[],
+): string[] => {
+  const ids: string[] = []
+
+  nodes.forEach((node) => {
+    if (node.children.length === 0) {
+      return
+    }
+
+    ids.push(node.id)
+    ids.push(...collectLiveMapDemoExpandableNodeIds(node.children))
+  })
+
+  return ids
 }
 
 export const mergeLiveMapDemoTargetEquipments = (

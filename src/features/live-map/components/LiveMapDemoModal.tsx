@@ -1,5 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -24,7 +25,10 @@ import { useLiveMapDemoJobs } from '../hooks/useLiveMapDemoJobs'
 import { useLiveMapDemoScenarios } from '../hooks/useLiveMapDemoScenarios'
 import {
   buildLiveMapDemoTree,
-  collectLiveMapDemoSelectionEquipments,
+  collectLiveMapDemoEquipmentsByEqpIds,
+  collectLiveMapDemoExpandableNodeIds,
+  collectLiveMapDemoTreeEqpIds,
+  filterLiveMapDemoTree,
   mergeLiveMapDemoTargetEquipments,
 } from '../lib/live-map-demo'
 import type {
@@ -77,13 +81,44 @@ const resolveJobBadgeVariant = (state: string) => {
   return 'outline' as const
 }
 
+type TreeCheckState = 'checked' | 'unchecked' | 'indeterminate'
+
+interface TriStateCheckboxProps {
+  state: TreeCheckState
+  ariaLabel: string
+  onChange: () => void
+}
+
+function TriStateCheckbox({ state, ariaLabel, onChange }: TriStateCheckboxProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.indeterminate = state === 'indeterminate'
+    }
+  }, [state])
+
+  return (
+    <input
+      ref={inputRef}
+      type="checkbox"
+      checked={state === 'checked'}
+      onChange={onChange}
+      onClick={(event) => event.stopPropagation()}
+      aria-label={ariaLabel}
+      className="size-4 shrink-0 cursor-pointer rounded border-[#C7D3CC] accent-[#1A7A55]"
+    />
+  )
+}
+
 export function LiveMapDemoModal({
   open,
   equipmentNodes,
   clusterItems,
   onClose,
 }: LiveMapDemoModalProps) {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedEqpIds, setSelectedEqpIds] = useState<string[]>([])
+  const [searchKeyword, setSearchKeyword] = useState('')
   const [targetEquipments, setTargetEquipments] = useState<LiveMapDemoTargetEquipment[]>([])
   const [selectedTestType, setSelectedTestType] = useState<LiveMapDemoTestType>('E2E')
   const [selectedScenarioId, setSelectedScenarioId] = useState('')
@@ -109,6 +144,25 @@ export function LiveMapDemoModal({
     [clusterItems, equipmentNodes],
   )
 
+  const visibleDemoTree = useMemo(
+    () => filterLiveMapDemoTree(demoTree, searchKeyword),
+    [demoTree, searchKeyword],
+  )
+
+  const isSearchActive = searchKeyword.trim() !== ''
+
+  const autoExpandedNodeIds = useMemo(
+    () => (isSearchActive ? collectLiveMapDemoExpandableNodeIds(visibleDemoTree) : null),
+    [isSearchActive, visibleDemoTree],
+  )
+
+  const effectiveExpandedNodeIds = useMemo(
+    () => new Set(autoExpandedNodeIds ?? expandedNodeIds),
+    [autoExpandedNodeIds, expandedNodeIds],
+  )
+
+  const selectedEqpIdSet = useMemo(() => new Set(selectedEqpIds), [selectedEqpIds])
+
   const effectiveSelectedScenarioId = useMemo(() => {
     if (scenarioOptions.some((scenarioOption) => scenarioOption.scenarioId === selectedScenarioId)) {
       return selectedScenarioId
@@ -124,11 +178,9 @@ export function LiveMapDemoModal({
     [effectiveSelectedScenarioId, scenarioOptions],
   )
 
-  const effectiveSelectedNodeId = selectedNodeId ?? demoTree[0]?.id ?? null
-
   const candidateEquipments = useMemo(
-    () => collectLiveMapDemoSelectionEquipments(effectiveSelectedNodeId, equipmentNodes),
-    [effectiveSelectedNodeId, equipmentNodes],
+    () => collectLiveMapDemoEquipmentsByEqpIds(selectedEqpIds, equipmentNodes),
+    [equipmentNodes, selectedEqpIds],
   )
 
   const refreshDemoData = useCallback(async () => {
@@ -164,7 +216,8 @@ export function LiveMapDemoModal({
   }, [open, refreshDemoData])
 
   const handleClose = () => {
-    setSelectedNodeId(null)
+    setSelectedEqpIds([])
+    setSearchKeyword('')
     setTargetEquipments([])
     setSelectedTestType('E2E')
     setSelectedScenarioId('')
@@ -176,11 +229,44 @@ export function LiveMapDemoModal({
   }
 
   const handleToggleExpanded = (nodeId: string) => {
+    if (isSearchActive) {
+      return
+    }
+
     setExpandedNodeIds((currentNodeIds) =>
       currentNodeIds.includes(nodeId)
         ? currentNodeIds.filter((currentNodeId) => currentNodeId !== nodeId)
         : [...currentNodeIds, nodeId],
     )
+  }
+
+  const handleToggleEquipment = (eqpId: string) => {
+    setSelectedEqpIds((currentEqpIds) =>
+      currentEqpIds.includes(eqpId)
+        ? currentEqpIds.filter((currentEqpId) => currentEqpId !== eqpId)
+        : [...currentEqpIds, eqpId],
+    )
+  }
+
+  const handleToggleGroup = (node: LiveMapDemoTreeNode) => {
+    const groupEqpIds = collectLiveMapDemoTreeEqpIds(node)
+
+    if (groupEqpIds.length === 0) {
+      return
+    }
+
+    const allChecked = groupEqpIds.every((groupEqpId) => selectedEqpIdSet.has(groupEqpId))
+
+    setSelectedEqpIds((currentEqpIds) => {
+      if (allChecked) {
+        const groupEqpIdSet = new Set(groupEqpIds)
+        return currentEqpIds.filter((currentEqpId) => !groupEqpIdSet.has(currentEqpId))
+      }
+
+      const nextEqpIdSet = new Set(currentEqpIds)
+      groupEqpIds.forEach((groupEqpId) => nextEqpIdSet.add(groupEqpId))
+      return Array.from(nextEqpIdSet)
+    })
   }
 
   const handleAddTargetEquipments = () => {
@@ -191,6 +277,7 @@ export function LiveMapDemoModal({
     setTargetEquipments((currentRows) =>
       mergeLiveMapDemoTargetEquipments(currentRows, candidateEquipments),
     )
+    setSelectedEqpIds([])
   }
 
   const handleRemoveTargetEquipment = (eqpId: string) => {
@@ -226,31 +313,83 @@ export function LiveMapDemoModal({
     setStartMessage(null)
     try {
       await cancelDemoJobMutation.mutateAsync(jobId)
-      setStartMessage('\uC124\uBE44\uB9CC \uC5F0\uACB0 \uD14C\uC2A4\uD2B8 \uC885\uB8CC\uB97C \uC694\uCCAD\uD588\uC2B5\uB2C8\uB2E4.')
+      setStartMessage('설비만 연결 테스트 종료를 요청했습니다.')
     } catch (error) {
       setStartMessage(
         error instanceof Error
           ? error.message
-          : '\uD14C\uC2A4\uD2B8 \uC885\uB8CC \uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',
+          : '테스트 종료 요청에 실패했습니다.',
       )
     }
   }
 
+  const resolveGroupCheckState = (node: LiveMapDemoTreeNode): TreeCheckState => {
+    const groupEqpIds = collectLiveMapDemoTreeEqpIds(node)
+
+    if (groupEqpIds.length === 0) {
+      return 'unchecked'
+    }
+
+    const checkedCount = groupEqpIds.reduce(
+      (count, groupEqpId) => count + (selectedEqpIdSet.has(groupEqpId) ? 1 : 0),
+      0,
+    )
+
+    if (checkedCount === 0) {
+      return 'unchecked'
+    }
+
+    if (checkedCount === groupEqpIds.length) {
+      return 'checked'
+    }
+
+    return 'indeterminate'
+  }
+
   const renderTreeNodes = (nodes: readonly LiveMapDemoTreeNode[], depth = 0) =>
     nodes.map((node) => {
-      const isSelected = effectiveSelectedNodeId === node.id
-      const isExpanded = expandedNodeIds.includes(node.id)
+      const isExpanded = effectiveExpandedNodeIds.has(node.id)
       const hasChildren = node.children.length > 0
       const nodeStyle =
         TREE_NODE_STYLE_BY_DEPTH[
           depth as keyof typeof TREE_NODE_STYLE_BY_DEPTH
         ] ?? TREE_NODE_STYLE_BY_DEPTH[2]
-      const selectionLabel =
-        node.type === 'LINE'
-          ? `${node.label} 라인 선택`
-          : node.type === 'PROCESS'
-            ? `${node.label} 공정 선택`
-            : `${node.label} 설비 선택`
+
+      if (node.type === 'EQUIPMENT') {
+        const isChecked = node.eqpId ? selectedEqpIdSet.has(node.eqpId) : false
+
+        return (
+          <div key={node.id} className="space-y-2">
+            <div className="flex items-center gap-2" style={{ marginLeft: `${depth * 16}px` }}>
+              <span className="size-5 shrink-0" aria-hidden="true" />
+              <label
+                className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
+                  isChecked
+                    ? 'border-[#2A7A55] bg-[#EAF6EE] text-[#15492F] shadow-[0_8px_18px_rgba(34,104,70,0.12)]'
+                    : nodeStyle
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => node.eqpId && handleToggleEquipment(node.eqpId)}
+                  aria-label={`${node.label} 설비 선택`}
+                  className="size-4 shrink-0 cursor-pointer rounded border-[#C7D3CC] accent-[#1A7A55]"
+                />
+                <Cpu className="size-4 shrink-0 text-[#6B7B73]" aria-hidden="true" />
+                <span className="flex-1 truncate text-sm font-medium">{node.label}</span>
+                {node.eqpName && node.eqpName !== node.label ? (
+                  <span className="shrink-0 text-xs text-[#73817A]">{node.eqpName}</span>
+                ) : null}
+              </label>
+            </div>
+          </div>
+        )
+      }
+
+      const groupCheckState = resolveGroupCheckState(node)
+      const groupLabel =
+        node.type === 'LINE' ? `${node.label} 라인 일괄 선택` : `${node.label} 공정 일괄 선택`
 
       return (
         <div key={node.id} className="space-y-2">
@@ -259,7 +398,8 @@ export function LiveMapDemoModal({
               <button
                 type="button"
                 onClick={() => handleToggleExpanded(node.id)}
-                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[#66766E] transition hover:bg-[#E8F2EC]"
+                disabled={isSearchActive}
+                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[#66766E] transition hover:bg-[#E8F2EC] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={`${node.label} ${isExpanded ? '접기' : '펼치기'}`}
               >
                 <ChevronRight
@@ -270,24 +410,19 @@ export function LiveMapDemoModal({
               <span className="size-5 shrink-0" aria-hidden="true" />
             )}
 
-            <button
-              type="button"
-              onClick={() => setSelectedNodeId(node.id)}
-              aria-label={selectionLabel}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
-                isSelected
-                  ? 'border-[#2A7A55] bg-[#EAF6EE] text-[#15492F] shadow-[0_8px_18px_rgba(34,104,70,0.12)]'
-                  : nodeStyle
-              }`}
+            <div
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 ${nodeStyle}`}
             >
-              {node.type === 'EQUIPMENT' ? (
-                <Cpu className="size-4 shrink-0 text-[#6B7B73]" aria-hidden="true" />
-              ) : null}
+              <TriStateCheckbox
+                state={groupCheckState}
+                ariaLabel={groupLabel}
+                onChange={() => handleToggleGroup(node)}
+              />
               <span className="flex-1 truncate text-sm font-medium">{node.label}</span>
               {node.type === 'PROCESS' ? (
                 <span className="shrink-0 text-xs text-[#73817A]">{node.children.length}대</span>
               ) : null}
-            </button>
+            </div>
           </div>
           {hasChildren && isExpanded ? renderTreeNodes(node.children, depth + 1) : null}
         </div>
@@ -316,14 +451,32 @@ export function LiveMapDemoModal({
                 <div>
                   <h3 className="text-base font-semibold text-[#22332A]">라인 트리</h3>
                   <p className="mt-1 text-xs text-[#6D7A73]">
-                    Line &gt; 공정 &gt; 설비 순서로 선택할 수 있습니다.
+                    설비를 개별 체크하거나 Line/공정 체크박스로 일괄 선택할 수 있습니다.
                   </p>
                 </div>
-                <Badge variant="outline">선택 후보 {candidateEquipments.length}대</Badge>
+                <Badge variant="outline">체크된 설비 {selectedEqpIds.length}대</Badge>
               </div>
 
-              <div className="mt-4 flex-1 overflow-y-auto rounded-[18px] bg-[#F8FBF9] p-3">
-                <div className="space-y-2">{renderTreeNodes(demoTree)}</div>
+              <div className="relative mt-3">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#93A19A]" />
+                <Input
+                  type="search"
+                  value={searchKeyword}
+                  onChange={(event) => setSearchKeyword(event.target.value)}
+                  placeholder="설비 ID 또는 설비명으로 검색"
+                  className="h-10 pl-9"
+                  aria-label="설비 검색"
+                />
+              </div>
+
+              <div className="mt-3 flex-1 overflow-y-auto rounded-[18px] bg-[#F8FBF9] p-3">
+                {visibleDemoTree.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-xs text-[#7B8A82]">
+                    검색 결과가 없습니다.
+                  </p>
+                ) : (
+                  <div className="space-y-2">{renderTreeNodes(visibleDemoTree)}</div>
+                )}
               </div>
             </section>
 
@@ -333,7 +486,7 @@ export function LiveMapDemoModal({
                 onClick={handleAddTargetEquipments}
                 disabled={candidateEquipments.length === 0}
                 className="h-12 w-12 rounded-full bg-[#1A7A55] text-white hover:bg-[#176748]"
-                aria-label="선택 설비 추가"
+                aria-label="체크된 설비 추가"
               >
                 <ArrowRight className="size-5" />
               </Button>
@@ -344,7 +497,7 @@ export function LiveMapDemoModal({
                 <div>
                   <h3 className="text-base font-semibold text-[#22332A]">대상 설비</h3>
                   <p className="mt-1 text-xs text-[#6D7A73]">
-                    중복 없이 설비가 누적되며, 공정 선택 시 해당 공정 설비 전체가 추가됩니다.
+                    좌측에서 체크한 설비가 중복 없이 누적됩니다.
                   </p>
                 </div>
                 <Badge>{targetEquipments.length}대 선택됨</Badge>
@@ -366,7 +519,7 @@ export function LiveMapDemoModal({
                       {targetEquipments.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="py-12 text-center text-sm text-[#708078]">
-                            좌측 트리에서 Line, 공정 또는 설비를 선택한 뒤 화살표 버튼으로 추가해 주세요.
+                            좌측 트리에서 설비를 체크한 뒤 화살표 버튼으로 추가해 주세요.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -498,7 +651,7 @@ export function LiveMapDemoModal({
                         <TableHead>현재 단계</TableHead>
                         <TableHead>상태</TableHead>
                         <TableHead className="min-w-[220px]">진행률</TableHead>
-                        <TableHead className="w-[96px] text-center">{'\uC885\uB8CC'}</TableHead>
+                        <TableHead className="w-[96px] text-center">{'종료'}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -561,7 +714,7 @@ export function LiveMapDemoModal({
                                   void handleCancelJob(job.jobId, job.testType)
                                 }}
                               >
-                                {'\uC885\uB8CC'}
+                                {'종료'}
                               </Button>
                             </TableCell>
                           </TableRow>

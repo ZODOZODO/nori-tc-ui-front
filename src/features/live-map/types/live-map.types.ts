@@ -86,6 +86,7 @@ export interface LiveMapDemoTreeNode {
   lineValue?: string
   clusterId?: string
   eqpId?: string
+  eqpName?: string
   children: LiveMapDemoTreeNode[]
 }
 
