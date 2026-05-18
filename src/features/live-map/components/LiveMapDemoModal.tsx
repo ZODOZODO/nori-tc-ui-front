@@ -44,7 +44,7 @@ interface LiveMapDemoModalProps {
 
 const DEFAULT_EXPANDED_NODE_IDS = ['line:A_LINE'] as const
 const ACTIVE_DEMO_JOB_STATES =
-  'QUEUED,PREPARING,SYNCING_SPEC,CONNECTING,RUNNING,CLEANING_UP,CANCEL_REQUESTED,COMPLETED,FAILED,CANCELED'
+  'QUEUED,PREPARING,SYNCING_SPEC,CONNECTING,AWAITING_TRIGGER,RUNNING,CLEANING_UP,CANCEL_REQUESTED,COMPLETED,FAILED,CANCELED'
 const DEMO_TEST_TYPE_OPTIONS: readonly { value: LiveMapDemoTestType; label: string }[] = [
   { value: 'SOCKET_ONLY', label: '설비만 연결' },
   { value: 'MES_ONLY', label: 'MES만 연결' },
@@ -70,6 +70,9 @@ const resolveJobBadgeVariant = (state: string) => {
   }
   if (state === 'QUEUED') {
     return 'secondary' as const
+  }
+  if (state === 'AWAITING_TRIGGER') {
+    return 'outline' as const
   }
   return 'outline' as const
 }
