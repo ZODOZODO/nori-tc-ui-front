@@ -76,29 +76,29 @@ function ClickableLogRow({
     <button
       type="button"
       onClick={() => onSelect(entry)}
-      className="flex w-full cursor-pointer gap-3 border-b border-[#1C2530] px-4 py-2 text-left text-[12px] transition hover:bg-[#1C2530] focus:bg-[#1C2530] focus:outline-none"
+      className="flex w-full cursor-pointer gap-3 border-b border-[#E5ECE7] px-4 py-2 text-left text-[12px] transition hover:bg-[#EAF2EC] focus:bg-[#EAF2EC] focus:outline-none"
     >
-      <span className="w-[96px] shrink-0 font-mono text-[#6B7A8A]">
+      <span className="w-[96px] shrink-0 font-mono text-[#6D7A73]">
         {formatTime(entry.timestampMs)}
       </span>
       <span
         className={[
           'w-[44px] shrink-0 font-bold',
-          isRecv ? 'text-[#4EA6FF]' : 'text-[#F5A623]',
+          isRecv ? 'text-[#1B6FB5]' : 'text-[#B5680B]',
         ].join(' ')}
       >
         {entry.direction}
       </span>
-      <span className="w-[48px] shrink-0 font-semibold text-[#7E8892]">
+      <span className="w-[48px] shrink-0 font-semibold text-[#6D7A73]">
         {entry.source}
       </span>
       <span
-        className="w-[220px] shrink-0 truncate font-semibold text-[#C9D3DB]"
+        className="w-[220px] shrink-0 truncate font-semibold text-[#22332A]"
         title={entry.messageName ?? undefined}
       >
         {entry.messageName ?? '-'}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[#8090A0]">
+      <span className="min-w-0 flex-1 truncate text-[#5A6862]">
         {entry.payload ?? ''}
       </span>
     </button>
@@ -120,12 +120,12 @@ function CommLogListModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="flex max-h-[88vh] max-w-[1200px] flex-col gap-0 overflow-hidden border-[#1C2530] bg-[#0E1418] p-0 text-[#C9D3DB]">
-        <DialogHeader className="border-b border-[#1C2530] px-5 py-4">
-          <DialogTitle className="flex items-center gap-3 text-sm font-semibold text-[#E2EAF0]">
+      <DialogContent className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 flex flex-col gap-0 overflow-hidden border-[#DCE7E0] bg-[#F7FAF8] p-0 text-[#22332A]">
+        <DialogHeader className="border-b border-[#E1EAE4] px-5 py-4">
+          <DialogTitle className="flex items-center gap-3 text-sm font-semibold text-[#1F2D26]">
             <span>통신 로그</span>
-            <span className="font-mono text-[12px] text-[#7E8892]">{eqpId}</span>
-            <span className="rounded-md bg-[#1C2530] px-2 py-0.5 text-[11px] font-normal text-[#7E8892]">
+            <span className="font-mono text-[12px] text-[#6D7A73]">{eqpId}</span>
+            <span className="rounded-md bg-[#EAF2EC] px-2 py-0.5 text-[11px] font-normal text-[#1C7F59]">
               {logs.length}건
             </span>
           </DialogTitle>
@@ -133,7 +133,7 @@ function CommLogListModal({
 
         <div className="min-h-0 flex-1 overflow-auto">
           {logs.length === 0 ? (
-            <div className="flex h-full items-center justify-center py-16 text-[12px] text-[#4B5A6A]">
+            <div className="flex h-full items-center justify-center py-16 text-[12px] text-[#8D9893]">
               최근 1시간 내 로그가 없습니다.
             </div>
           ) : (
@@ -165,49 +165,49 @@ function CommLogDetailModal({
   const isRecv = entry?.direction === 'RECV'
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="flex max-h-[85vh] max-w-[960px] flex-col gap-0 overflow-hidden border-[#1C2530] bg-[#0E1418] p-0 text-[#C9D3DB]">
+      <DialogContent className="flex max-h-[85vh] max-w-[960px] flex-col gap-0 overflow-hidden border-[#DCE7E0] bg-[#F7FAF8] p-0 text-[#22332A]">
         {entry ? (
           <>
-            <DialogHeader className="border-b border-[#1C2530] px-5 py-4">
-              <DialogTitle className="flex items-center gap-3 text-sm font-semibold text-[#E2EAF0]">
+            <DialogHeader className="border-b border-[#E1EAE4] px-5 py-4">
+              <DialogTitle className="flex items-center gap-3 text-sm font-semibold text-[#1F2D26]">
                 <span
                   className={[
                     'rounded-md px-2 py-0.5 text-[11px] font-bold',
                     isRecv
-                      ? 'bg-[#13314D] text-[#4EA6FF]'
-                      : 'bg-[#3A2A10] text-[#F5A623]',
+                      ? 'bg-[#DCEBF7] text-[#1B6FB5]'
+                      : 'bg-[#FBE8CC] text-[#B5680B]',
                   ].join(' ')}
                 >
                   {entry.direction}
                 </span>
-                <span className="text-[#7E8892]">{entry.source}</span>
+                <span className="text-[#6D7A73]">{entry.source}</span>
                 <span className="truncate">{entry.messageName ?? '-'}</span>
               </DialogTitle>
             </DialogHeader>
 
-            <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[#1C2530] px-5 py-3 text-[11px] text-[#7E8892]">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[#E1EAE4] px-5 py-3 text-[11px] text-[#6D7A73]">
               <span>
-                <span className="text-[#4B5A6A]">eqpId </span>
-                <span className="font-mono text-[#C9D3DB]">{entry.eqpId}</span>
+                <span className="text-[#8D9893]">eqpId </span>
+                <span className="font-mono text-[#22332A]">{entry.eqpId}</span>
               </span>
               <span>
-                <span className="text-[#4B5A6A]">time </span>
-                <span className="font-mono text-[#C9D3DB]">
+                <span className="text-[#8D9893]">time </span>
+                <span className="font-mono text-[#22332A]">
                   {formatTime(entry.timestampMs)}
                 </span>
               </span>
               <span>
-                <span className="text-[#4B5A6A]">epoch </span>
-                <span className="font-mono text-[#C9D3DB]">
+                <span className="text-[#8D9893]">epoch </span>
+                <span className="font-mono text-[#22332A]">
                   {entry.timestampMs}
                 </span>
               </span>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-              <pre className="whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-[#D8E1E8]">
+              <pre className="whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-[#1F2D26]">
                 {formatPayload(entry.payload) || (
-                  <span className="text-[#4B5A6A]">(payload 없음)</span>
+                  <span className="text-[#8D9893]">(payload 없음)</span>
                 )}
               </pre>
             </div>
