@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Maximize2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -32,20 +33,10 @@ function formatPayload(raw: string | null): string {
   }
 }
 
-function LogRow({
-  entry,
-  onSelect,
-}: {
-  entry: CommLogEntry
-  onSelect: (entry: CommLogEntry) => void
-}) {
+function PanelLogRow({ entry }: { entry: CommLogEntry }) {
   const isRecv = entry.direction === 'RECV'
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(entry)}
-      className="flex w-full cursor-pointer gap-3 border-b border-[#1C2530] px-3 py-1.5 text-left text-[10px] transition hover:bg-[#1C2530] focus:bg-[#1C2530] focus:outline-none"
-    >
+    <div className="flex gap-3 border-b border-[#1C2530] px-3 py-1.5 text-[10px]">
       <span className="w-[72px] shrink-0 font-mono text-[#6B7A8A]">
         {formatTime(entry.timestampMs)}
       </span>
@@ -69,7 +60,96 @@ function LogRow({
       <span className="min-w-0 flex-1 break-all text-[#6B7A8A]">
         {entry.payload ?? ''}
       </span>
+    </div>
+  )
+}
+
+function ClickableLogRow({
+  entry,
+  onSelect,
+}: {
+  entry: CommLogEntry
+  onSelect: (entry: CommLogEntry) => void
+}) {
+  const isRecv = entry.direction === 'RECV'
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(entry)}
+      className="flex w-full cursor-pointer gap-3 border-b border-[#1C2530] px-4 py-2 text-left text-[12px] transition hover:bg-[#1C2530] focus:bg-[#1C2530] focus:outline-none"
+    >
+      <span className="w-[96px] shrink-0 font-mono text-[#6B7A8A]">
+        {formatTime(entry.timestampMs)}
+      </span>
+      <span
+        className={[
+          'w-[44px] shrink-0 font-bold',
+          isRecv ? 'text-[#4EA6FF]' : 'text-[#F5A623]',
+        ].join(' ')}
+      >
+        {entry.direction}
+      </span>
+      <span className="w-[48px] shrink-0 font-semibold text-[#7E8892]">
+        {entry.source}
+      </span>
+      <span
+        className="w-[220px] shrink-0 truncate font-semibold text-[#C9D3DB]"
+        title={entry.messageName ?? undefined}
+      >
+        {entry.messageName ?? '-'}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[#8090A0]">
+        {entry.payload ?? ''}
+      </span>
     </button>
+  )
+}
+
+function CommLogListModal({
+  eqpId,
+  logs,
+  open,
+  onClose,
+  onSelectEntry,
+}: {
+  eqpId: string
+  logs: readonly CommLogEntry[]
+  open: boolean
+  onClose: () => void
+  onSelectEntry: (entry: CommLogEntry) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="flex max-h-[88vh] max-w-[1200px] flex-col gap-0 overflow-hidden border-[#1C2530] bg-[#0E1418] p-0 text-[#C9D3DB]">
+        <DialogHeader className="border-b border-[#1C2530] px-5 py-4">
+          <DialogTitle className="flex items-center gap-3 text-sm font-semibold text-[#E2EAF0]">
+            <span>통신 로그</span>
+            <span className="font-mono text-[12px] text-[#7E8892]">{eqpId}</span>
+            <span className="rounded-md bg-[#1C2530] px-2 py-0.5 text-[11px] font-normal text-[#7E8892]">
+              {logs.length}건
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          {logs.length === 0 ? (
+            <div className="flex h-full items-center justify-center py-16 text-[12px] text-[#4B5A6A]">
+              최근 1시간 내 로그가 없습니다.
+            </div>
+          ) : (
+            <div className="flex min-w-max flex-col-reverse">
+              {[...logs].reverse().map((entry, idx) => (
+                <ClickableLogRow
+                  key={`${entry.timestampMs}-${idx}`}
+                  entry={entry}
+                  onSelect={onSelectEntry}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -140,17 +220,26 @@ function CommLogDetailModal({
 
 export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
   const { data: logs = [], isFetching } = useCommLog(eqpId, 'all')
+  const [isListOpen, setIsListOpen] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState<CommLogEntry | null>(null)
 
   return (
     <>
       <div className="mt-3 flex h-full min-h-0 flex-col rounded-[12px] border border-[#212A32] bg-[#151B20]">
-        <div className="flex items-center justify-between border-b border-[#212A32] px-3 py-2">
-          <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">통신 로그</div>
+        <button
+          type="button"
+          onClick={() => setIsListOpen(true)}
+          className="flex w-full cursor-pointer items-center justify-between border-b border-[#212A32] px-3 py-2 text-left transition hover:bg-[#1C2530] focus:bg-[#1C2530] focus:outline-none"
+          aria-label="통신 로그 전체 보기"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">통신 로그</span>
+            <Maximize2 className="size-3 text-[#7E8892]" aria-hidden="true" />
+          </div>
           {isFetching && (
             <span className="text-[9px] text-[#4B5A6A]">갱신 중...</span>
           )}
-        </div>
+        </button>
 
         <div className="flex-1 min-h-0 overflow-auto">
           {logs.length === 0 ? (
@@ -160,16 +249,23 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
           ) : (
             <div className="flex min-w-max flex-col-reverse">
               {[...logs].reverse().map((entry, idx) => (
-                <LogRow
+                <PanelLogRow
                   key={`${entry.timestampMs}-${idx}`}
                   entry={entry}
-                  onSelect={setSelectedEntry}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      <CommLogListModal
+        eqpId={eqpId}
+        logs={logs}
+        open={isListOpen}
+        onClose={() => setIsListOpen(false)}
+        onSelectEntry={setSelectedEntry}
+      />
 
       <CommLogDetailModal
         entry={selectedEntry}
