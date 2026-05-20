@@ -126,27 +126,36 @@ const buildInitialFlowDetail = (): FlowDetailFixture => ({
 })
 
 /**
- * dcop-itemes 노드 응답의 client-side group divider 검증용 — workflow_name 빈 row 1 개를 포함합니다.
+ * dcop-itemes 노드 응답의 client-side group divider + 사이드바 Unassigned 섹션 검증용.
+ *
+ * 컬럼 순서는 백엔드 `ModelDetailResponseSupport.SECS_DCOP_ITEM_COLUMNS` 와 동일하게
+ * `[Dcop Item Name, Workflow Name, EventId, VariableId, Collection Rule, Calculation Rule, Order Rule]`.
+ *
+ * row.id 는 `dcop:{key}` 형식 — ModelDetailPanel 의 dcop-itemes prefetch 가 id 에서 key 를
+ * 파싱하여 사이드바 unassigned 행 React key 로 사용합니다 (백엔드 modelRowId 규약).
  */
 const buildDcopItemesPayload = () => ({
   columns: [
     'Dcop Item Name',
-    'Variable Id',
-    'Collection Rule',
-    'EventId',
     'Workflow Name',
+    'EventId',
+    'VariableId',
+    'Collection Rule',
+    'Calculation Rule',
+    'Order Rule',
   ],
   rows: [
     {
-      id: 'dcop-1',
-      values: ['LOT_START_COUNTER', 'VAR_LOT_COUNT', 'LAST', 'EVT_LOT_START', 'handleLotStart'],
-      previewValues: ['LOT_START_COUNTER', 'VAR_LOT_COUNT', 'LAST', 'EVT_LOT_START', 'handleLotStart'],
+      id: 'dcop:301',
+      values: ['LOT_START_COUNTER', 'handleLotStart', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
+      previewValues: ['LOT_START_COUNTER', 'handleLotStart', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
     },
     {
-      id: 'dcop-2',
-      // workflow_name=NULL — client-side group divider "── Unassigned ──" 가 이 row 위에 표시.
-      values: ['ORPHAN_DCOP', 'VAR_ORPHAN', 'FIRST', 'EVT_ORPHAN', ''],
-      previewValues: ['ORPHAN_DCOP', 'VAR_ORPHAN', 'FIRST', 'EVT_ORPHAN', ''],
+      id: 'dcop:302',
+      // workflow_name=NULL — 사이드바 "Unassigned DCOPs" 섹션 + Reference > Dcop Itemes 노드의
+      // client-side group divider "── Unassigned ──" 양쪽 모두 이 row 의 워크플로우 미할당 상태를 노출.
+      values: ['ORPHAN_DCOP', '', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
+      previewValues: ['ORPHAN_DCOP', '', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
     },
   ],
   mdfContents: [] as Array<{ name: string; xml: string }>,
@@ -360,6 +369,28 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
         })
         return
       }
+      if (node === 'mes-message') {
+        // SPEC line 115-116: FlowCard Message dropdown 은 (SECS+MES) 또는 (Socket+MES) 통합.
+        // 빈 mes-message 응답이어도 무방하지만 AC-4 dropdown 검증의 안정성을 위해 1 개 row 제공.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            createApiResponse({
+              columns: ['MES Message Name', 'Description'],
+              rows: [
+                {
+                  id: 'mes-1',
+                  values: ['MES_LOT_ACK', 'MES side ack'],
+                  previewValues: ['MES_LOT_ACK', 'MES side ack'],
+                },
+              ],
+              mdfContents: [],
+            }),
+          ),
+        })
+        return
+      }
       if (node === 'mdf') {
         await route.fulfill({
           status: 200,
@@ -494,12 +525,10 @@ test('Model-Flow-AC-3: [+ Add Flow] 클릭 시 빈 FlowCard 가 추가된다', a
 })
 
 // 시나리오 4 ----------------------------------------------------------------
-// SPEC line 156 의 원문은 "Identity dropdown 변경" 이나 1차 릴리즈 구현에서는
-// ModelDetailPanel 이 FlowCard 에 `messageOptions={[]}` 로 빈 옵션을 주입하므로
-// dropdown 자체로는 새 메시지를 선택할 수 없습니다. AC-4 의 본질 "FlowCard 편집 →
-// save → reload 후 유지" 를 보존하기 위해 자유 입력 가능한 Action Name 변경으로
-// 검증합니다 (dev-report 에 SPEC validation issue 로 기록).
-test('Model-Flow-AC-4: FlowCard 편집 → save 호출 → reload 후 변경값 유지', async ({
+// SPEC line 156: "Identity dropdown 변경 → save → reload 후 변경 유지."
+// F6.5 에서 ModelDetailPanel 이 FlowCard 에 SECS / MES 메시지 목록을 실제로 주입하므로
+// Identity 의 Message Name dropdown 으로 직접 새 메시지를 선택할 수 있습니다.
+test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload 후 유지', async ({
   page,
 }) => {
   const state = createDefaultMockState()
@@ -509,27 +538,45 @@ test('Model-Flow-AC-4: FlowCard 편집 → save 호출 → reload 후 변경값 
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
 
-  // Action Name 입력을 변경합니다.
-  // Action Name input — htmlFor/aria-label 이 없어 accessible name 대신
-   // placeholder 텍스트 (`예: TOOL_CONDITION_REPLY`) 로 찾습니다.
-  const actionNameInput = page.getByPlaceholder('예: TOOL_CONDITION_REPLY')
-  await actionNameInput.fill('ACK_LOT_START_V2')
-  await expect(actionNameInput).toHaveValue('ACK_LOT_START_V2')
+  // Identity 의 Message Name dropdown — shadcn Radix Select 트리거는 role="combobox".
+  // 화면 안 SelectTrigger 가 여러 개 (MDF Template 등) 이므로 Identity 섹션 컨테이너로 좁힌
+  // 첫 combobox 를 사용합니다. 초기값은 'S6F11'.
+  const identitySection = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Identity' }) })
+  const messageDropdown = identitySection.getByRole('combobox').first()
+  await expect(messageDropdown).toContainText('S6F11')
+  await messageDropdown.click()
+  // dropdown 옵션 — 초기 fixture 가 S6F11 / S6F13 / MES_LOT_ACK 3 개를 제공. S6F13 으로 변경.
+  await page.getByRole('option', { name: 'S6F13' }).click()
+  await expect(messageDropdown).toContainText('S6F13')
 
-  // 저장 버튼 클릭.
+  // 저장 → mock state 의 PUT call 기록을 검사하여 messageName 갱신을 확인합니다.
   await page.getByRole('button', { name: '저장' }).click()
   await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
   const updatedBody = state.updateFlowCalls[0].body as Record<string, unknown>
-  expect(updatedBody.actionName).toBe('ACK_LOT_START_V2')
+  expect(updatedBody.messageName).toBe('S6F13')
   expect(state.updateFlowCalls[0].flowId).toBe(201)
 
-  // reload 후에도 변경값이 유지되는지 — mock state 의 detail 응답이 갱신되므로
-  // 같은 Flow 를 다시 열면 새 actionName 으로 detail GET 응답이 돌아옵니다.
-  await openEditModelTab(page)
-  await page.getByRole('button', { name: 'S6F11' }).click()
-  await expect(page.getByPlaceholder('예: TOOL_CONDITION_REPLY')).toHaveValue(
-    'ACK_LOT_START_V2',
-  )
+  // mock state 의 detail / summary 가 새 messageName 으로 갱신되었음을 직접 검증합니다 —
+  // 즉 PUT 요청이 백엔드에 보내져 다음 GET 부터는 갱신된 messageName 이 응답되는 상태.
+  expect(state.details.get(201)?.messageName).toBe('S6F13')
+  expect(state.summaries[0]?.messageName).toBe('S6F13')
+
+  // reload — `page.reload()` 로 SPA JS state 와 React Query cache 를 완전 reset 한 뒤,
+  // mock 의 갱신된 응답으로 변경값이 유지되는지 확인합니다. 사이드바의 messageName 라벨
+  // (= ModelFlowSummary 응답의 messageName) 이 갱신값을 직접 노출하므로 reload 후 fresh
+  // GET /flows 응답에서 'S6F13' 으로 변경된 항목이 보이는 것을 검증합니다 — 이전 'S6F11'
+  // 항목은 더 이상 사이드바에 존재하지 않아야 합니다.
+  await page.reload()
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'FLOW_DEMO_MODEL_admin' }).click()
+  const reloadedEditRow = page.getByRole('row', { name: /FLOW_DEMO_MODEL_admin EDIT/i })
+  await reloadedEditRow.dblclick()
+  await expect(page.getByText('Message Flows')).toBeVisible()
+  // workflowName 그룹은 펼친 상태가 default — `S6F13` 행이 자동으로 가시.
+  await expect(page.getByRole('button', { name: 'S6F13' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'S6F11', exact: true })).toHaveCount(0)
 })
 
 // 시나리오 5 ----------------------------------------------------------------
@@ -582,17 +629,18 @@ test('Model-Flow-AC-6: Action [편집...] 클릭 시 Action Data Index 모달이
 })
 
 // 시나리오 7 ----------------------------------------------------------------
-test('Model-Flow-AC-7: Reference > Dcop Itemes 노드에 Unassigned group divider 가 표시된다', async ({
-  page,
-}) => {
+// SPEC line 159: "Reference 탭 → 'Unassigned DCOPs' 섹션 존재 확인 (workflow_name=NULL fixture)."
+// F6.5 에서 ModelDetailPanel 이 dcop-itemes 노드를 prefetch 하여 ModelFlowSidebar 의
+// `unassignedDcopItems` props 에 workflow_name=NULL row 들을 주입합니다 — 사이드바 안의
+// "Unassigned DCOPs" 섹션이 직접 표시되며 별도 Reference 노드 클릭 불필요.
+test('Model-Flow-AC-7: 사이드바에 Unassigned DCOPs 섹션이 표시된다', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
   await openEditModelTab(page)
 
-  // Reference 영역의 Dcop Itemes 버튼 클릭 — workflow_name=NULL fixture row 위에
-  // client-side group divider "── Unassigned ──" 가 표시되어야 한다.
-  await page.getByRole('button', { name: 'Dcop Itemes' }).click()
-  await expect(page.getByText('── Unassigned ──')).toBeVisible()
-  // Unassigned row 자체는 좁은 viewport 에서 가려질 수 있어 cell role 로만 검증합니다.
-  await expect(page.getByRole('cell', { name: 'ORPHAN_DCOP', exact: true })).toBeAttached()
+  // 사이드바 헤더 — extractUnassignedDcopItems 가 workflow_name=null row 만 추출.
+  await expect(page.getByText('Unassigned DCOPs')).toBeVisible()
+  // workflow_name=NULL fixture row 의 dcopItemName ('ORPHAN_DCOP') 이 항목으로 노출.
+  // 사이드바는 dcopItemName 만 노출하므로 정확한 텍스트 매칭으로 검증.
+  await expect(page.getByText('ORPHAN_DCOP', { exact: true })).toBeVisible()
 })

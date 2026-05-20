@@ -40,6 +40,7 @@ import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard } from './FlowCard'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
+import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
 
 const WORKFLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
 
@@ -256,11 +257,17 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   // SOCKET 모델 여부 판단
   const isSocketModel = activeModel?.commInterface?.toUpperCase() === 'SOCKET'
 
+  // FlowCard 의 Identity Message dropdown 도 같은 메시지 목록을 사용합니다 —
+  // Flow 선택 (selectedFlowId !== null) 또는 draft Flow 입력 모드일 때도 활성화.
+  // SPEC line 115-116: Flow Message dropdown 은 protocol 별 (SECS+MES) / (Socket+MES) 통합.
+  const isFlowCardVisible = selectedFlowId !== null || draftFlow !== null
   // workflow 편집 시 Message Name 정합성을 위해 secs-message / socket-message 데이터를 조회합니다.
-  // (읽기 전용 상태에서는 불필요하므로 edit 모드일 때만 활성화)
+  // (workflow / Flow 어느 쪽도 보이지 않으면 fetch 생략 — 읽기 전용 reference 노드 진입 시 무용 query 방지)
   const workflowMessageDetailNode = isSocketModel ? 'socket-message' : 'secs-message'
+  const messagesQueryEnabled =
+    (isWorkflowNode && !isReadOnly) || isFlowCardVisible
   const workflowMessageQuery = useModelNodeDetail(
-    isWorkflowNode && !isReadOnly ? (activeModel?.modelVersionKey ?? null) : null,
+    messagesQueryEnabled ? (activeModel?.modelVersionKey ?? null) : null,
     workflowMessageDetailNode,
   )
   // message 이름 컬럼은 첫 번째 컬럼 ('SECS Message Name' 또는 'Socket Message Name')
@@ -271,7 +278,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
   // workflow 편집 시 MES Message Name도 포함합니다. (SECS/Socket 모델 공통 적용)
   const mesMessageQuery = useModelNodeDetail(
-    isWorkflowNode && !isReadOnly ? (activeModel?.modelVersionKey ?? null) : null,
+    messagesQueryEnabled ? (activeModel?.modelVersionKey ?? null) : null,
     'mes-message',
   )
   const mesMessageOptions = useMemo(
@@ -456,11 +463,53 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     () => modelFlowListQuery.data?.items ?? [],
     [modelFlowListQuery.data?.items],
   )
-  // Unassigned DCOPs 는 dcop-itemes 노드의 워크플로우=null 행 — Reference 영역에서 별도 group.
-  // ModelDcopItem 형태 (workflowName 등) 가 detailRows 와 다르므로 modelFlowDetailQuery 에 없음.
-  // 1차 릴리즈에서는 dcop-itemes 노드를 직접 띄우지 않은 상태에서는 빈 배열을 전달
-  // — Unassigned 표시는 ModelFlowSidebar 내부 helper 가 빈 입력을 처리.
-  const referenceUnassignedDcopItems = useMemo<readonly ModelDcopItem[]>(() => [], [])
+  // Unassigned DCOPs 는 dcop-itemes 노드의 워크플로우=NULL 행 — 사이드바 read-only 표시 + FlowCard
+  // messageOptions / mdfTemplateOptions wiring 의 dcop 노드 prefetch 와 같은 query 를 공유합니다.
+  // 활성화 조건: activeModelVersionKey 가 있을 때 — Flow 사이드바는 모델 진입 즉시 표시되므로
+  // dcop-itemes 노드를 매번 prefetch (별 사용자 액션 필요 X). 다른 reference 노드는 클릭 시
+  // fetch 되지만 dcop-itemes 는 사이드바 "Unassigned DCOPs" 섹션이 항상 후보이므로 모델 진입 시 1 회.
+  const dcopItemesQuery = useModelNodeDetail(activeModelVersionKey, 'dcop-itemes')
+  // dcop-itemes 응답은 columns/values 평면 구조 — workflowName 컬럼 인덱스를 동적으로 찾고
+  // ModelDcopItem 형태로 변환합니다. SPEC line 56 의 "workflow_name IS NULL" 조건은 백엔드가
+  // `nullToEmpty` 처리하므로 빈 문자열을 null 로 되돌려 extractUnassignedDcopItems 의 기준
+  // (workflowName === null) 과 정합을 맞춥니다.
+  const referenceDcopItems = useMemo<readonly ModelDcopItem[]>(() => {
+    const data = dcopItemesQuery.data
+    if (!data || activeModelVersionKey === null) {
+      return []
+    }
+    const dcopItemNameIndex = data.columns.findIndex(
+      (column) => column.trim() === 'Dcop Item Name',
+    )
+    const workflowNameIndex = data.columns.findIndex(
+      (column) => column.trim() === 'Workflow Name',
+    )
+    if (dcopItemNameIndex < 0 || workflowNameIndex < 0) {
+      return []
+    }
+    return data.rows.map((row) => {
+      const rawWorkflowName = (row.values[workflowNameIndex] ?? '').trim()
+      // row.id 는 `dcop:{key}` 형식 (ModelDetailResponseSupport.modelRowId). 키가 비어 있으면 null.
+      const dcopKeyPart = row.id.startsWith('dcop:') ? row.id.slice('dcop:'.length) : ''
+      const parsedKey = Number.parseInt(dcopKeyPart, 10)
+      // FlowCard 사이드바는 dcopItemName / workflowName / dcopItemKey 만 사용 — 나머지 필드는
+      // dcop-itemes 노드 응답이 권위 source 라 평면 UI 가 직접 표시하므로 사이드바 변환에서는
+      // 최소 표시 필드 외 null/'' default 로 채웁니다.
+      return {
+        dcopItemKey: Number.isFinite(parsedKey) && parsedKey > 0 ? parsedKey : null,
+        modelVersionKey: activeModelVersionKey,
+        dcopItemName: row.values[dcopItemNameIndex] ?? '',
+        // SPEC line 56 의 NULL workflow_name 의미 보존을 위해 빈 문자열을 null cast.
+        workflowName: (rawWorkflowName === '' ? null : rawWorkflowName) as unknown as string,
+        eventId: null,
+        variableId: '',
+        collectionRule: 'LAST',
+        calculationRule: null,
+        orderRule: null,
+        updatedAt: '',
+      }
+    })
+  }, [dcopItemesQuery.data, activeModelVersionKey])
 
   const handleSelectFlow = (flowId: number) => {
     // Flow 선택은 Reference 노드 선택 / draftFlow 와 상호 배타 (store action 이 처리).
@@ -509,6 +558,35 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const flowDetail = modelFlowDetailQuery.data ?? null
   const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
   const isDraftMode = draftFlow !== null
+
+  // FlowCard Identity Message dropdown 옵션 — protocol 별 합쳐서 (SECS+MES) / (Socket+MES).
+  // workflowMessageOptions / mesMessageOptions 는 이미 위에서 같은 source 로 fetch 됨.
+  // 중복 이름은 한 번만 노출 — workflow.message_name 컬럼은 단일 string 이므로 통합 namespace.
+  const flowCardMessageOptions = useMemo<readonly { name: string }[]>(() => {
+    const uniqueNames = new Set<string>()
+    for (const name of workflowMessageOptions) {
+      uniqueNames.add(name)
+    }
+    for (const name of mesMessageOptions) {
+      uniqueNames.add(name)
+    }
+    return [...uniqueNames].sort((a, b) => a.localeCompare(b)).map((name) => ({ name }))
+  }, [workflowMessageOptions, mesMessageOptions])
+
+  // FlowCard Trigger Event Id dropdown 옵션 — eventides 의 첫 컬럼. SECS 모델 한정.
+  // workflowEventIdOptions 가 enable 조건상 isWorkflowNode || isDcopItemsNode 시점에만 fetch
+  // — FlowCard 시점엔 둘 다 false 라 빈 배열. FlowCard 자체가 Socket 일 때 Trigger 미렌더이므로
+  // 일치성은 보장. SECS Flow 의 Event dropdown 활성화는 별 SPEC (Identity / Action 우선).
+  const flowCardEventOptions = useMemo<readonly { id: string; label: string }[]>(
+    () => workflowEventIdOptions.map((id) => ({ id, label: id })),
+    [workflowEventIdOptions],
+  )
+
+  // FlowCard Action MDF Template dropdown 옵션 — workflowMdfContents 안 message[name] 추출.
+  const flowCardMdfTemplateOptions = useMemo<readonly { name: string }[]>(
+    () => extractMdfMessageOptions(workflowMdfContents).map((option) => ({ name: option.messageName })),
+    [workflowMdfContents],
+  )
   const activeFlowMutation = isDraftMode ? createFlowMutation : updateFlowMutation
   const flowSaveStatus: 'idle' | 'saving' | 'error' = activeFlowMutation.isPending
     ? 'saving'
@@ -728,7 +806,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
           <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-[#E4EAE6] bg-[#FAFCFB] p-2">
             <ModelFlowSidebar
               summaries={messageFlowSummaries}
-              unassignedDcopItems={referenceUnassignedDcopItems}
+              unassignedDcopItems={referenceDcopItems}
               selectedFlowId={selectedFlowId}
               onSelectFlow={handleSelectFlow}
               onAddFlow={handleAddFlow}
@@ -767,9 +845,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 key="draft-flow"
                 flow={draftToFlow(draftFlow)}
                 protocol={flowProtocol}
-                messageOptions={[]}
-                eventOptions={[]}
-                mdfTemplateOptions={[]}
+                messageOptions={flowCardMessageOptions}
+                eventOptions={flowCardEventOptions}
+                mdfTemplateOptions={flowCardMdfTemplateOptions}
                 onSave={handleSaveFlow}
                 saveStatus={flowSaveStatus}
                 errorMessage={flowSaveErrorMessage}
@@ -787,9 +865,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   key={flowDetail.flowId}
                   flow={flowDetail}
                   protocol={flowProtocol}
-                  messageOptions={[]}
-                  eventOptions={[]}
-                  mdfTemplateOptions={[]}
+                  messageOptions={flowCardMessageOptions}
+                  eventOptions={flowCardEventOptions}
+                  mdfTemplateOptions={flowCardMdfTemplateOptions}
                   onSave={handleSaveFlow}
                   saveStatus={flowSaveStatus}
                   errorMessage={flowSaveErrorMessage}
