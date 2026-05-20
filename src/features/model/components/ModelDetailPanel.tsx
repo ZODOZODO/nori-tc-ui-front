@@ -1,9 +1,9 @@
-import { memo, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useModelNodeDetail } from '../hooks/useModelNodeDetail'
+import { useModelFlowList } from '../hooks/useModelFlowList'
+import { useModelFlowDetail } from '../hooks/useModelFlowDetail'
+import { useModelFlowMutations } from '../hooks/useModelFlowMutations'
 import {
-  ArrowDown,
-  ArrowUp,
-  GripVertical,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -13,61 +13,33 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  buildActionDataIndexValue,
-  buildWorkflowFilterValue,
-  createEmptyActionDataIndexField,
-  createEmptyWorkflowFilterCondition,
-  createEmptyWorkflowGroup,
-  createTransformDraft,
-  LOOKUP_SOURCE_OPTIONS,
-  parseActionDataIndexEditor,
-  parseWorkflowFilterEditor,
   summarizeActionDataIndexValue,
   summarizeWorkflowFilterValue,
-  type ActionDataIndexEditorDraft,
-  type ActionDataIndexFieldDraft,
-  type TransformDraft,
-  type WorkflowComparison,
-  type WorkflowFilterEditorDraft,
-  type WorkflowGroupDraft,
-  type WorkflowLookupSource,
-  type WorkflowNodeDraft,
-  WORKFLOW_COMPARISON_OPTIONS,
 } from '../lib/model-detail-editor'
-import { extractMdfMessageOptions, type MdfMessageOption } from '../lib/mdf-message-parser'
 import {
   MODEL_DETAIL_NODE_LABELS,
   SECS_DETAIL_NODES,
   SOCKET_DETAIL_NODES,
+  type ModelDcopItem,
   type ModelDetailNode,
   type ModelDetailRow,
+  type ModelFlowSummary,
+  type ModelFlowUpdateRequest,
   type ModelMdfContent,
   type ModelInfo,
   type ModelOpenedTab,
 } from '../types/model.types'
+import { WorkflowFilterEditorModal } from './WorkflowFilterEditorModal'
+import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
+import { ModelFlowSidebar } from './ModelFlowSidebar'
+import { FlowCard } from './FlowCard'
 
 const WORKFLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
-const EMPTY_MDF_TEMPLATE_VALUE = '__empty__'
 
 /**
  * 모든 model 상세 테이블이 동일한 가시 프레임을 유지하도록 공통 최소 폭을 강제합니다.
@@ -204,449 +176,6 @@ const resolveWorkflowPreviewValue = (row: ModelDetailRow, columnIndex: number, c
   return rawValue
 }
 
-const updateActionDataIndexDraftRow = (
-  rows: ActionDataIndexFieldDraft[],
-  targetId: string,
-  patch: Partial<ActionDataIndexFieldDraft>,
-): ActionDataIndexFieldDraft[] =>
-  rows.map((row) => (row.id === targetId ? { ...row, ...patch } : row))
-
-const moveActionDataIndexDraftRow = (
-  rows: ActionDataIndexFieldDraft[],
-  sourceId: string,
-  targetIndex: number,
-): ActionDataIndexFieldDraft[] => {
-  const sourceIndex = rows.findIndex((row) => row.id === sourceId)
-  if (
-    sourceIndex < 0 ||
-    targetIndex < 0 ||
-    targetIndex >= rows.length ||
-    sourceIndex === targetIndex
-  ) {
-    return rows
-  }
-
-  const nextRows = [...rows]
-  const [movedRow] = nextRows.splice(sourceIndex, 1)
-  nextRows.splice(targetIndex, 0, movedRow)
-  return nextRows
-}
-
-const updateTransforms = (
-  transforms: TransformDraft[],
-  targetId: string,
-  patch: Partial<TransformDraft>,
-): TransformDraft[] =>
-  transforms.map((transform) =>
-    transform.id === targetId ? { ...transform, ...patch } : transform,
-  )
-
-const ensureGroupChildren = (children: WorkflowNodeDraft[]): WorkflowNodeDraft[] =>
-  children.length > 0 ? children : [createEmptyWorkflowFilterCondition()]
-
-const updateWorkflowNode = (
-  node: WorkflowNodeDraft,
-  targetId: string,
-  patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
-): WorkflowNodeDraft => {
-  if (node.id === targetId) {
-    return patcher(node)
-  }
-
-  if (node.nodeType === 'condition') {
-    return node
-  }
-
-  return {
-    ...node,
-    children: node.children.map((child) => updateWorkflowNode(child, targetId, patcher)),
-  }
-}
-
-const addWorkflowChildNode = (
-  node: WorkflowNodeDraft,
-  groupId: string,
-  nextChild: WorkflowNodeDraft,
-): WorkflowNodeDraft => {
-  if (node.nodeType === 'condition') {
-    return node
-  }
-
-  if (node.id === groupId) {
-    return {
-      ...node,
-      children: [...node.children, nextChild],
-    }
-  }
-
-  return {
-    ...node,
-    children: node.children.map((child) => addWorkflowChildNode(child, groupId, nextChild)),
-  }
-}
-
-const removeWorkflowNode = (
-  rootGroup: WorkflowGroupDraft,
-  targetId: string,
-): WorkflowGroupDraft => {
-  const removeChildFromGroup = (group: WorkflowGroupDraft): WorkflowGroupDraft => {
-    const nextChildren = group.children.flatMap<WorkflowNodeDraft>((child) => {
-      if (child.id === targetId) {
-        return []
-      }
-
-      if (child.nodeType === 'group') {
-        return [removeChildFromGroup(child)]
-      }
-
-      return [child]
-    })
-
-    return {
-      ...group,
-      children: ensureGroupChildren(nextChildren),
-    }
-  }
-
-  if (rootGroup.id === targetId) {
-    return {
-      ...rootGroup,
-      children: [createEmptyWorkflowFilterCondition()],
-    }
-  }
-
-  return removeChildFromGroup(rootGroup)
-}
-
-const buildMdfMessageOptions = (
-  workflowMdfContents: ModelMdfContent[],
-  currentValue: string,
-): MdfMessageOption[] => {
-  const optionMap = new Map<string, MdfMessageOption>()
-  extractMdfMessageOptions(workflowMdfContents).forEach((option) => {
-    optionMap.set(option.messageName, option)
-  })
-
-  const normalizedCurrentValue = currentValue.trim()
-  if (normalizedCurrentValue && !optionMap.has(normalizedCurrentValue)) {
-    optionMap.set(normalizedCurrentValue, {
-      messageName: normalizedCurrentValue,
-      sourceName: '',
-      xmlSnippet: '',
-      targetType: null,
-      outputType: null,
-    })
-  }
-
-  return [...optionMap.values()]
-}
-
-interface WorkflowNodeEditorProps {
-  node: WorkflowNodeDraft
-  depth: number
-  readOnly: boolean
-  onUpdateNode: (
-    targetId: string,
-    patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
-  ) => void
-  onAddCondition: (groupId: string) => void
-  onAddGroup: (groupId: string) => void
-  onRemoveNode: (nodeId: string) => void
-}
-
-function WorkflowNodeEditor({
-  node,
-  depth,
-  readOnly,
-  onUpdateNode,
-  onAddCondition,
-  onAddGroup,
-  onRemoveNode,
-}: WorkflowNodeEditorProps) {
-  if (node.nodeType === 'condition') {
-    return (
-      <div
-        className="rounded-2xl border border-[#DCE5E0] bg-white p-4 shadow-[0_1px_2px_rgba(20,46,36,0.04)]"
-        style={{ marginLeft: `${depth * 16}px` }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold text-[#1E3D33]">Condition</p>
-            <p className="text-[11px] text-[#738078]">
-              `from`, `path`, `comparison`, `expected`, `transforms`를 직접 편집합니다.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
-            onClick={() => onRemoveNode(node.id)}
-            disabled={readOnly}
-            aria-label="조건 삭제"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">from</label>
-            <select
-              value={node.from}
-              onChange={(event) =>
-                onUpdateNode(node.id, (targetNode) =>
-                  targetNode.nodeType === 'condition'
-                    ? {
-                        ...targetNode,
-                        from: event.target.value as WorkflowLookupSource,
-                      }
-                    : targetNode,
-                )
-              }
-              className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-              disabled={readOnly}
-            >
-              {LOOKUP_SOURCE_OPTIONS.map((source) => (
-                <option key={source} value={source}>
-                  {source}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">path</label>
-            <Input
-              value={node.path}
-              onChange={(event) =>
-                onUpdateNode(node.id, (targetNode) =>
-                  targetNode.nodeType === 'condition'
-                    ? {
-                        ...targetNode,
-                        path: event.target.value,
-                      }
-                    : targetNode,
-                )
-              }
-              placeholder="status"
-              readOnly={readOnly}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">comparison</label>
-            <select
-              value={node.comparison}
-              onChange={(event) =>
-                onUpdateNode(node.id, (targetNode) =>
-                  targetNode.nodeType === 'condition'
-                    ? {
-                        ...targetNode,
-                        comparison: event.target.value as WorkflowComparison,
-                      }
-                    : targetNode,
-                )
-              }
-              className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-              disabled={readOnly}
-            >
-              {WORKFLOW_COMPARISON_OPTIONS.map((comparison) => (
-                <option key={comparison} value={comparison}>
-                  {comparison}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">expected</label>
-            <Input
-              value={node.expectedText}
-              onChange={(event) =>
-                onUpdateNode(node.id, (targetNode) =>
-                  targetNode.nodeType === 'condition'
-                    ? {
-                        ...targetNode,
-                        expectedText: event.target.value,
-                      }
-                    : targetNode,
-                )
-              }
-              placeholder='예: "PASS", 4, true, ["A", "B"]'
-              readOnly={readOnly}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold text-[#1E3D33]">transforms</p>
-              <p className="text-[11px] text-[#738078]">
-                순차 적용할 transform을 한 줄씩 추가합니다.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                onUpdateNode(node.id, (targetNode) =>
-                  targetNode.nodeType === 'condition'
-                    ? {
-                        ...targetNode,
-                        transforms: [...targetNode.transforms, createTransformDraft()],
-                      }
-                    : targetNode,
-                )
-              }
-              disabled={readOnly}
-            >
-              <Plus className="size-3.5" aria-hidden="true" />
-              transform 추가
-            </Button>
-          </div>
-
-          {node.transforms.length === 0 ? (
-            <p className="text-[11px] text-[#97A39C]">transform이 없으면 원본 값을 그대로 비교합니다.</p>
-          ) : (
-            <div className="space-y-2">
-              {node.transforms.map((transform) => (
-                <div key={transform.id} className="flex items-center gap-2">
-                  <Input
-                    value={transform.value}
-                    onChange={(event) =>
-                      onUpdateNode(node.id, (targetNode) =>
-                        targetNode.nodeType === 'condition'
-                          ? {
-                              ...targetNode,
-                              transforms: updateTransforms(targetNode.transforms, transform.id, {
-                                value: event.target.value,
-                              }),
-                            }
-                          : targetNode,
-                      )
-                    }
-                    placeholder="trim"
-                    readOnly={readOnly}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className={cn(
-                      'size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]',
-                      readOnly ? 'hidden' : null,
-                    )}
-                    onClick={() =>
-                      onUpdateNode(node.id, (targetNode) =>
-                        targetNode.nodeType === 'condition'
-                          ? {
-                              ...targetNode,
-                              transforms: targetNode.transforms.filter(
-                                (item) => item.id !== transform.id,
-                              ),
-                            }
-                          : targetNode,
-                      )
-                    }
-                    disabled={readOnly}
-                    aria-label="transform 삭제"
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="rounded-2xl border border-[#D6E4DD] bg-[#F8FBF9] p-4"
-      style={{ marginLeft: `${depth * 16}px` }}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold text-[#1E3D33]">Group</p>
-          <p className="text-[11px] text-[#738078]">
-            하위 조건을 `{node.groupType}` 기준으로 묶습니다.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={node.groupType}
-            onChange={(event) =>
-              onUpdateNode(node.id, (targetNode) =>
-                targetNode.nodeType === 'group'
-                  ? {
-                      ...targetNode,
-                      groupType: event.target.value as WorkflowGroupDraft['groupType'],
-                    }
-                  : targetNode,
-              )
-            }
-            className="h-9 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-            disabled={readOnly}
-          >
-            <option value="and">and</option>
-            <option value="or">or</option>
-          </select>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onAddCondition(node.id)}
-            disabled={readOnly}
-          >
-            <Plus className="size-3.5" aria-hidden="true" />
-            조건 추가
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onAddGroup(node.id)}
-            disabled={readOnly}
-          >
-            <Plus className="size-3.5" aria-hidden="true" />
-            그룹 추가
-          </Button>
-          {depth > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onRemoveNode(node.id)}
-              disabled={readOnly}
-            >
-              <Trash2 className="size-4" aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        {node.children.map((childNode) => (
-          <WorkflowNodeEditor
-            key={childNode.id}
-            node={childNode}
-            depth={depth + 1}
-            readOnly={readOnly}
-            onUpdateNode={onUpdateNode}
-            onAddCondition={onAddCondition}
-            onAddGroup={onAddGroup}
-            onRemoveNode={onRemoveNode}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /**
  * Model Version 상세 패널입니다.
@@ -683,14 +212,24 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   onRequestCheckIn,
 }: ModelDetailPanelProps) {
   const [workflowTextEditor, setWorkflowTextEditor] = useState<WorkflowTextEditorState | null>(null)
-  const [workflowFilterDraft, setWorkflowFilterDraft] = useState<WorkflowFilterEditorDraft>(() =>
-    parseWorkflowFilterEditor(''),
-  )
-  const [actionDataIndexDraft, setActionDataIndexDraft] = useState<ActionDataIndexEditorDraft>(() =>
-    parseActionDataIndexEditor(''),
-  )
-  const [draggingActionDataIndexFieldId, setDraggingActionDataIndexFieldId] = useState<string | null>(null)
+  // 모달이 편집 중인 raw JSON string (filter 또는 action_data_index).
+  // 추출된 모달은 자기 자신의 draft state 를 보유하므로 ModelDetailPanel 은 row.values 의
+  // raw string 만 전달하면 됩니다.
+  const [workflowEditorValue, setWorkflowEditorValue] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // F4: Message Flows 사이드바 — selectedFlowId 는 ModelDetailPanel 로컬 state.
+  // F5 에서 model-ui.store 로 이관 예정.
+  const [selectedFlowId, setSelectedFlowId] = useState<number | null>(null)
+  const activeModelVersionKey = activeModel?.modelVersionKey ?? null
+  const modelFlowListQuery = useModelFlowList(activeModelVersionKey)
+  const modelFlowDetailQuery = useModelFlowDetail(activeModelVersionKey, selectedFlowId)
+  const { updateFlowMutation } = useModelFlowMutations(activeModelVersionKey)
+
+  // activeTab 이 바뀌면 Flow 선택 초기화 — 다른 모델로 전환 시 stale flowId 회피.
+  useEffect(() => {
+    setSelectedFlowId(null)
+  }, [activeTab])
 
   const detailNodes = resolveDetailNodes(activeModel)
   const normalizedDetailNode = detailNode ?? detailNodes[0] ?? null
@@ -703,6 +242,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     isBranchModel && activeModel?.status.trim().toUpperCase() === 'DEPRECATED'
   const isReadOnly = !isEditMode || isLockedByOtherUser
   const isWorkflowEditorOpen = workflowTextEditor !== null && normalizedDetailNode === 'workflow'
+  const isFilterEditorOpen =
+    isWorkflowEditorOpen && isFilterColumn(workflowTextEditor?.columnName)
+  const isActionDataIndexEditorOpen =
+    isWorkflowEditorOpen && isDataIndexColumn(workflowTextEditor?.columnName)
   const canEditTableRows = !isReadOnly && !isMdfNode
 
   // SOCKET 모델 여부 판단
@@ -870,57 +413,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     return normalizedMessage.startsWith(rowPrefix) ? normalizedMessage : null
   }, [actionErrorMessage, workflowTextEditor])
 
-  const workflowMdfMessageOptions = useMemo(
-    () => buildMdfMessageOptions(workflowMdfContents, actionDataIndexDraft.mdfTemplateName),
-    [actionDataIndexDraft.mdfTemplateName, workflowMdfContents],
-  )
-  const selectedWorkflowMdfMessage = useMemo(
-    () =>
-      workflowMdfMessageOptions.find(
-        (option) => option.messageName === actionDataIndexDraft.mdfTemplateName.trim(),
-      ) ?? null,
-    [actionDataIndexDraft.mdfTemplateName, workflowMdfMessageOptions],
-  )
-
-  const handleUpdateWorkflowNode = (
-    targetId: string,
-    patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
-  ) => {
-    setWorkflowFilterDraft((previousDraft) => ({
-      ...previousDraft,
-      rootGroup: updateWorkflowNode(previousDraft.rootGroup, targetId, patcher) as WorkflowGroupDraft,
-    }))
-  }
-
-  const handleAddWorkflowCondition = (groupId: string) => {
-    setWorkflowFilterDraft((previousDraft) => ({
-      ...previousDraft,
-      rootGroup: addWorkflowChildNode(
-        previousDraft.rootGroup,
-        groupId,
-        createEmptyWorkflowFilterCondition(),
-      ) as WorkflowGroupDraft,
-    }))
-  }
-
-  const handleAddWorkflowGroup = (groupId: string) => {
-    setWorkflowFilterDraft((previousDraft) => ({
-      ...previousDraft,
-      rootGroup: addWorkflowChildNode(
-        previousDraft.rootGroup,
-        groupId,
-        createEmptyWorkflowGroup('and'),
-      ) as WorkflowGroupDraft,
-    }))
-  }
-
-  const handleRemoveWorkflowNode = (nodeId: string) => {
-    setWorkflowFilterDraft((previousDraft) => ({
-      ...previousDraft,
-      rootGroup: removeWorkflowNode(previousDraft.rootGroup, nodeId),
-    }))
-  }
-
   const handleOpenWorkflowTextEditor = (
     row: ModelDetailRow,
     rowIndex: number,
@@ -931,7 +423,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       return
     }
 
-    const value = row.values[columnIndex] ?? ''
     setWorkflowTextEditor({
       rowId: row.id,
       rowLabel: row.values[0] ?? '',
@@ -939,97 +430,101 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       columnIndex,
       columnName,
     })
-
-    if (isFilterColumn(columnName)) {
-      setWorkflowFilterDraft(parseWorkflowFilterEditor(value))
-    } else {
-      setActionDataIndexDraft(parseActionDataIndexEditor(value))
-    }
+    setWorkflowEditorValue(row.values[columnIndex] ?? '')
   }
 
   const handleCloseWorkflowTextEditor = () => {
     setWorkflowTextEditor(null)
-    setDraggingActionDataIndexFieldId(null)
+    setWorkflowEditorValue('')
   }
 
-  const handleSaveWorkflowTextEditor = () => {
+  const handleSaveWorkflowTextEditor = (nextValue: string) => {
     if (!workflowTextEditor || isReadOnly) {
       return
     }
-
-    const nextValue = isFilterColumn(workflowTextEditor.columnName)
-      ? buildWorkflowFilterValue(workflowFilterDraft)
-      : buildActionDataIndexValue(actionDataIndexDraft)
-
     onChangeDetailValue(workflowTextEditor.rowId, workflowTextEditor.columnIndex, nextValue)
     handleCloseWorkflowTextEditor()
   }
 
-  const handleMoveActionDataIndexField = (fieldId: string, targetIndex: number) => {
-    if (isReadOnly) {
-      return
-    }
+  // Message Flows 사이드바용 — modelFlowListQuery + Unassigned DCOPs.
+  const messageFlowSummaries = useMemo<readonly ModelFlowSummary[]>(
+    () => modelFlowListQuery.data?.items ?? [],
+    [modelFlowListQuery.data?.items],
+  )
+  // Unassigned DCOPs 는 dcop-itemes 노드의 워크플로우=null 행 — Reference 영역에서 별도 group.
+  // ModelDcopItem 형태 (workflowName 등) 가 detailRows 와 다르므로 modelFlowDetailQuery 에 없음.
+  // 1차 릴리즈에서는 dcop-itemes 노드를 직접 띄우지 않은 상태에서는 빈 배열을 전달
+  // — Unassigned 표시는 ModelFlowSidebar 내부 helper 가 빈 입력을 처리.
+  const referenceUnassignedDcopItems = useMemo<readonly ModelDcopItem[]>(() => [], [])
 
-    setActionDataIndexDraft((previousDraft) => ({
-      ...previousDraft,
-      fields: moveActionDataIndexDraftRow(previousDraft.fields, fieldId, targetIndex),
-    }))
+  const handleSelectFlow = (flowId: number) => {
+    // Flow 선택은 Reference 노드 선택과 상호 배타 — 선택 즉시 detail fetch.
+    setSelectedFlowId(flowId)
   }
 
-  const handleActionDataIndexFieldDragStart = (
-    event: DragEvent<HTMLButtonElement>,
-    fieldId: string,
-  ) => {
-    if (isReadOnly) {
-      event.preventDefault()
-      return
-    }
-
-    setDraggingActionDataIndexFieldId(fieldId)
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', fieldId)
+  const handleAddFlow = () => {
+    // F5 (draft + store) 도입 전까지는 placeholder. 사용자가 [+ Add Flow] 클릭 시
+    // 빈 Flow 추가가 아직 미구현임을 알리는 콘솔 로그만 남김 (Plan F5 단계 작업).
+    console.warn('[ModelDetailPanel] handleAddFlow: F5 단계에서 draft + POST 구현 예정')
   }
 
-  const handleActionDataIndexFieldDragOver = (
-    event: DragEvent<HTMLTableRowElement>,
-    targetFieldId: string,
-  ) => {
-    if (isReadOnly || !draggingActionDataIndexFieldId || draggingActionDataIndexFieldId === targetFieldId) {
-      return
-    }
-
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
+  // FlowCard 의 [편집...] 버튼은 F4 단계에서 모달로 wiring 하지 않음 — 기존 dcop-itemes
+  // 평면 UI 와의 통합 처리는 F5 단계에서 store + 모달 상태 일원화와 함께 진행 (Plan F5).
+  const handleFlowEditWorkflowFilter = () => {
+    console.warn('[ModelDetailPanel] FlowCard onEditWorkflowFilter: F5 단계 wiring 예정')
+  }
+  const handleFlowEditActionDataIndex = () => {
+    console.warn('[ModelDetailPanel] FlowCard onEditActionDataIndex: F5 단계 wiring 예정')
+  }
+  const handleFlowAddDcopItem = () => {
+    console.warn('[ModelDetailPanel] FlowCard onAddDcopItem: F5 단계 wiring 예정')
   }
 
-  const handleActionDataIndexFieldDrop = (
-    event: DragEvent<HTMLTableRowElement>,
-    targetFieldId: string,
-  ) => {
-    if (isReadOnly) {
+  const flowDetail = modelFlowDetailQuery.data ?? null
+  const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
+  const flowSaveStatus: 'idle' | 'saving' | 'error' = updateFlowMutation.isPending
+    ? 'saving'
+    : updateFlowMutation.isError
+      ? 'error'
+      : 'idle'
+  const flowSaveErrorMessage =
+    updateFlowMutation.isError && updateFlowMutation.error instanceof Error
+      ? updateFlowMutation.error.message
+      : null
+
+  const handleSaveFlow = (payload: ModelFlowUpdateRequest) => {
+    if (selectedFlowId === null) {
       return
     }
+    updateFlowMutation.mutate({ flowId: selectedFlowId, request: payload })
+  }
 
-    event.preventDefault()
-    const sourceId = event.dataTransfer.getData('text/plain') || draggingActionDataIndexFieldId
-    if (!sourceId || sourceId === targetFieldId) {
-      setDraggingActionDataIndexFieldId(null)
-      return
+  // dcop-itemes 노드에서 Workflow Name 컬럼 인덱스 찾기 — Unassigned client-side group 용.
+  // deps 는 raw props (detailColumns) — normalizedDetailColumns 는 매 render 마다 새 ref 가능.
+  const dcopWorkflowNameColumnIndex = useMemo(() => {
+    if (!isDcopItemsNode) {
+      return -1
     }
+    return detailColumns.findIndex((columnName) => isDcopWorkflowNameColumn(columnName))
+  }, [isDcopItemsNode, detailColumns])
 
-    setActionDataIndexDraft((previousDraft) => {
-      const targetIndex = previousDraft.fields.findIndex((field) => field.id === targetFieldId)
-      return {
-        ...previousDraft,
-        fields: moveActionDataIndexDraftRow(previousDraft.fields, sourceId, targetIndex),
+  // dcop-itemes 일 때 rows 를 Assigned / Unassigned 로 분리. 다른 노드는 split 없음.
+  const dcopGroupedRows = useMemo(() => {
+    if (!isDcopItemsNode || dcopWorkflowNameColumnIndex < 0) {
+      return null
+    }
+    const assigned: ModelDetailRow[] = []
+    const unassigned: ModelDetailRow[] = []
+    for (const row of detailRows) {
+      const workflowName = (row.values[dcopWorkflowNameColumnIndex] ?? '').trim()
+      if (workflowName === '') {
+        unassigned.push(row)
+      } else {
+        assigned.push(row)
       }
-    })
-    setDraggingActionDataIndexFieldId(null)
-  }
-
-  const handleActionDataIndexFieldDragEnd = () => {
-    setDraggingActionDataIndexFieldId(null)
-  }
+    }
+    return { assigned, unassigned }
+  }, [detailRows, isDcopItemsNode, dcopWorkflowNameColumnIndex])
 
   const handleTriggerUpload = () => {
     if (isReadOnly || !isMdfNode) {
@@ -1188,26 +683,66 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         ) : null}
 
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[#E4EAE6]">
-          <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#E4EAE6] bg-[#FAFCFB] p-2">
-            {detailNodes.map((node) => (
-              <button
-                key={node}
-                type="button"
-                onClick={() => onSelectDetailNode(node)}
-                className={cn(
-                  'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
-                  normalizedDetailNode === node
-                    ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
-                    : 'text-[#51605A] hover:bg-[#F1F6F3]',
-                )}
-              >
-                {MODEL_DETAIL_NODE_LABELS[node]}
-              </button>
-            ))}
+          <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-[#E4EAE6] bg-[#FAFCFB] p-2">
+            <ModelFlowSidebar
+              summaries={messageFlowSummaries}
+              unassignedDcopItems={referenceUnassignedDcopItems}
+              selectedFlowId={selectedFlowId}
+              onSelectFlow={handleSelectFlow}
+              onAddFlow={handleAddFlow}
+            />
+
+            <section className="rounded-lg border border-[#DDE8E1] bg-white p-2">
+              <p className="px-1 pb-2 text-xs font-semibold text-[#243129]">Reference</p>
+              <div className="flex flex-col gap-0.5">
+                {detailNodes.map((node) => (
+                  <button
+                    key={node}
+                    type="button"
+                    onClick={() => {
+                      // Reference 노드 선택은 Flow selection 과 상호 배타.
+                      setSelectedFlowId(null)
+                      onSelectDetailNode(node)
+                    }}
+                    className={cn(
+                      'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                      selectedFlowId === null && normalizedDetailNode === node
+                        ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
+                        : 'text-[#51605A] hover:bg-[#F1F6F3]',
+                    )}
+                  >
+                    {MODEL_DETAIL_NODE_LABELS[node]}
+                  </button>
+                ))}
+              </div>
+            </section>
           </aside>
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-3">
-            {isMdfNode ? (
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto p-3">
+            {selectedFlowId !== null ? (
+              modelFlowDetailQuery.isLoading ? (
+                <p className="text-sm text-[#647169]">Flow 데이터를 불러오는 중입니다.</p>
+              ) : modelFlowDetailQuery.isError ? (
+                <p className="text-sm text-[#C5534B]">Flow 데이터를 불러오지 못했습니다.</p>
+              ) : flowDetail ? (
+                <FlowCard
+                  key={flowDetail.flowId}
+                  flow={flowDetail}
+                  protocol={flowProtocol}
+                  messageOptions={[]}
+                  eventOptions={[]}
+                  mdfTemplateOptions={[]}
+                  onSave={handleSaveFlow}
+                  saveStatus={flowSaveStatus}
+                  errorMessage={flowSaveErrorMessage}
+                  onEditWorkflowFilter={handleFlowEditWorkflowFilter}
+                  onEditActionDataIndex={handleFlowEditActionDataIndex}
+                  onAddDcopItem={handleFlowAddDcopItem}
+                />
+              ) : (
+                <p className="text-sm text-[#647169]">선택된 Flow 가 없습니다.</p>
+              )
+            ) : isMdfNode ? (
               <div className="flex h-full min-h-0 flex-col">
                 <input
                   ref={fileInputRef}
@@ -1356,7 +891,26 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                           </TableCell>
                         </TableRow>
                       ) : (
-                        detailRows.map((row, rowIndex) => (
+                        (dcopGroupedRows
+                          ? [...dcopGroupedRows.assigned, ...dcopGroupedRows.unassigned]
+                          : detailRows
+                        ).map((row, rowIndex, displayedRows) => {
+                          // dcop-itemes Unassigned group divider — 첫 unassigned row 전에 표시.
+                          const assignedCount = dcopGroupedRows?.assigned.length ?? -1
+                          const showUnassignedHeader =
+                            dcopGroupedRows !== null && rowIndex === assignedCount && assignedCount < displayedRows.length
+                          return (
+                          <>
+                          {showUnassignedHeader ? (
+                            <TableRow key={`unassigned-divider-${row.id}`} className="bg-[#F1F5F2]">
+                              <TableCell
+                                colSpan={normalizedDetailColumns.length + (canEditTableRows ? 1 : 0)}
+                                className="py-1.5 text-xs font-semibold text-[#6A7971]"
+                              >
+                                ── Unassigned ──
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
                           <TableRow key={row.id}>
                             {normalizedDetailColumns.map((columnName, columnIndex) => {
                               const rawValue = row.values[columnIndex] ?? ''
@@ -1573,7 +1127,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                               </TableCell>
                             ) : null}
                           </TableRow>
-                        ))
+                          </>
+                          )
+                        })
                       )}
                     </TableBody>
                   </Table>
@@ -1584,426 +1140,26 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         </div>
       </section>
 
-      <Dialog
-        open={isWorkflowEditorOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCloseWorkflowTextEditor()
-          }
-        }}
-      >
-        <DialogContent
-          className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 overflow-hidden p-0 md:!left-6 md:!right-6 md:!top-6 md:!bottom-6"
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          <div className="flex h-full min-h-0 flex-col">
-            <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
-            <DialogTitle>{workflowEditorTitle || 'Workflow 편집'}</DialogTitle>
-            <DialogDescription>
-              {isFilterColumn(workflowTextEditor?.columnName)
-                ? 'workflow_filter를 canonical group/condition 구조로 편집합니다.'
-                : 'action_data_index를 mdfTemplateName과 field 매핑 기준으로 편집합니다.'}
-            </DialogDescription>
-            </DialogHeader>
+      <WorkflowFilterEditorModal
+        open={isFilterEditorOpen}
+        value={workflowEditorValue}
+        readOnly={isReadOnly}
+        titleLabel={workflowEditorTitle}
+        errorMessage={workflowEditorErrorMessage}
+        onClose={handleCloseWorkflowTextEditor}
+        onSave={handleSaveWorkflowTextEditor}
+      />
 
-            <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
-              <div className="flex h-full min-h-0 flex-col gap-3">
-            {workflowEditorErrorMessage ? (
-              <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
-                {workflowEditorErrorMessage}
-              </p>
-            ) : null}
-
-            {isFilterColumn(workflowTextEditor?.columnName) ? (
-              workflowFilterDraft.mode === 'raw' ? (
-                <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <p className="text-sm text-[#C5534B]">
-                    현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
-                  </p>
-                  <textarea
-                    value={workflowFilterDraft.rawValue}
-                    onChange={(event) =>
-                      setWorkflowFilterDraft((previousDraft) => ({
-                        ...previousDraft,
-                        rawValue: event.target.value,
-                      }))
-                    }
-                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                    readOnly={isReadOnly}
-                  />
-                </div>
-              ) : (
-                <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-3">
-                    <p className="text-sm font-semibold text-[#1E3D33]">
-                      root group와 하위 condition을 조합해 `and` / `or` 식을 구성합니다.
-                    </p>
-                    <p className="mt-1 text-xs text-[#738078]">
-                      `expected`는 JSON literal 기준으로 입력하면 숫자, boolean, array까지 lossless 하게 저장됩니다.
-                    </p>
-                  </div>
-
-                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                    <WorkflowNodeEditor
-                      node={workflowFilterDraft.rootGroup}
-                      depth={0}
-                      readOnly={isReadOnly}
-                      onUpdateNode={handleUpdateWorkflowNode}
-                      onAddCondition={handleAddWorkflowCondition}
-                      onAddGroup={handleAddWorkflowGroup}
-                      onRemoveNode={handleRemoveWorkflowNode}
-                    />
-                  </div>
-                </div>
-              )
-            ) : actionDataIndexDraft.mode === 'raw' ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <p className="text-sm text-[#C5534B]">
-                  현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
-                </p>
-                <textarea
-                  value={actionDataIndexDraft.rawValue}
-                  onChange={(event) =>
-                    setActionDataIndexDraft((previousDraft) => ({
-                      ...previousDraft,
-                      rawValue: event.target.value,
-                    }))
-                  }
-                  className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                  readOnly={isReadOnly}
-                />
-              </div>
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col gap-4">
-                <div className="grid gap-4 rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-                  <div className="space-y-2.5">
-                    <label className="text-xs font-semibold text-[#1E3D33]">MDF Message</label>
-                    <Select
-                      value={actionDataIndexDraft.mdfTemplateName || EMPTY_MDF_TEMPLATE_VALUE}
-                      disabled={isReadOnly}
-                      onValueChange={(nextValue) =>
-                        setActionDataIndexDraft((previousDraft) => ({
-                          ...previousDraft,
-                          mdfTemplateName:
-                            nextValue === EMPTY_MDF_TEMPLATE_VALUE
-                              ? ''
-                              : nextValue,
-                        }))
-                      }
-                    >
-                      <SelectTrigger disabled={isReadOnly}>
-                        <SelectValue placeholder="MDF message를 선택해 주세요." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={EMPTY_MDF_TEMPLATE_VALUE}>선택 안 함</SelectItem>
-                        {workflowMdfMessageOptions.map((messageOption) => (
-                          <SelectItem
-                            key={`${messageOption.sourceName}-${messageOption.messageName}`}
-                            value={messageOption.messageName}
-                          >
-                            {messageOption.messageName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-[#738078]">
-                      현재 model의 MDF XML 내부 메시지 이름을 선택하면 `mdfTemplateName`으로 저장됩니다.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <label className="text-xs font-semibold text-[#1E3D33]">선택된 XML Preview</label>
-                    <div className="min-h-[124px] max-h-[180px] overflow-auto rounded-xl border border-[#DCE5E0] bg-white px-3 py-2.5">
-                      {selectedWorkflowMdfMessage?.xmlSnippet ? (
-                        <pre className="whitespace-pre-wrap break-all font-mono text-xs text-[#22322B]">
-                          {selectedWorkflowMdfMessage.xmlSnippet}
-                        </pre>
-                      ) : actionDataIndexDraft.mdfTemplateName.trim() ? (
-                        <p className="text-sm text-[#65726B]">
-                          현재 `mdfTemplateName`과 일치하는 MDF 메시지를 찾지 못했습니다.
-                        </p>
-                      ) : (
-                        <p className="text-sm text-[#65726B]">
-                          MDF 메시지를 선택하면 전체 XML 조각을 여기에서 바로 확인할 수 있습니다.
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#738078]">
-                      {selectedWorkflowMdfMessage?.sourceName
-                        ? `Source MDF: ${selectedWorkflowMdfMessage.sourceName}`
-                        : '업로드된 MDF XML에 정의된 메시지 본문을 그대로 보여 줍니다.'}
-                    </p>
-                  </div>
-
-                </div>
-
-                {/* Fields 테이블 레이블 및 '+field 추가' 버튼 영역 */}
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-xs font-semibold text-[#1E3D33]">Fields</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 rounded-lg px-2 text-xs"
-                    onClick={() =>
-                      setActionDataIndexDraft((previousDraft) => ({
-                        ...previousDraft,
-                        fields: [...previousDraft.fields, createEmptyActionDataIndexField()],
-                      }))
-                    }
-                    disabled={isReadOnly}
-                  >
-                    <Plus className="size-3" aria-hidden="true" />
-                    field 추가
-                  </Button>
-                </div>
-
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[#E4EAE6]">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-[#F6F9F7]">
-                      <TableRow className="bg-[#F6F9F7]">
-                        <TableHead className="w-[112px]">순서</TableHead>
-                        <TableHead>Field</TableHead>
-                        <TableHead>from</TableHead>
-                        <TableHead>path</TableHead>
-                        <TableHead>transforms</TableHead>
-                        <TableHead className="w-[72px]">작업</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {actionDataIndexDraft.fields.map((field, fieldIndex) => (
-                        <TableRow
-                          key={field.id}
-                          className={cn(
-                            'align-top',
-                            draggingActionDataIndexFieldId === field.id && 'bg-[#EEF7F1] opacity-70',
-                          )}
-                          onDragOver={(event) => handleActionDataIndexFieldDragOver(event, field.id)}
-                          onDrop={(event) => handleActionDataIndexFieldDrop(event, field.id)}
-                        >
-                          <TableCell className="whitespace-nowrap">
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="size-8 cursor-grab rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] active:cursor-grabbing"
-                                draggable={!isReadOnly}
-                                onDragStart={(event) => handleActionDataIndexFieldDragStart(event, field.id)}
-                                onDragEnd={handleActionDataIndexFieldDragEnd}
-                                disabled={isReadOnly}
-                                aria-label={`${field.fieldName || 'field'} 순서 드래그`}
-                                title="드래그해서 순서 변경"
-                              >
-                                <GripVertical className="size-4" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
-                                onClick={() => handleMoveActionDataIndexField(field.id, fieldIndex - 1)}
-                                disabled={isReadOnly || fieldIndex === 0}
-                                aria-label={`${field.fieldName || 'field'} 위로 이동`}
-                                title="위로 이동"
-                              >
-                                <ArrowUp className="size-4" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
-                                onClick={() => handleMoveActionDataIndexField(field.id, fieldIndex + 1)}
-                                disabled={isReadOnly || fieldIndex === actionDataIndexDraft.fields.length - 1}
-                                aria-label={`${field.fieldName || 'field'} 아래로 이동`}
-                                title="아래로 이동"
-                              >
-                                <ArrowDown className="size-4" aria-hidden="true" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={field.fieldName}
-                              onChange={(event) =>
-                                setActionDataIndexDraft((previousDraft) => ({
-                                  ...previousDraft,
-                                  fields: updateActionDataIndexDraftRow(
-                                    previousDraft.fields,
-                                    field.id,
-                                    {
-                                      fieldName: event.target.value,
-                                    },
-                                  ),
-                                }))
-                              }
-                              placeholder="EQPID"
-                              readOnly={isReadOnly}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <select
-                              value={field.from}
-                              onChange={(event) =>
-                                setActionDataIndexDraft((previousDraft) => ({
-                                  ...previousDraft,
-                                  fields: updateActionDataIndexDraftRow(
-                                    previousDraft.fields,
-                                    field.id,
-                                    {
-                                      from: event.target.value as WorkflowLookupSource,
-                                    },
-                                  ),
-                                }))
-                              }
-                              className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                              disabled={isReadOnly}
-                            >
-                              {LOOKUP_SOURCE_OPTIONS.map((source) => (
-                                <option key={source} value={source}>
-                                  {source}
-                                </option>
-                              ))}
-                            </select>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={field.path}
-                              onChange={(event) =>
-                                setActionDataIndexDraft((previousDraft) => ({
-                                  ...previousDraft,
-                                  fields: updateActionDataIndexDraftRow(
-                                    previousDraft.fields,
-                                    field.id,
-                                    {
-                                      path: event.target.value,
-                                    },
-                                  ),
-                                }))
-                              }
-                              placeholder="eqpId"
-                              readOnly={isReadOnly}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-2">
-                              {field.transforms.length === 0 ? (
-                                <p className="text-[11px] text-[#97A39C]">transform 없음</p>
-                              ) : (
-                                field.transforms.map((transform) => (
-                                  <div key={transform.id} className="flex items-center gap-2">
-                                    <Input
-                                      value={transform.value}
-                                      onChange={(event) =>
-                                        setActionDataIndexDraft((previousDraft) => ({
-                                          ...previousDraft,
-                                          fields: updateActionDataIndexDraftRow(
-                                            previousDraft.fields,
-                                            field.id,
-                                            {
-                                              transforms: updateTransforms(
-                                                field.transforms,
-                                                transform.id,
-                                                { value: event.target.value },
-                                              ),
-                                            },
-                                          ),
-                                        }))
-                                      }
-                                      placeholder="trim"
-                                      readOnly={isReadOnly}
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon-sm"
-                                      className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
-                                      onClick={() =>
-                                        setActionDataIndexDraft((previousDraft) => ({
-                                          ...previousDraft,
-                                          fields: updateActionDataIndexDraftRow(
-                                            previousDraft.fields,
-                                            field.id,
-                                            {
-                                              transforms: field.transforms.filter(
-                                                (item) => item.id !== transform.id,
-                                              ),
-                                            },
-                                          ),
-                                        }))
-                                      }
-                                      disabled={isReadOnly}
-                                      aria-label="transform 삭제"
-                                    >
-                                      <Trash2 className="size-4" aria-hidden="true" />
-                                    </Button>
-                                  </div>
-                                ))
-                              )}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  setActionDataIndexDraft((previousDraft) => ({
-                                    ...previousDraft,
-                                    fields: updateActionDataIndexDraftRow(
-                                      previousDraft.fields,
-                                      field.id,
-                                      {
-                                        transforms: [...field.transforms, createTransformDraft()],
-                                      },
-                                    ),
-                                  }))
-                                }
-                                disabled={isReadOnly}
-                              >
-                                <Plus className="size-3.5" aria-hidden="true" />
-                                transform 추가
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
-                              onClick={() =>
-                                setActionDataIndexDraft((previousDraft) => ({
-                                  ...previousDraft,
-                                  fields:
-                                    previousDraft.fields.length > 1
-                                      ? previousDraft.fields.filter((item) => item.id !== field.id)
-                                      : [createEmptyActionDataIndexField()],
-                                }))
-                              }
-                              disabled={isReadOnly}
-                              aria-label="field 삭제"
-                            >
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-              </div>
-            </div>
-
-            <DialogFooter className="shrink-0 border-t border-[#EEF3F0] px-6 py-4">
-            <Button variant="outline" onClick={handleCloseWorkflowTextEditor}>
-              취소
-            </Button>
-            {!isReadOnly ? <Button onClick={handleSaveWorkflowTextEditor}>적용</Button> : null}
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ActionDataIndexEditorModal
+        open={isActionDataIndexEditorOpen}
+        value={workflowEditorValue}
+        readOnly={isReadOnly}
+        titleLabel={workflowEditorTitle}
+        errorMessage={workflowEditorErrorMessage}
+        workflowMdfContents={workflowMdfContents}
+        onClose={handleCloseWorkflowTextEditor}
+        onSave={handleSaveWorkflowTextEditor}
+      />
     </>
   )
 })
