@@ -351,6 +351,106 @@ export const createModelFailResponse = (
 }
 
 /**
+ * DCOP 수집 규칙 — backend UiDcopCollectionRule enum 미러입니다.
+ */
+export type ModelDcopCollectionRule = 'FIRST' | 'LAST' | 'AVERAGE' | 'MIN' | 'MAX'
+
+/**
+ * Message Flow 의 Collect 섹션에서 노출되는 DCOP item 한 행입니다.
+ *
+ * Backend {@code UiModelDcopItem} 도메인 record 와 1:1 매핑되며,
+ * Flow 편집 화면에서는 readonly 로만 사용 (편집은 dcop-itemes 노드 모달에서 별도 진행).
+ */
+export interface ModelDcopItem {
+  dcopItemKey: number | null
+  modelVersionKey: number
+  dcopItemName: string
+  workflowName: string
+  eventId: string | null
+  variableId: string
+  collectionRule: ModelDcopCollectionRule
+  calculationRule: string | null
+  orderRule: number | null
+  updatedAt: string
+}
+
+/**
+ * GET /api/model/{modelVersionKey}/flows 의 목록 1 행 항목입니다.
+ *
+ * Flat 구조 — 트리 그룹화(workflowName 묶음)는 FE 가 담당합니다.
+ */
+export interface ModelFlowSummary {
+  flowId: number
+  workflowName: string
+  messageName: string
+  actionName: string
+}
+
+/**
+ * GET /api/model/{modelVersionKey}/flows/{flowId} 의 4 섹션 상세 응답입니다.
+ *
+ * - Identity: workflowName, messageName
+ * - Trigger: eventId, transactionId, workflowFilter (Socket 모델은 모두 null)
+ * - Action: actionName, actionDataIndex (raw JSON string 또는 null)
+ * - Collect: dcopItems (workflowName 매칭된 행만)
+ */
+export interface ModelFlow {
+  flowId: number
+  workflowName: string
+  messageName: string
+  eventId: string | null
+  transactionId: string | null
+  workflowFilter: string | null
+  actionName: string
+  actionDataIndex: string | null
+  dcopItems: ModelDcopItem[]
+}
+
+/**
+ * POST /api/model/{modelVersionKey}/flows 의 응답 payload 입니다.
+ */
+export interface ModelFlowCreatedData {
+  flowId: number
+}
+
+/**
+ * POST /api/model/{modelVersionKey}/flows 의 요청 바디입니다.
+ * Identity 섹션만 입력 — Trigger / Action 은 빈 상태로 생성됩니다.
+ */
+export interface ModelFlowCreateRequest {
+  workflowName: string
+  messageName: string
+}
+
+/**
+ * PUT /api/model/{modelVersionKey}/flows/{flowId} 의 요청 바디입니다.
+ * 4 섹션을 한 번에 전송하며, Trigger 3 필드와 actionDataIndex 는 nullable 입니다.
+ */
+export interface ModelFlowUpdateRequest {
+  workflowName: string
+  messageName: string
+  eventId: string | null
+  transactionId: string | null
+  workflowFilter: string | null
+  actionName: string
+  actionDataIndex: string | null
+}
+
+/**
+ * GET /api/model/{modelVersionKey}/flows 응답 payload 입니다.
+ */
+export interface ModelFlowListPayload {
+  items: ModelFlowSummary[]
+}
+
+/**
+ * Flow 목록/상세/생성 응답 타입입니다.
+ */
+export type ModelFlowListResponse = ApiResponse<ModelFlowListPayload>
+export type ModelFlowDetailResponse = ApiResponse<ModelFlow>
+export type ModelFlowCreatedResponse = ApiResponse<ModelFlowCreatedData>
+
+/**
  * Model API 레이어 전용 오류 객체입니다.
  */
 export class ModelApiError extends Error {
