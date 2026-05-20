@@ -13,22 +13,19 @@ import {
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
 
-const USER_TABLE_COLUMN_COUNT = 8
+const USER_TABLE_COLUMN_COUNT = 6
 
 export const USER_PAGE_SIZE = 20
 
-interface UserListTableProps {
-  onSelectUser: (userPk: number) => void
-}
-
 /**
  * User 페이지의 사용자 목록 테이블입니다.
+ * - 컬럼: userId / userName / group(chip) / company / department / 액션
+ * - 그룹 소속 추가/제거는 Group 페이지에서 관리합니다 (여기는 표시만).
  * - 페이지네이션: Prev/Next 명시 (DeployMonitorPanel 와 동일 패턴)
  * - 액션 컬럼: 수정 / 삭제 / 비밀번호 초기화
  */
-export function UserListTable({ onSelectUser }: UserListTableProps) {
+export function UserListTable() {
   const listOffset = useUserUiStore((state) => state.listOffset)
-  const activeUserPk = useUserUiStore((state) => state.activeUserPk)
   const setListOffset = useUserUiStore((state) => state.setListOffset)
   const openEditModal = useUserUiStore((state) => state.openEditModal)
   const openDeleteDialog = useUserUiStore((state) => state.openDeleteDialog)
@@ -51,11 +48,9 @@ export function UserListTable({ onSelectUser }: UserListTableProps) {
             <TableRow>
               <TableHead>userId</TableHead>
               <TableHead>userName</TableHead>
+              <TableHead>group</TableHead>
               <TableHead>company</TableHead>
               <TableHead>department</TableHead>
-              <TableHead>email</TableHead>
-              <TableHead>status</TableHead>
-              <TableHead>updatedAt</TableHead>
               <TableHead className="text-right">액션</TableHead>
             </TableRow>
           </TableHeader>
@@ -77,75 +72,68 @@ export function UserListTable({ onSelectUser }: UserListTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((user) => {
-                const isActive = activeUserPk === user.userPk
-                return (
-                  <TableRow
-                    key={user.userPk}
-                    data-testid={`user-row-${user.userPk}`}
-                    data-active={isActive ? 'true' : 'false'}
-                    onClick={() => onSelectUser(user.userPk)}
-                    className={`cursor-pointer ${isActive ? 'bg-[#EAF3EE]' : ''}`}
-                  >
-                    <TableCell className="font-medium text-[#1F2D26]">{user.userId}</TableCell>
-                    <TableCell>{user.userName}</TableCell>
-                    <TableCell>{user.company}</TableCell>
-                    <TableCell>{user.department}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                        {user.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-[#5C6A63]">
-                      {user.updatedAt}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`사용자 ${user.userId} 수정`}
-                          data-testid={`user-row-edit-${user.userPk}`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openEditModal(user.userPk)
-                          }}
-                        >
-                          <Pencil className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`사용자 ${user.userId} 비밀번호 초기화`}
-                          data-testid={`user-row-reset-${user.userPk}`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openPasswordResetModal(user.userPk)
-                          }}
-                        >
-                          <KeyRound className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`사용자 ${user.userId} 삭제`}
-                          data-testid={`user-row-delete-${user.userPk}`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openDeleteDialog(user.userPk)
-                          }}
-                        >
-                          <Trash2 className="size-4" aria-hidden="true" />
-                        </Button>
+              items.map((user) => (
+                <TableRow
+                  key={user.userPk}
+                  data-testid={`user-row-${user.userPk}`}
+                >
+                  <TableCell className="font-medium text-[#1F2D26]">{user.userId}</TableCell>
+                  <TableCell>{user.userName}</TableCell>
+                  <TableCell>
+                    {user.groups.length === 0 ? (
+                      <span className="text-xs text-[#7F8A84]">-</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1" data-testid={`user-row-groups-${user.userPk}`}>
+                        {user.groups.map((group) => (
+                          <Badge
+                            key={group.groupId}
+                            variant="secondary"
+                            data-testid={`user-row-group-${user.userPk}-${group.groupId}`}
+                          >
+                            {group.groupCode}
+                          </Badge>
+                        ))}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
+                    )}
+                  </TableCell>
+                  <TableCell>{user.company}</TableCell>
+                  <TableCell>{user.department}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`사용자 ${user.userId} 수정`}
+                        data-testid={`user-row-edit-${user.userPk}`}
+                        onClick={() => openEditModal(user.userPk)}
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`사용자 ${user.userId} 비밀번호 초기화`}
+                        data-testid={`user-row-reset-${user.userPk}`}
+                        onClick={() => openPasswordResetModal(user.userPk)}
+                      >
+                        <KeyRound className="size-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`사용자 ${user.userId} 삭제`}
+                        data-testid={`user-row-delete-${user.userPk}`}
+                        onClick={() => openDeleteDialog(user.userPk)}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

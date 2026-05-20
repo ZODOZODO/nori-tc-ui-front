@@ -58,8 +58,7 @@ export function useDeleteGroup() {
 
 /**
  * 그룹 멤버 추가 mutation 훅입니다. (`POST /api/user/{userPk}/group/{groupId}`)
- * user feature 의 useAddUserGroup 와 동일 엔드포인트이나 호출처(Group 페이지) 분리를 위해
- * Group 도메인에서 별도 훅으로 노출합니다.
+ * 성공 시 User 페이지의 사용자 목록 (group chip) 과 해당 그룹의 멤버 목록을 갱신합니다.
  */
 export function useAddGroupMember() {
   const queryClient = useQueryClient()
@@ -67,7 +66,8 @@ export function useAddGroupMember() {
   return useMutation({
     mutationFn: ({ userPk, groupId }: MembershipVariables) => groupApi.addMember(userPk, groupId),
     onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['user', 'groups', variables.userPk] })
+      await queryClient.invalidateQueries({ queryKey: ['user'] })
+      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.members(variables.groupId) })
     },
   })
 }
@@ -81,7 +81,8 @@ export function useRemoveGroupMember() {
   return useMutation({
     mutationFn: ({ userPk, groupId }: MembershipVariables) => groupApi.removeMember(userPk, groupId),
     onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['user', 'groups', variables.userPk] })
+      await queryClient.invalidateQueries({ queryKey: ['user'] })
+      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.members(variables.groupId) })
     },
   })
 }

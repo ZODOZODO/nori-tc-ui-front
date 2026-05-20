@@ -2,6 +2,7 @@ import type { ApiResponse } from '@/features/auth/types/auth.types'
 
 /**
  * UserController GET /api/user/{userPk} 응답 payload 타입입니다.
+ * 단건 조회, POST, PUT 응답에서 사용합니다.
  */
 export interface UserInfo {
   userPk: number
@@ -19,10 +20,27 @@ export interface UserInfo {
 }
 
 /**
+ * 사용자 목록 행에 포함되는 그룹 요약 정보입니다. 백엔드 `UserListItemResponse.GroupSummary` 와 1:1.
+ */
+export interface UserGroupSummary {
+  groupId: number
+  groupCode: string
+  groupName: string
+}
+
+/**
+ * GET /api/user 응답의 단일 행 타입입니다. `UserInfo` 의 모든 필드에 `groups` 가 추가됩니다.
+ * 단건/POST/PUT 응답은 `UserInfo` 를 그대로 사용합니다.
+ */
+export interface UserListItem extends UserInfo {
+  groups: UserGroupSummary[]
+}
+
+/**
  * GET /api/user 조회 응답 payload 타입입니다.
  */
 export interface UserPage {
-  items: UserInfo[]
+  items: UserListItem[]
   offset: number
   limit: number
   count: number
@@ -50,29 +68,6 @@ export type UserPasswordResetResponse = ApiResponse<null>
  * DELETE /api/user/{userPk} 응답입니다.
  */
 export type UserDeleteResponse = ApiResponse<null>
-
-/**
- * 사용자 그룹 매핑 응답 row 입니다. ui-backend `UserGroupMappingResponse` 와 1:1.
- */
-export interface UserGroupMapping {
-  userPk: number
-  groupId: number
-  groupCode: string
-  groupName: string
-}
-
-/**
- * GET /api/user/{userPk}/group 응답. `ApiResponse<PagedResponse<UserGroupMappingResponse>>` 형태.
- */
-export interface UserGroupMappingPage {
-  items: UserGroupMapping[]
-  offset: number
-  limit: number
-  count: number
-}
-
-export type UserGroupMappingPageResponse = ApiResponse<UserGroupMappingPage>
-export type UserGroupMembershipResponse = ApiResponse<null>
 
 /**
  * 백엔드 `UiUserStatus` enum 4값과 정확히 일치하는 union 입니다.

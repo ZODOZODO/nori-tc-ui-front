@@ -9,6 +9,8 @@ interface GroupUiState {
   upsertMode: GroupUpsertMode
   isDeleteDialogOpen: boolean
   pendingDeleteGroupId: number | null
+  isAddMembersModalOpen: boolean
+  addMembersTargetGroupId: number | null
   setListOffset: (offset: number) => void
   resetListOffset: () => void
   selectGroup: (groupId: number | null) => void
@@ -17,6 +19,8 @@ interface GroupUiState {
   closeUpsertModal: () => void
   openDeleteDialog: (groupId: number) => void
   closeDeleteDialog: () => void
+  openAddMembersModal: (groupId: number) => void
+  closeAddMembersModal: () => void
 }
 
 export const useGroupUiStore = create<GroupUiState>((set) => ({
@@ -26,6 +30,8 @@ export const useGroupUiStore = create<GroupUiState>((set) => ({
   upsertMode: 'create',
   isDeleteDialogOpen: false,
   pendingDeleteGroupId: null,
+  isAddMembersModalOpen: false,
+  addMembersTargetGroupId: null,
   setListOffset: (offset) => set({ listOffset: Math.max(0, offset) }),
   resetListOffset: () => set({ listOffset: 0 }),
   selectGroup: (groupId) => set({ activeGroupId: groupId }),
@@ -38,4 +44,8 @@ export const useGroupUiStore = create<GroupUiState>((set) => ({
     set({ isDeleteDialogOpen: true, pendingDeleteGroupId: groupId }),
   closeDeleteDialog: () =>
     set({ isDeleteDialogOpen: false, pendingDeleteGroupId: null }),
+  openAddMembersModal: (groupId) =>
+    set({ isAddMembersModalOpen: true, addMembersTargetGroupId: groupId }),
+  closeAddMembersModal: () =>
+    set({ isAddMembersModalOpen: false, addMembersTargetGroupId: null }),
 }))
