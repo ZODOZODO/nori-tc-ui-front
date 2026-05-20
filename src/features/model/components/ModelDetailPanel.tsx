@@ -38,6 +38,8 @@ import { WorkflowFilterEditorModal } from './WorkflowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard } from './FlowCard'
+import { useModelUiStore } from '../stores/model-ui.store'
+import { draftToFlow } from '../lib/model-flow-editor'
 
 const WORKFLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
 
@@ -218,18 +220,21 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const [workflowEditorValue, setWorkflowEditorValue] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // F4: Message Flows 사이드바 — selectedFlowId 는 ModelDetailPanel 로컬 state.
-  // F5 에서 model-ui.store 로 이관 예정.
-  const [selectedFlowId, setSelectedFlowId] = useState<number | null>(null)
+  // F5: Message Flows 사이드바 — selectedFlowId / draftFlow 는 model-ui store 로 이관.
+  const selectedFlowId = useModelUiStore((state) => state.selectedFlowId)
+  const draftFlow = useModelUiStore((state) => state.draftFlow)
+  const setSelectedFlowId = useModelUiStore((state) => state.setSelectedFlowId)
+  const startDraftFlow = useModelUiStore((state) => state.startDraftFlow)
+  const clearDraftFlow = useModelUiStore((state) => state.clearDraftFlow)
   const activeModelVersionKey = activeModel?.modelVersionKey ?? null
   const modelFlowListQuery = useModelFlowList(activeModelVersionKey)
   const modelFlowDetailQuery = useModelFlowDetail(activeModelVersionKey, selectedFlowId)
-  const { updateFlowMutation } = useModelFlowMutations(activeModelVersionKey)
+  const { createFlowMutation, updateFlowMutation } = useModelFlowMutations(activeModelVersionKey)
 
-  // activeTab 이 바뀌면 Flow 선택 초기화 — 다른 모델로 전환 시 stale flowId 회피.
+  // activeTab 이 바뀌면 Flow 선택 / draft 초기화 — 다른 모델로 전환 시 stale 회피.
   useEffect(() => {
     setSelectedFlowId(null)
-  }, [activeTab])
+  }, [activeTab, setSelectedFlowId])
 
   const detailNodes = resolveDetailNodes(activeModel)
   const normalizedDetailNode = detailNode ?? detailNodes[0] ?? null
@@ -458,41 +463,78 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const referenceUnassignedDcopItems = useMemo<readonly ModelDcopItem[]>(() => [], [])
 
   const handleSelectFlow = (flowId: number) => {
-    // Flow 선택은 Reference 노드 선택과 상호 배타 — 선택 즉시 detail fetch.
+    // Flow 선택은 Reference 노드 선택 / draftFlow 와 상호 배타 (store action 이 처리).
     setSelectedFlowId(flowId)
   }
 
   const handleAddFlow = () => {
-    // F5 (draft + store) 도입 전까지는 placeholder. 사용자가 [+ Add Flow] 클릭 시
-    // 빈 Flow 추가가 아직 미구현임을 알리는 콘솔 로그만 남김 (Plan F5 단계 작업).
-    console.warn('[ModelDetailPanel] handleAddFlow: F5 단계에서 draft + POST 구현 예정')
+    // store action 이 selectedFlowId 도 함께 정리합니다 — 우측 패널이 draft 카드로 전환.
+    startDraftFlow()
   }
 
-  // FlowCard 의 [편집...] 버튼은 F4 단계에서 모달로 wiring 하지 않음 — 기존 dcop-itemes
-  // 평면 UI 와의 통합 처리는 F5 단계에서 store + 모달 상태 일원화와 함께 진행 (Plan F5).
-  const handleFlowEditWorkflowFilter = () => {
-    console.warn('[ModelDetailPanel] FlowCard onEditWorkflowFilter: F5 단계 wiring 예정')
+  // FlowCard 의 [편집...] 클릭 시 raw JSON + onChange 콜백을 받습니다.
+  // ModelDetailPanel 이 wirimg 보관 state (모달 open 여부 / 현재 value / save callback) 를 보유하고,
+  // 추출된 모달의 open / value / onSave 만 채워 줍니다.
+  const [flowEditor, setFlowEditor] = useState<{
+    kind: 'workflow-filter' | 'action-data-index'
+    value: string
+    onChange: (nextRaw: string) => void
+  } | null>(null)
+
+  const handleFlowEditWorkflowFilter = (currentRaw: string, onChange: (nextRaw: string) => void) => {
+    setFlowEditor({ kind: 'workflow-filter', value: currentRaw, onChange })
   }
-  const handleFlowEditActionDataIndex = () => {
-    console.warn('[ModelDetailPanel] FlowCard onEditActionDataIndex: F5 단계 wiring 예정')
+  const handleFlowEditActionDataIndex = (
+    currentRaw: string,
+    onChange: (nextRaw: string) => void,
+  ) => {
+    setFlowEditor({ kind: 'action-data-index', value: currentRaw, onChange })
   }
+  const handleCloseFlowEditor = () => setFlowEditor(null)
+  const handleSaveFlowEditor = (nextValue: string) => {
+    if (flowEditor === null) {
+      return
+    }
+    flowEditor.onChange(nextValue)
+    setFlowEditor(null)
+  }
+
   const handleFlowAddDcopItem = () => {
-    console.warn('[ModelDetailPanel] FlowCard onAddDcopItem: F5 단계 wiring 예정')
+    // Plan D4: DCOP 추가는 별도 dcop-itemes 노드 평면 UI 로 라우팅.
+    // 1차 릴리즈에선 Flow 선택을 해제하고 Reference > DCOP 노드로 이동.
+    setSelectedFlowId(null)
+    onSelectDetailNode('dcop-itemes')
   }
 
   const flowDetail = modelFlowDetailQuery.data ?? null
   const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
-  const flowSaveStatus: 'idle' | 'saving' | 'error' = updateFlowMutation.isPending
+  const isDraftMode = draftFlow !== null
+  const activeFlowMutation = isDraftMode ? createFlowMutation : updateFlowMutation
+  const flowSaveStatus: 'idle' | 'saving' | 'error' = activeFlowMutation.isPending
     ? 'saving'
-    : updateFlowMutation.isError
+    : activeFlowMutation.isError
       ? 'error'
       : 'idle'
   const flowSaveErrorMessage =
-    updateFlowMutation.isError && updateFlowMutation.error instanceof Error
-      ? updateFlowMutation.error.message
+    activeFlowMutation.isError && activeFlowMutation.error instanceof Error
+      ? activeFlowMutation.error.message
       : null
 
   const handleSaveFlow = (payload: ModelFlowUpdateRequest) => {
+    if (isDraftMode) {
+      // 첫 저장은 Identity 만 — Trigger / Action 은 사용자가 별도 PUT 저장합니다
+      // (F5 결정 #1: POST 만 → 후속 PUT 으로 4 섹션 갱신).
+      createFlowMutation.mutate(
+        { workflowName: payload.workflowName, messageName: payload.messageName },
+        {
+          onSuccess: (data) => {
+            clearDraftFlow()
+            setSelectedFlowId(data.flowId)
+          },
+        },
+      )
+      return
+    }
     if (selectedFlowId === null) {
       return
     }
@@ -700,13 +742,13 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     key={node}
                     type="button"
                     onClick={() => {
-                      // Reference 노드 선택은 Flow selection 과 상호 배타.
+                      // Reference 노드 선택은 Flow selection / draft 와 상호 배타.
                       setSelectedFlowId(null)
                       onSelectDetailNode(node)
                     }}
                     className={cn(
                       'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
-                      selectedFlowId === null && normalizedDetailNode === node
+                      selectedFlowId === null && !isDraftMode && normalizedDetailNode === node
                         ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
                         : 'text-[#51605A] hover:bg-[#F1F6F3]',
                     )}
@@ -719,7 +761,23 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
           </aside>
 
           <div className="min-h-0 min-w-0 flex-1 overflow-auto p-3">
-            {selectedFlowId !== null ? (
+            {isDraftMode && draftFlow ? (
+              <FlowCard
+                // draft 카드는 매 startDraftFlow 호출마다 새로 mount — sentinel key 로 안정.
+                key="draft-flow"
+                flow={draftToFlow(draftFlow)}
+                protocol={flowProtocol}
+                messageOptions={[]}
+                eventOptions={[]}
+                mdfTemplateOptions={[]}
+                onSave={handleSaveFlow}
+                saveStatus={flowSaveStatus}
+                errorMessage={flowSaveErrorMessage}
+                onEditWorkflowFilter={handleFlowEditWorkflowFilter}
+                onEditActionDataIndex={handleFlowEditActionDataIndex}
+                onAddDcopItem={handleFlowAddDcopItem}
+              />
+            ) : selectedFlowId !== null ? (
               modelFlowDetailQuery.isLoading ? (
                 <p className="text-sm text-[#647169]">Flow 데이터를 불러오는 중입니다.</p>
               ) : modelFlowDetailQuery.isError ? (
@@ -1159,6 +1217,33 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         workflowMdfContents={workflowMdfContents}
         onClose={handleCloseWorkflowTextEditor}
         onSave={handleSaveWorkflowTextEditor}
+      />
+
+      {/*
+        FlowCard 의 [편집...] 모달 — 기존 평면 UI 의 모달 호출 (위 두 개) 과는
+        별 state (flowEditor) 로 분리되어 동시 mount 가 안전합니다. FlowCard 의
+        draft → raw 직렬화는 FlowCard 내부, 모달 → draft 역변환도 FlowCard 내부
+        (handleClickEdit* 의 onChange 콜백). ModelDetailPanel 은 단순 라우터.
+      */}
+      <WorkflowFilterEditorModal
+        open={flowEditor?.kind === 'workflow-filter'}
+        value={flowEditor?.kind === 'workflow-filter' ? flowEditor.value : ''}
+        readOnly={isReadOnly}
+        titleLabel="Workflow Filter"
+        errorMessage={null}
+        onClose={handleCloseFlowEditor}
+        onSave={handleSaveFlowEditor}
+      />
+
+      <ActionDataIndexEditorModal
+        open={flowEditor?.kind === 'action-data-index'}
+        value={flowEditor?.kind === 'action-data-index' ? flowEditor.value : ''}
+        readOnly={isReadOnly}
+        titleLabel="Action Data Index"
+        errorMessage={null}
+        workflowMdfContents={workflowMdfContents}
+        onClose={handleCloseFlowEditor}
+        onSave={handleSaveFlowEditor}
       />
     </>
   )

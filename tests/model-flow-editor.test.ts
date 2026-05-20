@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  DRAFT_FLOW_ID_SENTINEL,
   buildFlowDraft,
   createEmptyFlowDraft,
+  draftToFlow,
   serializeFlowDraft,
 } from '../src/features/model/lib/model-flow-editor.ts'
 import type { ModelFlow } from '../src/features/model/types/model.types.ts'
@@ -174,4 +176,75 @@ test('round-trip: SECS Flow는 buildFlowDraft + serializeFlowDraft를 거쳐도 
     JSON.parse(payload.actionDataIndex as string),
     JSON.parse(flow.actionDataIndex as string),
   )
+})
+
+test('draftToFlow: 빈 draft가 sentinel flowId를 가진 ModelFlow shape으로 변환됩니다', () => {
+  const draft = createEmptyFlowDraft()
+  const flow = draftToFlow(draft)
+
+  assert.equal(flow.flowId, DRAFT_FLOW_ID_SENTINEL)
+  assert.equal(flow.workflowName, '')
+  assert.equal(flow.messageName, '')
+  assert.equal(flow.eventId, null)
+  assert.equal(flow.transactionId, null)
+  assert.equal(flow.workflowFilter, null)
+  assert.equal(flow.actionName, '')
+  assert.equal(flow.actionDataIndex, null)
+  assert.equal(flow.dcopItems.length, 0)
+})
+
+test('draftToFlow: Identity가 채워진 draft는 workflowName/messageName이 반영됩니다', () => {
+  const draft = createEmptyFlowDraft()
+  const filledDraft = {
+    ...draft,
+    workflowName: 'handleLotStart',
+    messageName: 'S6F11',
+    actionName: 'LOT_START_REPLY',
+  }
+  const flow = draftToFlow(filledDraft)
+
+  assert.equal(flow.workflowName, 'handleLotStart')
+  assert.equal(flow.messageName, 'S6F11')
+  assert.equal(flow.actionName, 'LOT_START_REPLY')
+  assert.equal(flow.flowId, DRAFT_FLOW_ID_SENTINEL)
+})
+
+test('draftToFlow: structured workflowFilter draft가 raw JSON string으로 직렬화되어 반영됩니다', () => {
+  const baseFlow = buildSecsFlow()
+  const draft = buildFlowDraft(baseFlow)
+  const flow = draftToFlow({ ...draft, flowId: null })
+
+  assert.notEqual(flow.workflowFilter, null)
+  assert.deepEqual(
+    JSON.parse(flow.workflowFilter as string),
+    JSON.parse(WORKFLOW_FILTER_JSON),
+  )
+  assert.notEqual(flow.actionDataIndex, null)
+  assert.deepEqual(
+    JSON.parse(flow.actionDataIndex as string),
+    JSON.parse(ACTION_DATA_INDEX_JSON),
+  )
+})
+
+test('draftToFlow: Socket draft는 Trigger 3 필드와 actionDataIndex가 모두 null입니다', () => {
+  const draft = buildFlowDraft(buildSocketFlow())
+  const flow = draftToFlow({ ...draft, flowId: null })
+
+  assert.equal(flow.eventId, null)
+  assert.equal(flow.transactionId, null)
+  assert.equal(flow.workflowFilter, null)
+  assert.equal(flow.actionDataIndex, null)
+})
+
+test('draftToFlow: dcopItems는 readonly 빈 배열로 보존됩니다', () => {
+  const draft = createEmptyFlowDraft()
+  const flow = draftToFlow(draft)
+
+  assert.ok(Array.isArray(flow.dcopItems))
+  assert.equal(flow.dcopItems.length, 0)
+})
+
+test('DRAFT_FLOW_ID_SENTINEL: backend가 발급하지 않는 음수 값으로 충돌을 회피합니다', () => {
+  // backend PK 는 양수 — 음수 sentinel 로 draft 와 real flow 구분.
+  assert.ok(DRAFT_FLOW_ID_SENTINEL < 0)
 })

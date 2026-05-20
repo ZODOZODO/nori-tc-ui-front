@@ -12,6 +12,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import {
+  DRAFT_FLOW_ID_SENTINEL,
   type FlowDraft,
   buildFlowDraft,
   serializeFlowDraft,
@@ -19,6 +20,12 @@ import {
   summarizeFlowActionDataIndex,
   summarizeFlowWorkflowFilter,
 } from '../lib/model-flow-editor'
+import {
+  buildActionDataIndexValue,
+  buildWorkflowFilterValue,
+  parseActionDataIndexEditor,
+  parseWorkflowFilterEditor,
+} from '../lib/model-detail-editor'
 import type {
   ModelFlow,
   ModelFlowUpdateRequest,
@@ -67,8 +74,14 @@ interface FlowCardProps {
   onSave: (payload: ModelFlowUpdateRequest) => void
   saveStatus: 'idle' | 'saving' | 'error'
   errorMessage: string | null
-  onEditWorkflowFilter: () => void
-  onEditActionDataIndex: () => void
+  /**
+   * Trigger 의 [편집...] 클릭 핸들러. 현재 draft 의 raw JSON string 과 모달 결과를
+   * 다시 draft 에 반영할 onChange 콜백을 부모에 전달합니다 — 부모는 추출된 모달의
+   * open / value / onSave 만 wiring 하면 됩니다.
+   */
+  onEditWorkflowFilter: (currentRaw: string, onChange: (nextRaw: string) => void) => void
+  /** Action 의 [편집...] 클릭 핸들러. 시그니처는 onEditWorkflowFilter 와 동일. */
+  onEditActionDataIndex: (currentRaw: string, onChange: (nextRaw: string) => void) => void
   onAddDcopItem: () => void
 }
 
@@ -145,6 +158,31 @@ export function FlowCard({
     onSave(serializeFlowDraft(draft))
   }
 
+  // [편집...] 클릭 시 draft 의 structured workflowFilter 를 raw JSON 으로 직렬화해
+  // 모달에 넘기고, 모달 onSave 결과를 다시 structured draft 로 역변환합니다.
+  // raw 가 빈 문자열이면 null draft 로 — Socket / 빈 SECS Flow 의 의미와 일치.
+  const handleClickEditWorkflowFilter = () => {
+    const currentRaw =
+      draft.workflowFilter === null ? '' : buildWorkflowFilterValue(draft.workflowFilter)
+    onEditWorkflowFilter(currentRaw, (nextRaw) => {
+      setDraft((previousDraft) => ({
+        ...previousDraft,
+        workflowFilter: nextRaw.length === 0 ? null : parseWorkflowFilterEditor(nextRaw),
+      }))
+    })
+  }
+
+  const handleClickEditActionDataIndex = () => {
+    const currentRaw =
+      draft.actionDataIndex === null ? '' : buildActionDataIndexValue(draft.actionDataIndex)
+    onEditActionDataIndex(currentRaw, (nextRaw) => {
+      setDraft((previousDraft) => ({
+        ...previousDraft,
+        actionDataIndex: nextRaw.length === 0 ? null : parseActionDataIndexEditor(nextRaw),
+      }))
+    })
+  }
+
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-[#E4EAE6] bg-white p-5 shadow-[0_1px_2px_rgba(20,46,36,0.04)]">
       <header className="flex items-baseline justify-between gap-3">
@@ -152,7 +190,9 @@ export function FlowCard({
           <h2 className="text-base font-semibold text-[#213028]">
             {draft.workflowName || '(workflow 미지정)'} / {draft.messageName || '(message 미지정)'}
           </h2>
-          <p className="text-xs text-[#738078]">Flow ID #{flow.flowId}</p>
+          <p className="text-xs text-[#738078]">
+            {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? 'Flow ID #신규' : `Flow ID #${flow.flowId}`}
+          </p>
         </div>
         {errorMessage ? (
           <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-1.5 text-xs text-[#B4483F]">
@@ -240,7 +280,7 @@ export function FlowCard({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={onEditWorkflowFilter}
+                onClick={handleClickEditWorkflowFilter}
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
                 편집...
@@ -276,7 +316,7 @@ export function FlowCard({
                  * 본 dropdown 은 현재 값 표시 + 모달 진입 트리거. 직접 선택 시
                  * 빠른 빈 매핑 entry 만 만들고 모달에서 fields 작성.
                  */
-                onEditActionDataIndex()
+                handleClickEditActionDataIndex()
                 void value
               }}
             >
@@ -307,7 +347,7 @@ export function FlowCard({
               type="button"
               variant="outline"
               size="sm"
-              onClick={onEditActionDataIndex}
+              onClick={handleClickEditActionDataIndex}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               편집...

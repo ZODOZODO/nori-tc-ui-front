@@ -11,6 +11,16 @@ import {
 } from './model-detail-editor.ts'
 
 /**
+ * Unsaved draft Flow 에 부여하는 placeholder flowId 입니다.
+ *
+ * backend 의 `tc_workflow.workflow_key` 는 양수 PK 이므로 음수 sentinel 은
+ * 실 데이터와 충돌하지 않습니다. FlowCard 가 ModelFlow shape 을 요구하므로
+ * draftToFlow 어댑터가 이 값을 사용합니다 — 헤더 / 키 등 표시는 호출자가
+ * sentinel 여부를 분기해 "신규" 등으로 처리합니다.
+ */
+export const DRAFT_FLOW_ID_SENTINEL = -1
+
+/**
  * FlowCard 의 4 섹션 편집 상태입니다.
  *
  * - Trigger 의 workflowFilter / Action 의 actionDataIndex 는 JSON string 대신
@@ -146,3 +156,37 @@ export const summarizeFlowActionDataIndex = (
  */
 export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean =>
   protocol === 'SECS'
+
+/**
+ * Draft 상태의 FlowDraft 를 FlowCard 가 요구하는 ModelFlow shape 으로 변환합니다.
+ *
+ * draft 의 flowId 가 null (= unsaved) 인 경우 {@link DRAFT_FLOW_ID_SENTINEL} 로
+ * 치환합니다. workflowFilter / actionDataIndex 의 structured draft 는 raw JSON
+ * string 으로 직렬화되며, 빈 결과는 null 로 유지됩니다.
+ *
+ * 이 어댑터는 store.draftFlow 가 채워졌을 때 FlowCard 에 그대로 주입하기 위해
+ * 사용됩니다 — 첫 저장은 POST /flows (Identity 만) 로 처리되며, Trigger / Action
+ * 은 후속 PUT 으로 저장합니다.
+ */
+export const draftToFlow = (draft: FlowDraft): ModelFlow => {
+  const workflowFilterValue =
+    draft.workflowFilter === null ? null : buildWorkflowFilterValue(draft.workflowFilter)
+  const actionDataIndexValue =
+    draft.actionDataIndex === null ? null : buildActionDataIndexValue(draft.actionDataIndex)
+
+  return {
+    flowId: draft.flowId ?? DRAFT_FLOW_ID_SENTINEL,
+    workflowName: draft.workflowName,
+    messageName: draft.messageName,
+    eventId: draft.eventId,
+    transactionId: draft.transactionId,
+    workflowFilter:
+      workflowFilterValue !== null && workflowFilterValue.length > 0 ? workflowFilterValue : null,
+    actionName: draft.actionName,
+    actionDataIndex:
+      actionDataIndexValue !== null && actionDataIndexValue.length > 0
+        ? actionDataIndexValue
+        : null,
+    dcopItems: [...draft.dcopItems],
+  }
+}

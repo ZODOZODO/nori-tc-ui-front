@@ -4,6 +4,7 @@ import {
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_DEFAULT_WIDTH_PX,
 } from '@/shared/layout/sidebar-layout'
+import { createEmptyFlowDraft, type FlowDraft } from '../lib/model-flow-editor'
 import type { ModelDetailNode, ModelInfo, ModelOpenedTab } from '../types/model.types'
 
 interface ModelUiState {
@@ -20,6 +21,17 @@ interface ModelUiState {
   isProfileModalOpen: boolean
   /** 상하 패널 분리 핸들의 상단 패널 높이 비율(%) */
   topPanelHeightPercent: number
+  /**
+   * 좌측 사이드바에서 선택된 Message Flow 의 flowId. null = Reference 영역 모드.
+   * draftFlow 와 상호 배타 — draftFlow 가 채워지면 selectedFlowId 는 null 로 강제됩니다.
+   */
+  selectedFlowId: number | null
+  /**
+   * "+ Add Flow" 로 생성된 unsaved Flow draft. null = draft 없음.
+   * Identity 두 값을 채운 후 첫 저장 시 POST /flows 로 생성되며, 성공하면
+   * draftFlow=null + selectedFlowId=발급된 flowId 로 전환됩니다.
+   */
+  draftFlow: FlowDraft | null
   setSelectedModelVersionKey: (modelVersionKey: number | null) => void
   setSidebarOpen: (open: boolean) => void
   setSidebarWidth: (width: number) => void
@@ -39,6 +51,20 @@ interface ModelUiState {
    * 직접 값 또는 이전 값을 받는 updater 함수 모두 허용합니다.
    */
   setTopPanelHeightPercent: (updater: number | ((prev: number) => number)) => void
+  /**
+   * 좌측 트리에서 Flow 를 선택합니다.
+   * Flow 선택은 draftFlow 와 상호 배타 — draftFlow 도 함께 정리합니다.
+   */
+  setSelectedFlowId: (flowId: number | null) => void
+  /**
+   * "+ Add Flow" 클릭 시 빈 FlowDraft 를 채워 unsaved 상태로 전환합니다.
+   * selectedFlowId 는 null 로 정리되어 우측 패널이 draft 카드를 렌더하게 합니다.
+   */
+  startDraftFlow: () => void
+  /**
+   * draftFlow 를 비웁니다 (취소 또는 저장 완료 후 호출).
+   */
+  clearDraftFlow: () => void
   handleModelVersionsRemoved: (
     removedModelVersionKeys: number[],
     fallbackSelectedModelVersionKey?: number | null,
@@ -80,6 +106,8 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
   isCheckInModalOpen: false,
   isProfileModalOpen: false,
   topPanelHeightPercent: MODEL_PANEL_INITIAL_TOP_PERCENT,
+  selectedFlowId: null,
+  draftFlow: null,
   setSelectedModelVersionKey: (modelVersionKey) => set({ selectedModelVersionKey: modelVersionKey }),
   setSidebarOpen: (open) =>
     set((state) =>
@@ -211,6 +239,13 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
       topPanelHeightPercent:
         typeof updater === 'function' ? updater(state.topPanelHeightPercent) : updater,
     })),
+  setSelectedFlowId: (flowId) =>
+    // Flow 선택은 draftFlow 와 상호 배타 — Reference 노드 / Flow 카드 / draft 카드 중
+    // 하나만 우측 패널에 노출됩니다.
+    set({ selectedFlowId: flowId, draftFlow: null }),
+  startDraftFlow: () =>
+    set({ draftFlow: createEmptyFlowDraft(), selectedFlowId: null }),
+  clearDraftFlow: () => set({ draftFlow: null }),
   handleModelVersionsRemoved: (removedModelVersionKeys, fallbackSelectedModelVersionKey = null) =>
     set((state) => {
       const removedVersionKeySet = new Set(removedModelVersionKeys)
@@ -291,5 +326,7 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
       isCheckInModalOpen: false,
       isProfileModalOpen: false,
       topPanelHeightPercent: MODEL_PANEL_INITIAL_TOP_PERCENT,
+      selectedFlowId: null,
+      draftFlow: null,
     }),
 }))
