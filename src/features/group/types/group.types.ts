@@ -32,6 +32,29 @@ export type GroupDeleteResponse = ApiResponse<null>
 export type GroupMembershipResponse = ApiResponse<null>
 
 /**
+ * GET /api/group/{groupId}/user 응답 한 행 — ui-backend `GroupMemberResponse` 와 1:1.
+ */
+export interface GroupMember {
+  userPk: number
+  userId: string
+  userName: string
+  company: string
+  department: string
+}
+
+/**
+ * GET /api/group/{groupId}/user 응답 페이지 (PagedResponse<GroupMemberResponse>).
+ */
+export interface GroupMemberPage {
+  items: GroupMember[]
+  offset: number
+  limit: number
+  count: number
+}
+
+export type GroupMemberPageResponse = ApiResponse<GroupMemberPage>
+
+/**
  * POST /api/group, PUT /api/group/{groupId} 요청 DTO 입니다.
  * 백엔드 `GroupUpsertRequest` 와 1:1 매칭됩니다.
  */

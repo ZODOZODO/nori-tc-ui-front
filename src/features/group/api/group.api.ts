@@ -10,6 +10,9 @@ import {
   type GroupDeleteResponse,
   type GroupInfo,
   type GroupInfoResponse,
+  type GroupMember,
+  type GroupMemberPage,
+  type GroupMemberPageResponse,
   type GroupMembershipResponse,
   type GroupPage,
   type GroupPageResponse,
@@ -20,6 +23,7 @@ import {
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 const GROUP_LIST_FALLBACK_MESSAGE = '그룹 목록을 조회하지 못했습니다.'
+const GROUP_MEMBER_LIST_FALLBACK_MESSAGE = '그룹 멤버 목록을 조회하지 못했습니다.'
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -110,6 +114,52 @@ const isGroupInfoItem = (value: unknown): value is GroupInfo =>
   typeof value.isActive === 'boolean' &&
   typeof value.createdAt === 'string' &&
   typeof value.updatedAt === 'string'
+
+const isGroupMemberItem = (value: unknown): value is GroupMember =>
+  isRecord(value) &&
+  typeof value.userPk === 'number' &&
+  typeof value.userId === 'string' &&
+  typeof value.userName === 'string' &&
+  typeof value.company === 'string' &&
+  typeof value.department === 'string'
+
+const normalizeGroupMemberPagePayload = (
+  payload: unknown,
+  requestedOffset: number,
+  requestedLimit: number,
+): GroupMemberPage => {
+  if (Array.isArray(payload)) {
+    const normalizedItems = payload.filter(isGroupMemberItem)
+    return {
+      items: normalizedItems,
+      offset: requestedOffset,
+      limit: requestedLimit,
+      count: normalizedItems.length,
+    }
+  }
+
+  if (!isRecord(payload) || !Array.isArray(payload.items)) {
+    throw new GroupApiError(
+      createGroupFailResponse(
+        {
+          success: false,
+          data: null,
+          errorCode: 'INVALID_RESPONSE',
+          errorMsg: GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+        },
+        GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+      ),
+    )
+  }
+
+  const items = payload.items.filter(isGroupMemberItem)
+  const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
+  const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
+  const count =
+    typeof payload.count === 'number' ? Math.max(payload.count, items.length) : items.length
+
+  return { items, offset, limit, count }
+}
 
 const normalizeGroupPagePayload = (
   payload: unknown,
@@ -252,6 +302,27 @@ export const groupApi = {
       )
     } catch (error) {
       throw normalizeGroupError(error, '그룹 삭제에 실패했습니다.')
+    }
+  },
+
+  listMembers: async (groupId: number, offset = 0, limit = 500): Promise<GroupMemberPage> => {
+    try {
+      const response = await apiClient.get<GroupMemberPageResponse>(`/group/${groupId}/user`, {
+        params: { offset, limit },
+        withCredentials: true,
+      })
+
+      return normalizeGroupMemberPagePayload(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+        ),
+        offset,
+        limit,
+      )
+    } catch (error) {
+      throw normalizeGroupError(error, GROUP_MEMBER_LIST_FALLBACK_MESSAGE)
     }
   },
 

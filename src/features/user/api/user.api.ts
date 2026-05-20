@@ -9,12 +9,10 @@ import {
   type UserCreateRequest,
   type UserCreateResponse,
   type UserDeleteResponse,
-  type UserGroupMapping,
-  type UserGroupMappingPage,
-  type UserGroupMappingPageResponse,
-  type UserGroupMembershipResponse,
+  type UserGroupSummary,
   type UserInfo,
   type UserInfoResponse,
+  type UserListItem,
   type UserPage,
   type UserPageResponse,
   type UserPasswordResetRequest,
@@ -26,7 +24,6 @@ import {
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 const USER_LIST_FALLBACK_MESSAGE = '사용자 목록을 조회하지 못했습니다.'
-const USER_GROUP_LIST_FALLBACK_MESSAGE = '사용자의 그룹 목록을 조회하지 못했습니다.'
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -109,7 +106,13 @@ const resolveSuccessPayload = <TData>(
   return payload.data as TData
 }
 
-const isUserInfoItem = (value: unknown): value is UserInfo =>
+const isUserGroupSummaryItem = (value: unknown): value is UserGroupSummary =>
+  isRecord(value) &&
+  typeof value.groupId === 'number' &&
+  typeof value.groupCode === 'string' &&
+  typeof value.groupName === 'string'
+
+const isUserListItem = (value: unknown): value is UserListItem =>
   isRecord(value) &&
   typeof value.userPk === 'number' &&
   typeof value.userId === 'string' &&
@@ -122,14 +125,9 @@ const isUserInfoItem = (value: unknown): value is UserInfo =>
   typeof value.createdAt === 'string' &&
   typeof value.updatedAt === 'string' &&
   typeof value.createdBy === 'string' &&
-  typeof value.updatedBy === 'string'
-
-const isUserGroupMappingItem = (value: unknown): value is UserGroupMapping =>
-  isRecord(value) &&
-  typeof value.userPk === 'number' &&
-  typeof value.groupId === 'number' &&
-  typeof value.groupCode === 'string' &&
-  typeof value.groupName === 'string'
+  typeof value.updatedBy === 'string' &&
+  Array.isArray(value.groups) &&
+  value.groups.every(isUserGroupSummaryItem)
 
 const normalizeUserPagePayload = (
   payload: unknown,
@@ -137,7 +135,7 @@ const normalizeUserPagePayload = (
   requestedLimit: number,
 ): UserPage => {
   if (Array.isArray(payload)) {
-    const normalizedItems = payload.filter(isUserInfoItem)
+    const normalizedItems = payload.filter(isUserListItem)
 
     return {
       items: normalizedItems,
@@ -161,46 +159,7 @@ const normalizeUserPagePayload = (
     )
   }
 
-  const items = payload.items.filter(isUserInfoItem)
-  const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
-  const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
-  const count =
-    typeof payload.count === 'number' ? Math.max(payload.count, items.length) : items.length
-
-  return { items, offset, limit, count }
-}
-
-const normalizeUserGroupPagePayload = (
-  payload: unknown,
-  requestedOffset: number,
-  requestedLimit: number,
-): UserGroupMappingPage => {
-  if (Array.isArray(payload)) {
-    const normalizedItems = payload.filter(isUserGroupMappingItem)
-
-    return {
-      items: normalizedItems,
-      offset: requestedOffset,
-      limit: requestedLimit,
-      count: normalizedItems.length,
-    }
-  }
-
-  if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new UserApiError(
-      createUserFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'INVALID_RESPONSE',
-          errorMsg: USER_GROUP_LIST_FALLBACK_MESSAGE,
-        },
-        USER_GROUP_LIST_FALLBACK_MESSAGE,
-      ),
-    )
-  }
-
-  const items = payload.items.filter(isUserGroupMappingItem)
+  const items = payload.items.filter(isUserListItem)
   const offset = typeof payload.offset === 'number' ? payload.offset : requestedOffset
   const limit = typeof payload.limit === 'number' ? payload.limit : requestedLimit
   const count =
@@ -261,11 +220,14 @@ export const userApi = {
   },
 
   /**
-   * 멘션 자동완성 등에서 사용하는 전체 사용자 조회입니다.
+   * 멘션 자동완성 / 그룹 멤버 추가 모달 등에서 사용하는 전체 사용자 조회입니다.
    * profile 영역 전용 — User 페이지는 페이지네이션 명시 호출(getUserList)을 사용합니다.
+   *
+   * 응답 항목은 `UserListItem` (groups 포함) 이며, groups 가 필요 없는 사용처는
+   * `UserInfo` 로 사용해도 안전합니다 (UserListItem extends UserInfo).
    */
-  getAllUsers: async (): Promise<UserInfo[]> => {
-    const usersById = new Map<number, UserInfo>()
+  getAllUsers: async (): Promise<UserListItem[]> => {
+    const usersById = new Map<number, UserListItem>()
     const firstPage = await userApi.getUserList(0, 500)
     let cursorOffset = 0
 
@@ -383,89 +345,4 @@ export const userApi = {
     }
   },
 
-  /**
-   * 사용자가 소속된 그룹 목록을 조회합니다. (R6 백엔드 신규 GET)
-   */
-  listUserGroups: async (
-    userPk: number,
-    offset = 0,
-    limit = 50,
-  ): Promise<UserGroupMappingPage> => {
-    try {
-      const response = await apiClient.get<UserGroupMappingPageResponse>(
-        `/user/${userPk}/group`,
-        {
-          params: { offset, limit },
-          withCredentials: true,
-        },
-      )
-
-      return normalizeUserGroupPagePayload(
-        resolveSuccessPayload<unknown>(
-          response.data,
-          response.status,
-          USER_GROUP_LIST_FALLBACK_MESSAGE,
-        ),
-        offset,
-        limit,
-      )
-    } catch (error) {
-      throw normalizeUserError(error, USER_GROUP_LIST_FALLBACK_MESSAGE)
-    }
-  },
-
-  /**
-   * 사용자에게 그룹을 추가합니다.
-   */
-  addUserGroup: async (userPk: number, groupId: number): Promise<void> => {
-    try {
-      const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.post<UserGroupMembershipResponse>(
-          `/user/${userPk}/group/${groupId}`,
-          null,
-          {
-            withCredentials: true,
-            headers: { [CSRF_HEADER_NAME]: csrfToken },
-            validateStatus: (status) => status >= 200 && status < 600,
-          },
-        ),
-      )
-
-      resolveSuccessPayload<null>(
-        response.data,
-        response.status,
-        '그룹 추가에 실패했습니다.',
-        true,
-      )
-    } catch (error) {
-      throw normalizeUserError(error, '그룹 추가에 실패했습니다.')
-    }
-  },
-
-  /**
-   * 사용자의 그룹을 제거합니다.
-   */
-  removeUserGroup: async (userPk: number, groupId: number): Promise<void> => {
-    try {
-      const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.delete<UserGroupMembershipResponse>(
-          `/user/${userPk}/group/${groupId}`,
-          {
-            withCredentials: true,
-            headers: { [CSRF_HEADER_NAME]: csrfToken },
-            validateStatus: (status) => status >= 200 && status < 600,
-          },
-        ),
-      )
-
-      resolveSuccessPayload<null>(
-        response.data,
-        response.status,
-        '그룹 제거에 실패했습니다.',
-        true,
-      )
-    } catch (error) {
-      throw normalizeUserError(error, '그룹 제거에 실패했습니다.')
-    }
-  },
 }

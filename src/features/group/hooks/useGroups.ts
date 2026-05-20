@@ -25,3 +25,16 @@ export function useGroupDetail(groupId: number | null, enabled = true) {
     enabled: enabled && groupId !== null,
   })
 }
+
+/**
+ * 특정 그룹에 속한 멤버 목록 조회 훅입니다 (GET /api/group/{groupId}/user).
+ *
+ * limit=500 으로 한 번에 조회 — 한 그룹의 멤버 수가 적다고 가정합니다.
+ */
+export function useGroupMembers(groupId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: groupId === null ? ['group', 'members', 'noop'] : groupQueryKeys.members(groupId),
+    queryFn: () => groupApi.listMembers(groupId as number, 0, 500),
+    enabled: enabled && groupId !== null,
+  })
+}
