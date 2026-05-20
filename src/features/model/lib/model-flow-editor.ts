@@ -6,6 +6,8 @@ import {
   buildWorkflowFilterValue,
   parseActionDataIndexEditor,
   parseWorkflowFilterEditor,
+  summarizeActionDataIndexValue,
+  summarizeWorkflowFilterValue,
 } from './model-detail-editor.ts'
 
 /**
@@ -91,3 +93,56 @@ export const createEmptyFlowDraft = (): FlowDraft => ({
   actionDataIndex: null,
   dcopItems: [],
 })
+
+/**
+ * Trigger 섹션의 workflow_filter summary 텍스트입니다.
+ *
+ * draft 의 structured root group 을 1 줄 요약. raw 모드면 첫 줄을 그대로 노출.
+ * draft 가 null 이면 "필터 없음" — Socket 모델 또는 비어 있는 SECS Flow.
+ */
+export const summarizeFlowWorkflowFilter = (
+  draft: WorkflowFilterEditorDraft | null,
+): string => {
+  if (draft === null) {
+    return '필터 없음'
+  }
+
+  const serialized = buildWorkflowFilterValue(draft)
+  if (serialized.length === 0) {
+    return '필터 없음'
+  }
+
+  const summary = summarizeWorkflowFilterValue(serialized)
+  return summary.length > 0 ? summary : '필터 없음'
+}
+
+/**
+ * Action 섹션의 action_data_index summary 텍스트입니다.
+ *
+ * mdfTemplateName + 첫 field 매핑을 한 줄로 표시. draft 가 null 이거나 결과가
+ * 비어 있으면 "매핑 없음".
+ */
+export const summarizeFlowActionDataIndex = (
+  draft: ActionDataIndexEditorDraft | null,
+): string => {
+  if (draft === null) {
+    return '매핑 없음'
+  }
+
+  const serialized = buildActionDataIndexValue(draft)
+  if (serialized.length === 0) {
+    return '매핑 없음'
+  }
+
+  const summary = summarizeActionDataIndexValue(serialized)
+  return summary.length > 0 ? summary : '매핑 없음'
+}
+
+/**
+ * FlowCard 가 Trigger 섹션을 렌더할지 결정합니다.
+ *
+ * SPEC line 80-83: Socket 모델은 Trigger 섹션 자체 미렌더. F1 dev-report 의
+ * 권장에 따라 model 의 commInterface 값으로 명시 분기 (flow 의 3 필드 null 검사 X).
+ */
+export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean =>
+  protocol === 'SECS'
