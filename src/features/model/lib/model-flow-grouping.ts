@@ -1,4 +1,4 @@
-import type { ModelDcopItem, ModelFlowSummary } from '../types/model.types.ts'
+import type { ModelFlowSummary } from '../types/model.types.ts'
 
 /**
  * `groupFlowsByWorkflowName` 의 결과 한 그룹입니다.
@@ -40,18 +40,3 @@ export const groupFlowsByWorkflowName = (
     .sort((a, b) => a.workflowName.localeCompare(b.workflowName))
 }
 
-/**
- * dcop-itemes 응답 row 중 workflow_name 이 NULL 인 행만 추출합니다.
- *
- * 백엔드 {@code ModelFlowQueryService.findUnassignedDcopItems} 와 동일한 의미 —
- * 어느 Flow 의 Collect 섹션에도 속하지 않는 DCOP item 만 sidebar 하단의
- * "Unassigned DCOPs" 영역에 read-only 로 노출합니다.
- *
- * 백엔드 record 는 nullable workflowName 을 직렬화하지만 FE 타입은 string 으로
- * 좁혀져 있어 비교 시 unknown cast 로 받습니다 (별 SPEC 에서 ModelDcopItem
- * 타입 수정 권고).
- */
-export const extractUnassignedDcopItems = (
-  items: readonly ModelDcopItem[],
-): ModelDcopItem[] =>
-  items.filter((item) => (item.workflowName as unknown) === null)

@@ -2,15 +2,11 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import {
-  extractUnassignedDcopItems,
-  groupFlowsByWorkflowName,
-} from '../lib/model-flow-grouping.ts'
-import type { ModelDcopItem, ModelFlowSummary } from '../types/model.types.ts'
+import { groupFlowsByWorkflowName } from '../lib/model-flow-grouping.ts'
+import type { ModelFlowSummary } from '../types/model.types.ts'
 
 interface ModelFlowSidebarProps {
   summaries: readonly ModelFlowSummary[]
-  unassignedDcopItems: readonly ModelDcopItem[]
   selectedFlowId: number | null
   onSelectFlow: (flowId: number) => void
   onAddFlow: () => void
@@ -92,38 +88,37 @@ function WorkflowGroupSection({
 /**
  * Model 페이지 좌측 사이드바의 "Message Flows" 영역입니다.
  *
- * workflowName 1 단계 트리 + messageName 2 단계 행으로 Flow 목록을 렌더링하고,
- * 하단에 workflow_name=NULL 인 DCOP item 들을 read-only 로 표시합니다.
+ * workflowName 1 단계 트리 + messageName 2 단계 행으로 Flow 목록을 렌더링합니다.
  *
- * 트리 그룹화 / Unassigned 필터링은 {@link groupFlowsByWorkflowName} /
- * {@link extractUnassignedDcopItems} pure helper 에 위임 — sidebar 자체는
+ * dcop-flow-binding v4 에서 미매핑 dcop 전용 영역은 폐기됨 — N:M 모델에서 Flow 0 개
+ * 매핑은 자연 상태이며, picker 모달이 좌측 disabled 배지로 binding 상태를 직접 시각화함.
+ *
+ * 트리 그룹화는 {@link groupFlowsByWorkflowName} pure helper 에 위임 — sidebar 자체는
  * 렌더 + 사용자 상호작용 (펼침 / 선택 / Add Flow) 만 담당합니다.
- *
- * Reference 영역 (Variable / Report / Event / MDF / SocketMessage / MesMessage /
- * Parameter) 은 F4 (ModelDetailPanel 재구성) 단계에서 같은 사이드바 컨테이너에
- * 통합됩니다 — F3 본 컴포넌트는 Message Flows + Unassigned DCOPs 영역만 책임.
  */
 export const ModelFlowSidebar = memo(function ModelFlowSidebar({
   summaries,
-  unassignedDcopItems,
   selectedFlowId,
   onSelectFlow,
   onAddFlow,
   isEditable,
 }: ModelFlowSidebarProps) {
   const groups = useMemo(() => groupFlowsByWorkflowName(summaries), [summaries])
-  const unassigned = useMemo(
-    () => extractUnassignedDcopItems(unassignedDcopItems),
-    [unassignedDcopItems],
-  )
 
   return (
     <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
       <header className="mb-2 flex items-center justify-between px-1">
         <span className="text-xs font-semibold text-[#243129]">Message Flows</span>
         {isEditable ? (
-          <Button type="button" variant="outline" size="sm" onClick={onAddFlow}>
-            <Plus className="size-3.5" aria-hidden="true" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="px-1 text-[10px]"
+            data-testid="add-flow-button"
+            onClick={onAddFlow}
+          >
+            <Plus className="size-3" aria-hidden="true" />
             Add Flow
           </Button>
         ) : null}
@@ -145,23 +140,6 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
         )}
       </div>
 
-      {unassigned.length > 0 ? (
-        <div className="mt-3 border-t border-[#E4EAE6] pt-2">
-          <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-[#738078]">
-            Unassigned DCOPs
-          </p>
-          <ul className="space-y-0.5 pl-1">
-            {unassigned.map((item) => (
-              <li
-                key={`${item.dcopItemKey ?? item.dcopItemName}`}
-                className="truncate px-2 py-1 text-xs text-[#51605A]"
-              >
-                {item.dcopItemName}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   )
 })
