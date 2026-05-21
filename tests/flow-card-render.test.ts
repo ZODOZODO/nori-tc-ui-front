@@ -53,7 +53,6 @@ const buildSecsFlow = (): ModelFlow => ({
       dcopItemKey: 7,
       modelVersionKey: 100,
       dcopItemName: 'TOOL_CONDITION_DCOP',
-      workflowName: 'TOOL_CONDITION',
       eventId: 'CEID_1001',
       variableId: 'VID_2002',
       collectionRule: 'LAST',
@@ -62,6 +61,7 @@ const buildSecsFlow = (): ModelFlow => ({
       updatedAt: '2026-05-19T10:00:00Z',
     },
   ],
+  dcopItemKeys: [7],
 })
 
 const buildSocketFlow = (): ModelFlow => ({
@@ -74,6 +74,7 @@ const buildSocketFlow = (): ModelFlow => ({
   actionName: 'SOCKET_REPLY',
   actionDataIndex: null,
   dcopItems: [],
+  dcopItemKeys: [],
 })
 
 test('shouldRenderTriggerSection: SECS 모델은 Trigger 섹션을 렌더합니다', () => {

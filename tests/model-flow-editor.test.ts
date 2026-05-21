@@ -44,7 +44,6 @@ const buildSecsFlow = (): ModelFlow => ({
       dcopItemKey: 7,
       modelVersionKey: 100,
       dcopItemName: 'TOOL_CONDITION_DCOP',
-      workflowName: 'TOOL_CONDITION',
       eventId: 'CEID_1001',
       variableId: 'VID_2002',
       collectionRule: 'LAST',
@@ -53,6 +52,7 @@ const buildSecsFlow = (): ModelFlow => ({
       updatedAt: '2026-05-19T10:00:00Z',
     },
   ],
+  dcopItemKeys: [7],
 })
 
 const buildSocketFlow = (): ModelFlow => ({
@@ -65,6 +65,7 @@ const buildSocketFlow = (): ModelFlow => ({
   actionName: 'SOCKET_REPLY',
   actionDataIndex: null,
   dcopItems: [],
+  dcopItemKeys: [],
 })
 
 test('buildFlowDraft: SECS Flow의 workflowFilter가 parsed structured draft로 변환됩니다', () => {
@@ -142,6 +143,16 @@ test('serializeFlowDraft: Socket draft는 Trigger 3 필드와 actionDataIndex가
   assert.equal(payload.actionDataIndex, null)
   assert.equal(payload.workflowName, 'SOCKET_FLOW')
   assert.equal(payload.actionName, 'SOCKET_REPLY')
+})
+
+test('serializeFlowDraft: Collect 섹션 dcopItemKeys 는 null 로 직렬화되어 BE 가 Collect 미갱신으로 해석합니다', () => {
+  // FlowCard 의 저장은 Identity / Trigger / Filter / Action 4 섹션만 갱신 — Collect 의
+  // dcop_item binding 은 DcopItemPickerModal 의 별 PUT 으로 전송된다 (dcop-flow-binding v4).
+  const flow = buildSecsFlow()
+  const draft = buildFlowDraft(flow)
+  const payload = serializeFlowDraft(draft)
+
+  assert.equal(payload.dcopItemKeys, null)
 })
 
 test('createEmptyFlowDraft: 신규 draft는 flowId=null과 빈 string/null 필드를 가집니다', () => {
@@ -242,6 +253,15 @@ test('draftToFlow: dcopItems는 readonly 빈 배열로 보존됩니다', () => {
 
   assert.ok(Array.isArray(flow.dcopItems))
   assert.equal(flow.dcopItems.length, 0)
+  assert.ok(Array.isArray(flow.dcopItemKeys))
+  assert.equal(flow.dcopItemKeys.length, 0)
+})
+
+test('draftToFlow: SECS Flow 의 dcopItems 가 있을 때 dcopItemKeys 가 그 PK 배열로 추출됩니다', () => {
+  const draft = buildFlowDraft(buildSecsFlow())
+  const flow = draftToFlow(draft)
+
+  assert.deepEqual(flow.dcopItemKeys, [7])
 })
 
 test('DRAFT_FLOW_ID_SENTINEL: backend가 발급하지 않는 음수 값으로 충돌을 회피합니다', () => {

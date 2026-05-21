@@ -88,8 +88,8 @@ interface FlowDetailFixture {
     variableId: string
     collectionRule: string
     eventId: string | null
-    workflowName: string | null
   }>
+  dcopItemKeys: number[]
 }
 
 interface FlowMockState {
@@ -121,24 +121,24 @@ const buildInitialFlowDetail = (): FlowDetailFixture => ({
       variableId: 'VAR_LOT_COUNT',
       collectionRule: 'LAST',
       eventId: 'EVT_LOT_START',
-      workflowName: 'handleLotStart',
     },
   ],
+  dcopItemKeys: [301],
 })
 
 /**
- * dcop-itemes 노드 응답의 client-side group divider + 사이드바 Unassigned 섹션 검증용.
+ * dcop-itemes 노드 응답 fixture (dcop-flow-binding v4).
  *
  * 컬럼 순서는 백엔드 `ModelDetailResponseSupport.SECS_DCOP_ITEM_COLUMNS` 와 동일하게
- * `[Dcop Item Name, Workflow Name, EventId, VariableId, Collection Rule, Calculation Rule, Order Rule]`.
+ * `[Dcop Item Name, EventId, VariableId, Collection Rule, Calculation Rule, Order Rule]`
+ * 6 컬럼 (v4 에서 Workflow Name 컬럼 제거).
  *
- * row.id 는 `dcop:{key}` 형식 — ModelDetailPanel 의 dcop-itemes prefetch 가 id 에서 key 를
- * 파싱하여 사이드바 unassigned 행 React key 로 사용합니다 (백엔드 modelRowId 규약).
+ * row.id 는 `dcop:{key}` 형식 — ModelDetailPanel 의 dcop-itemes prefetch 가 id 에서
+ * key 를 파싱해 picker 모달의 reference pool 으로 사용합니다 (백엔드 modelRowId 규약).
  */
 const buildDcopItemesPayload = () => ({
   columns: [
     'Dcop Item Name',
-    'Workflow Name',
     'EventId',
     'VariableId',
     'Collection Rule',
@@ -148,15 +148,14 @@ const buildDcopItemesPayload = () => ({
   rows: [
     {
       id: 'dcop:301',
-      values: ['LOT_START_COUNTER', 'handleLotStart', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
-      previewValues: ['LOT_START_COUNTER', 'handleLotStart', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
+      values: ['LOT_START_COUNTER', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
+      previewValues: ['LOT_START_COUNTER', 'EVT_LOT_START', 'VAR_LOT_COUNT', 'LAST', '', ''],
     },
     {
       id: 'dcop:302',
-      // workflow_name=NULL — 사이드바 "Unassigned DCOPs" 섹션 + Reference > Dcop Itemes 노드의
-      // client-side group divider "── Unassigned ──" 양쪽 모두 이 row 의 워크플로우 미할당 상태를 노출.
-      values: ['ORPHAN_DCOP', '', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
-      previewValues: ['ORPHAN_DCOP', '', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
+      // dcop_item 본체는 Flow 와 독립 — Flow 와 binding 되지 않은 dcop_item 도 자연 상태로 pool 에 존재.
+      values: ['ORPHAN_DCOP', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
+      previewValues: ['ORPHAN_DCOP', 'EVT_ORPHAN', 'VAR_ORPHAN', 'FIRST', '', ''],
     },
   ],
   mdfContents: [] as Array<{ name: string; xml: string }>,
@@ -265,6 +264,7 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
           actionName: '',
           actionDataIndex: null,
           dcopItems: [],
+          dcopItemKeys: [],
         }
         state.details.set(created.flowId, created)
         state.summaries.push(flowSummaryFromDetail(created))
@@ -299,6 +299,20 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
         state.updateFlowCalls.push({ flowId, body })
         const previous = state.details.get(flowId)
         if (previous) {
+          // dcopItemKeys 는 null (Collect 미갱신) / 배열 (binding 재정의) 모두 허용.
+          const requestedDcopItemKeys = (body as Record<string, unknown>).dcopItemKeys
+          const nextDcopItemKeys =
+            Array.isArray(requestedDcopItemKeys)
+              ? requestedDcopItemKeys.map((key) => Number(key))
+              : previous.dcopItemKeys
+          // dcopItems 본체도 nextDcopItemKeys 에 맞춰 trimming — picker 가 우측에 표시할
+          // currentFlowDcopItems 가 nextDcopItemKeys 와 같아야 round-trip 시각 일관성 확보.
+          const nextDcopItems =
+            nextDcopItemKeys === previous.dcopItemKeys
+              ? previous.dcopItems
+              : previous.dcopItems.filter((item) =>
+                  item.dcopItemKey !== null && nextDcopItemKeys.includes(item.dcopItemKey),
+                )
           const next: FlowDetailFixture = {
             ...previous,
             workflowName: String(
@@ -317,6 +331,8 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
             ),
             actionDataIndex:
               ((body as Record<string, unknown>).actionDataIndex as string | null | undefined) ?? null,
+            dcopItems: nextDcopItems,
+            dcopItemKeys: nextDcopItemKeys,
           }
           state.details.set(flowId, next)
           const summaryIndex = state.summaries.findIndex((summary) => summary.flowId === flowId)
@@ -663,6 +679,7 @@ test('Model-Flow-AC-5.1: SOCKET model 의 자유 messageName Flow 도 Filter 섹
     actionName: 'EQP_REPLY',
     actionDataIndex: null,
     dcopItems: [],
+    dcopItemKeys: [],
   }
   state.summaries = [
     {
@@ -733,19 +750,95 @@ test('Model-Flow-AC-5.1: SOCKET model 의 자유 messageName Flow 도 Filter 섹
   await expect(page.getByTestId('flow-card-workflow-filter-summary')).toContainText('STATUS')
 })
 
-// 시나리오 7 ----------------------------------------------------------------
-// SPEC line 159: "Reference 탭 → 'Unassigned DCOPs' 섹션 존재 확인 (workflow_name=NULL fixture)."
-// F6.5 에서 ModelDetailPanel 이 dcop-itemes 노드를 prefetch 하여 ModelFlowSidebar 의
-// `unassignedDcopItems` props 에 workflow_name=NULL row 들을 주입합니다 — 사이드바 안의
-// "Unassigned DCOPs" 섹션이 직접 표시되며 별도 Reference 노드 클릭 불필요.
-test('Model-Flow-AC-7: 사이드바에 Unassigned DCOPs 섹션이 표시된다', async ({ page }) => {
+// 시나리오 F1 ---------------------------------------------------------------
+// dcop-flow-binding v4 AC F1: ModelFlowSidebar 의 Add Flow 버튼이 80 x 28 px 이하 (사용자
+// 요구 "너무 커" 정정).
+test('Model-Flow-AC-F1: Add Flow 버튼 bounding-box 가 80x28 이하다', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
   await openEditModelTab(page)
 
-  // 사이드바 헤더 — extractUnassignedDcopItems 가 workflow_name=null row 만 추출.
-  await expect(page.getByText('Unassigned DCOPs')).toBeVisible()
-  // workflow_name=NULL fixture row 의 dcopItemName ('ORPHAN_DCOP') 이 항목으로 노출.
-  // 사이드바는 dcopItemName 만 노출하므로 정확한 텍스트 매칭으로 검증.
-  await expect(page.getByText('ORPHAN_DCOP', { exact: true })).toBeVisible()
+  const addFlowButton = page.locator('[data-testid="add-flow-button"]')
+  await expect(addFlowButton).toBeVisible()
+  const box = await addFlowButton.boundingBox()
+  if (box === null) {
+    throw new Error('add-flow-button bounding box 를 측정할 수 없습니다.')
+  }
+  expect(box.width).toBeLessThanOrEqual(80)
+  expect(box.height).toBeLessThanOrEqual(28)
+})
+
+// 시나리오 F2 ---------------------------------------------------------------
+// dcop-flow-binding v4 AC F2: Flow 카드의 "+ DCOP 추가" 클릭 → DcopItemPickerModal open →
+// 좌측 1 체크 → → → 우측 1 행 → Save → PUT body 에 dcopItemKeys: [301] 포함 → 모달 닫힘.
+test('Model-Flow-AC-F2: DcopItemPickerModal N:M binding 라운드트립', async ({ page }) => {
+  const state = createDefaultMockState()
+  // dcop:302 (ORPHAN_DCOP) 을 매핑 시도. Reference pool 에 들어 있고 현재 Flow #201 에는
+  // 아직 binding 되지 않은 상태 — picker 좌측에서 체크 가능.
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
+
+  // Collect 섹션의 "DCOP 추가" 클릭 → picker open.
+  await page.getByRole('button', { name: /DCOP 추가/ }).click()
+  const pickerDialog = page.getByRole('dialog')
+  await expect(pickerDialog).toBeVisible()
+  await expect(pickerDialog.getByText('DCOP Item 선택')).toBeVisible()
+
+  // 좌측에서 ORPHAN_DCOP 체크 (LOT_START_COUNTER 는 이미 매핑됨 — disabled).
+  await pickerDialog.getByLabel('ORPHAN_DCOP 선택').check()
+
+  // → 클릭 — 우측에 누적.
+  await pickerDialog.locator('[data-testid="dcop-picker-move-button"]').click()
+  // 우측 영역에 ORPHAN_DCOP 행 표시.
+  await expect(pickerDialog.locator('[data-testid="dcop-picker-right"]').getByText('ORPHAN_DCOP')).toBeVisible()
+
+  // Save 클릭 — PUT 발사.
+  await pickerDialog.locator('[data-testid="dcop-picker-save-button"]').click()
+
+  // PUT body 에 dcopItemKeys 가 포함되고 기존 301 + 새 302 가 모두 들어 있어야 함.
+  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
+  const lastCall = state.updateFlowCalls[state.updateFlowCalls.length - 1]
+  expect(lastCall.flowId).toBe(201)
+  const body = lastCall.body as Record<string, unknown>
+  expect(Array.isArray(body.dcopItemKeys)).toBe(true)
+  const sentKeys = (body.dcopItemKeys as number[]).map((key) => Number(key)).sort((a, b) => a - b)
+  expect(sentKeys).toEqual([301, 302])
+
+  // 모달 닫힘.
+  await expect(pickerDialog).toBeHidden()
+})
+
+// 시나리오 F5 ---------------------------------------------------------------
+// dcop-flow-binding v4 AC F5: Reference > Dcop Itemes 노드 평면 테이블에 Workflow Name 컬럼 부재.
+test('Model-Flow-AC-F5: dcop-itemes 노드 테이블에 Workflow Name 컬럼이 없다', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: 'Dcop Itemes' }).click()
+  await expect(page.getByRole('heading', { name: 'Dcop Itemes' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Workflow Name' })).toHaveCount(0)
+})
+
+// 시나리오 F8 ---------------------------------------------------------------
+// dcop-flow-binding v4 AC F8: socket-message / mes-message / secs-message 3 노드 평면
+// 테이블에 Data Index / Data Indexes 컬럼 헤더 0 건 (Phase C 의 BE 컬럼 제거 반영).
+test('Model-Flow-AC-F8: 3 message 노드 평면 테이블에 Data Index 컬럼이 없다', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  // SECS Message
+  await page.getByRole('button', { name: 'SECS Message' }).click()
+  await expect(page.getByRole('heading', { name: 'SECS Message' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /data index(es)?/i })).toHaveCount(0)
+
+  // MES Message
+  await page.getByRole('button', { name: 'MES Message' }).click()
+  await expect(page.getByRole('heading', { name: 'MES Message' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /data index(es)?/i })).toHaveCount(0)
 })
