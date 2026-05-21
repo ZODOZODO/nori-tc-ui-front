@@ -83,6 +83,10 @@ export const serializeFlowDraft = (draft: FlowDraft): ModelFlowUpdateRequest => 
       actionDataIndexValue !== null && actionDataIndexValue.length > 0
         ? actionDataIndexValue
         : null,
+    // FlowCard 의 저장은 Identity / Trigger / Filter / Action 4 섹션만 갱신 —
+    // Collect 의 dcop_item binding 은 DcopItemPickerModal 이 별 PUT 으로 송신하므로
+    // null 로 두어 BE 에서 Collect 미갱신으로 해석되도록 한다.
+    dcopItemKeys: null,
   }
 }
 
@@ -193,5 +197,8 @@ export const draftToFlow = (draft: FlowDraft): ModelFlow => {
         ? actionDataIndexValue
         : null,
     dcopItems: [...draft.dcopItems],
+    dcopItemKeys: draft.dcopItems
+      .map((item) => item.dcopItemKey)
+      .filter((key): key is number => key !== null),
   }
 }

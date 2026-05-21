@@ -360,12 +360,16 @@ export type ModelDcopCollectionRule = 'FIRST' | 'LAST' | 'AVERAGE' | 'MIN' | 'MA
  *
  * Backend {@code UiModelDcopItem} 도메인 record 와 1:1 매핑되며,
  * Flow 편집 화면에서는 readonly 로만 사용 (편집은 dcop-itemes 노드 모달에서 별도 진행).
+ *
+ * dcop-flow-binding v4 에서 `workflowName` 컬럼이 BE 응답에서 제거되어 dcop_item 본체는
+ * model_version 단위 pool 의 원소로만 유지된다. Flow 와의 binding 은 join table
+ * `tc_model_message_flow_dcop_item` 으로 분리 — picker 모달이 dcop_item_key 배열 단위
+ * 로 N:M 매핑을 관리한다.
  */
 export interface ModelDcopItem {
   dcopItemKey: number | null
   modelVersionKey: number
   dcopItemName: string
-  workflowName: string
   eventId: string | null
   variableId: string
   collectionRule: ModelDcopCollectionRule
@@ -392,7 +396,9 @@ export interface ModelFlowSummary {
  * - Identity: workflowName, messageName
  * - Trigger: eventId, transactionId, workflowFilter (Socket 모델은 모두 null)
  * - Action: actionName, actionDataIndex (raw JSON string 또는 null)
- * - Collect: dcopItems (workflowName 매칭된 행만)
+ * - Collect: dcopItems (Flow 에 binding 된 dcop_item 본체) + dcopItemKeys (PUT round-trip
+ *   용 key 배열). v4 에서 BE 가 두 표현을 동시 노출 — `dcopItemKeys` 는 picker 모달이
+ *   그대로 다음 PUT 에 송신.
  */
 export interface ModelFlow {
   flowId: number
@@ -404,6 +410,7 @@ export interface ModelFlow {
   actionName: string
   actionDataIndex: string | null
   dcopItems: ModelDcopItem[]
+  dcopItemKeys: number[]
 }
 
 /**
@@ -425,6 +432,9 @@ export interface ModelFlowCreateRequest {
 /**
  * PUT /api/model/{modelVersionKey}/flows/{flowId} 의 요청 바디입니다.
  * 4 섹션을 한 번에 전송하며, Trigger 3 필드와 actionDataIndex 는 nullable 입니다.
+ *
+ * `dcopItemKeys` 는 Collect 섹션의 N:M binding 갱신 — null = Collect 미갱신, 빈 배열 =
+ * 기존 binding 전부 정리. DcopItemPickerModal save 시에만 값 (PK 배열) 으로 채움.
  */
 export interface ModelFlowUpdateRequest {
   workflowName: string
@@ -434,6 +444,7 @@ export interface ModelFlowUpdateRequest {
   workflowFilter: string | null
   actionName: string
   actionDataIndex: string | null
+  dcopItemKeys: number[] | null
 }
 
 /**
