@@ -240,6 +240,16 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const detailNodes = resolveDetailNodes(activeModel)
   const normalizedDetailNode = detailNode ?? detailNodes[0] ?? null
   const normalizedDetailColumns = detailColumns.length > 0 ? detailColumns : ['Value']
+  // SPEC line 122 의 "변경 최소화" 와 충돌하지만 사용자 결정 (F8 smoke fix #5):
+  // socket-message / mes-message 의 `Data Indexes` 컬럼은 평면 UI 에서 hide.
+  // backend 응답 (`ModelDetailResponseSupport.SECS_MESSAGE_COLUMNS` 등) 무수정 — render 만 skip.
+  // row.values 의 index 매핑은 그대로 유지하므로 onChangeDetailValue / columnIndex 라우팅은 영향 없음.
+  const isColumnHiddenForCurrentNode = (columnName: string | undefined): boolean => {
+    if (normalizedDetailNode !== 'socket-message' && normalizedDetailNode !== 'mes-message') {
+      return false
+    }
+    return (columnName ?? '').trim().toLowerCase() === 'data indexes'
+  }
   const isMdfNode = normalizedDetailNode === 'mdf'
   const isWorkflowNode = normalizedDetailNode === 'workflow'
   const isDcopItemsNode = normalizedDetailNode === 'dcop-itemes'
@@ -390,6 +400,13 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       MODEL_DETAIL_TEXT_FIELD_MIN_WIDTH_CH,
     )}ch`
   })
+
+  // F8 fix #5: 시각적으로 노출할 컬럼만 따로 추출. `Data Indexes` (socket/mes-message) 는 hide.
+  // row.values 의 raw index 매핑은 유지하므로 (visibleIndex, rawIndex) 쌍을 보존합니다.
+  const visibleColumns = normalizedDetailColumns
+    .map((columnName, columnIndex) => ({ columnName, columnIndex }))
+    .filter(({ columnName }) => !isColumnHiddenForCurrentNode(columnName))
+  const visibleColumnCount = visibleColumns.length
 
   const saveDisabled =
     isDetailLoading ||
@@ -810,12 +827,15 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               selectedFlowId={selectedFlowId}
               onSelectFlow={handleSelectFlow}
               onAddFlow={handleAddFlow}
+              isEditable={canEditTableRows}
             />
 
             <section className="rounded-lg border border-[#DDE8E1] bg-white p-2">
               <p className="px-1 pb-2 text-xs font-semibold text-[#243129]">Reference</p>
               <div className="flex flex-col gap-0.5">
-                {detailNodes.map((node) => (
+                {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
+                    MesMessage / Parameter / Unassigned DCOPs — workflow 는 Message Flows 가 대체. */}
+                {detailNodes.filter((node) => node !== 'workflow').map((node) => (
                   <button
                     key={node}
                     type="button"
@@ -854,6 +874,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 onEditWorkflowFilter={handleFlowEditWorkflowFilter}
                 onEditActionDataIndex={handleFlowEditActionDataIndex}
                 onAddDcopItem={handleFlowAddDcopItem}
+                onCancelDraft={clearDraftFlow}
               />
             ) : selectedFlowId !== null ? (
               modelFlowDetailQuery.isLoading ? (
@@ -874,6 +895,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   onEditWorkflowFilter={handleFlowEditWorkflowFilter}
                   onEditActionDataIndex={handleFlowEditActionDataIndex}
                   onAddDcopItem={handleFlowAddDcopItem}
+                  onCancelDraft={null}
                 />
               ) : (
                 <p className="text-sm text-[#647169]">선택된 Flow 가 없습니다.</p>
@@ -942,7 +964,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   <Table className={MODEL_DETAIL_TABLE_CLASS}>
                     <colgroup>
-                      {normalizedDetailColumns.map((columnName, columnIndex) => {
+                      {visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => {
                         const isModalEditableColumn = isWorkflowModalEditableColumn(
                           normalizedDetailNode,
                           columnName,
@@ -951,7 +973,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
                         return (
                           <col
-                            key={columnName}
+                            key={`${columnName}-${visibleIndex}`}
                             style={{
                               width: columnWidth,
                               minWidth: columnWidth,
@@ -964,12 +986,12 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     </colgroup>
                     <TableHeader>
                         <TableRow className="bg-[#F6F9F7]">
-                        {normalizedDetailColumns.map((columnName, columnIndex) => (
+                        {visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => (
                           <TableHead
-                            key={columnName}
+                            key={`${columnName}-${visibleIndex}`}
                             className={cn(
                               'whitespace-nowrap',
-                              columnIndex === 0
+                              visibleIndex === 0
                                 ? 'sticky left-0 z-30 bg-[#F6F9F7] shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
                                 : null,
                             )}
@@ -979,7 +1001,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                               maxWidth: isWorkflowModalEditableColumn(normalizedDetailNode, columnName)
                                 ? detailColumnWidths[columnIndex]
                                 : undefined,
-                              ...(columnIndex === 0
+                              ...(visibleIndex === 0
                                 ? {
                                     left: 0,
                                     position: 'sticky',
@@ -999,7 +1021,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       {isDetailLoading ? (
                         Array.from({ length: 8 }).map((_, rowIndex) => (
                           <TableRow key={`model-detail-skeleton-${rowIndex}`} data-testid="model-detail-skeleton">
-                            {Array.from({ length: normalizedDetailColumns.length + (canEditTableRows ? 1 : 0) }).map((_, cellIndex) => (
+                            {Array.from({ length: visibleColumnCount + (canEditTableRows ? 1 : 0) }).map((_, cellIndex) => (
                               <TableCell key={cellIndex}>
                                 <Skeleton className="h-4 w-full" />
                               </TableCell>
@@ -1009,7 +1031,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       ) : detailErrorMessage ? (
                         <TableRow>
                           <TableCell
-                            colSpan={normalizedDetailColumns.length + (canEditTableRows ? 1 : 0)}
+                            colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
                             className="py-10 text-center text-sm text-[#C5534B]"
                           >
                             {detailErrorMessage}
@@ -1018,7 +1040,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       ) : detailRows.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={normalizedDetailColumns.length + (canEditTableRows ? 1 : 0)}
+                            colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
                             className="py-10 text-center text-sm text-[#647169]"
                           >
                             {canEditTableRows
@@ -1040,7 +1062,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                           {showUnassignedHeader ? (
                             <TableRow key={`unassigned-divider-${row.id}`} className="bg-[#F1F5F2]">
                               <TableCell
-                                colSpan={normalizedDetailColumns.length + (canEditTableRows ? 1 : 0)}
+                                colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
                                 className="py-1.5 text-xs font-semibold text-[#6A7971]"
                               >
                                 ── Unassigned ──
@@ -1048,7 +1070,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                             </TableRow>
                           ) : null}
                           <TableRow key={row.id}>
-                            {normalizedDetailColumns.map((columnName, columnIndex) => {
+                            {visibleColumns.map(({ columnName, columnIndex }) => {
                               const rawValue = row.values[columnIndex] ?? ''
                               const isModalEditable = isWorkflowModalEditableColumn(
                                 normalizedDetailNode,

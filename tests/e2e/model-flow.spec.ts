@@ -481,9 +481,11 @@ test('Model-Flow-AC-1: /model 진입 후 좌측 사이드바에 Flow 트리가 �
   await setupMocks(page, state)
   await openEditModelTab(page)
 
-  // Message Flows 헤더 + workflowName 그룹 + messageName 행.
+  // Message Flows 헤더 + workflowName 그룹.
   await expect(page.getByText('Message Flows')).toBeVisible()
   await expect(page.getByRole('button', { name: /handleLotStart/ })).toBeVisible()
+  // F8 fix #1: 트리 default 닫힘으로 변경 — workflowName 그룹 클릭 시 펼침.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await expect(page.getByRole('button', { name: 'S6F11' })).toBeVisible()
 })
 
@@ -495,6 +497,8 @@ test('Model-Flow-AC-2: Flow 카드 클릭 시 4 섹션이 모두 펼친 상태�
   await setupMocks(page, state)
   await openEditModelTab(page)
 
+  // F8 fix #1: workflowName 그룹 default 닫힘 → 펼친 후 messageName 행 클릭.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
 
   // FlowCard 의 4 섹션 헤딩 — 1차 릴리즈에서는 모두 default 펼침 상태.
@@ -535,6 +539,8 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
   await setupMocks(page, state)
   await openEditModelTab(page)
 
+  // F8 fix #1: workflowName 그룹 default 닫힘 → 펼친 후 messageName 행 클릭.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
 
@@ -574,7 +580,8 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
   const reloadedEditRow = page.getByRole('row', { name: /FLOW_DEMO_MODEL_admin EDIT/i })
   await reloadedEditRow.dblclick()
   await expect(page.getByText('Message Flows')).toBeVisible()
-  // workflowName 그룹은 펼친 상태가 default — `S6F13` 행이 자동으로 가시.
+  // F8 fix #1: 트리 default 닫힘 — workflowName 그룹 클릭 후 `S6F13` 행 확인.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await expect(page.getByRole('button', { name: 'S6F13' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'S6F11', exact: true })).toHaveCount(0)
 })
@@ -587,6 +594,8 @@ test('Model-Flow-AC-5: Trigger [편집...] 클릭 시 Workflow Filter 모달이 
   await setupMocks(page, state)
   await openEditModelTab(page)
 
+  // F8 fix #1: workflowName 그룹 default 닫힘 → 펼친 후 messageName 행 클릭.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Trigger' })).toBeVisible()
 
@@ -614,6 +623,8 @@ test('Model-Flow-AC-6: Action [편집...] 클릭 시 Action Data Index 모달이
   await setupMocks(page, state)
   await openEditModelTab(page)
 
+  // F8 fix #1: workflowName 그룹 default 닫힘 → 펼친 후 messageName 행 클릭.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Action' })).toBeVisible()
 

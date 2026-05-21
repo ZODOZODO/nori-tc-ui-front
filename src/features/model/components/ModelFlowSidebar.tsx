@@ -14,6 +14,11 @@ interface ModelFlowSidebarProps {
   selectedFlowId: number | null
   onSelectFlow: (flowId: number) => void
   onAddFlow: () => void
+  /**
+   * 모델 편집 가능 여부 (= checkout 상태). false 면 `Add Flow` 버튼 미렌더.
+   * 형제 패턴: `ModelDetailPanel` 의 `canEditTableRows` 가드 (line 929).
+   */
+  isEditable: boolean
 }
 
 interface WorkflowGroupSectionProps {
@@ -25,8 +30,9 @@ interface WorkflowGroupSectionProps {
 
 /**
  * workflowName 한 그룹과 그 하위 messageName 행을 렌더링합니다.
- * 펼침 상태는 컴포넌트 로컬 useState — 1차 릴리즈에선 사용자 토글 가능하지만
- * 저장하지 않음 (페이지 재진입 시 기본 펼침).
+ * 펼침 상태는 컴포넌트 로컬 useState — 사용자 토글 가능하지만 저장하지 않음
+ * (페이지 재진입 시 기본 닫힘). 사용자가 명시적으로 클릭해서 펼침 시점에만 하위
+ * messageName 행이 노출됩니다.
  */
 function WorkflowGroupSection({
   workflowName,
@@ -34,7 +40,7 @@ function WorkflowGroupSection({
   selectedFlowId,
   onSelectFlow,
 }: WorkflowGroupSectionProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <div className="space-y-1">
@@ -103,6 +109,7 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
   selectedFlowId,
   onSelectFlow,
   onAddFlow,
+  isEditable,
 }: ModelFlowSidebarProps) {
   const groups = useMemo(() => groupFlowsByWorkflowName(summaries), [summaries])
   const unassigned = useMemo(
@@ -114,10 +121,12 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
     <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
       <header className="mb-2 flex items-center justify-between px-1">
         <span className="text-xs font-semibold text-[#243129]">Message Flows</span>
-        <Button type="button" variant="outline" size="sm" onClick={onAddFlow}>
-          <Plus className="size-3.5" aria-hidden="true" />
-          Add Flow
-        </Button>
+        {isEditable ? (
+          <Button type="button" variant="outline" size="sm" onClick={onAddFlow}>
+            <Plus className="size-3.5" aria-hidden="true" />
+            Add Flow
+          </Button>
+        ) : null}
       </header>
 
       <div className="space-y-1.5">

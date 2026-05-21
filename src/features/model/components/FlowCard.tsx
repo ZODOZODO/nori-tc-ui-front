@@ -83,6 +83,14 @@ interface FlowCardProps {
   /** Action 의 [편집...] 클릭 핸들러. 시그니처는 onEditWorkflowFilter 와 동일. */
   onEditActionDataIndex: (currentRaw: string, onChange: (nextRaw: string) => void) => void
   onAddDcopItem: () => void
+  /**
+   * draft 카드 (`flow.flowId === DRAFT_FLOW_ID_SENTINEL`) 의 Cancel 버튼 핸들러.
+   * 호출 시 부모는 `useModelUiStore.clearDraftFlow()` 로 store.draftFlow 를 비워
+   * FlowCard 가 자연스럽게 unmount 되도록 합니다.
+   *
+   * 저장된 Flow 의 카드 (sentinel 아님) 에는 Cancel 버튼이 미렌더 — `null` 가능.
+   */
+  onCancelDraft: (() => void) | null
 }
 
 /**
@@ -112,11 +120,13 @@ export function FlowCard({
   onEditWorkflowFilter,
   onEditActionDataIndex,
   onAddDcopItem,
+  onCancelDraft,
 }: FlowCardProps) {
   const [draft, setDraft] = useState<FlowDraft>(() => buildFlowDraft(flow))
 
   const isSaving = saveStatus === 'saving'
-  const renderTrigger = shouldRenderTriggerSection(protocol)
+  const renderTrigger = shouldRenderTriggerSection(protocol, draft.messageName)
+  const isDraftCard = flow.flowId === DRAFT_FLOW_ID_SENTINEL
 
   const workflowFilterSummary = useMemo(
     () => summarizeFlowWorkflowFilter(draft.workflowFilter),
@@ -408,6 +418,16 @@ export function FlowCard({
       </FlowCardSection>
 
       <footer className="flex items-center justify-end gap-2 border-t border-[#EEF3F0] pt-4">
+        {isDraftCard && onCancelDraft !== null ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancelDraft}
+            disabled={isSaving}
+          >
+            취소
+          </Button>
+        ) : null}
         <Button
           type="button"
           onClick={handleSave}

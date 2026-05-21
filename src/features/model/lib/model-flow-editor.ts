@@ -153,9 +153,27 @@ export const summarizeFlowActionDataIndex = (
  *
  * SPEC line 80-83: Socket 모델은 Trigger 섹션 자체 미렌더. F1 dev-report 의
  * 권장에 따라 model 의 commInterface 값으로 명시 분기 (flow 의 3 필드 null 검사 X).
+ *
+ * F8 (smoke fix #2 root cause): protocol prop 만으로는 부족함을 발견 —
+ * messageName 이 SECS 패턴 (`S\d+F\d+`) 이면 protocol 이 'SOCKET' 으로 잘못
+ * derive 된 경우에도 Trigger 섹션을 렌더해 fallback. SOCKET 모델에는 SECS 메시지명이
+ * 존재하지 않으므로 SPEC line 80-83 의 의도 (SOCKET = Trigger 없음) 와 충돌 없음.
+ *
+ * @param protocol 모델 통신 인터페이스
+ * @param messageName Flow 의 message_name (식별 보조)
  */
-export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean =>
-  protocol === 'SECS'
+export const shouldRenderTriggerSection = (
+  protocol: 'SECS' | 'SOCKET',
+  messageName: string,
+): boolean => {
+  if (protocol === 'SECS') {
+    return true
+  }
+  // protocol='SOCKET' 이지만 messageName 이 SECS 패턴이면 fallback 렌더 (data integrity 방어).
+  return SECS_MESSAGE_NAME_PATTERN.test(messageName.trim())
+}
+
+const SECS_MESSAGE_NAME_PATTERN = /^S\d+F\d+$/i
 
 /**
  * Draft 상태의 FlowDraft 를 FlowCard 가 요구하는 ModelFlow shape 으로 변환합니다.
