@@ -75,9 +75,9 @@ interface FlowCardProps {
   saveStatus: 'idle' | 'saving' | 'error'
   errorMessage: string | null
   /**
-   * Trigger 의 [편집...] 클릭 핸들러. 현재 draft 의 raw JSON string 과 모달 결과를
-   * 다시 draft 에 반영할 onChange 콜백을 부모에 전달합니다 — 부모는 추출된 모달의
-   * open / value / onSave 만 wiring 하면 됩니다.
+   * Filter 의 [편집...] 클릭 핸들러 (F8.1: Trigger 와 분리된 Filter 섹션). 현재
+   * draft 의 raw JSON string 과 모달 결과를 다시 draft 에 반영할 onChange 콜백을
+   * 부모에 전달합니다 — 부모는 추출된 모달의 open / value / onSave 만 wiring 하면 됩니다.
    */
   onEditWorkflowFilter: (currentRaw: string, onChange: (nextRaw: string) => void) => void
   /** Action 의 [편집...] 클릭 핸들러. 시그니처는 onEditWorkflowFilter 와 동일. */
@@ -94,11 +94,13 @@ interface FlowCardProps {
 }
 
 /**
- * `(workflow_name, message_name)` 1 쌍을 4 섹션 (Identity / Trigger / Action / Collect)
- * 으로 default 펼친 상태로 노출하는 Flow 카드입니다.
+ * `(workflow_name, message_name)` 1 쌍을 5 섹션 (Identity / Trigger / Filter /
+ * Action / Collect) 으로 default 펼친 상태로 노출하는 Flow 카드입니다.
  *
  * - Identity 의 workflowName 은 read-only (Plan 위험표 #3 — DCOP cascade 미정).
- * - SOCKET protocol 인 경우 Trigger 섹션 자체 미렌더 (SPEC line 80-83).
+ * - SOCKET protocol 인 경우 Trigger 섹션 (EventId + TransactionId) 자체 미렌더
+ *   (SPEC line 80-83). Filter 섹션은 SOCKET 도 표시 — workflow_filter 는 protocol
+ *   무관 모든 Flow 에서 편집 가능 (F8.1 root cause fix).
  * - workflowFilter / actionDataIndex 인라인 트리 편집 도입 안 함 — 부모가 모달
  *   open 핸들러 (`onEditWorkflowFilter` / `onEditActionDataIndex`) 를 주입.
  * - Collect 의 DCOP 행 추가는 기존 `PUT /details/dcop-itemes` 노드로 위임 (Plan D4),
@@ -125,7 +127,7 @@ export function FlowCard({
   const [draft, setDraft] = useState<FlowDraft>(() => buildFlowDraft(flow))
 
   const isSaving = saveStatus === 'saving'
-  const renderTrigger = shouldRenderTriggerSection(protocol, draft.messageName)
+  const renderTrigger = shouldRenderTriggerSection(protocol)
   const isDraftCard = flow.flowId === DRAFT_FLOW_ID_SENTINEL
 
   const workflowFilterSummary = useMemo(
@@ -277,34 +279,39 @@ export function FlowCard({
               </p>
             </div>
           </div>
-
-          <div className="mt-4 space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-[#1E3D33]">Workflow Filter</p>
-                <p className="text-[11px] text-[#738078]">
-                  data / event / context 의 조건 트리를 편집합니다.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleClickEditWorkflowFilter}
-              >
-                <Pencil className="size-3.5" aria-hidden="true" />
-                편집...
-              </Button>
-            </div>
-            <p
-              className="rounded-lg border border-[#DCE5E0] bg-white px-3 py-2 text-xs text-[#22322B]"
-              data-testid="flow-card-workflow-filter-summary"
-            >
-              {workflowFilterSummary}
-            </p>
-          </div>
         </FlowCardSection>
       ) : null}
+
+      <FlowCardSection
+        title="Filter"
+        description="workflow_filter — data / event / context 조건 트리. 모든 protocol 에서 편집 가능."
+      >
+        <div className="space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-[#1E3D33]">Workflow Filter</p>
+              <p className="text-[11px] text-[#738078]">
+                data / event / context 의 조건 트리를 편집합니다.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClickEditWorkflowFilter}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              편집...
+            </Button>
+          </div>
+          <p
+            className="rounded-lg border border-[#DCE5E0] bg-white px-3 py-2 text-xs text-[#22322B]"
+            data-testid="flow-card-workflow-filter-summary"
+          >
+            {workflowFilterSummary}
+          </p>
+        </div>
+      </FlowCardSection>
 
       <FlowCardSection title="Action" description="이 Flow 가 실행하는 동작입니다.">
         <div className="grid gap-4 md:grid-cols-2">
@@ -451,7 +458,7 @@ interface FlowCardSectionProps {
 }
 
 /**
- * Flow 카드 내부 4 섹션의 공통 헤더 + 본문 래퍼입니다.
+ * Flow 카드 내부 5 섹션의 공통 헤더 + 본문 래퍼입니다 (F8.1: Filter 섹션 분리).
  *
  * 1차 릴리즈에서는 collapse 토글 없음 — 모두 default 펼친 상태로 노출 (SPEC line 122).
  */

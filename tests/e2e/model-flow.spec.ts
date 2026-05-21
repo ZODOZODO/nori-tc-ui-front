@@ -8,10 +8,11 @@ import { expect, test, type Page, type Route } from '@playwright/test'
  *
  * 시나리오 (SPEC line 152-159):
  *   1. /model 진입 → 좌측 사이드바의 Message Flows 트리 렌더.
- *   2. Flow 카드 클릭 → 4 섹션 (Identity / Trigger / Action / Collect) 모두 펼침 상태.
- *   3. [+ Add Flow] → 빈 FlowCard 추가, 4 섹션 빈 상태.
+ *   2. Flow 카드 클릭 → 5 섹션 (Identity / Trigger / Filter / Action / Collect) 모두 펼침 상태.
+ *      (F8.1 root cause fix — Filter 섹션 분리: Trigger 는 SECS only / Filter 는 모든 protocol.)
+ *   3. [+ Add Flow] → 빈 FlowCard 추가, 5 섹션 빈 상태.
  *   4. Identity dropdown 변경 → save → reload 후 변경 유지.
- *   5. Trigger [편집...] → Workflow Filter 모달 열림.
+ *   5. Filter [편집...] → Workflow Filter 모달 열림.
  *   6. Action [편집...] → Action Data Index 모달 열림.
  *   7. Reference > Dcop Itemes 노드 → workflow_name=NULL fixture row 위에
  *      "── Unassigned ──" group divider 표시 (1차 릴리즈에서는 ModelDetailPanel 의
@@ -490,7 +491,7 @@ test('Model-Flow-AC-1: /model 진입 후 좌측 사이드바에 Flow 트리가 �
 })
 
 // 시나리오 2 ----------------------------------------------------------------
-test('Model-Flow-AC-2: Flow 카드 클릭 시 4 섹션이 모두 펼친 상태로 표시된다', async ({
+test('Model-Flow-AC-2: Flow 카드 클릭 시 5 섹션이 모두 펼친 상태로 표시된다', async ({
   page,
 }) => {
   const state = createDefaultMockState()
@@ -501,9 +502,10 @@ test('Model-Flow-AC-2: Flow 카드 클릭 시 4 섹션이 모두 펼친 상태�
   await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
 
-  // FlowCard 의 4 섹션 헤딩 — 1차 릴리즈에서는 모두 default 펼침 상태.
+  // F8.1 root cause fix: FlowCard 의 5 섹션 헤딩 — Filter 섹션이 Trigger 와 분리.
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Trigger' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Filter' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Action' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
 })
@@ -519,9 +521,10 @@ test('Model-Flow-AC-3: [+ Add Flow] 클릭 시 빈 FlowCard 가 추가된다', a
   // 빈 draft card → workflow / message 모두 미지정 헤더.
   await expect(page.getByRole('heading', { name: /\(workflow 미지정\)/ })).toBeVisible()
   await expect(page.getByText('Flow ID #신규')).toBeVisible()
-  // 4 섹션 모두 펼쳐져 있다.
+  // F8.1 root cause fix: 5 섹션 모두 펼쳐져 있다 — Filter 가 Trigger 와 분리.
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Trigger' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Filter' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Action' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
   // Collect 빈 상태 안내 텍스트.
@@ -587,7 +590,9 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
 })
 
 // 시나리오 5 ----------------------------------------------------------------
-test('Model-Flow-AC-5: Trigger [편집...] 클릭 시 Workflow Filter 모달이 열린다', async ({
+// F8.1 root cause fix: Trigger 안 [편집...] 이 아니라 분리된 Filter 섹션의 [편집...] 검증.
+// workflow_filter 는 protocol 무관 모든 Flow 에서 편집 필요.
+test('Model-Flow-AC-5: Filter [편집...] 클릭 시 Workflow Filter 모달이 열린다', async ({
   page,
 }) => {
   const state = createDefaultMockState()
@@ -597,16 +602,14 @@ test('Model-Flow-AC-5: Trigger [편집...] 클릭 시 Workflow Filter 모달이 
   // F8 fix #1: workflowName 그룹 default 닫힘 → 펼친 후 messageName 행 클릭.
   await page.getByRole('button', { name: /handleLotStart/ }).click()
   await page.getByRole('button', { name: 'S6F11' }).click()
-  await expect(page.getByRole('heading', { name: 'Trigger' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Filter' })).toBeVisible()
 
-  // Trigger 섹션의 "편집..." 버튼 (Workflow Filter 옆).
-  // FlowCard 가 통째로 'Workflow Filter' 텍스트를 포함하므로 outer section 으로 좁히면
-  // Action 의 [편집] 버튼이 함께 잡힙니다. summary testid 의 직전 형제 button 으로 좁혀
-  // Trigger inner 카드 안의 [편집] 버튼만 선택합니다.
-  const triggerCard = page.locator(
+  // F8.1: Filter 섹션 안 "편집..." 버튼 (Workflow Filter summary 옆).
+  // summary testid 의 직전 형제 button 으로 좁혀 Filter inner 카드 안의 [편집] 버튼만 선택.
+  const filterCard = page.locator(
     'div:has(> [data-testid="flow-card-workflow-filter-summary"])',
   )
-  await triggerCard.getByRole('button', { name: /편집/ }).click()
+  await filterCard.getByRole('button', { name: /편집/ }).click()
 
   // 모달 DialogTitle "Workflow Filter".
   await expect(page.getByRole('dialog')).toBeVisible()
@@ -637,6 +640,97 @@ test('Model-Flow-AC-6: Action [편집...] 클릭 시 Action Data Index 모달이
   await expect(
     page.getByRole('dialog').getByText('Action Data Index', { exact: true }),
   ).toBeVisible()
+})
+
+// 시나리오 5.1 (F8.1) -------------------------------------------------------
+// 사용자 환경 (Socket model + 자유 messageName, 예: EQP_CONDITION_CHECK / 1000_TOOLCHECK)
+// 의 Flow 에서도 Filter 섹션이 표시되는지 검증. Trigger 섹션은 SOCKET 이므로 미렌더.
+test('Model-Flow-AC-5.1: SOCKET model 의 자유 messageName Flow 도 Filter 섹션을 표시한다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  // SOCKET 모델 + 자유 messageName Flow 로 fixture 치환 (F8.1 사용자 시나리오).
+  const SOCKET_ROOT = { ...ROOT_MODEL, commInterface: 'SOCKET' as const }
+  const SOCKET_EDIT = { ...EDIT_MODEL, commInterface: 'SOCKET' as const }
+  const socketFlow: FlowDetailFixture = {
+    flowId: 401,
+    workflowName: 'EQP_CONDITION_CHECK',
+    messageName: '1000_TOOLCHECK',
+    eventId: null,
+    transactionId: null,
+    workflowFilter:
+      '{"comparisonType":"EQUALS","leftSide":{"dataKey":"BODY.STATUS"},"rightSide":{"literal":"OK"}}',
+    actionName: 'EQP_REPLY',
+    actionDataIndex: null,
+    dcopItems: [],
+  }
+  state.summaries = [
+    {
+      flowId: socketFlow.flowId,
+      workflowName: socketFlow.workflowName,
+      messageName: socketFlow.messageName,
+      actionName: socketFlow.actionName,
+    },
+  ]
+  state.details = new Map<number, FlowDetailFixture>([[socketFlow.flowId, socketFlow]])
+
+  // setupMocks 의 ROOT_MODEL / EDIT_MODEL 응답을 SOCKET 으로 덮어쓰려면 page.route 를
+  // setupMocks 전에 먼저 등록해야 합니다 (Playwright route 매칭은 *나중에 등록된* 라우트 우선).
+  // 따라서 setupMocks 이후에 특수 라우트로 /api/model* 의 commInterface 만 SOCKET 으로 응답.
+  await setupMocks(page, state)
+  await page.route('**/api/model', async (route, request) => {
+    if (request.method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        createApiResponse({
+          items: [SOCKET_ROOT, SOCKET_EDIT],
+          offset: 0,
+          limit: 500,
+          count: 2,
+        }),
+      ),
+    })
+  })
+  await page.route(`**/api/model/${EDIT_MODEL.modelVersionKey}`, async (route, request) => {
+    if (request.method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createApiResponse(SOCKET_EDIT)),
+    })
+  })
+  await page.route(`**/api/model/${ROOT_MODEL.modelVersionKey}`, async (route, request) => {
+    if (request.method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createApiResponse(SOCKET_ROOT)),
+    })
+  })
+
+  await openEditModelTab(page)
+
+  // workflowName 그룹 펼친 후 자유 messageName 행 클릭.
+  await page.getByRole('button', { name: /EQP_CONDITION_CHECK/ }).click()
+  await page.getByRole('button', { name: '1000_TOOLCHECK' }).click()
+
+  // F8.1 root cause: Filter 섹션은 SOCKET 도 표시.
+  await expect(page.getByRole('heading', { name: 'Filter' })).toBeVisible()
+  // SOCKET 모델은 Trigger 섹션 미렌더 (EventId / TransactionId 영역 없음).
+  await expect(page.getByRole('heading', { name: 'Trigger' })).toHaveCount(0)
+  // Filter summary 가 workflow_filter 의 BODY.STATUS path 를 포함해야 함.
+  await expect(page.getByTestId('flow-card-workflow-filter-summary')).toContainText('STATUS')
 })
 
 // 시나리오 7 ----------------------------------------------------------------

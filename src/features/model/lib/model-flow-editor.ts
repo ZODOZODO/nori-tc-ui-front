@@ -21,9 +21,9 @@ import {
 export const DRAFT_FLOW_ID_SENTINEL = -1
 
 /**
- * FlowCard 의 4 섹션 편집 상태입니다.
+ * FlowCard 의 5 섹션 편집 상태입니다 (F8.1: Filter 가 Trigger 와 분리).
  *
- * - Trigger 의 workflowFilter / Action 의 actionDataIndex 는 JSON string 대신
+ * - Filter 의 workflowFilter / Action 의 actionDataIndex 는 JSON string 대신
  *   structured editor draft 로 보관 (기존 model-detail-editor 의 draft 타입 재사용).
  * - dcopItems 는 별도 모달에서만 편집되므로 FlowCard 안에서는 readonly.
  */
@@ -105,10 +105,10 @@ export const createEmptyFlowDraft = (): FlowDraft => ({
 })
 
 /**
- * Trigger 섹션의 workflow_filter summary 텍스트입니다.
+ * Filter 섹션의 workflow_filter summary 텍스트입니다 (F8.1: Trigger 와 분리된 Filter).
  *
  * draft 의 structured root group 을 1 줄 요약. raw 모드면 첫 줄을 그대로 노출.
- * draft 가 null 이면 "필터 없음" — Socket 모델 또는 비어 있는 SECS Flow.
+ * draft 가 null 이면 "필터 없음" — protocol 무관 비어 있는 Flow.
  */
 export const summarizeFlowWorkflowFilter = (
   draft: WorkflowFilterEditorDraft | null,
@@ -149,31 +149,18 @@ export const summarizeFlowActionDataIndex = (
 }
 
 /**
- * FlowCard 가 Trigger 섹션을 렌더할지 결정합니다.
+ * FlowCard 가 Trigger 섹션 (EventId + TransactionId) 을 렌더할지 결정합니다.
  *
- * SPEC line 80-83: Socket 모델은 Trigger 섹션 자체 미렌더. F1 dev-report 의
- * 권장에 따라 model 의 commInterface 값으로 명시 분기 (flow 의 3 필드 null 검사 X).
+ * SPEC line 80-83: Socket 모델은 Trigger 섹션 자체 미렌더 — EventId / TransactionId
+ * 가 SECS 전용이기 때문. workflow_filter 는 protocol 무관 모든 Flow 에서 편집
+ * 가능하므로 Filter 섹션이 따로 분리되어 항상 렌더 (F8.1 root cause fix).
  *
- * F8 (smoke fix #2 root cause): protocol prop 만으로는 부족함을 발견 —
- * messageName 이 SECS 패턴 (`S\d+F\d+`) 이면 protocol 이 'SOCKET' 으로 잘못
- * derive 된 경우에도 Trigger 섹션을 렌더해 fallback. SOCKET 모델에는 SECS 메시지명이
- * 존재하지 않으므로 SPEC line 80-83 의 의도 (SOCKET = Trigger 없음) 와 충돌 없음.
- *
- * @param protocol 모델 통신 인터페이스
- * @param messageName Flow 의 message_name (식별 보조)
+ * F1 dev-report 권장에 따라 model 의 commInterface 값으로 명시 분기
+ * (flow 의 3 필드 null 검사 X).
  */
-export const shouldRenderTriggerSection = (
-  protocol: 'SECS' | 'SOCKET',
-  messageName: string,
-): boolean => {
-  if (protocol === 'SECS') {
-    return true
-  }
-  // protocol='SOCKET' 이지만 messageName 이 SECS 패턴이면 fallback 렌더 (data integrity 방어).
-  return SECS_MESSAGE_NAME_PATTERN.test(messageName.trim())
+export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean => {
+  return protocol === 'SECS'
 }
-
-const SECS_MESSAGE_NAME_PATTERN = /^S\d+F\d+$/i
 
 /**
  * Draft 상태의 FlowDraft 를 FlowCard 가 요구하는 ModelFlow shape 으로 변환합니다.

@@ -77,16 +77,13 @@ const buildSocketFlow = (): ModelFlow => ({
 })
 
 test('shouldRenderTriggerSection: SECS 모델은 Trigger 섹션을 렌더합니다', () => {
-  assert.equal(shouldRenderTriggerSection('SECS', 'S6F11'), true)
+  // F8.1 root cause fix: messageName 인자 제거 — protocol 단독 분기.
+  assert.equal(shouldRenderTriggerSection('SECS'), true)
 })
 
 test('shouldRenderTriggerSection: SOCKET 모델은 Trigger 섹션을 미렌더합니다', () => {
-  assert.equal(shouldRenderTriggerSection('SOCKET', 'PING'), false)
-})
-
-test('shouldRenderTriggerSection: SOCKET 이지만 messageName 이 SECS 패턴이면 fallback 렌더', () => {
-  // F8 fix #2 root cause: protocol 이 잘못 derive 된 경우의 fail-safe.
-  assert.equal(shouldRenderTriggerSection('SOCKET', 'S6F11'), true)
+  // F8.1: SOCKET 은 messageName 무관 항상 미렌더 — workflow_filter 는 Filter 섹션이 별도 노출.
+  assert.equal(shouldRenderTriggerSection('SOCKET'), false)
 })
 
 test('summarizeFlowWorkflowFilter: SECS draft의 structured root는 요약 문자열을 반환합니다', () => {
