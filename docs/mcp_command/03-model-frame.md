@@ -283,7 +283,7 @@ Pencil MCP 작업 요청:
 
 3. 노드-데이터 매핑
    - 각 노드 클릭 시 tc_model_* 테이블 계열 데이터와 매핑
-   - 예: tc_model_param, tc_model_secs_message, tc_model_variables, tc_model_eventid, tc_model_workflow, tc_model_mdf, tc_model_dcop_item
+   - 예: tc_model_param, tc_model_secs_message, tc_model_variables, tc_model_eventid, tc_model_message_flow, tc_model_mdf, tc_model_dcop_item
 
 ### User Profile Modal 동시 표시
 
@@ -387,7 +387,7 @@ Pencil MCP 작업 요청:
      - Socket: Model Parameter, Socket Message, Workflow, MDF, Dcop Itemes
    - Check Out / Check In 버튼 전환
    - Read-only/Editable 힌트 문구 상태 전환
-   - 노드 선택 시 tc_model_* 데이터 소스 매핑 (tc_model_param, tc_model_secs_message, tc_model_variables, tc_model_eventid, tc_model_workflow, tc_model_mdf, tc_model_dcop_item 등)
+   - 노드 선택 시 tc_model_* 데이터 소스 매핑 (tc_model_param, tc_model_secs_message, tc_model_variables, tc_model_eventid, tc_model_message_flow, tc_model_mdf, tc_model_dcop_item 등)
    - 주의: 상세 데이터 전용 API가 없으면 초기에는 화면 상태/임시 데이터로 구성하고, 추후 API 연결을 위한 인터페이스 분리
 
 10. **ModelCheckInModal.tsx**
