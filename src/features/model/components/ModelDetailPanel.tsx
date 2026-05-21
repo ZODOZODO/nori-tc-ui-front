@@ -38,6 +38,7 @@ import { WorkflowFilterEditorModal } from './WorkflowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard } from './FlowCard'
+import { DcopItemPickerModal } from './DcopItemPickerModal'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
 import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
@@ -135,9 +136,6 @@ const isMessageNameColumn = (columnName: string | undefined): boolean =>
 
 const isEventIdColumn = (columnName: string | undefined): boolean =>
   (columnName ?? '').trim().toLowerCase() === 'eventid'
-
-const isDcopWorkflowNameColumn = (columnName: string | undefined): boolean =>
-  (columnName ?? '').trim() === 'Workflow Name'
 
 const isDcopCollectionRuleColumn = (columnName: string | undefined): boolean =>
   (columnName ?? '').trim() === 'Collection Rule'
@@ -240,16 +238,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const detailNodes = resolveDetailNodes(activeModel)
   const normalizedDetailNode = detailNode ?? detailNodes[0] ?? null
   const normalizedDetailColumns = detailColumns.length > 0 ? detailColumns : ['Value']
-  // SPEC line 122 의 "변경 최소화" 와 충돌하지만 사용자 결정 (F8 smoke fix #5):
-  // socket-message / mes-message 의 `Data Indexes` 컬럼은 평면 UI 에서 hide.
-  // backend 응답 (`ModelDetailResponseSupport.SECS_MESSAGE_COLUMNS` 등) 무수정 — render 만 skip.
-  // row.values 의 index 매핑은 그대로 유지하므로 onChangeDetailValue / columnIndex 라우팅은 영향 없음.
-  const isColumnHiddenForCurrentNode = (columnName: string | undefined): boolean => {
-    if (normalizedDetailNode !== 'socket-message' && normalizedDetailNode !== 'mes-message') {
-      return false
-    }
-    return (columnName ?? '').trim().toLowerCase() === 'data indexes'
-  }
   const isMdfNode = normalizedDetailNode === 'mdf'
   const isWorkflowNode = normalizedDetailNode === 'workflow'
   const isDcopItemsNode = normalizedDetailNode === 'dcop-itemes'
@@ -337,18 +325,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     [workflowEventIdQuery.data?.rows],
   )
 
-  // dcop-itemes 편집 시 Workflow Name 정합성을 위해 workflow 데이터를 조회합니다.
-  // (읽기 전용 상태에서는 불필요하므로 edit 모드일 때만 활성화)
-  const dcopWorkflowQuery = useModelNodeDetail(
-    isDcopItemsNode && !isReadOnly ? (activeModel?.modelVersionKey ?? null) : null,
-    'workflow',
-  )
-  // Workflow Name 컬럼은 workflow의 첫 번째 컬럼
-  const dcopWorkflowNameOptions = useMemo(
-    () => dcopWorkflowQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
-    [dcopWorkflowQuery.data?.rows],
-  )
-
   const hintText = !activeModel
     ? '모델을 선택해 주세요.'
     : !isBranchModel
@@ -401,11 +377,12 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     )}ch`
   })
 
-  // F8 fix #5: 시각적으로 노출할 컬럼만 따로 추출. `Data Indexes` (socket/mes-message) 는 hide.
-  // row.values 의 raw index 매핑은 유지하므로 (visibleIndex, rawIndex) 쌍을 보존합니다.
-  const visibleColumns = normalizedDetailColumns
-    .map((columnName, columnIndex) => ({ columnName, columnIndex }))
-    .filter(({ columnName }) => !isColumnHiddenForCurrentNode(columnName))
+  // 모든 노드에서 columns 를 그대로 노출 — 컬럼 hide 로직은 v4 에서 폐기 (BE 응답이
+  // 이미 컬럼 자체를 제거). (visibleIndex, rawIndex) 쌍 구조는 다른 분기 호환을 위해 유지.
+  const visibleColumns = normalizedDetailColumns.map((columnName, columnIndex) => ({
+    columnName,
+    columnIndex,
+  }))
   const visibleColumnCount = visibleColumns.length
 
   const saveDisabled =
@@ -475,21 +452,17 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     handleCloseWorkflowTextEditor()
   }
 
-  // Message Flows 사이드바용 — modelFlowListQuery + Unassigned DCOPs.
+  // Message Flows 사이드바용 — modelFlowListQuery 만 (Unassigned 영역은 v4 에서 폐기).
   const messageFlowSummaries = useMemo<readonly ModelFlowSummary[]>(
     () => modelFlowListQuery.data?.items ?? [],
     [modelFlowListQuery.data?.items],
   )
-  // Unassigned DCOPs 는 dcop-itemes 노드의 워크플로우=NULL 행 — 사이드바 read-only 표시 + FlowCard
-  // messageOptions / mdfTemplateOptions wiring 의 dcop 노드 prefetch 와 같은 query 를 공유합니다.
-  // 활성화 조건: activeModelVersionKey 가 있을 때 — Flow 사이드바는 모델 진입 즉시 표시되므로
-  // dcop-itemes 노드를 매번 prefetch (별 사용자 액션 필요 X). 다른 reference 노드는 클릭 시
-  // fetch 되지만 dcop-itemes 는 사이드바 "Unassigned DCOPs" 섹션이 항상 후보이므로 모델 진입 시 1 회.
+  // DcopItemPickerModal 의 좌측 Reference pool 공급용 — dcop-itemes 노드의 평면 응답을
+  // 그대로 재사용해 별 endpoint 추가 없이 picker 가 모든 dcop_item 후보를 갖도록 한다.
+  // 활성화 조건: activeModelVersionKey 가 있을 때 — 모델 진입 즉시 prefetch.
   const dcopItemesQuery = useModelNodeDetail(activeModelVersionKey, 'dcop-itemes')
-  // dcop-itemes 응답은 columns/values 평면 구조 — workflowName 컬럼 인덱스를 동적으로 찾고
-  // ModelDcopItem 형태로 변환합니다. SPEC line 56 의 "workflow_name IS NULL" 조건은 백엔드가
-  // `nullToEmpty` 처리하므로 빈 문자열을 null 로 되돌려 extractUnassignedDcopItems 의 기준
-  // (workflowName === null) 과 정합을 맞춥니다.
+  // dcop-itemes 응답 (columns/values 평면) 을 picker 가 다루는 ModelDcopItem 으로 변환.
+  // v4 에서 응답의 Workflow Name 컬럼은 제거됐으므로 dcopItemName + row.id 의 PK 만 사용한다.
   const referenceDcopItems = useMemo<readonly ModelDcopItem[]>(() => {
     const data = dcopItemesQuery.data
     if (!data || activeModelVersionKey === null) {
@@ -498,28 +471,22 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     const dcopItemNameIndex = data.columns.findIndex(
       (column) => column.trim() === 'Dcop Item Name',
     )
-    const workflowNameIndex = data.columns.findIndex(
-      (column) => column.trim() === 'Workflow Name',
-    )
-    if (dcopItemNameIndex < 0 || workflowNameIndex < 0) {
+    if (dcopItemNameIndex < 0) {
       return []
     }
+    const variableIdIndex = data.columns.findIndex(
+      (column) => column.trim() === 'VariableId',
+    )
     return data.rows.map((row) => {
-      const rawWorkflowName = (row.values[workflowNameIndex] ?? '').trim()
       // row.id 는 `dcop:{key}` 형식 (ModelDetailResponseSupport.modelRowId). 키가 비어 있으면 null.
       const dcopKeyPart = row.id.startsWith('dcop:') ? row.id.slice('dcop:'.length) : ''
       const parsedKey = Number.parseInt(dcopKeyPart, 10)
-      // FlowCard 사이드바는 dcopItemName / workflowName / dcopItemKey 만 사용 — 나머지 필드는
-      // dcop-itemes 노드 응답이 권위 source 라 평면 UI 가 직접 표시하므로 사이드바 변환에서는
-      // 최소 표시 필드 외 null/'' default 로 채웁니다.
       return {
         dcopItemKey: Number.isFinite(parsedKey) && parsedKey > 0 ? parsedKey : null,
         modelVersionKey: activeModelVersionKey,
         dcopItemName: row.values[dcopItemNameIndex] ?? '',
-        // SPEC line 56 의 NULL workflow_name 의미 보존을 위해 빈 문자열을 null cast.
-        workflowName: (rawWorkflowName === '' ? null : rawWorkflowName) as unknown as string,
         eventId: null,
-        variableId: '',
+        variableId: variableIdIndex >= 0 ? (row.values[variableIdIndex] ?? '') : '',
         collectionRule: 'LAST',
         calculationRule: null,
         orderRule: null,
@@ -565,14 +532,49 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     setFlowEditor(null)
   }
 
+  const flowDetail = modelFlowDetailQuery.data ?? null
+
+  // Plan D4 (dcop-flow-binding v4): "+ DCOP 추가" 클릭 시 dcop-itemes 노드 라우팅 대신
+  // DcopItemPickerModal 을 열어 N:M binding 을 직접 편집합니다. draft 카드 (unsaved Flow) 는
+  // PUT 대상 flowId 가 없으므로 picker 진입 거부 — Identity 먼저 저장 후 picker 사용.
+  const [dcopPickerFlowId, setDcopPickerFlowId] = useState<number | null>(null)
+
   const handleFlowAddDcopItem = () => {
-    // Plan D4: DCOP 추가는 별도 dcop-itemes 노드 평면 UI 로 라우팅.
-    // 1차 릴리즈에선 Flow 선택을 해제하고 Reference > DCOP 노드로 이동.
-    setSelectedFlowId(null)
-    onSelectDetailNode('dcop-itemes')
+    if (selectedFlowId === null) {
+      return
+    }
+    setDcopPickerFlowId(selectedFlowId)
   }
 
-  const flowDetail = modelFlowDetailQuery.data ?? null
+  const handleCloseDcopPicker = () => {
+    setDcopPickerFlowId(null)
+  }
+
+  const handleSaveDcopPicker = (nextDcopItemKeys: readonly number[]) => {
+    if (dcopPickerFlowId === null || flowDetail === null) {
+      return
+    }
+    // 다른 4 섹션은 현재 BE 응답값 그대로 round-trip — picker 가 Identity / Trigger /
+    // Filter / Action 을 건드리지 않으므로 baseline 으로 flowDetail 값 그대로 사용.
+    const request: ModelFlowUpdateRequest = {
+      workflowName: flowDetail.workflowName,
+      messageName: flowDetail.messageName,
+      eventId: flowDetail.eventId,
+      transactionId: flowDetail.transactionId,
+      workflowFilter: flowDetail.workflowFilter,
+      actionName: flowDetail.actionName,
+      actionDataIndex: flowDetail.actionDataIndex,
+      dcopItemKeys: [...nextDcopItemKeys],
+    }
+    updateFlowMutation.mutate(
+      { flowId: dcopPickerFlowId, request },
+      {
+        onSuccess: () => {
+          setDcopPickerFlowId(null)
+        },
+      },
+    )
+  }
   const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
   const isDraftMode = draftFlow !== null
 
@@ -635,33 +637,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     }
     updateFlowMutation.mutate({ flowId: selectedFlowId, request: payload })
   }
-
-  // dcop-itemes 노드에서 Workflow Name 컬럼 인덱스 찾기 — Unassigned client-side group 용.
-  // deps 는 raw props (detailColumns) — normalizedDetailColumns 는 매 render 마다 새 ref 가능.
-  const dcopWorkflowNameColumnIndex = useMemo(() => {
-    if (!isDcopItemsNode) {
-      return -1
-    }
-    return detailColumns.findIndex((columnName) => isDcopWorkflowNameColumn(columnName))
-  }, [isDcopItemsNode, detailColumns])
-
-  // dcop-itemes 일 때 rows 를 Assigned / Unassigned 로 분리. 다른 노드는 split 없음.
-  const dcopGroupedRows = useMemo(() => {
-    if (!isDcopItemsNode || dcopWorkflowNameColumnIndex < 0) {
-      return null
-    }
-    const assigned: ModelDetailRow[] = []
-    const unassigned: ModelDetailRow[] = []
-    for (const row of detailRows) {
-      const workflowName = (row.values[dcopWorkflowNameColumnIndex] ?? '').trim()
-      if (workflowName === '') {
-        unassigned.push(row)
-      } else {
-        assigned.push(row)
-      }
-    }
-    return { assigned, unassigned }
-  }, [detailRows, isDcopItemsNode, dcopWorkflowNameColumnIndex])
 
   const handleTriggerUpload = () => {
     if (isReadOnly || !isMdfNode) {
@@ -823,7 +798,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
           <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-[#E4EAE6] bg-[#FAFCFB] p-2">
             <ModelFlowSidebar
               summaries={messageFlowSummaries}
-              unassignedDcopItems={referenceDcopItems}
               selectedFlowId={selectedFlowId}
               onSelectFlow={handleSelectFlow}
               onAddFlow={handleAddFlow}
@@ -834,7 +808,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               <p className="px-1 pb-2 text-xs font-semibold text-[#243129]">Reference</p>
               <div className="flex flex-col gap-0.5">
                 {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
-                    MesMessage / Parameter / Unassigned DCOPs — workflow 는 Message Flows 가 대체. */}
+                    MesMessage / Parameter — workflow 는 Message Flows 가 대체. */}
                 {detailNodes.filter((node) => node !== 'workflow').map((node) => (
                   <button
                     key={node}
@@ -1049,26 +1023,8 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                           </TableCell>
                         </TableRow>
                       ) : (
-                        (dcopGroupedRows
-                          ? [...dcopGroupedRows.assigned, ...dcopGroupedRows.unassigned]
-                          : detailRows
-                        ).map((row, rowIndex, displayedRows) => {
-                          // dcop-itemes Unassigned group divider — 첫 unassigned row 전에 표시.
-                          const assignedCount = dcopGroupedRows?.assigned.length ?? -1
-                          const showUnassignedHeader =
-                            dcopGroupedRows !== null && rowIndex === assignedCount && assignedCount < displayedRows.length
+                        detailRows.map((row, rowIndex) => {
                           return (
-                          <>
-                          {showUnassignedHeader ? (
-                            <TableRow key={`unassigned-divider-${row.id}`} className="bg-[#F1F5F2]">
-                              <TableCell
-                                colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
-                                className="py-1.5 text-xs font-semibold text-[#6A7971]"
-                              >
-                                ── Unassigned ──
-                              </TableCell>
-                            </TableRow>
-                          ) : null}
                           <TableRow key={row.id}>
                             {visibleColumns.map(({ columnName, columnIndex }) => {
                               const rawValue = row.values[columnIndex] ?? ''
@@ -1190,26 +1146,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                         </option>
                                       ))}
                                     </select>
-                                  ) : isDcopItemsNode && isDcopWorkflowNameColumn(columnName) ? (
-                                    // dcop-itemes Workflow Name: workflow 목록 드롭다운
-                                    <select
-                                      value={rawValue}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                    >
-                                      <option value="">—</option>
-                                      {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !dcopWorkflowNameOptions.includes(rawValue) && (
-                                        <option value={rawValue}>{rawValue}</option>
-                                      )}
-                                      {dcopWorkflowNameOptions.map((name) => (
-                                        <option key={name} value={name}>
-                                          {name}
-                                        </option>
-                                      ))}
-                                    </select>
                                   ) : isDcopItemsNode && isEventIdColumn(columnName) ? (
                                     // dcop-itemes EventId: eventides 목록 드롭다운 (SECS 모델 전용)
                                     <select
@@ -1285,7 +1221,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                               </TableCell>
                             ) : null}
                           </TableRow>
-                          </>
                           )
                         })
                       )}
@@ -1344,6 +1279,21 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         workflowMdfContents={workflowMdfContents}
         onClose={handleCloseFlowEditor}
         onSave={handleSaveFlowEditor}
+      />
+
+      {/*
+        FlowCard 의 Collect 섹션 "+ DCOP 추가" 클릭 시 열리는 N:M picker 모달.
+        flowDetail 이 있어야 binding 편집이 가능 — picker 가 열린 상태에서 다른 Flow
+        로 selection 이 바뀌면 부모가 dcopPickerFlowId 를 그대로 두므로 round-trip 후
+        새로 열린 picker 가 그 Flow 의 binding 으로 초기화됩니다.
+      */}
+      <DcopItemPickerModal
+        open={dcopPickerFlowId !== null}
+        flowId={dcopPickerFlowId ?? 0}
+        referenceDcopItems={referenceDcopItems}
+        currentFlowDcopItems={flowDetail?.dcopItems ?? []}
+        onSave={handleSaveDcopPicker}
+        onClose={handleCloseDcopPicker}
       />
     </>
   )
