@@ -125,7 +125,7 @@ const withCsrfHeaders = async <TResponse>(
 
 export const modelFlowApi = {
   /**
-   * Message Flow 목록을 조회합니다 (workflow_key ASC).
+   * Message Flow 목록을 조회합니다 (message_flow_key ASC, backend flowId).
    */
   list: async (modelVersionKey: number): Promise<ModelFlowListPayload> => {
     try {

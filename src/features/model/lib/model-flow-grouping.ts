@@ -16,7 +16,7 @@ export interface FlowWorkflowGroup {
  *
  * - 1 단계 = workflowName, 2 단계 = messageName.
  * - workflowName 사전순, 그룹 내부 flows 는 messageName 사전순으로 정렬합니다.
- *   (백엔드가 workflowKey ASC 정렬을 보장하지만 messageName 도 사전 정렬해
+ *   (백엔드가 flowId ASC 정렬을 보장하지만 messageName 도 사전 정렬해
  *    같은 workflowName 안에서 메시지 순서를 안정화합니다.)
  */
 export const groupFlowsByWorkflowName = (

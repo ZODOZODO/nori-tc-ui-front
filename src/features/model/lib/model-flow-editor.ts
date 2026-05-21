@@ -13,7 +13,7 @@ import {
 /**
  * Unsaved draft Flow 에 부여하는 placeholder flowId 입니다.
  *
- * backend 의 `tc_workflow.workflow_key` 는 양수 PK 이므로 음수 sentinel 은
+ * backend 의 `tc_model_message_flow.message_flow_key` 는 양수 PK 이므로 음수 sentinel 은
  * 실 데이터와 충돌하지 않습니다. FlowCard 가 ModelFlow shape 을 요구하므로
  * draftToFlow 어댑터가 이 값을 사용합니다 — 헤더 / 키 등 표시는 호출자가
  * sentinel 여부를 분기해 "신규" 등으로 처리합니다.
