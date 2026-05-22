@@ -48,17 +48,11 @@ const buildSocketRows = () =>
     const rowNumber = String(index + 1).padStart(2, '0')
     const messageName = `SOCKET_MESSAGE_NAME_${rowNumber}_VERY_LONG_IDENTIFIER_FOR_LAYOUT_CHECK`
     const description = `설명_${rowNumber}_LONG_TEXT_LONG_TEXT_LONG_TEXT_LONG_TEXT_LONG_TEXT`
-    const dataIndexes = [
-      `BODY.HEADER.TRACE_ID_${rowNumber}`,
-      `BODY.DATA.EQUIPMENT_ID_${rowNumber}`,
-      `BODY.DATA.WORK.ORDER_${rowNumber}`,
-      `BODY.METADATA.REQUEST.USER_${rowNumber}`,
-    ].join(',')
 
     return {
       id: `socket-${rowNumber}`,
-      values: [messageName, description, dataIndexes],
-      previewValues: [messageName, description, dataIndexes],
+      values: [messageName, description],
+      previewValues: [messageName, description],
     }
   })
 
@@ -179,7 +173,7 @@ test('Socket Message 상세 테이블 레이아웃을 재현합니다.', async (
           contentType: 'application/json',
           body: JSON.stringify(
             createApiResponse({
-              columns: ['Socket Message Name', 'Description', 'Data Indexes'],
+              columns: ['Socket Message Name', 'Description'],
               rows: buildSocketRows(),
               mdfContents: [],
             }),

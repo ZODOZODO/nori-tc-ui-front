@@ -14,7 +14,27 @@ export const modelQueryKeys = {
   detailNode: (modelVersionKey: number | null, detailNode: ModelDetailNode | null) =>
     ['model', 'detail-node', modelVersionKey, detailNode] as const,
   parentCommit: (modelKey: number | null) => ['model', 'parent-commit', modelKey] as const,
+  flowsRoot: () => ['model', 'flows'] as const,
+  flows: (modelVersionKey: number | null) => ['model', 'flows', modelVersionKey] as const,
+  flowDetail: (modelVersionKey: number | null, flowId: number | null) =>
+    ['model', 'flow-detail', modelVersionKey, flowId] as const,
 } as const
+
+/**
+ * 단일 modelVersionKey 의 Flow 목록 / 상세 캐시를 모두 무효화합니다.
+ * Flow 생성·수정 직후 화면 동기화에 사용합니다.
+ */
+export const invalidateModelFlowQueries = async (
+  queryClient: QueryClient,
+  modelVersionKey: number,
+): Promise<void> => {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: modelQueryKeys.flows(modelVersionKey) }),
+    queryClient.invalidateQueries({
+      queryKey: ['model', 'flow-detail', modelVersionKey] as const,
+    }),
+  ])
+}
 
 /**
  * Model 목록/상세/탭 데이터를 함께 무효화합니다.
