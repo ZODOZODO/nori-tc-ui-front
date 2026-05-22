@@ -567,7 +567,9 @@ test('Model-Flow-AC-3b: draft Flow Name 이 editable 이고 저장 시 POST body
 
   await flowNameInput.fill('NEW_FLOW_NAME')
 
-  await page.getByRole('button', { name: '저장' }).click()
+  // 통합된 우상단 Save 버튼 — FlowCard 컨텍스트에서 aria-label='Flow 저장' 으로 노출.
+  // FlowCard 하단의 별도 "저장" 버튼은 제거되어 우상단 한 곳에서만 트리거합니다.
+  await page.getByRole('button', { name: 'Flow 저장' }).click()
   await expect.poll(() => state.createFlowCalls.length).toBeGreaterThan(0)
   const body = state.createFlowCalls[0].body as Record<string, unknown>
   expect(body.workflowName).toBe('NEW_FLOW_NAME')
@@ -622,7 +624,8 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
   await expect(messageDropdown).toContainText('S6F13')
 
   // 저장 → mock state 의 PUT call 기록을 검사하여 messageName 갱신을 확인합니다.
-  await page.getByRole('button', { name: '저장' }).click()
+  // 통합된 우상단 Save (Flow 컨텍스트일 때 aria-label='Flow 저장').
+  await page.getByRole('button', { name: 'Flow 저장' }).click()
   await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
   const updatedBody = state.updateFlowCalls[0].body as Record<string, unknown>
   expect(updatedBody.messageName).toBe('S6F13')
@@ -814,8 +817,10 @@ test('Model-Flow-AC-F1: Add Flow 버튼 bounding-box 가 80x28 이하다', async
 })
 
 // 시나리오 F2 ---------------------------------------------------------------
-// dcop-flow-binding v4 AC F2: Flow 카드의 "+ DCOP 추가" 클릭 → DcopItemPickerModal open →
-// 좌측 1 체크 → → → 우측 1 행 → Save → PUT body 에 dcopItemKeys: [301] 포함 → 모달 닫힘.
+// dcop-flow-binding v4 AC F2 (model-flow-save-unify 갱신):
+// Flow 카드의 "+ DCOP 추가" 클릭 → DcopItemPickerModal open → 좌측 1 체크 → → → 우측 1 행
+// → picker Save (모달 닫힘 + draft 반영만) → 우상단 "Flow 저장" → PUT body 에
+// dcopItemKeys: [301, 302] 포함.
 test('Model-Flow-AC-F2: DcopItemPickerModal N:M binding 라운드트립', async ({ page }) => {
   const state = createDefaultMockState()
   // dcop:302 (ORPHAN_DCOP) 을 매핑 시도. Reference pool 에 들어 있고 현재 Flow #201 에는
@@ -827,7 +832,7 @@ test('Model-Flow-AC-F2: DcopItemPickerModal N:M binding 라운드트립', async 
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
 
-  // Collect 섹션의 "DCOP 추가" 클릭 → picker open.
+  // Collect 섹션 헤더 우측의 "DCOP 추가" 클릭 → picker open.
   await page.getByRole('button', { name: /DCOP 추가/ }).click()
   const pickerDialog = page.getByRole('dialog')
   await expect(pickerDialog).toBeVisible()
@@ -841,20 +846,21 @@ test('Model-Flow-AC-F2: DcopItemPickerModal N:M binding 라운드트립', async 
   // 우측 영역에 ORPHAN_DCOP 행 표시.
   await expect(pickerDialog.locator('[data-testid="dcop-picker-right"]').getByText('ORPHAN_DCOP')).toBeVisible()
 
-  // Save 클릭 — PUT 발사.
+  // picker Save — 즉시 PUT 안 됨. draft 반영 + 모달 닫힘만.
+  const baselinePutCount = state.updateFlowCalls.length
   await pickerDialog.locator('[data-testid="dcop-picker-save-button"]').click()
+  await expect(pickerDialog).toBeHidden()
+  expect(state.updateFlowCalls.length).toBe(baselinePutCount)
 
-  // PUT body 에 dcopItemKeys 가 포함되고 기존 301 + 새 302 가 모두 들어 있어야 함.
-  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
+  // 우상단 통합 "Flow 저장" 누르면 그때 PUT 발사 — 5 섹션 + Collect 가 한 번에 송신.
+  await page.getByRole('button', { name: 'Flow 저장' }).click()
+  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(baselinePutCount)
   const lastCall = state.updateFlowCalls[state.updateFlowCalls.length - 1]
   expect(lastCall.flowId).toBe(201)
   const body = lastCall.body as Record<string, unknown>
   expect(Array.isArray(body.dcopItemKeys)).toBe(true)
   const sentKeys = (body.dcopItemKeys as number[]).map((key) => Number(key)).sort((a, b) => a - b)
   expect(sentKeys).toEqual([301, 302])
-
-  // 모달 닫힘.
-  await expect(pickerDialog).toBeHidden()
 })
 
 // 시나리오 F3 (model-flow-draft-and-rename U3/A1, AC-P3) ----------------------
@@ -892,9 +898,9 @@ test('Model-Flow-AC-F3: DcopItemPickerModal 모두 선택 토글이 unbound 항�
   await expect(orphanCheckbox).not.toBeChecked()
 })
 
-// 시나리오 F4 (model-flow-draft-and-rename A2, AC-P4) --------------------------
-// 우측 DCOP pool 의 "모두 제거" 버튼 클릭 후 picker 저장 시 PUT body 의
-// dcopItemKeys 가 빈 배열로 송신되는지 검증.
+// 시나리오 F4 (model-flow-draft-and-rename A2, AC-P4 → model-flow-save-unify 갱신) --
+// 우측 DCOP pool 의 "모두 제거" 버튼 클릭 후 picker Save (draft 반영) → 우상단
+// "Flow 저장" → PUT body 의 dcopItemKeys 가 빈 배열로 송신되는지 검증.
 test('Model-Flow-AC-F4: 모두 제거 클릭 후 picker 저장 시 dcopItemKeys 가 빈 배열로 송신된다', async ({
   page,
 }) => {
@@ -916,9 +922,15 @@ test('Model-Flow-AC-F4: 모두 제거 클릭 후 picker 저장 시 dcopItemKeys 
   await pickerDialog.locator('[data-testid="dcop-picker-clear-right"]').click()
   await expect(rightSection.getByText('LOT_START_COUNTER')).toHaveCount(0)
 
-  // Save → PUT body 의 dcopItemKeys 가 빈 배열.
+  // picker Save — draft 반영 + 모달 닫힘만 (즉시 PUT 안 됨).
+  const baselinePutCount = state.updateFlowCalls.length
   await pickerDialog.locator('[data-testid="dcop-picker-save-button"]').click()
-  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
+  await expect(pickerDialog).toBeHidden()
+  expect(state.updateFlowCalls.length).toBe(baselinePutCount)
+
+  // 우상단 "Flow 저장" → PUT body 의 dcopItemKeys 가 빈 배열.
+  await page.getByRole('button', { name: 'Flow 저장' }).click()
+  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(baselinePutCount)
   const lastCall = state.updateFlowCalls[state.updateFlowCalls.length - 1]
   const body = lastCall.body as Record<string, unknown>
   expect(Array.isArray(body.dcopItemKeys)).toBe(true)
@@ -954,4 +966,46 @@ test('Model-Flow-AC-F8: 3 message 노드 평면 테이블에 Data Index 컬럼�
   await page.getByRole('button', { name: 'MES Message' }).click()
   await expect(page.getByRole('heading', { name: 'MES Message' })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: /data index(es)?/i })).toHaveCount(0)
+})
+
+// 시나리오 Save-1 (model-flow-save-unify) ----------------------------------
+// 우상단 통합 Save 버튼이 Flow 영역에서는 'Flow 저장', Reference 영역에서는
+// 'Reference 저장' aria-label 로 컨텍스트를 구분한다. 동일 버튼 위치를 유지하면서
+// 호출 mutation 만 분기 — Flow 작업 중 우상단 버튼이 Flow 와 무관한 PUT 을
+// 보내던 사전 결함의 회귀 방지.
+test('Model-Flow-AC-Save-1: 우상단 Save 의 aria-label 이 컨텍스트(Flow / Reference) 별로 다르다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  // 초기 진입은 Reference (model-parameter 등 기본 노드) — aria-label 'Reference 저장'.
+  await expect(page.getByRole('button', { name: 'Reference 저장' })).toBeVisible()
+
+  // Flow 선택 → aria-label 이 'Flow 저장' 으로 전환.
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Flow 저장' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reference 저장' })).toHaveCount(0)
+})
+
+// 시나리오 Save-2 (model-flow-save-unify) ----------------------------------
+// FlowCard 카드 본문 안에 별도 "저장" 버튼이 더 이상 렌더되지 않는다 — 우상단
+// 통합 Save 만 사용. footer 영역에는 draft 모드의 "취소" 버튼만 남는다.
+test('Model-Flow-AC-Save-2: FlowCard 본문에 별도 저장 버튼이 없다', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
+
+  // 카드 내부에 한글 '저장' 텍스트의 버튼은 0 개 (exact 매칭 — 'Flow 저장' 은 별개).
+  await expect(page.getByRole('button', { name: '저장', exact: true })).toHaveCount(0)
+
+  // 우상단 'Flow 저장' 만 존재.
+  await expect(page.getByRole('button', { name: 'Flow 저장' })).toHaveCount(1)
 })

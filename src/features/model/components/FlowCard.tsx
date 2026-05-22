@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Loader2, Pencil, Plus } from 'lucide-react'
+import { forwardRef, useImperativeHandle, useMemo, useState } from 'react'
+import { Pencil, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { cn } from '@/lib/utils'
 import {
   DRAFT_FLOW_ID_SENTINEL,
   type FlowDraft,
@@ -27,6 +26,7 @@ import {
   parseFlowFilterEditor,
 } from '../lib/model-detail-editor'
 import type {
+  ModelDcopItem,
   ModelFlow,
   ModelFlowUpdateRequest,
 } from '../types/model.types'
@@ -59,6 +59,26 @@ export interface FlowCardEventOption {
  */
 export interface FlowCardMdfTemplateOption {
   name: string
+}
+
+/**
+ * FlowCard 의 imperative handle.
+ *
+ * 우상단 통합 Save 버튼이 FlowCard 내부 draft state 에 접근하기 위해 노출하는
+ * 진입점입니다 — 부모(ModelDetailPanel) 가 ref 를 통해 `save()` 를 호출하면
+ * FlowCard 가 자기 draft 를 직렬화해 onSave prop 으로 전달합니다.
+ *
+ * draft state 를 lift up 하지 않는 이유는 FlowCard 가 5 섹션 + 모달 콜백 다수를
+ * 내부에서 다루기 때문 — controlled component 전환 시 변경 표면적이 큽니다.
+ */
+export interface FlowCardHandle {
+  save: () => void
+  /**
+   * 외부(DcopItemPickerModal) 가 picker 의 확인 결과를 카드의 draft 에 반영합니다.
+   * 호출 후 DB 저장은 일어나지 않으며, 사용자가 우상단 통합 Save 를 눌렀을 때
+   * dcopItemKeys 가 PUT body 의 한 필드로 함께 전송됩니다.
+   */
+  setDcopItems: (items: readonly ModelDcopItem[]) => void
 }
 
 interface FlowCardProps {
@@ -110,25 +130,41 @@ interface FlowCardProps {
  * 재마운트하여 draft 를 자연스럽게 reset 한다 (useEffect + setState 회피 — F1
  * dev-report 가 지적한 `react-hooks/set-state-in-effect` 룰 준수).
  */
-export function FlowCard({
-  flow,
-  protocol,
-  messageOptions,
-  eventOptions,
-  mdfTemplateOptions,
-  onSave,
-  saveStatus,
-  errorMessage,
-  onEditFlowFilter,
-  onEditActionDataIndex,
-  onAddDcopItem,
-  onCancelDraft,
-}: FlowCardProps) {
+export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowCard(
+  {
+    flow,
+    protocol,
+    messageOptions,
+    eventOptions,
+    mdfTemplateOptions,
+    onSave,
+    saveStatus,
+    errorMessage,
+    onEditFlowFilter,
+    onEditActionDataIndex,
+    onAddDcopItem,
+    onCancelDraft,
+  },
+  ref,
+) {
   const [draft, setDraft] = useState<FlowDraft>(() => buildFlowDraft(flow))
 
   const isSaving = saveStatus === 'saving'
   const renderTrigger = shouldRenderTriggerSection(protocol)
   const isDraftCard = flow.flowId === DRAFT_FLOW_ID_SENTINEL
+
+  // 우상단 통합 Save 버튼이 호출하는 진입점 — 현재 draft 를 PUT body 로 직렬화해
+  // 부모가 주입한 onSave 콜백으로 전달합니다. draft 가 갱신될 때마다 deps 가 바뀌어
+  // 항상 최신 값을 반영합니다.
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: () => onSave(serializeFlowDraft(draft)),
+      setDcopItems: (items) =>
+        setDraft((previousDraft) => ({ ...previousDraft, dcopItems: items })),
+    }),
+    [draft, onSave],
+  )
 
   const flowFilterSummary = useMemo(
     () => summarizeFlowFilter(draft.workflowFilter),
@@ -164,10 +200,6 @@ export function FlowCard({
 
   const handleChangeActionName = (rawInput: string) => {
     setDraft((previousDraft) => ({ ...previousDraft, actionName: rawInput }))
-  }
-
-  const handleSave = () => {
-    onSave(serializeFlowDraft(draft))
   }
 
   // [편집...] 클릭 시 draft 의 structured workflowFilter 를 raw JSON 으로 직렬화해
@@ -394,6 +426,20 @@ export function FlowCard({
       <FlowCardSection
         title="Collect"
         description="해당 Flow 가 수집하는 DCOP 항목입니다."
+        headerRight={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddDcopItem}
+            disabled={isDraftCard}
+            aria-disabled={isDraftCard ? 'true' : undefined}
+            title={isDraftCard ? 'Flow 저장 후 DCOP 추가 가능' : undefined}
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            DCOP 추가
+          </Button>
+        }
       >
         <div className="rounded-xl border border-[#E4EAE6]">
           <Table className="min-w-[640px]">
@@ -428,24 +474,10 @@ export function FlowCard({
             </TableBody>
           </Table>
         </div>
-        <div className="mt-2 flex justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onAddDcopItem}
-            disabled={isDraftCard}
-            aria-disabled={isDraftCard ? 'true' : undefined}
-            title={isDraftCard ? 'Flow 저장 후 DCOP 추가 가능' : undefined}
-          >
-            <Plus className="size-3.5" aria-hidden="true" />
-            DCOP 추가
-          </Button>
-        </div>
       </FlowCardSection>
 
-      <footer className="flex items-center justify-end gap-2 border-t border-[#EEF3F0] pt-4">
-        {isDraftCard && onCancelDraft !== null ? (
+      {isDraftCard && onCancelDraft !== null ? (
+        <footer className="flex items-center justify-end gap-2 border-t border-[#EEF3F0] pt-4">
           <Button
             type="button"
             variant="outline"
@@ -454,26 +486,17 @@ export function FlowCard({
           >
             취소
           </Button>
-        ) : null}
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className={cn(isSaving ? 'opacity-70' : null)}
-        >
-          {isSaving ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : null}
-          저장
-        </Button>
-      </footer>
+        </footer>
+      ) : null}
     </section>
   )
-}
+})
 
 interface FlowCardSectionProps {
   title: string
   description: string
+  /** 헤더 우측에 표시할 액션 슬롯 (예: Collect 의 "DCOP 추가" 버튼). */
+  headerRight?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -482,12 +505,15 @@ interface FlowCardSectionProps {
  *
  * 1차 릴리즈에서는 collapse 토글 없음 — 모두 default 펼친 상태로 노출 (SPEC line 122).
  */
-function FlowCardSection({ title, description, children }: FlowCardSectionProps) {
+function FlowCardSection({ title, description, headerRight, children }: FlowCardSectionProps) {
   return (
     <section className="space-y-3 rounded-2xl border border-[#E7EEEA] bg-[#FBFDFC] p-4">
-      <header>
-        <h3 className="text-sm font-semibold text-[#1E3D33]">{title}</h3>
-        <p className="text-[11px] text-[#738078]">{description}</p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[#1E3D33]">{title}</h3>
+          <p className="text-[11px] text-[#738078]">{description}</p>
+        </div>
+        {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
       </header>
       <div>{children}</div>
     </section>

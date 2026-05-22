@@ -145,14 +145,17 @@ test('serializeFlowDraft: Socket draft는 Trigger 3 필드와 actionDataIndex가
   assert.equal(payload.actionName, 'SOCKET_REPLY')
 })
 
-test('serializeFlowDraft: Collect 섹션 dcopItemKeys 는 null 로 직렬화되어 BE 가 Collect 미갱신으로 해석합니다', () => {
-  // FlowCard 의 저장은 Identity / Trigger / Filter / Action 4 섹션만 갱신 — Collect 의
-  // dcop_item binding 은 DcopItemPickerModal 의 별 PUT 으로 전송된다 (dcop-flow-binding v4).
+test('serializeFlowDraft: Collect 섹션 dcopItemKeys 는 draft.dcopItems 의 PK 배열로 함께 직렬화됩니다', () => {
+  // model-flow-save-unify: FlowCard 의 저장은 5 섹션 + Collect 를 한 번의 PUT 으로 갱신.
+  // DcopItemPickerModal 의 "확인" 은 즉시 PUT 대신 draft.dcopItems 에 반영만 하고,
+  // 사용자가 우상단 통합 Save 를 누른 시점의 dcopItems 가 PUT body 의 dcopItemKeys
+  // 필드로 함께 전송됩니다.
   const flow = buildSecsFlow()
   const draft = buildFlowDraft(flow)
   const payload = serializeFlowDraft(draft)
 
-  assert.equal(payload.dcopItemKeys, null)
+  assert.ok(Array.isArray(payload.dcopItemKeys))
+  assert.deepEqual(payload.dcopItemKeys, [7])
 })
 
 test('createEmptyFlowDraft: 신규 draft는 flowId=null과 빈 string/null 필드를 가집니다', () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { groupFlowsByWorkflowName } from '../src/features/model/lib/model-flow-grouping.ts'
+import { groupFlowsByFlowName } from '../src/features/model/lib/model-flow-grouping.ts'
 import type { ModelFlowSummary } from '../src/features/model/types/model.types.ts'
 
 /**
@@ -24,21 +24,21 @@ function makeSummary(
   return { flowId, workflowName, messageName, actionName }
 }
 
-test('groupFlowsByWorkflowName: 빈 입력은 빈 배열을 반환한다', () => {
-  const result = groupFlowsByWorkflowName([])
+test('groupFlowsByFlowName: 빈 입력은 빈 배열을 반환한다', () => {
+  const result = groupFlowsByFlowName([])
   assert.deepEqual(result, [])
 })
 
-test('groupFlowsByWorkflowName: 단일 flow 는 단일 그룹으로 묶인다', () => {
-  const result = groupFlowsByWorkflowName([makeSummary(1, 'handleLotStart', 'S6F11')])
+test('groupFlowsByFlowName: 단일 flow 는 단일 그룹으로 묶인다', () => {
+  const result = groupFlowsByFlowName([makeSummary(1, 'handleLotStart', 'S6F11')])
   assert.equal(result.length, 1)
   assert.equal(result[0].workflowName, 'handleLotStart')
   assert.equal(result[0].flows.length, 1)
   assert.equal(result[0].flows[0].flowId, 1)
 })
 
-test('groupFlowsByWorkflowName: 같은 workflowName 의 여러 messageName 은 한 그룹으로 합쳐진다', () => {
-  const result = groupFlowsByWorkflowName([
+test('groupFlowsByFlowName: 같은 workflowName 의 여러 messageName 은 한 그룹으로 합쳐진다', () => {
+  const result = groupFlowsByFlowName([
     makeSummary(1, 'handleLotStart', 'S6F11'),
     makeSummary(2, 'handleLotStart', 'S6F13'),
   ])
@@ -50,8 +50,8 @@ test('groupFlowsByWorkflowName: 같은 workflowName 의 여러 messageName 은 �
   )
 })
 
-test('groupFlowsByWorkflowName: 다른 workflowName 들은 각각 별 그룹을 만든다', () => {
-  const result = groupFlowsByWorkflowName([
+test('groupFlowsByFlowName: 다른 workflowName 들은 각각 별 그룹을 만든다', () => {
+  const result = groupFlowsByFlowName([
     makeSummary(1, 'handleLotStart', 'S6F11'),
     makeSummary(2, 'reportToMes', 'S6F11'),
   ])
@@ -62,8 +62,8 @@ test('groupFlowsByWorkflowName: 다른 workflowName 들은 각각 별 그룹을 
   )
 })
 
-test('groupFlowsByWorkflowName: workflowName 사전순 / 그룹 내부 messageName 사전순으로 정렬한다', () => {
-  const result = groupFlowsByWorkflowName([
+test('groupFlowsByFlowName: workflowName 사전순 / 그룹 내부 messageName 사전순으로 정렬한다', () => {
+  const result = groupFlowsByFlowName([
     makeSummary(3, 'reportToMes', 'S6F11'),
     makeSummary(1, 'handleLotStart', 'S6F13'),
     makeSummary(2, 'handleLotStart', 'S6F11'),

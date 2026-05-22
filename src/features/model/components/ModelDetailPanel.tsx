@@ -37,7 +37,7 @@ import {
 import { FlowFilterEditorModal } from './FlowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
-import { FlowCard } from './FlowCard'
+import { FlowCard, type FlowCardHandle } from './FlowCard'
 import { DcopItemPickerModal } from './DcopItemPickerModal'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
@@ -220,6 +220,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   // raw string 만 전달하면 됩니다.
   const [flowEditorValue, setFlowEditorValue] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // 우상단 통합 Save 버튼이 FlowCard 의 imperative save() 를 트리거하기 위한 ref.
+  // FlowCard 내부 draft state 는 closure 안에 있어 외부에서 접근 불가하므로
+  // forwardRef + useImperativeHandle 패턴으로 진입점을 노출합니다.
+  const flowCardRef = useRef<FlowCardHandle | null>(null)
 
   // F5: Message Flows 사이드바 — selectedFlowId / draftFlow 는 model-ui store 로 이관.
   const selectedFlowId = useModelUiStore((state) => state.selectedFlowId)
@@ -349,15 +353,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     isCheckinPending ||
     !isEditMode ||
     isLockedByOtherUser
-  // workflow 노드에서 Flow Name 중복이 있으면 저장을 차단합니다.
-  const hasFlowNameDuplicate = useMemo(() => {
-    if (!isFlowNode) {
-      return false
-    }
-    const names = detailRows.map((row) => (row.values[0] ?? '').trim()).filter(Boolean)
-    return names.length !== new Set(names).size
-  }, [isFlowNode, detailRows])
-
   const detailColumnWidths = normalizedDetailColumns.map((columnName, columnIndex) => {
     if (isFlowModalEditableColumn(normalizedDetailNode, columnName)) {
       return MODEL_DETAIL_MODAL_PREVIEW_WIDTH
@@ -387,13 +382,18 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   }))
   const visibleColumnCount = visibleColumns.length
 
+  // FlowCard 가 우상단 Save 의 대상인지 — isFlowCardVisible 과 동일하지만
+  // saveDisabled 흐름 안에서의 의미를 명시하기 위해 alias.
+  // 이 경우 우상단 Save 는 PUT /details/{node} 가 아니라 FlowCard.save() 를 호출하며
+  // 그 안에서 POST /flows 또는 PUT /flows/{id} 로 분기됩니다.
+  const isFlowSaving = createFlowMutation.isPending || updateFlowMutation.isPending
+
   const saveDisabled =
     isDetailLoading ||
-    isDetailSavePending ||
+    (isFlowCardVisible ? isFlowSaving : isDetailSavePending) ||
     !isEditMode ||
     isLockedByOtherUser ||
-    isMdfNode ||
-    hasFlowNameDuplicate
+    isMdfNode
 
   const flowEditorTitle = useMemo(() => {
     if (!flowTextEditor) {
@@ -553,29 +553,18 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   }
 
   const handleSaveDcopPicker = (nextDcopItemKeys: readonly number[]) => {
-    if (dcopPickerFlowId === null || flowDetail === null) {
+    if (dcopPickerFlowId === null) {
       return
     }
-    // 다른 4 섹션은 현재 BE 응답값 그대로 round-trip — picker 가 Identity / Trigger /
-    // Filter / Action 을 건드리지 않으므로 baseline 으로 flowDetail 값 그대로 사용.
-    const request: ModelFlowUpdateRequest = {
-      workflowName: flowDetail.workflowName,
-      messageName: flowDetail.messageName,
-      eventId: flowDetail.eventId,
-      transactionId: flowDetail.transactionId,
-      workflowFilter: flowDetail.workflowFilter,
-      actionName: flowDetail.actionName,
-      actionDataIndex: flowDetail.actionDataIndex,
-      dcopItemKeys: [...nextDcopItemKeys],
-    }
-    updateFlowMutation.mutate(
-      { flowId: dcopPickerFlowId, request },
-      {
-        onSuccess: () => {
-          setDcopPickerFlowId(null)
-        },
-      },
-    )
+    // picker 의 "확인" 은 즉시 PUT 대신 FlowCard.draft.dcopItems 에 반영만 합니다 —
+    // 사용자가 우상단 통합 Save 를 눌렀을 때 5 섹션 + Collect 가 한 번의 PUT 으로
+    // DB 에 반영됩니다. 따라서 picker 가 보낸 key 배열을 referenceDcopItems 풀에서
+    // ModelDcopItem 본체로 매핑해 카드에 전달.
+    const nextItems: ModelDcopItem[] = nextDcopItemKeys
+      .map((key) => referenceDcopItems.find((item) => item.dcopItemKey === key) ?? null)
+      .filter((item): item is ModelDcopItem => item !== null)
+    flowCardRef.current?.setDcopItems(nextItems)
+    setDcopPickerFlowId(null)
   }
   const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
   const isDraftMode = draftFlow !== null
@@ -639,6 +628,20 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     }
     updateFlowMutation.mutate({ flowId: selectedFlowId, request: payload })
   }
+
+  // 우상단 통합 Save 버튼 클릭 핸들러 — 현재 우측 영역에 FlowCard 가 보이면 그 카드의
+  // imperative save() 를 호출 (POST/PUT /flows), 그렇지 않으면 기존 Reference detail
+  // PUT 흐름으로 위임합니다. 위치는 한 곳이지만 호출하는 mutation 은 컨텍스트별로 분기.
+  const handleTopSave = () => {
+    if (isFlowCardVisible) {
+      flowCardRef.current?.save()
+      return
+    }
+    onSaveDetailRows()
+  }
+
+  // 우상단 Save 의 tooltip — 어떤 영역을 저장하는지 사용자에게 변별값 제공.
+  const topSaveTooltip = isFlowCardVisible ? 'Flow 저장' : 'Reference 저장'
 
   const handleTriggerUpload = () => {
     if (isReadOnly || !isMdfNode) {
@@ -743,10 +746,16 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     type="button"
                     variant="outline"
                     className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
-                    onClick={onSaveDetailRows}
+                    onClick={handleTopSave}
                     disabled={saveDisabled}
+                    title={topSaveTooltip}
+                    aria-label={topSaveTooltip}
                   >
-                    {isDetailSavePending ? (
+                    {isFlowCardVisible ? (
+                      isFlowSaving ? (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                      ) : null
+                    ) : isDetailSavePending ? (
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     ) : null}
                     Save
@@ -843,6 +852,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               <FlowCard
                 // draft 카드는 매 startDraftFlow 호출마다 새로 mount — sentinel key 로 안정.
                 key="draft-flow"
+                ref={flowCardRef}
                 flow={draftToFlow(draftFlow)}
                 protocol={flowProtocol}
                 messageOptions={flowCardMessageOptions}
@@ -864,6 +874,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               ) : flowDetail ? (
                 <FlowCard
                   key={flowDetail.flowId}
+                  ref={flowCardRef}
                   flow={flowDetail}
                   protocol={flowProtocol}
                   messageOptions={flowCardMessageOptions}

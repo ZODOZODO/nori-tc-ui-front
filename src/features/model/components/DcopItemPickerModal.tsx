@@ -30,7 +30,9 @@ interface DcopItemPickerModalProps {
   currentFlowDcopItems: readonly ModelDcopItem[]
   /**
    * 저장 클릭 시 호출되는 콜백 — 우측 누적 array (dcop_item_key 만) 가 인자.
-   * 부모가 PUT /flows/{flowId} 요청을 발사하고 성공 후 onClose 를 호출합니다.
+   * 부모는 즉시 PUT 대신 FlowCard.draft.dcopItems 에 반영만 하고 모달을 닫습니다 —
+   * 실제 DB 저장은 사용자가 우상단 통합 "Flow 저장" 을 눌렀을 때 5 섹션 + Collect 가
+   * 한 번의 PUT 으로 전송됩니다.
    */
   onSave: (next: readonly number[]) => void
   onClose: () => void
@@ -196,6 +198,7 @@ export function DcopItemPickerModal({
                   onClick={handleToggleSelectAll}
                   disabled={selectableFilteredKeys.length === 0}
                   data-testid="dcop-picker-toggle-select-all"
+                  className="h-6 px-2 text-[11px]"
                 >
                   {allSelectableChecked ? '모두 해제' : '모두 선택'}
                 </Button>
@@ -290,6 +293,7 @@ export function DcopItemPickerModal({
                   onClick={clearRight}
                   disabled={rightItems.length === 0}
                   data-testid="dcop-picker-clear-right"
+                  className="h-6 px-2 text-[11px]"
                 >
                   모두 제거
                 </Button>

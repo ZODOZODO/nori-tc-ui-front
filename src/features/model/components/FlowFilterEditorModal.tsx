@@ -216,7 +216,7 @@ function FlowFilterEditorModalBody({
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          {!readOnly ? <Button onClick={handleSave}>적용</Button> : null}
+          {!readOnly ? <Button onClick={handleSave}>저장</Button> : null}
         </DialogFooter>
       </div>
     </DialogContent>
