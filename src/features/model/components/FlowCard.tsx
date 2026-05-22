@@ -18,13 +18,13 @@ import {
   serializeFlowDraft,
   shouldRenderTriggerSection,
   summarizeFlowActionDataIndex,
-  summarizeFlowWorkflowFilter,
+  summarizeFlowFilter,
 } from '../lib/model-flow-editor'
 import {
   buildActionDataIndexValue,
-  buildWorkflowFilterValue,
+  buildFlowFilterValue,
   parseActionDataIndexEditor,
-  parseWorkflowFilterEditor,
+  parseFlowFilterEditor,
 } from '../lib/model-detail-editor'
 import type {
   ModelFlow,
@@ -79,8 +79,8 @@ interface FlowCardProps {
    * draft 의 raw JSON string 과 모달 결과를 다시 draft 에 반영할 onChange 콜백을
    * 부모에 전달합니다 — 부모는 추출된 모달의 open / value / onSave 만 wiring 하면 됩니다.
    */
-  onEditWorkflowFilter: (currentRaw: string, onChange: (nextRaw: string) => void) => void
-  /** Action 의 [편집...] 클릭 핸들러. 시그니처는 onEditWorkflowFilter 와 동일. */
+  onEditFlowFilter: (currentRaw: string, onChange: (nextRaw: string) => void) => void
+  /** Action 의 [편집...] 클릭 핸들러. 시그니처는 onEditFlowFilter 와 동일. */
   onEditActionDataIndex: (currentRaw: string, onChange: (nextRaw: string) => void) => void
   onAddDcopItem: () => void
   /**
@@ -97,12 +97,12 @@ interface FlowCardProps {
  * `(workflow_name, message_name)` 1 쌍을 5 섹션 (Identity / Trigger / Filter /
  * Action / Collect) 으로 default 펼친 상태로 노출하는 Flow 카드입니다.
  *
- * - Identity 의 workflowName 은 read-only (Plan 위험표 #3 — DCOP cascade 미정).
+ * - Identity 의 workflowName 은 draft 모드에서만 editable (saved 카드는 read-only).
  * - SOCKET protocol 인 경우 Trigger 섹션 (EventId + TransactionId) 자체 미렌더
  *   (SPEC line 80-83). Filter 섹션은 SOCKET 도 표시 — workflow_filter 는 protocol
  *   무관 모든 Flow 에서 편집 가능 (F8.1 root cause fix).
  * - workflowFilter / actionDataIndex 인라인 트리 편집 도입 안 함 — 부모가 모달
- *   open 핸들러 (`onEditWorkflowFilter` / `onEditActionDataIndex`) 를 주입.
+ *   open 핸들러 (`onEditFlowFilter` / `onEditActionDataIndex`) 를 주입.
  * - Collect 의 DCOP 행 추가는 기존 `PUT /details/dcop-itemes` 노드로 위임 (Plan D4),
  *   `onAddDcopItem` 이 그 라우팅을 처리.
  *
@@ -119,7 +119,7 @@ export function FlowCard({
   onSave,
   saveStatus,
   errorMessage,
-  onEditWorkflowFilter,
+  onEditFlowFilter,
   onEditActionDataIndex,
   onAddDcopItem,
   onCancelDraft,
@@ -130,8 +130,8 @@ export function FlowCard({
   const renderTrigger = shouldRenderTriggerSection(protocol)
   const isDraftCard = flow.flowId === DRAFT_FLOW_ID_SENTINEL
 
-  const workflowFilterSummary = useMemo(
-    () => summarizeFlowWorkflowFilter(draft.workflowFilter),
+  const flowFilterSummary = useMemo(
+    () => summarizeFlowFilter(draft.workflowFilter),
     [draft.workflowFilter],
   )
 
@@ -173,13 +173,13 @@ export function FlowCard({
   // [편집...] 클릭 시 draft 의 structured workflowFilter 를 raw JSON 으로 직렬화해
   // 모달에 넘기고, 모달 onSave 결과를 다시 structured draft 로 역변환합니다.
   // raw 가 빈 문자열이면 null draft 로 — Socket / 빈 SECS Flow 의 의미와 일치.
-  const handleClickEditWorkflowFilter = () => {
+  const handleClickEditFlowFilter = () => {
     const currentRaw =
-      draft.workflowFilter === null ? '' : buildWorkflowFilterValue(draft.workflowFilter)
-    onEditWorkflowFilter(currentRaw, (nextRaw) => {
+      draft.workflowFilter === null ? '' : buildFlowFilterValue(draft.workflowFilter)
+    onEditFlowFilter(currentRaw, (nextRaw) => {
       setDraft((previousDraft) => ({
         ...previousDraft,
-        workflowFilter: nextRaw.length === 0 ? null : parseWorkflowFilterEditor(nextRaw),
+        workflowFilter: nextRaw.length === 0 ? null : parseFlowFilterEditor(nextRaw),
       }))
     })
   }
@@ -200,7 +200,7 @@ export function FlowCard({
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-[#213028]">
-            {draft.workflowName || '(workflow 미지정)'} / {draft.messageName || '(message 미지정)'}
+            {draft.workflowName || '(flow 미지정)'} / {draft.messageName || '(message 미지정)'}
           </h2>
           <p className="text-xs text-[#738078]">
             {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? 'Flow ID #신규' : `Flow ID #${flow.flowId}`}
@@ -216,12 +216,24 @@ export function FlowCard({
       <FlowCardSection title="Identity" description="Flow 의 고유 식별값입니다.">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">Workflow Name</label>
-            {/* Plan 위험표 #3: 1차 릴리즈 read-only. DCOP cascade 가 필요해지면 별 SPEC. */}
-            <Input value={draft.workflowName} readOnly aria-readonly="true" />
-            <p className="text-[11px] text-[#97A39C]">
-              1차 릴리즈에서는 변경 불가입니다. 변경이 필요하면 새 Flow 를 추가하고 기존 Flow 를 삭제하세요.
-            </p>
+            <label className="text-xs font-semibold text-[#1E3D33]">Flow Name</label>
+            <Input
+              value={draft.workflowName}
+              onChange={(event) =>
+                setDraft((previousDraft) => ({
+                  ...previousDraft,
+                  workflowName: event.target.value,
+                }))
+              }
+              readOnly={!isDraftCard}
+              aria-readonly={isDraftCard ? 'false' : 'true'}
+              placeholder={isDraftCard ? '신규 Flow 이름을 입력하세요' : undefined}
+            />
+            {!isDraftCard ? (
+              <p className="text-[11px] text-[#97A39C]">
+                저장된 Flow 의 Flow Name 은 변경 불가입니다. 변경이 필요하면 새 Flow 를 추가하고 기존 Flow 를 삭제하세요.
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#1E3D33]">Message Name</label>
@@ -289,7 +301,7 @@ export function FlowCard({
         <div className="space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-[#1E3D33]">Workflow Filter</p>
+              <p className="text-xs font-semibold text-[#1E3D33]">Flow Filter</p>
               <p className="text-[11px] text-[#738078]">
                 data / event / context 의 조건 트리를 편집합니다.
               </p>
@@ -298,7 +310,7 @@ export function FlowCard({
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleClickEditWorkflowFilter}
+              onClick={handleClickEditFlowFilter}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               편집...
@@ -308,7 +320,7 @@ export function FlowCard({
             className="rounded-lg border border-[#DCE5E0] bg-white px-3 py-2 text-xs text-[#22322B]"
             data-testid="flow-card-workflow-filter-summary"
           >
-            {workflowFilterSummary}
+            {flowFilterSummary}
           </p>
         </div>
       </FlowCardSection>
@@ -417,7 +429,15 @@ export function FlowCard({
           </Table>
         </div>
         <div className="mt-2 flex justify-end">
-          <Button type="button" variant="outline" size="sm" onClick={onAddDcopItem}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddDcopItem}
+            disabled={isDraftCard}
+            aria-disabled={isDraftCard ? 'true' : undefined}
+            title={isDraftCard ? 'Flow 저장 후 DCOP 추가 가능' : undefined}
+          >
             <Plus className="size-3.5" aria-hidden="true" />
             DCOP 추가
           </Button>

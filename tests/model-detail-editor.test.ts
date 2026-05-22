@@ -2,11 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildActionDataIndexValue,
-  buildWorkflowFilterValue,
+  buildFlowFilterValue,
   parseActionDataIndexEditor,
-  parseWorkflowFilterEditor,
+  parseFlowFilterEditor,
   summarizeActionDataIndexValue,
-  summarizeWorkflowFilterValue,
+  summarizeFlowFilterValue,
 } from '../src/features/model/lib/model-detail-editor.ts'
 
 const WORKFLOW_CANONICAL = `{
@@ -50,13 +50,13 @@ const ACTION_CANONICAL_WITH_SHORTHAND = `{
 }`
 
 test('workflow_filter canonical JSON은 structured parse/build/summarize를 유지합니다', () => {
-  const editor = parseWorkflowFilterEditor(WORKFLOW_CANONICAL)
+  const editor = parseFlowFilterEditor(WORKFLOW_CANONICAL)
 
   assert.equal(editor.mode, 'structured')
   assert.equal(editor.rootGroup.groupType, 'and')
   assert.equal(editor.rootGroup.children.length, 2)
 
-  const rebuilt = buildWorkflowFilterValue(editor)
+  const rebuilt = buildFlowFilterValue(editor)
   assert.deepEqual(JSON.parse(rebuilt), JSON.parse(WORKFLOW_CANONICAL))
 
   const editableCondition = editor.rootGroup.children[0]
@@ -64,12 +64,12 @@ test('workflow_filter canonical JSON은 structured parse/build/summarize를 유�
   editableCondition.path = 'result.status'
   editableCondition.expectedText = '"READY"'
 
-  const rebuiltAfterEdit = JSON.parse(buildWorkflowFilterValue(editor))
+  const rebuiltAfterEdit = JSON.parse(buildFlowFilterValue(editor))
   assert.equal(rebuiltAfterEdit.and[0].path, 'result.status')
   assert.equal(rebuiltAfterEdit.and[0].expected, 'READY')
 
   assert.equal(
-    summarizeWorkflowFilterValue(WORKFLOW_CANONICAL),
+    summarizeFlowFilterValue(WORKFLOW_CANONICAL),
     'and(data.status{comparison=equals, expected="OK", transforms=[trim, upper]}, or(metadata.eventType{comparison=equals, expected="READY"}, data.retryCount{comparison=greater_than_or_equal, expected=4}))',
   )
 })
@@ -95,13 +95,13 @@ test('workflow_filter 구계약 또는 invalid path 입력은 raw fallback으로
   ]
 }`
 
-  const legacyEditor = parseWorkflowFilterEditor(legacyWorkflow)
-  const invalidEditor = parseWorkflowFilterEditor(invalidAbsolutePath)
+  const legacyEditor = parseFlowFilterEditor(legacyWorkflow)
+  const invalidEditor = parseFlowFilterEditor(invalidAbsolutePath)
 
   assert.equal(legacyEditor.mode, 'raw')
   assert.equal(invalidEditor.mode, 'raw')
-  assert.equal(buildWorkflowFilterValue(legacyEditor), legacyWorkflow.trim())
-  assert.equal(buildWorkflowFilterValue(invalidEditor), invalidAbsolutePath.trim())
+  assert.equal(buildFlowFilterValue(legacyEditor), legacyWorkflow.trim())
+  assert.equal(buildFlowFilterValue(invalidEditor), invalidAbsolutePath.trim())
 })
 
 test('action_data_index canonical JSON은 shorthand를 포함해 structured parse/build/summarize를 유지합니다', () => {
@@ -175,16 +175,16 @@ test('workflow_filter는 param from을 structured parse/build/summarize에 포�
   ]
 }`
 
-  const editor = parseWorkflowFilterEditor(workflowWithParam)
+  const editor = parseFlowFilterEditor(workflowWithParam)
 
   assert.equal(editor.mode, 'structured')
   const condition = editor.rootGroup.children[0]
   assert.equal(condition.nodeType, 'condition')
   assert.equal(condition.from, 'param')
   assert.equal(condition.path, 'recipeId')
-  assert.deepEqual(JSON.parse(buildWorkflowFilterValue(editor)), JSON.parse(workflowWithParam))
+  assert.deepEqual(JSON.parse(buildFlowFilterValue(editor)), JSON.parse(workflowWithParam))
   assert.equal(
-    summarizeWorkflowFilterValue(workflowWithParam),
+    summarizeFlowFilterValue(workflowWithParam),
     'and(param.recipeId{comparison=equals, expected="RCP-01"})',
   )
 })

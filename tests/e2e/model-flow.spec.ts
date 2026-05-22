@@ -534,8 +534,8 @@ test('Model-Flow-AC-3: [+ Add Flow] 클릭 시 빈 FlowCard 가 추가된다', a
 
   await page.getByRole('button', { name: /Add Flow/i }).click()
 
-  // 빈 draft card → workflow / message 모두 미지정 헤더.
-  await expect(page.getByRole('heading', { name: /\(workflow 미지정\)/ })).toBeVisible()
+  // 빈 draft card → flow / message 모두 미지정 헤더.
+  await expect(page.getByRole('heading', { name: /\(flow 미지정\)/ })).toBeVisible()
   await expect(page.getByText('Flow ID #신규')).toBeVisible()
   // F8.1 root cause fix: 5 섹션 모두 펼쳐져 있다 — Filter 가 Trigger 와 분리.
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
@@ -545,6 +545,51 @@ test('Model-Flow-AC-3: [+ Add Flow] 클릭 시 빈 FlowCard 가 추가된다', a
   await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
   // Collect 빈 상태 안내 텍스트.
   await expect(page.getByText('수집 항목이 없습니다.')).toBeVisible()
+})
+
+// 시나리오 3b (model-flow-draft-and-rename U1, AC-P1) ---------------------------
+// draft 카드의 Flow Name Input 이 editable 이고, 저장 시 POST body 의
+// workflowName 에 입력값이 반영되는지 검증.
+test('Model-Flow-AC-3b: draft Flow Name 이 editable 이고 저장 시 POST body workflowName 에 반영된다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /Add Flow/i }).click()
+
+  // draft 카드의 Flow Name Input — placeholder 로 locate (label/input association 없음).
+  const flowNameInput = page.getByPlaceholder('신규 Flow 이름을 입력하세요')
+  await expect(flowNameInput).toBeVisible()
+  // U1: draft 모드에서는 readOnly 가 풀려 있어야 함.
+  await expect(flowNameInput).toHaveJSProperty('readOnly', false)
+
+  await flowNameInput.fill('NEW_FLOW_NAME')
+
+  await page.getByRole('button', { name: '저장' }).click()
+  await expect.poll(() => state.createFlowCalls.length).toBeGreaterThan(0)
+  const body = state.createFlowCalls[0].body as Record<string, unknown>
+  expect(body.workflowName).toBe('NEW_FLOW_NAME')
+})
+
+// 시나리오 3c (model-flow-draft-and-rename U2, AC-P2) ---------------------------
+// draft 카드의 "+ DCOP 추가" 버튼이 disabled 이고 hover/focus 시 tooltip 이
+// 표시되는지 검증 (옵션 (i): 백엔드 POST DTO 가 dcopItemKeys 미수용).
+test('Model-Flow-AC-3c: draft 카드의 DCOP 추가 버튼이 disabled + tooltip 으로 안내된다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /Add Flow/i }).click()
+  await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
+
+  const dcopAddButton = page.getByRole('button', { name: /DCOP 추가/ })
+  await expect(dcopAddButton).toBeDisabled()
+  await expect(dcopAddButton).toHaveAttribute('aria-disabled', 'true')
+  await expect(dcopAddButton).toHaveAttribute('title', 'Flow 저장 후 DCOP 추가 가능')
 })
 
 // 시나리오 4 ----------------------------------------------------------------
@@ -608,7 +653,7 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
 // 시나리오 5 ----------------------------------------------------------------
 // F8.1 root cause fix: Trigger 안 [편집...] 이 아니라 분리된 Filter 섹션의 [편집...] 검증.
 // workflow_filter 는 protocol 무관 모든 Flow 에서 편집 필요.
-test('Model-Flow-AC-5: Filter [편집...] 클릭 시 Workflow Filter 모달이 열린다', async ({
+test('Model-Flow-AC-5: Filter [편집...] 클릭 시 Flow Filter 모달이 열린다', async ({
   page,
 }) => {
   const state = createDefaultMockState()
@@ -620,17 +665,17 @@ test('Model-Flow-AC-5: Filter [편집...] 클릭 시 Workflow Filter 모달이 �
   await page.getByRole('button', { name: 'S6F11' }).click()
   await expect(page.getByRole('heading', { name: 'Filter' })).toBeVisible()
 
-  // F8.1: Filter 섹션 안 "편집..." 버튼 (Workflow Filter summary 옆).
+  // F8.1: Filter 섹션 안 "편집..." 버튼 (Flow Filter summary 옆).
   // summary testid 의 직전 형제 button 으로 좁혀 Filter inner 카드 안의 [편집] 버튼만 선택.
   const filterCard = page.locator(
     'div:has(> [data-testid="flow-card-workflow-filter-summary"])',
   )
   await filterCard.getByRole('button', { name: /편집/ }).click()
 
-  // 모달 DialogTitle "Workflow Filter".
+  // 모달 DialogTitle "Flow Filter".
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(
-    page.getByRole('dialog').getByText('Workflow Filter', { exact: true }),
+    page.getByRole('dialog').getByText('Flow Filter', { exact: true }),
   ).toBeVisible()
 })
 
@@ -810,6 +855,74 @@ test('Model-Flow-AC-F2: DcopItemPickerModal N:M binding 라운드트립', async 
 
   // 모달 닫힘.
   await expect(pickerDialog).toBeHidden()
+})
+
+// 시나리오 F3 (model-flow-draft-and-rename U3/A1, AC-P3) ----------------------
+// Reference DCOP "모두 선택" 토글이 검색이 적용된 항목 중 매핑되지 않은 것만 체크하고,
+// 다시 토글 시 해제하는지 검증. 이미 매핑된 항목 (disabled) 은 unchecked 유지.
+test('Model-Flow-AC-F3: DcopItemPickerModal 모두 선택 토글이 unbound 항목만 tri-state 로 처리한다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await expect(page.getByRole('heading', { name: 'Collect' })).toBeVisible()
+
+  await page.getByRole('button', { name: /DCOP 추가/ }).click()
+  const pickerDialog = page.getByRole('dialog')
+  await expect(pickerDialog).toBeVisible()
+
+  // ORPHAN_DCOP 는 unbound, LOT_START_COUNTER 는 이미 bound (disabled).
+  const orphanCheckbox = pickerDialog.getByLabel('ORPHAN_DCOP 선택')
+  const boundCheckbox = pickerDialog.getByLabel('LOT_START_COUNTER 선택')
+  await expect(orphanCheckbox).not.toBeChecked()
+  await expect(boundCheckbox).toBeDisabled()
+
+  // 모두 선택 토글 클릭 → unbound 항목만 체크.
+  const toggleButton = pickerDialog.locator('[data-testid="dcop-picker-toggle-select-all"]')
+  await toggleButton.click()
+  await expect(orphanCheckbox).toBeChecked()
+  await expect(boundCheckbox).not.toBeChecked() // bound 항목은 unchecked 유지.
+
+  // 다시 클릭 → 전체 해제.
+  await toggleButton.click()
+  await expect(orphanCheckbox).not.toBeChecked()
+})
+
+// 시나리오 F4 (model-flow-draft-and-rename A2, AC-P4) --------------------------
+// 우측 DCOP pool 의 "모두 제거" 버튼 클릭 후 picker 저장 시 PUT body 의
+// dcopItemKeys 가 빈 배열로 송신되는지 검증.
+test('Model-Flow-AC-F4: 모두 제거 클릭 후 picker 저장 시 dcopItemKeys 가 빈 배열로 송신된다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await page.getByRole('button', { name: /DCOP 추가/ }).click()
+  const pickerDialog = page.getByRole('dialog')
+  await expect(pickerDialog).toBeVisible()
+
+  // 초기 우측에 LOT_START_COUNTER (key=301) 1 행이 있어야 함.
+  const rightSection = pickerDialog.locator('[data-testid="dcop-picker-right"]')
+  await expect(rightSection.getByText('LOT_START_COUNTER')).toBeVisible()
+
+  // 모두 제거 클릭 → 우측 비고.
+  await pickerDialog.locator('[data-testid="dcop-picker-clear-right"]').click()
+  await expect(rightSection.getByText('LOT_START_COUNTER')).toHaveCount(0)
+
+  // Save → PUT body 의 dcopItemKeys 가 빈 배열.
+  await pickerDialog.locator('[data-testid="dcop-picker-save-button"]').click()
+  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
+  const lastCall = state.updateFlowCalls[state.updateFlowCalls.length - 1]
+  const body = lastCall.body as Record<string, unknown>
+  expect(Array.isArray(body.dcopItemKeys)).toBe(true)
+  expect((body.dcopItemKeys as number[]).length).toBe(0)
 })
 
 // 시나리오 F5 ---------------------------------------------------------------

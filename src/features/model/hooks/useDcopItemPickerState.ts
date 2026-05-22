@@ -17,10 +17,16 @@ export interface DcopItemPickerState {
   rightItems: readonly number[]
   /** 좌측 체크 토글. 이미 우측에 있는 dcop_item 은 disabled 라 외부에서 호출되지 않음. */
   toggleLeftSelection: (dcopItemKey: number) => void
+  /** 좌측 선택 집합에 여러 키를 한 번에 추가 ("모두 선택" 토글). */
+  selectKeys: (dcopItemKeys: readonly number[]) => void
+  /** 좌측 선택 집합에서 여러 키를 한 번에 제거 (전체 체크 상태에서 "모두 선택" 재클릭). */
+  deselectKeys: (dcopItemKeys: readonly number[]) => void
   /** 좌측 체크된 항목들을 우측 array 에 append 하고, 좌측 선택을 비웁니다. */
   moveSelectedToRight: () => void
   /** 우측 array 에서 1 행 제거 (Trash 클릭). */
   removeFromRight: (dcopItemKey: number) => void
+  /** 우측 array 를 비웁니다 ("모두 제거" 토글). */
+  clearRight: () => void
   /** 외부에서 다시 모달을 열 때 초기 우측 array 로 리셋 (좌측 선택은 항상 비움). */
   reset: (initialRight: readonly number[]) => void
 }
@@ -41,6 +47,45 @@ export const toggleSelection = (
     next.add(dcopItemKey)
   }
   return next
+}
+
+/**
+ * leftSelection Set 에 여러 키를 한 번에 추가합니다.
+ *
+ * Pure 함수 — 추가될 키가 없으면 입력 참조 그대로 반환.
+ */
+export const selectKeysInSelection = (
+  previous: ReadonlySet<number>,
+  dcopItemKeys: readonly number[],
+): ReadonlySet<number> => {
+  const next = new Set(previous)
+  let mutated = false
+  for (const key of dcopItemKeys) {
+    if (!next.has(key)) {
+      next.add(key)
+      mutated = true
+    }
+  }
+  return mutated ? next : previous
+}
+
+/**
+ * leftSelection Set 에서 여러 키를 한 번에 제거합니다.
+ *
+ * Pure 함수 — 제거될 키가 없으면 입력 참조 그대로 반환.
+ */
+export const deselectKeysFromSelection = (
+  previous: ReadonlySet<number>,
+  dcopItemKeys: readonly number[],
+): ReadonlySet<number> => {
+  const next = new Set(previous)
+  let mutated = false
+  for (const key of dcopItemKeys) {
+    if (next.delete(key)) {
+      mutated = true
+    }
+  }
+  return mutated ? next : previous
 }
 
 /**
@@ -98,6 +143,14 @@ export const useDcopItemPickerState = (
     setLeftSelection((previous) => toggleSelection(previous, dcopItemKey))
   }, [])
 
+  const selectKeys = useCallback((dcopItemKeys: readonly number[]) => {
+    setLeftSelection((previous) => selectKeysInSelection(previous, dcopItemKeys))
+  }, [])
+
+  const deselectKeys = useCallback((dcopItemKeys: readonly number[]) => {
+    setLeftSelection((previous) => deselectKeysFromSelection(previous, dcopItemKeys))
+  }, [])
+
   const moveSelectedToRight = useCallback(() => {
     setRightItems((previousRight) => moveSelectionToRight(previousRight, leftSelection))
     setLeftSelection(new Set<number>())
@@ -105,6 +158,10 @@ export const useDcopItemPickerState = (
 
   const removeFromRight = useCallback((dcopItemKey: number) => {
     setRightItems((previous) => removeFromRightArray(previous, dcopItemKey))
+  }, [])
+
+  const clearRight = useCallback(() => {
+    setRightItems((previous) => (previous.length === 0 ? previous : []))
   }, [])
 
   const reset = useCallback((nextRight: readonly number[]) => {
@@ -116,8 +173,11 @@ export const useDcopItemPickerState = (
     leftSelection,
     rightItems,
     toggleLeftSelection,
+    selectKeys,
+    deselectKeys,
     moveSelectedToRight,
     removeFromRight,
+    clearRight,
     reset,
   }
 }

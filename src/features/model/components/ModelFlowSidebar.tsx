@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { groupFlowsByWorkflowName } from '../lib/model-flow-grouping.ts'
+import { groupFlowsByFlowName } from '../lib/model-flow-grouping.ts'
 import type { ModelFlowSummary } from '../types/model.types.ts'
 
 interface ModelFlowSidebarProps {
@@ -17,7 +17,7 @@ interface ModelFlowSidebarProps {
   isEditable: boolean
 }
 
-interface WorkflowGroupSectionProps {
+interface FlowGroupSectionProps {
   workflowName: string
   flows: ModelFlowSummary[]
   selectedFlowId: number | null
@@ -30,12 +30,12 @@ interface WorkflowGroupSectionProps {
  * (페이지 재진입 시 기본 닫힘). 사용자가 명시적으로 클릭해서 펼침 시점에만 하위
  * messageName 행이 노출됩니다.
  */
-function WorkflowGroupSection({
+function FlowGroupSection({
   workflowName,
   flows,
   selectedFlowId,
   onSelectFlow,
-}: WorkflowGroupSectionProps) {
+}: FlowGroupSectionProps) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -93,7 +93,7 @@ function WorkflowGroupSection({
  * dcop-flow-binding v4 에서 미매핑 dcop 전용 영역은 폐기됨 — N:M 모델에서 Flow 0 개
  * 매핑은 자연 상태이며, picker 모달이 좌측 disabled 배지로 binding 상태를 직접 시각화함.
  *
- * 트리 그룹화는 {@link groupFlowsByWorkflowName} pure helper 에 위임 — sidebar 자체는
+ * 트리 그룹화는 {@link groupFlowsByFlowName} pure helper 에 위임 — sidebar 자체는
  * 렌더 + 사용자 상호작용 (펼침 / 선택 / Add Flow) 만 담당합니다.
  */
 export const ModelFlowSidebar = memo(function ModelFlowSidebar({
@@ -103,7 +103,7 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
   onAddFlow,
   isEditable,
 }: ModelFlowSidebarProps) {
-  const groups = useMemo(() => groupFlowsByWorkflowName(summaries), [summaries])
+  const groups = useMemo(() => groupFlowsByFlowName(summaries), [summaries])
 
   return (
     <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
@@ -129,7 +129,7 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
           <p className="px-2 py-1 text-[11px] text-[#97A39C]">표시할 Flow 가 없습니다.</p>
         ) : (
           groups.map((group) => (
-            <WorkflowGroupSection
+            <FlowGroupSection
               key={group.workflowName}
               workflowName={group.workflowName}
               flows={group.flows}

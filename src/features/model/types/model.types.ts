@@ -280,7 +280,7 @@ export const MODEL_DETAIL_NODE_LABELS: Record<ModelDetailNode, string> = {
   reportides: 'ReportIdes',
   eventides: 'EventIdes',
   'socket-message': 'Socket Message',
-  workflow: 'Workflow',
+  workflow: 'Flow',
   mdf: 'MDF',
   'dcop-itemes': 'Dcop Itemes',
 }

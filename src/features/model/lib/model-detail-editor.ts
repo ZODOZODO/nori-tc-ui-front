@@ -1,5 +1,5 @@
 const LOOKUP_SOURCE_OPTIONS = ['data', 'metadata', 'param'] as const
-const WORKFLOW_COMPARISON_OPTIONS = [
+const FLOW_COMPARISON_OPTIONS = [
   'equals',
   'not_equals',
   'greater_than',
@@ -11,45 +11,45 @@ const WORKFLOW_COMPARISON_OPTIONS = [
 ] as const
 
 type EditorMode = 'structured' | 'raw'
-type WorkflowGroupType = 'and' | 'or'
+type FlowGroupType = 'and' | 'or'
 
-export type WorkflowLookupSource = (typeof LOOKUP_SOURCE_OPTIONS)[number]
-export type WorkflowComparison = (typeof WORKFLOW_COMPARISON_OPTIONS)[number]
+export type FlowLookupSource = (typeof LOOKUP_SOURCE_OPTIONS)[number]
+export type FlowComparison = (typeof FLOW_COMPARISON_OPTIONS)[number]
 
 export interface TransformDraft {
   id: string
   value: string
 }
 
-export interface WorkflowConditionDraft {
+export interface FlowConditionDraft {
   id: string
   nodeType: 'condition'
-  from: WorkflowLookupSource
+  from: FlowLookupSource
   path: string
-  comparison: WorkflowComparison
+  comparison: FlowComparison
   expectedText: string
   transforms: TransformDraft[]
 }
 
-export interface WorkflowGroupDraft {
+export interface FlowGroupDraft {
   id: string
   nodeType: 'group'
-  groupType: WorkflowGroupType
-  children: WorkflowNodeDraft[]
+  groupType: FlowGroupType
+  children: FlowNodeDraft[]
 }
 
-export type WorkflowNodeDraft = WorkflowConditionDraft | WorkflowGroupDraft
+export type FlowNodeDraft = FlowConditionDraft | FlowGroupDraft
 
-export interface WorkflowFilterEditorDraft {
+export interface FlowFilterEditorDraft {
   mode: EditorMode
   rawValue: string
-  rootGroup: WorkflowGroupDraft
+  rootGroup: FlowGroupDraft
 }
 
 export interface ActionDataIndexFieldDraft {
   id: string
   fieldName: string
-  from: WorkflowLookupSource
+  from: FlowLookupSource
   path: string
   transforms: TransformDraft[]
 }
@@ -61,7 +61,7 @@ export interface ActionDataIndexEditorDraft {
   fields: ActionDataIndexFieldDraft[]
 }
 
-const WORKFLOW_CONDITION_KEYS = new Set(['from', 'path', 'comparison', 'expected', 'transforms'])
+const FLOW_CONDITION_KEYS = new Set(['from', 'path', 'comparison', 'expected', 'transforms'])
 const ACTION_DATA_INDEX_ROOT_KEYS = new Set(['mdfTemplateName', 'fields'])
 const ACTION_DATA_INDEX_FIELD_KEYS = new Set(['from', 'path', 'transforms'])
 
@@ -114,7 +114,7 @@ const validateAllowedKeys = (
   }
 }
 
-const parseLookupSource = (value: unknown, label: string): WorkflowLookupSource => {
+const parseLookupSource = (value: unknown, label: string): FlowLookupSource => {
   const normalized = normalizeText(typeof value === 'string' ? value : '')
   if (normalized !== 'data' && normalized !== 'metadata' && normalized !== 'param') {
     throw new Error(label)
@@ -134,14 +134,14 @@ const parseRelativePath = (value: unknown, label: string): string => {
   return normalized
 }
 
-const parseWorkflowComparison = (value: unknown): WorkflowComparison => {
+const parseFlowComparison = (value: unknown): FlowComparison => {
   const normalized = normalizeText(typeof value === 'string' ? value : '')
   if (
-    !WORKFLOW_COMPARISON_OPTIONS.includes(normalized as WorkflowComparison)
+    !FLOW_COMPARISON_OPTIONS.includes(normalized as FlowComparison)
   ) {
     throw new Error('workflow_filter 조건의 comparison은 표준 연산만 허용됩니다.')
   }
-  return normalized as WorkflowComparison
+  return normalized as FlowComparison
 }
 
 const stringifyExpectedText = (value: unknown): string => {
@@ -240,9 +240,9 @@ const serializeTransforms = (transforms: TransformDraft[]): string[] =>
     .map((transform) => normalizeText(transform.value))
     .filter((transform) => transform.length > 0)
 
-const summarizeWorkflowNode = (node: WorkflowNodeDraft): string => {
+const summarizeFlowNode = (node: FlowNodeDraft): string => {
   if (node.nodeType === 'group') {
-    return `${node.groupType}(${node.children.map((child) => summarizeWorkflowNode(child)).join(', ')})`
+    return `${node.groupType}(${node.children.map((child) => summarizeFlowNode(child)).join(', ')})`
   }
 
   const summaryParts = [
@@ -283,10 +283,10 @@ const summarizeActionField = (
   return summaryParts.join('')
 }
 
-const parseWorkflowConditionDraft = (candidate: Record<string, unknown>): WorkflowConditionDraft => {
+const parseFlowConditionDraft = (candidate: Record<string, unknown>): FlowConditionDraft => {
   validateAllowedKeys(
     candidate,
-    WORKFLOW_CONDITION_KEYS,
+    FLOW_CONDITION_KEYS,
     'workflow_filter 조건에는 from, path, comparison, expected, transforms만 허용됩니다.',
   )
 
@@ -305,7 +305,7 @@ const parseWorkflowConditionDraft = (candidate: Record<string, unknown>): Workfl
       candidate.path,
       'workflow_filter 조건의 path는 from 기준 상대 경로여야 합니다.',
     ),
-    comparison: parseWorkflowComparison(candidate.comparison),
+    comparison: parseFlowComparison(candidate.comparison),
     expectedText: stringifyExpectedText(candidate.expected),
     transforms: parseTransforms(
       candidate.transforms,
@@ -314,7 +314,7 @@ const parseWorkflowConditionDraft = (candidate: Record<string, unknown>): Workfl
   }
 }
 
-const parseWorkflowNodeDraft = (candidate: unknown, isRoot = false): WorkflowNodeDraft => {
+const parseFlowNodeDraft = (candidate: unknown, isRoot = false): FlowNodeDraft => {
   if (!isRecord(candidate)) {
     throw new Error('workflow_filter 노드는 JSON object여야 합니다.')
   }
@@ -327,7 +327,7 @@ const parseWorkflowNodeDraft = (candidate: unknown, isRoot = false): WorkflowNod
       throw new Error('workflow_filter 그룹 노드는 and와 or를 동시에 가질 수 없습니다.')
     }
 
-    const groupType: WorkflowGroupType | null = hasAnd ? 'and' : hasOr ? 'or' : null
+    const groupType: FlowGroupType | null = hasAnd ? 'and' : hasOr ? 'or' : null
     if (!groupType) {
       throw new Error(
         isRoot
@@ -352,7 +352,7 @@ const parseWorkflowNodeDraft = (candidate: unknown, isRoot = false): WorkflowNod
       id: createEditorId(),
       nodeType: 'group',
       groupType,
-      children: rawChildren.map((child) => parseWorkflowNodeDraft(child)),
+      children: rawChildren.map((child) => parseFlowNodeDraft(child)),
     }
   }
 
@@ -360,7 +360,7 @@ const parseWorkflowNodeDraft = (candidate: unknown, isRoot = false): WorkflowNod
     throw new Error('workflow_filter 루트는 and 또는 or 그룹이어야 합니다.')
   }
 
-  return parseWorkflowConditionDraft(candidate)
+  return parseFlowConditionDraft(candidate)
 }
 
 const parseActionDataIndexFieldDraft = (
@@ -408,10 +408,10 @@ const parseActionDataIndexFieldDraft = (
   }
 }
 
-const serializeWorkflowNode = (node: WorkflowNodeDraft): Record<string, unknown> | null => {
+const serializeFlowNode = (node: FlowNodeDraft): Record<string, unknown> | null => {
   if (node.nodeType === 'group') {
     const children = node.children
-      .map((child) => serializeWorkflowNode(child))
+      .map((child) => serializeFlowNode(child))
       .filter((child): child is Record<string, unknown> => child !== null)
 
     if (children.length === 0) {
@@ -451,11 +451,11 @@ const serializeWorkflowNode = (node: WorkflowNodeDraft): Record<string, unknown>
   return serializedCondition
 }
 
-const createStructuredRootGroup = (): WorkflowGroupDraft => ({
+const createStructuredRootGroup = (): FlowGroupDraft => ({
   id: createEditorId(),
   nodeType: 'group',
   groupType: 'and',
-  children: [createEmptyWorkflowFilterCondition()],
+  children: [createEmptyFlowFilterCondition()],
 })
 
 export const createTransformDraft = (value = ''): TransformDraft => ({
@@ -463,7 +463,7 @@ export const createTransformDraft = (value = ''): TransformDraft => ({
   value,
 })
 
-export const createEmptyWorkflowFilterCondition = (): WorkflowConditionDraft => ({
+export const createEmptyFlowFilterCondition = (): FlowConditionDraft => ({
   id: createEditorId(),
   nodeType: 'condition',
   from: 'data',
@@ -473,13 +473,13 @@ export const createEmptyWorkflowFilterCondition = (): WorkflowConditionDraft => 
   transforms: [],
 })
 
-export const createEmptyWorkflowGroup = (
-  groupType: WorkflowGroupType = 'and',
-): WorkflowGroupDraft => ({
+export const createEmptyFlowGroup = (
+  groupType: FlowGroupType = 'and',
+): FlowGroupDraft => ({
   id: createEditorId(),
   nodeType: 'group',
   groupType,
-  children: [createEmptyWorkflowFilterCondition()],
+  children: [createEmptyFlowFilterCondition()],
 })
 
 export const createEmptyActionDataIndexField = (): ActionDataIndexFieldDraft => ({
@@ -490,7 +490,7 @@ export const createEmptyActionDataIndexField = (): ActionDataIndexFieldDraft => 
   transforms: [],
 })
 
-export const parseWorkflowFilterEditor = (value: string): WorkflowFilterEditorDraft => {
+export const parseFlowFilterEditor = (value: string): FlowFilterEditorDraft => {
   const rawValue = value ?? ''
   const normalized = rawValue.trim()
 
@@ -512,7 +512,7 @@ export const parseWorkflowFilterEditor = (value: string): WorkflowFilterEditorDr
   }
 
   try {
-    const rootGroup = parseWorkflowNodeDraft(parsed, true)
+    const rootGroup = parseFlowNodeDraft(parsed, true)
     if (rootGroup.nodeType !== 'group') {
       throw new Error('workflow_filter 루트는 and 또는 or 그룹이어야 합니다.')
     }
@@ -531,12 +531,12 @@ export const parseWorkflowFilterEditor = (value: string): WorkflowFilterEditorDr
   }
 }
 
-export const buildWorkflowFilterValue = (draft: WorkflowFilterEditorDraft): string => {
+export const buildFlowFilterValue = (draft: FlowFilterEditorDraft): string => {
   if (draft.mode === 'raw') {
     return draft.rawValue.trim()
   }
 
-  const rootGroup = serializeWorkflowNode(draft.rootGroup)
+  const rootGroup = serializeFlowNode(draft.rootGroup)
   if (!rootGroup) {
     return ''
   }
@@ -642,18 +642,18 @@ export const buildActionDataIndexValue = (draft: ActionDataIndexEditorDraft): st
   return JSON.stringify(serializedRoot, null, 2)
 }
 
-export const summarizeWorkflowFilterValue = (value: string): string => {
+export const summarizeFlowFilterValue = (value: string): string => {
   const fallback = normalizeFirstLine(value)
   if (!fallback) {
     return ''
   }
 
-  const editor = parseWorkflowFilterEditor(value)
+  const editor = parseFlowFilterEditor(value)
   if (editor.mode === 'raw') {
     return fallback
   }
 
-  return summarizeWorkflowNode(editor.rootGroup)
+  return summarizeFlowNode(editor.rootGroup)
 }
 
 export const summarizeActionDataIndexValue = (value: string): string => {
@@ -677,4 +677,4 @@ export const summarizeActionDataIndexValue = (value: string): string => {
   return summarizeActionField(firstField.fieldName.trim(), firstField, editor.mdfTemplateName)
 }
 
-export { LOOKUP_SOURCE_OPTIONS, WORKFLOW_COMPARISON_OPTIONS }
+export { LOOKUP_SOURCE_OPTIONS, FLOW_COMPARISON_OPTIONS }

@@ -76,8 +76,17 @@ export function DcopItemPickerModal({
     [currentFlowDcopItems],
   )
 
-  const { leftSelection, rightItems, toggleLeftSelection, moveSelectedToRight, removeFromRight, reset } =
-    useDcopItemPickerState(initialRight)
+  const {
+    leftSelection,
+    rightItems,
+    toggleLeftSelection,
+    selectKeys,
+    deselectKeys,
+    moveSelectedToRight,
+    removeFromRight,
+    clearRight,
+    reset,
+  } = useDcopItemPickerState(initialRight)
 
   // 모달이 다시 open 될 때 (또는 flowId 가 바뀔 때) 우측을 초기 binding 으로 reset.
   useEffect(() => {
@@ -112,6 +121,31 @@ export function DcopItemPickerModal({
   }, [rightItems, referenceItems])
 
   const hasLeftSelection = leftSelection.size > 0
+
+  // "모두 선택" 토글 대상은 검색이 적용된 좌측 항목 중 *아직 우측에 매핑되지 않은*
+  // 항목만. 이미 매핑된 항목은 disabled 라 체크 변경 자체가 무의미.
+  const selectableFilteredKeys = useMemo(
+    () =>
+      filteredReferenceItems
+        .map((item) => item.dcopItemKey as number)
+        .filter((key) => !rightItemSet.has(key)),
+    [filteredReferenceItems, rightItemSet],
+  )
+
+  const allSelectableChecked =
+    selectableFilteredKeys.length > 0
+    && selectableFilteredKeys.every((key) => leftSelection.has(key))
+
+  const handleToggleSelectAll = () => {
+    if (selectableFilteredKeys.length === 0) {
+      return
+    }
+    if (allSelectableChecked) {
+      deselectKeys(selectableFilteredKeys)
+    } else {
+      selectKeys(selectableFilteredKeys)
+    }
+  }
 
   const handleClickMove = () => {
     if (!hasLeftSelection) {
@@ -153,7 +187,19 @@ export function DcopItemPickerModal({
                   model 의 dcop_item pool 전체. 이미 매핑된 항목은 비활성화됩니다.
                 </p>
               </div>
-              <Badge variant="outline">선택 {leftSelection.size}건</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">선택 {leftSelection.size}건</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleSelectAll}
+                  disabled={selectableFilteredKeys.length === 0}
+                  data-testid="dcop-picker-toggle-select-all"
+                >
+                  {allSelectableChecked ? '모두 해제' : '모두 선택'}
+                </Button>
+              </div>
             </div>
 
             <div className="relative mt-3">
@@ -235,7 +281,19 @@ export function DcopItemPickerModal({
                   좌측에서 추가한 항목이 누적됩니다. Trash 로 1 행씩 제거할 수 있습니다.
                 </p>
               </div>
-              <Badge>{rightDisplayItems.length}개 매핑</Badge>
+              <div className="flex items-center gap-2">
+                <Badge>{rightDisplayItems.length}개 매핑</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearRight}
+                  disabled={rightItems.length === 0}
+                  data-testid="dcop-picker-clear-right"
+                >
+                  모두 제거
+                </Button>
+              </div>
             </div>
 
             <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-[#E5ECE7]">

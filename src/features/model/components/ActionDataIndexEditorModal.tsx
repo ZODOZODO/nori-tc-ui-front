@@ -28,7 +28,7 @@ import {
   type ActionDataIndexEditorDraft,
   type ActionDataIndexFieldDraft,
   type TransformDraft,
-  type WorkflowLookupSource,
+  type FlowLookupSource,
 } from '../lib/model-detail-editor'
 import { extractMdfMessageOptions, type MdfMessageOption } from '../lib/mdf-message-parser'
 import type { ModelMdfContent } from '../types/model.types'
@@ -38,7 +38,7 @@ import type { ModelMdfContent } from '../types/model.types'
  *
  * ModelDetailPanel.tsx 의 inline Dialog 블록(line 1659~1996) 을 별 파일로 추출.
  * 외부 props 시그니처는 `open / value / readOnly / titleLabel / errorMessage /
- * workflowMdfContents / onClose / onSave` 로 자기완결 — 내부 draft state 와
+ * flowMdfContents / onClose / onSave` 로 자기완결 — 내부 draft state 와
  * MDF dropdown 옵션 가공도 모달 안에서 관리합니다.
  */
 
@@ -50,7 +50,7 @@ interface ActionDataIndexEditorModalProps {
   readOnly: boolean
   titleLabel: string
   errorMessage: string | null
-  workflowMdfContents: ModelMdfContent[]
+  flowMdfContents: ModelMdfContent[]
   onClose: () => void
   onSave: (nextValue: string) => void
 }
@@ -61,7 +61,7 @@ export function ActionDataIndexEditorModal({
   readOnly,
   titleLabel,
   errorMessage,
-  workflowMdfContents,
+  flowMdfContents,
   onClose,
   onSave,
 }: ActionDataIndexEditorModalProps) {
@@ -82,7 +82,7 @@ export function ActionDataIndexEditorModal({
           readOnly={readOnly}
           titleLabel={titleLabel}
           errorMessage={errorMessage}
-          workflowMdfContents={workflowMdfContents}
+          flowMdfContents={flowMdfContents}
           onClose={onClose}
           onSave={onSave}
         />
@@ -96,7 +96,7 @@ interface ActionDataIndexEditorModalBodyProps {
   readOnly: boolean
   titleLabel: string
   errorMessage: string | null
-  workflowMdfContents: ModelMdfContent[]
+  flowMdfContents: ModelMdfContent[]
   onClose: () => void
   onSave: (nextValue: string) => void
 }
@@ -106,7 +106,7 @@ function ActionDataIndexEditorModalBody({
   readOnly,
   titleLabel,
   errorMessage,
-  workflowMdfContents,
+  flowMdfContents,
   onClose,
   onSave,
 }: ActionDataIndexEditorModalBodyProps) {
@@ -116,8 +116,8 @@ function ActionDataIndexEditorModalBody({
   const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null)
 
   const mdfMessageOptions = useMemo(
-    () => buildMdfMessageOptions(workflowMdfContents, draft.mdfTemplateName),
-    [draft.mdfTemplateName, workflowMdfContents],
+    () => buildMdfMessageOptions(flowMdfContents, draft.mdfTemplateName),
+    [draft.mdfTemplateName, flowMdfContents],
   )
 
   const selectedMdfMessage = useMemo(
@@ -207,7 +207,7 @@ function ActionDataIndexEditorModalBody({
     >
       <div className="flex h-full min-h-0 flex-col">
         <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
-          <DialogTitle>{titleLabel || 'Workflow 편집'}</DialogTitle>
+          <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
           <DialogDescription>
             action_data_index를 mdfTemplateName과 field 매핑 기준으로 편집합니다.
           </DialogDescription>
@@ -414,7 +414,7 @@ function ActionDataIndexEditorModalBody({
                                       previousDraft.fields,
                                       field.id,
                                       {
-                                        from: event.target.value as WorkflowLookupSource,
+                                        from: event.target.value as FlowLookupSource,
                                       },
                                     ),
                                   }))
@@ -611,11 +611,11 @@ const updateTransforms = (
   )
 
 const buildMdfMessageOptions = (
-  workflowMdfContents: ModelMdfContent[],
+  flowMdfContents: ModelMdfContent[],
   currentValue: string,
 ): MdfMessageOption[] => {
   const optionMap = new Map<string, MdfMessageOption>()
-  extractMdfMessageOptions(workflowMdfContents).forEach((option) => {
+  extractMdfMessageOptions(flowMdfContents).forEach((option) => {
     optionMap.set(option.messageName, option)
   })
 

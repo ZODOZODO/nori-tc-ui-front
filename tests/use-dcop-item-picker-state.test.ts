@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  deselectKeysFromSelection,
   moveSelectionToRight,
   removeFromRightArray,
+  selectKeysInSelection,
   toggleSelection,
 } from '../src/features/model/hooks/useDcopItemPickerState.ts'
 
@@ -85,6 +87,42 @@ test('Save callback 시나리오: 좌측 2 체크 → → → 우측 2 행 → 1
   // Save 가 받을 next array — 1 원소.
   assert.equal(right.length, 1)
   assert.equal(right[0], 202)
+})
+
+test('selectKeysInSelection: 빈 set 에 여러 키 동시 추가', () => {
+  const result = selectKeysInSelection(new Set(), [10, 20, 30])
+  assert.deepEqual([...result].sort((a, b) => a - b), [10, 20, 30])
+})
+
+test('selectKeysInSelection: 추가될 키가 모두 이미 있으면 동일 참조 반환 (memo 친화)', () => {
+  const original = new Set([10, 20]) as ReadonlySet<number>
+  const result = selectKeysInSelection(original, [10, 20])
+  assert.equal(result, original)
+})
+
+test('selectKeysInSelection: 입력 set 은 변경되지 않는다 (pure)', () => {
+  const original = new Set([1])
+  selectKeysInSelection(original, [2, 3])
+  assert.deepEqual([...original], [1])
+})
+
+test('deselectKeysFromSelection: 여러 키 동시 제거', () => {
+  const result = deselectKeysFromSelection(new Set([10, 20, 30]), [10, 30])
+  assert.deepEqual([...result], [20])
+})
+
+test('deselectKeysFromSelection: 제거될 키가 모두 없으면 동일 참조 반환', () => {
+  const original = new Set([10, 20]) as ReadonlySet<number>
+  const result = deselectKeysFromSelection(original, [99])
+  assert.equal(result, original)
+})
+
+test('모두 선택 토글 round-trip: select → deselect 시 빈 set 으로 돌아간다', () => {
+  // U3/A1: tri-state 토글 — 전체 선택 후 동일 키로 deselect 호출 시 비어야 함.
+  const targetKeys = [1, 2, 3]
+  const after = selectKeysInSelection(new Set(), targetKeys)
+  const cleared = deselectKeysFromSelection(after, targetKeys)
+  assert.equal(cleared.size, 0)
 })
 
 test('round-trip 시나리오: 매핑됨 disabled 우회해도 우측 중복 추가는 차단된다', () => {

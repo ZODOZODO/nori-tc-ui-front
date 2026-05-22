@@ -61,7 +61,7 @@ const resolveErrorMessage = (error: unknown, fallbackMessage: string): string =>
 
 /**
  * 상세 데이터 rows를 첫 번째 컬럼 값 기준으로 오름차순 정렬합니다.
- * Model Param, Workflow, Dcop Items 등 모든 detail 테이블에 공통 적용됩니다.
+ * Model Param, Flow, Dcop Items 등 모든 detail 테이블에 공통 적용됩니다.
  */
 const sortDetailRowsByFirstColumn = (rows: ModelDetailRow[]): ModelDetailRow[] =>
   [...rows].sort((a, b) => (a.values[0] ?? '').localeCompare(b.values[0] ?? ''))
@@ -373,7 +373,7 @@ export function ModelPage() {
   }, [activeTab, modelItems])
 
   const detailNodeQuery = useModelNodeDetail(activeTabModel?.modelVersionKey ?? null, detailNode)
-  const workflowMdfQuery = useModelNodeDetail(
+  const flowMdfQuery = useModelNodeDetail(
     activeTabModel?.modelVersionKey ?? null,
     activeTabModel && detailNode !== 'mdf' ? 'mdf' : null,
   )
@@ -494,11 +494,11 @@ export function ModelPage() {
   }, [activeTabModel, detailNode, detailNodeQuery.data])
 
   /**
-   * workflow editor의 MDF template select가 현재 model의 MDF 목록을 항상 사용할 수 있도록
+   * flow editor의 MDF template select가 현재 model의 MDF 목록을 항상 사용할 수 있도록
    * 별도 MDF detail 응답도 캐시에 적재합니다.
    */
   useEffect(() => {
-    if (!activeTabModel || !workflowMdfQuery.data) {
+    if (!activeTabModel || !flowMdfQuery.data) {
       return
     }
 
@@ -510,10 +510,10 @@ export function ModelPage() {
 
       return {
         ...previousMdfByContext,
-        [mdfContextKey]: workflowMdfQuery.data.mdfContents,
+        [mdfContextKey]: flowMdfQuery.data.mdfContents,
       }
     })
-  }, [activeTabModel, workflowMdfQuery.data])
+  }, [activeTabModel, flowMdfQuery.data])
 
   /**
    * 활성 탭이 EDIT 모델인지/소유자인지에 따라 편집 모드를 동기화합니다.
@@ -637,14 +637,14 @@ export function ModelPage() {
     return detailMdfByContext[detailContextKey] ?? detailNodeQuery.data?.mdfContents ?? []
   }, [detailContextKey, detailMdfByContext, detailNodeQuery.data?.mdfContents])
 
-  const workflowMdfContents = useMemo(() => {
+  const flowMdfContents = useMemo(() => {
     if (!activeTabModel) {
       return []
     }
 
     const mdfContextKey = `${activeTabModel.modelVersionKey}:mdf`
-    return workflowMdfQuery.data?.mdfContents ?? detailMdfByContext[mdfContextKey] ?? []
-  }, [activeTabModel, detailMdfByContext, workflowMdfQuery.data?.mdfContents])
+    return flowMdfQuery.data?.mdfContents ?? detailMdfByContext[mdfContextKey] ?? []
+  }, [activeTabModel, detailMdfByContext, flowMdfQuery.data?.mdfContents])
 
   const hasDetailData = detailRows.length > 0 || detailMdfContents.length > 0
   const detailLoadErrorMessage =
@@ -781,15 +781,24 @@ export function ModelPage() {
 
   /**
    * Model 정보 row 더블 클릭 시 Version 화면 탭을 엽니다.
+   *
+   * 이미 열려 있는 탭을 다시 더블 클릭한 경우 detailNodeByTab[modelVersionKey] 의
+   * 이전 선택 노드를 보존합니다 — 탭 간 전환이 각 탭의 마지막 detail 노드를
+   * 기억하도록 하는 격리 보장 (store 의 `detailNodeByTab` 의도와 정합).
    */
   const handleOpenModelDetail = (model: ModelInfo) => {
     setSelectedInterfaceGroup(null)
+    const alreadyOpened = openedTabs.some(
+      (tab) => tab.modelVersionKey === model.modelVersionKey,
+    )
     openModelTab(model)
     setSelectedModelVersionKey(model.modelVersionKey)
     setActiveTab(model.modelVersionKey)
-    const detailNodes = resolveDetailNodesByInterface(model.commInterface)
-    if (detailNodes.length > 0) {
-      setDetailNodeForTab(model.modelVersionKey, detailNodes[0])
+    if (!alreadyOpened) {
+      const detailNodes = resolveDetailNodesByInterface(model.commInterface)
+      if (detailNodes.length > 0) {
+        setDetailNodeForTab(model.modelVersionKey, detailNodes[0])
+      }
     }
     setCheckInErrorMessage(null)
   }
@@ -1431,7 +1440,7 @@ export function ModelPage() {
                       detailColumns={detailColumns}
                       detailRows={detailRows}
                       mdfContents={detailMdfContents}
-                      workflowMdfContents={workflowMdfContents}
+                      flowMdfContents={flowMdfContents}
                       isDetailLoading={detailNodeQuery.isLoading}
                       detailErrorMessage={detailLoadErrorMessage}
                       isEditMode={isEditMode}
@@ -1439,6 +1448,7 @@ export function ModelPage() {
                       lockOwner={lockOwner}
                       isCheckoutPending={checkoutModelMutation.isPending}
                       isCheckinPending={checkinModelMutation.isPending}
+                      isUndoPending={deleteModelMutation.isPending}
                       isDetailSavePending={saveDetailRowsMutation.isPending}
                       isMdfUploadPending={uploadMdfMutation.isPending}
                       actionErrorMessage={checkInErrorMessage}

@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   summarizeActionDataIndexValue,
-  summarizeWorkflowFilterValue,
+  summarizeFlowFilterValue,
 } from '../lib/model-detail-editor'
 import {
   MODEL_DETAIL_NODE_LABELS,
@@ -34,7 +34,7 @@ import {
   type ModelInfo,
   type ModelOpenedTab,
 } from '../types/model.types'
-import { WorkflowFilterEditorModal } from './WorkflowFilterEditorModal'
+import { FlowFilterEditorModal } from './FlowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard } from './FlowCard'
@@ -43,7 +43,7 @@ import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
 import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
 
-const WORKFLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
+const FLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
 
 /**
  * 모든 model 상세 테이블이 동일한 가시 프레임을 유지하도록 공통 최소 폭을 강제합니다.
@@ -54,7 +54,7 @@ const MODEL_DETAIL_TEXT_FIELD_MIN_WIDTH_CH = 26
 const MODEL_DETAIL_TEXT_FIELD_PADDING_CH = 14
 const MODEL_DETAIL_MODAL_PREVIEW_WIDTH = '180px'
 
-interface WorkflowTextEditorState {
+interface FlowTextEditorState {
   rowId: string
   rowLabel: string
   rowIndex: number
@@ -62,7 +62,7 @@ interface WorkflowTextEditorState {
   columnName: string
 }
 
-interface WorkflowMessageOption {
+interface FlowMessageOption {
   value: string
   label: string
 }
@@ -75,7 +75,7 @@ interface ModelDetailPanelProps {
   detailColumns: string[]
   detailRows: ModelDetailRow[]
   mdfContents: ModelMdfContent[]
-  workflowMdfContents: ModelMdfContent[]
+  flowMdfContents: ModelMdfContent[]
   isDetailLoading: boolean
   detailErrorMessage: string | null
   isEditMode: boolean
@@ -83,6 +83,7 @@ interface ModelDetailPanelProps {
   lockOwner: string | null
   isCheckoutPending: boolean
   isCheckinPending: boolean
+  isUndoPending: boolean
   isDetailSavePending: boolean
   isMdfUploadPending: boolean
   actionErrorMessage: string | null
@@ -114,7 +115,7 @@ const resolveDetailNodes = (model: ModelInfo | null): ModelDetailNode[] => {
 /**
  * workflow의 Filter/Data Index 컬럼은 구조화 편집 대상으로 분기합니다.
  */
-const isWorkflowModalEditableColumn = (
+const isFlowModalEditableColumn = (
   detailNode: ModelDetailNode | null,
   columnName: string | undefined,
 ): boolean => {
@@ -122,7 +123,7 @@ const isWorkflowModalEditableColumn = (
     return false
   }
 
-  return WORKFLOW_MODAL_EDITABLE_COLUMNS.has(columnName.trim().toLowerCase())
+  return FLOW_MODAL_EDITABLE_COLUMNS.has(columnName.trim().toLowerCase())
 }
 
 const isFilterColumn = (columnName: string | undefined): boolean =>
@@ -144,14 +145,14 @@ const isDcopCollectionRuleColumn = (columnName: string | undefined): boolean =>
 const DCOP_COLLECTION_RULE_OPTIONS = ['LAST', 'FIRST', 'AVERAGE', 'MIN', 'MAX'] as const
 
 /**
- * workflow 테이블에서 Workflow Name(첫 번째 컬럼) 입력값이 다른 행에 중복되는지 확인합니다.
+ * workflow 테이블에서 Flow Name(첫 번째 컬럼) 입력값이 다른 행에 중복되는지 확인합니다.
  *
  * @param value 현재 입력값
  * @param rowId 현재 row의 id (자기 자신 제외용)
  * @param allRows 전체 row 목록
  * @returns 중복이 있으면 true
  */
-const hasDuplicateWorkflowName = (value: string, rowId: string, allRows: ModelDetailRow[]): boolean => {
+const hasDuplicateFlowName = (value: string, rowId: string, allRows: ModelDetailRow[]): boolean => {
   const normalized = value.trim()
   if (!normalized) {
     return false
@@ -159,7 +160,7 @@ const hasDuplicateWorkflowName = (value: string, rowId: string, allRows: ModelDe
   return allRows.some((other) => other.id !== rowId && (other.values[0] ?? '').trim() === normalized)
 }
 
-const resolveWorkflowPreviewValue = (row: ModelDetailRow, columnIndex: number, columnName: string): string => {
+const resolveFlowPreviewValue = (row: ModelDetailRow, columnIndex: number, columnName: string): string => {
   const storedPreview = row.previewValues[columnIndex]?.trim()
   if (storedPreview) {
     return storedPreview
@@ -167,7 +168,7 @@ const resolveWorkflowPreviewValue = (row: ModelDetailRow, columnIndex: number, c
 
   const rawValue = row.values[columnIndex] ?? ''
   if (isFilterColumn(columnName)) {
-    return summarizeWorkflowFilterValue(rawValue)
+    return summarizeFlowFilterValue(rawValue)
   }
 
   if (isDataIndexColumn(columnName)) {
@@ -189,7 +190,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   detailColumns,
   detailRows,
   mdfContents,
-  workflowMdfContents,
+  flowMdfContents,
   isDetailLoading,
   detailErrorMessage,
   isEditMode,
@@ -197,6 +198,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   lockOwner,
   isCheckoutPending,
   isCheckinPending,
+  isUndoPending,
   isDetailSavePending,
   isMdfUploadPending,
   actionErrorMessage,
@@ -212,11 +214,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   onCheckOut,
   onRequestCheckIn,
 }: ModelDetailPanelProps) {
-  const [workflowTextEditor, setWorkflowTextEditor] = useState<WorkflowTextEditorState | null>(null)
+  const [flowTextEditor, setFlowTextEditor] = useState<FlowTextEditorState | null>(null)
   // 모달이 편집 중인 raw JSON string (filter 또는 action_data_index).
   // 추출된 모달은 자기 자신의 draft state 를 보유하므로 ModelDetailPanel 은 row.values 의
   // raw string 만 전달하면 됩니다.
-  const [workflowEditorValue, setWorkflowEditorValue] = useState<string>('')
+  const [flowEditorValue, setFlowEditorValue] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // F5: Message Flows 사이드바 — selectedFlowId / draftFlow 는 model-ui store 로 이관.
@@ -239,17 +241,17 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const normalizedDetailNode = detailNode ?? detailNodes[0] ?? null
   const normalizedDetailColumns = detailColumns.length > 0 ? detailColumns : ['Value']
   const isMdfNode = normalizedDetailNode === 'mdf'
-  const isWorkflowNode = normalizedDetailNode === 'workflow'
+  const isFlowNode = normalizedDetailNode === 'workflow'
   const isDcopItemsNode = normalizedDetailNode === 'dcop-itemes'
   const isBranchModel = Boolean(activeModel?.parentModel?.trim())
   const isDeprecatedBranch =
     isBranchModel && activeModel?.status.trim().toUpperCase() === 'DEPRECATED'
   const isReadOnly = !isEditMode || isLockedByOtherUser
-  const isWorkflowEditorOpen = workflowTextEditor !== null && normalizedDetailNode === 'workflow'
+  const isFlowEditorOpen = flowTextEditor !== null && normalizedDetailNode === 'workflow'
   const isFilterEditorOpen =
-    isWorkflowEditorOpen && isFilterColumn(workflowTextEditor?.columnName)
+    isFlowEditorOpen && isFilterColumn(flowTextEditor?.columnName)
   const isActionDataIndexEditorOpen =
-    isWorkflowEditorOpen && isDataIndexColumn(workflowTextEditor?.columnName)
+    isFlowEditorOpen && isDataIndexColumn(flowTextEditor?.columnName)
   const canEditTableRows = !isReadOnly && !isMdfNode
 
   // SOCKET 모델 여부 판단
@@ -261,17 +263,17 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const isFlowCardVisible = selectedFlowId !== null || draftFlow !== null
   // workflow 편집 시 Message Name 정합성을 위해 secs-message / socket-message 데이터를 조회합니다.
   // (workflow / Flow 어느 쪽도 보이지 않으면 fetch 생략 — 읽기 전용 reference 노드 진입 시 무용 query 방지)
-  const workflowMessageDetailNode = isSocketModel ? 'socket-message' : 'secs-message'
+  const flowMessageDetailNode = isSocketModel ? 'socket-message' : 'secs-message'
   const messagesQueryEnabled =
-    (isWorkflowNode && !isReadOnly) || isFlowCardVisible
-  const workflowMessageQuery = useModelNodeDetail(
+    (isFlowNode && !isReadOnly) || isFlowCardVisible
+  const flowMessageQuery = useModelNodeDetail(
     messagesQueryEnabled ? (activeModel?.modelVersionKey ?? null) : null,
-    workflowMessageDetailNode,
+    flowMessageDetailNode,
   )
   // message 이름 컬럼은 첫 번째 컬럼 ('SECS Message Name' 또는 'Socket Message Name')
-  const workflowMessageOptions = useMemo(
-    () => workflowMessageQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
-    [workflowMessageQuery.data?.rows],
+  const flowMessageOptions = useMemo(
+    () => flowMessageQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
+    [flowMessageQuery.data?.rows],
   )
 
   // workflow 편집 시 MES Message Name도 포함합니다. (SECS/Socket 모델 공통 적용)
@@ -284,8 +286,8 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     [mesMessageQuery.data?.rows],
   )
   // 동일 message 이름이 여러 출처에 있으면 저장값은 그대로 두고 라벨만 병합해 보여 줍니다.
-  const allMessageOptions = useMemo<WorkflowMessageOption[]>(() => {
-    const sortedWorkflowMessageOptions = [...workflowMessageOptions].sort((firstItem, secondItem) =>
+  const allMessageOptions = useMemo<FlowMessageOption[]>(() => {
+    const sortedFlowMessageOptions = [...flowMessageOptions].sort((firstItem, secondItem) =>
       firstItem.localeCompare(secondItem),
     )
     const sortedMesMessageOptions = [...mesMessageOptions].sort((firstItem, secondItem) =>
@@ -293,7 +295,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     )
     const sourceSetByName = new Map<string, Set<string>>()
 
-    sortedWorkflowMessageOptions.forEach((messageName) => {
+    sortedFlowMessageOptions.forEach((messageName) => {
       const existingSourceSet = sourceSetByName.get(messageName) ?? new Set<string>()
       existingSourceSet.add(isSocketModel ? 'Socket Message' : 'SECS Message')
       sourceSetByName.set(messageName, existingSourceSet)
@@ -309,20 +311,20 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       value,
       label: `${value} [${[...sourceSet].join(', ')}]`,
     }))
-  }, [isSocketModel, mesMessageOptions, workflowMessageOptions])
+  }, [isSocketModel, mesMessageOptions, flowMessageOptions])
 
   // SECS 모델 workflow / dcop-itemes 편집 시 EventId 정합성을 위해 eventides 데이터를 조회합니다.
   // (SOCKET 모델이거나 읽기 전용 상태에서는 조회하지 않음)
-  const workflowEventIdQuery = useModelNodeDetail(
-    (isWorkflowNode || isDcopItemsNode) && !isReadOnly && !isSocketModel
+  const flowEventIdQuery = useModelNodeDetail(
+    (isFlowNode || isDcopItemsNode) && !isReadOnly && !isSocketModel
       ? (activeModel?.modelVersionKey ?? null)
       : null,
     'eventides',
   )
   // EventId 컬럼은 eventides의 첫 번째 컬럼
-  const workflowEventIdOptions = useMemo(
-    () => workflowEventIdQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
-    [workflowEventIdQuery.data?.rows],
+  const flowEventIdOptions = useMemo(
+    () => flowEventIdQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
+    [flowEventIdQuery.data?.rows],
   )
 
   const hintText = !activeModel
@@ -347,24 +349,24 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     isCheckinPending ||
     !isEditMode ||
     isLockedByOtherUser
-  // workflow 노드에서 Workflow Name 중복이 있으면 저장을 차단합니다.
-  const hasWorkflowNameDuplicate = useMemo(() => {
-    if (!isWorkflowNode) {
+  // workflow 노드에서 Flow Name 중복이 있으면 저장을 차단합니다.
+  const hasFlowNameDuplicate = useMemo(() => {
+    if (!isFlowNode) {
       return false
     }
     const names = detailRows.map((row) => (row.values[0] ?? '').trim()).filter(Boolean)
     return names.length !== new Set(names).size
-  }, [isWorkflowNode, detailRows])
+  }, [isFlowNode, detailRows])
 
   const detailColumnWidths = normalizedDetailColumns.map((columnName, columnIndex) => {
-    if (isWorkflowModalEditableColumn(normalizedDetailNode, columnName)) {
+    if (isFlowModalEditableColumn(normalizedDetailNode, columnName)) {
       return MODEL_DETAIL_MODAL_PREVIEW_WIDTH
     }
 
     const maxValueLength = detailRows.reduce((maxLength, row) => {
       const rawValue = row.values[columnIndex] ?? ''
       const displayValue =
-        isWorkflowNode && isMessageNameColumn(columnName)
+        isFlowNode && isMessageNameColumn(columnName)
           ? (allMessageOptions.find((option) => option.value === rawValue)?.label ?? rawValue)
           : rawValue
 
@@ -391,22 +393,22 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     !isEditMode ||
     isLockedByOtherUser ||
     isMdfNode ||
-    hasWorkflowNameDuplicate
+    hasFlowNameDuplicate
 
-  const workflowEditorTitle = useMemo(() => {
-    if (!workflowTextEditor) {
+  const flowEditorTitle = useMemo(() => {
+    if (!flowTextEditor) {
       return ''
     }
 
-    if (!workflowTextEditor.rowLabel) {
-      return workflowTextEditor.columnName
+    if (!flowTextEditor.rowLabel) {
+      return flowTextEditor.columnName
     }
 
-    return `${workflowTextEditor.rowLabel} / ${workflowTextEditor.columnName}`
-  }, [workflowTextEditor])
+    return `${flowTextEditor.rowLabel} / ${flowTextEditor.columnName}`
+  }, [flowTextEditor])
 
-  const workflowEditorErrorMessage = useMemo(() => {
-    if (!workflowTextEditor || !actionErrorMessage) {
+  const flowEditorErrorMessage = useMemo(() => {
+    if (!flowTextEditor || !actionErrorMessage) {
       return null
     }
 
@@ -415,41 +417,41 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       return normalizedMessage
     }
 
-    const rowPrefix = `workflow ${workflowTextEditor.rowIndex + 1}행`
+    const rowPrefix = `workflow ${flowTextEditor.rowIndex + 1}행`
     return normalizedMessage.startsWith(rowPrefix) ? normalizedMessage : null
-  }, [actionErrorMessage, workflowTextEditor])
+  }, [actionErrorMessage, flowTextEditor])
 
-  const handleOpenWorkflowTextEditor = (
+  const handleOpenFlowTextEditor = (
     row: ModelDetailRow,
     rowIndex: number,
     columnIndex: number,
   ) => {
     const columnName = normalizedDetailColumns[columnIndex]
-    if (!isWorkflowModalEditableColumn(normalizedDetailNode, columnName)) {
+    if (!isFlowModalEditableColumn(normalizedDetailNode, columnName)) {
       return
     }
 
-    setWorkflowTextEditor({
+    setFlowTextEditor({
       rowId: row.id,
       rowLabel: row.values[0] ?? '',
       rowIndex,
       columnIndex,
       columnName,
     })
-    setWorkflowEditorValue(row.values[columnIndex] ?? '')
+    setFlowEditorValue(row.values[columnIndex] ?? '')
   }
 
-  const handleCloseWorkflowTextEditor = () => {
-    setWorkflowTextEditor(null)
-    setWorkflowEditorValue('')
+  const handleCloseFlowTextEditor = () => {
+    setFlowTextEditor(null)
+    setFlowEditorValue('')
   }
 
-  const handleSaveWorkflowTextEditor = (nextValue: string) => {
-    if (!workflowTextEditor || isReadOnly) {
+  const handleSaveFlowTextEditor = (nextValue: string) => {
+    if (!flowTextEditor || isReadOnly) {
       return
     }
-    onChangeDetailValue(workflowTextEditor.rowId, workflowTextEditor.columnIndex, nextValue)
-    handleCloseWorkflowTextEditor()
+    onChangeDetailValue(flowTextEditor.rowId, flowTextEditor.columnIndex, nextValue)
+    handleCloseFlowTextEditor()
   }
 
   // Message Flows 사이드바용 — modelFlowListQuery 만 (Unassigned 영역은 v4 에서 폐기).
@@ -462,7 +464,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   // 활성화 조건: activeModelVersionKey 가 있을 때 — 모델 진입 즉시 prefetch.
   const dcopItemesQuery = useModelNodeDetail(activeModelVersionKey, 'dcop-itemes')
   // dcop-itemes 응답 (columns/values 평면) 을 picker 가 다루는 ModelDcopItem 으로 변환.
-  // v4 에서 응답의 Workflow Name 컬럼은 제거됐으므로 dcopItemName + row.id 의 PK 만 사용한다.
+  // v4 에서 응답의 workflowName 컬럼은 제거됐으므로 dcopItemName + row.id 의 PK 만 사용한다.
   const referenceDcopItems = useMemo<readonly ModelDcopItem[]>(() => {
     const data = dcopItemesQuery.data
     if (!data || activeModelVersionKey === null) {
@@ -514,7 +516,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     onChange: (nextRaw: string) => void
   } | null>(null)
 
-  const handleFlowEditWorkflowFilter = (currentRaw: string, onChange: (nextRaw: string) => void) => {
+  const handleEditFlowFilter = (currentRaw: string, onChange: (nextRaw: string) => void) => {
     setFlowEditor({ kind: 'workflow-filter', value: currentRaw, onChange })
   }
   const handleFlowEditActionDataIndex = (
@@ -579,32 +581,32 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const isDraftMode = draftFlow !== null
 
   // FlowCard Identity Message dropdown 옵션 — protocol 별 합쳐서 (SECS+MES) / (Socket+MES).
-  // workflowMessageOptions / mesMessageOptions 는 이미 위에서 같은 source 로 fetch 됨.
+  // flowMessageOptions / mesMessageOptions 는 이미 위에서 같은 source 로 fetch 됨.
   // 중복 이름은 한 번만 노출 — workflow.message_name 컬럼은 단일 string 이므로 통합 namespace.
   const flowCardMessageOptions = useMemo<readonly { name: string }[]>(() => {
     const uniqueNames = new Set<string>()
-    for (const name of workflowMessageOptions) {
+    for (const name of flowMessageOptions) {
       uniqueNames.add(name)
     }
     for (const name of mesMessageOptions) {
       uniqueNames.add(name)
     }
     return [...uniqueNames].sort((a, b) => a.localeCompare(b)).map((name) => ({ name }))
-  }, [workflowMessageOptions, mesMessageOptions])
+  }, [flowMessageOptions, mesMessageOptions])
 
   // FlowCard Trigger Event Id dropdown 옵션 — eventides 의 첫 컬럼. SECS 모델 한정.
-  // workflowEventIdOptions 가 enable 조건상 isWorkflowNode || isDcopItemsNode 시점에만 fetch
+  // flowEventIdOptions 가 enable 조건상 isFlowNode || isDcopItemsNode 시점에만 fetch
   // — FlowCard 시점엔 둘 다 false 라 빈 배열. FlowCard 자체가 Socket 일 때 Trigger 미렌더이므로
   // 일치성은 보장. SECS Flow 의 Event dropdown 활성화는 별 SPEC (Identity / Action 우선).
   const flowCardEventOptions = useMemo<readonly { id: string; label: string }[]>(
-    () => workflowEventIdOptions.map((id) => ({ id, label: id })),
-    [workflowEventIdOptions],
+    () => flowEventIdOptions.map((id) => ({ id, label: id })),
+    [flowEventIdOptions],
   )
 
-  // FlowCard Action MDF Template dropdown 옵션 — workflowMdfContents 안 message[name] 추출.
+  // FlowCard Action MDF Template dropdown 옵션 — flowMdfContents 안 message[name] 추출.
   const flowCardMdfTemplateOptions = useMemo<readonly { name: string }[]>(
-    () => extractMdfMessageOptions(workflowMdfContents).map((option) => ({ name: option.messageName })),
-    [workflowMdfContents],
+    () => extractMdfMessageOptions(flowMdfContents).map((option) => ({ name: option.messageName })),
+    [flowMdfContents],
   )
   const activeFlowMutation = isDraftMode ? createFlowMutation : updateFlowMutation
   const flowSaveStatus: 'idle' | 'saving' | 'error' = activeFlowMutation.isPending
@@ -711,9 +713,13 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 variant="outline"
                 className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
                 onClick={onUndo}
-                disabled={isDetailSavePending || isCheckinPending || isMdfUploadPending}
+                disabled={isDetailSavePending || isCheckinPending || isMdfUploadPending || isUndoPending}
               >
-                <RotateCcw className="size-3.5" aria-hidden="true" />
+                {isUndoPending ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
+                )}
                 Undo
               </Button>
               {isMdfNode ? (
@@ -845,7 +851,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 onSave={handleSaveFlow}
                 saveStatus={flowSaveStatus}
                 errorMessage={flowSaveErrorMessage}
-                onEditWorkflowFilter={handleFlowEditWorkflowFilter}
+                onEditFlowFilter={handleEditFlowFilter}
                 onEditActionDataIndex={handleFlowEditActionDataIndex}
                 onAddDcopItem={handleFlowAddDcopItem}
                 onCancelDraft={clearDraftFlow}
@@ -866,7 +872,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   onSave={handleSaveFlow}
                   saveStatus={flowSaveStatus}
                   errorMessage={flowSaveErrorMessage}
-                  onEditWorkflowFilter={handleFlowEditWorkflowFilter}
+                  onEditFlowFilter={handleEditFlowFilter}
                   onEditActionDataIndex={handleFlowEditActionDataIndex}
                   onAddDcopItem={handleFlowAddDcopItem}
                   onCancelDraft={null}
@@ -939,7 +945,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   <Table className={MODEL_DETAIL_TABLE_CLASS}>
                     <colgroup>
                       {visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => {
-                        const isModalEditableColumn = isWorkflowModalEditableColumn(
+                        const isModalEditableColumn = isFlowModalEditableColumn(
                           normalizedDetailNode,
                           columnName,
                         )
@@ -972,7 +978,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                             style={{
                               width: detailColumnWidths[columnIndex],
                               minWidth: detailColumnWidths[columnIndex],
-                              maxWidth: isWorkflowModalEditableColumn(normalizedDetailNode, columnName)
+                              maxWidth: isFlowModalEditableColumn(normalizedDetailNode, columnName)
                                 ? detailColumnWidths[columnIndex]
                                 : undefined,
                               ...(visibleIndex === 0
@@ -1028,19 +1034,19 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                           <TableRow key={row.id}>
                             {visibleColumns.map(({ columnName, columnIndex }) => {
                               const rawValue = row.values[columnIndex] ?? ''
-                              const isModalEditable = isWorkflowModalEditableColumn(
+                              const isModalEditable = isFlowModalEditableColumn(
                                 normalizedDetailNode,
                                 columnName,
                               )
                               const displayValue = isModalEditable
-                                ? resolveWorkflowPreviewValue(row, columnIndex, columnName)
+                                ? resolveFlowPreviewValue(row, columnIndex, columnName)
                                 : rawValue
 
-                              // Workflow Name 중복 여부 (workflow 노드의 첫 번째 컬럼)
+                              // Flow Name 중복 여부 (workflow 노드의 첫 번째 컬럼)
                               const isDuplicate =
-                                isWorkflowNode &&
+                                isFlowNode &&
                                 columnIndex === 0 &&
-                                hasDuplicateWorkflowName(rawValue, row.id, detailRows)
+                                hasDuplicateFlowName(rawValue, row.id, detailRows)
 
                               return (
                                 <TableCell
@@ -1072,7 +1078,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                     <div
                                       className="group flex min-h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-[#DCE5E0] bg-white px-2 py-1.5"
                                       onDoubleClick={() =>
-                                        handleOpenWorkflowTextEditor(row, rowIndex, columnIndex)
+                                        handleOpenFlowTextEditor(row, rowIndex, columnIndex)
                                       }
                                     >
                                       <span
@@ -1087,10 +1093,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          handleOpenWorkflowTextEditor(row, rowIndex, columnIndex)
+                                          handleOpenFlowTextEditor(row, rowIndex, columnIndex)
                                         }
                                         className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[#5B6962] transition hover:border-[#DCE5E0] hover:bg-[#F3F7F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                        aria-label={`${row.values[0] ?? 'workflow'} ${columnName} 편집`}
+                                        aria-label={`${row.values[0] ?? 'flow'} ${columnName} 편집`}
                                       >
                                         <MoreHorizontal className="size-3.5" />
                                       </button>
@@ -1105,7 +1111,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                     >
                                       {displayValue || '—'}
                                     </span>
-                                  ) : isWorkflowNode && isMessageNameColumn(columnName) ? (
+                                  ) : isFlowNode && isMessageNameColumn(columnName) ? (
                                     // Message Name: secs-message / socket-message 목록 드롭다운
                                     <select
                                       value={rawValue}
@@ -1126,7 +1132,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                         </option>
                                       ))}
                                     </select>
-                                  ) : isWorkflowNode && isEventIdColumn(columnName) ? (
+                                  ) : isFlowNode && isEventIdColumn(columnName) ? (
                                     // EventId: eventides 목록 드롭다운 (SECS 모델 전용)
                                     <select
                                       value={rawValue}
@@ -1137,10 +1143,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !workflowEventIdOptions.includes(rawValue) && (
+                                      {rawValue && !flowEventIdOptions.includes(rawValue) && (
                                         <option value={rawValue}>{rawValue}</option>
                                       )}
-                                      {workflowEventIdOptions.map((id) => (
+                                      {flowEventIdOptions.map((id) => (
                                         <option key={id} value={id}>
                                           {id}
                                         </option>
@@ -1157,10 +1163,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                     >
                                       <option value="">—</option>
                                       {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !workflowEventIdOptions.includes(rawValue) && (
+                                      {rawValue && !flowEventIdOptions.includes(rawValue) && (
                                         <option value={rawValue}>{rawValue}</option>
                                       )}
-                                      {workflowEventIdOptions.map((id) => (
+                                      {flowEventIdOptions.map((id) => (
                                         <option key={id} value={id}>
                                           {id}
                                         </option>
@@ -1183,7 +1189,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                       ))}
                                     </select>
                                   ) : (
-                                    // 일반 Input (Workflow Name은 중복 시 에러 표시)
+                                    // 일반 Input (Flow Name 은 중복 시 에러 표시)
                                     <Input
                                       value={rawValue}
                                       onChange={(event) =>
@@ -1197,7 +1203,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                       )}
                                       title={
                                         isDuplicate
-                                          ? '다른 행에 동일한 Workflow Name이 있습니다.'
+                                          ? '다른 행에 동일한 Flow Name이 있습니다.'
                                           : undefined
                                       }
                                     />
@@ -1233,25 +1239,25 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         </div>
       </section>
 
-      <WorkflowFilterEditorModal
+      <FlowFilterEditorModal
         open={isFilterEditorOpen}
-        value={workflowEditorValue}
+        value={flowEditorValue}
         readOnly={isReadOnly}
-        titleLabel={workflowEditorTitle}
-        errorMessage={workflowEditorErrorMessage}
-        onClose={handleCloseWorkflowTextEditor}
-        onSave={handleSaveWorkflowTextEditor}
+        titleLabel={flowEditorTitle}
+        errorMessage={flowEditorErrorMessage}
+        onClose={handleCloseFlowTextEditor}
+        onSave={handleSaveFlowTextEditor}
       />
 
       <ActionDataIndexEditorModal
         open={isActionDataIndexEditorOpen}
-        value={workflowEditorValue}
+        value={flowEditorValue}
         readOnly={isReadOnly}
-        titleLabel={workflowEditorTitle}
-        errorMessage={workflowEditorErrorMessage}
-        workflowMdfContents={workflowMdfContents}
-        onClose={handleCloseWorkflowTextEditor}
-        onSave={handleSaveWorkflowTextEditor}
+        titleLabel={flowEditorTitle}
+        errorMessage={flowEditorErrorMessage}
+        flowMdfContents={flowMdfContents}
+        onClose={handleCloseFlowTextEditor}
+        onSave={handleSaveFlowTextEditor}
       />
 
       {/*
@@ -1260,11 +1266,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         draft → raw 직렬화는 FlowCard 내부, 모달 → draft 역변환도 FlowCard 내부
         (handleClickEdit* 의 onChange 콜백). ModelDetailPanel 은 단순 라우터.
       */}
-      <WorkflowFilterEditorModal
+      <FlowFilterEditorModal
         open={flowEditor?.kind === 'workflow-filter'}
         value={flowEditor?.kind === 'workflow-filter' ? flowEditor.value : ''}
         readOnly={isReadOnly}
-        titleLabel="Workflow Filter"
+        titleLabel="Flow Filter"
         errorMessage={null}
         onClose={handleCloseFlowEditor}
         onSave={handleSaveFlowEditor}
@@ -1276,7 +1282,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         readOnly={isReadOnly}
         titleLabel="Action Data Index"
         errorMessage={null}
-        workflowMdfContents={workflowMdfContents}
+        flowMdfContents={flowMdfContents}
         onClose={handleCloseFlowEditor}
         onSave={handleSaveFlowEditor}
       />

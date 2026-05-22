@@ -5,7 +5,7 @@ import {
   createEmptyFlowDraft,
   shouldRenderTriggerSection,
   summarizeFlowActionDataIndex,
-  summarizeFlowWorkflowFilter,
+  summarizeFlowFilter,
 } from '../src/features/model/lib/model-flow-editor.ts'
 import type { ModelFlow } from '../src/features/model/types/model.types.ts'
 
@@ -87,18 +87,18 @@ test('shouldRenderTriggerSection: SOCKET 모델은 Trigger 섹션을 미렌더�
   assert.equal(shouldRenderTriggerSection('SOCKET'), false)
 })
 
-test('summarizeFlowWorkflowFilter: SECS draft의 structured root는 요약 문자열을 반환합니다', () => {
+test('summarizeFlowFilter: SECS draft의 structured root는 요약 문자열을 반환합니다', () => {
   const draft = buildFlowDraft(buildSecsFlow())
-  const summary = summarizeFlowWorkflowFilter(draft.workflowFilter)
+  const summary = summarizeFlowFilter(draft.workflowFilter)
 
   assert.notEqual(summary, '필터 없음')
   // 'status' path가 요약에 포함되어야 합니다 (summarizeWorkflowFilterValue 동작 검증).
   assert.equal(summary.includes('status'), true)
 })
 
-test('summarizeFlowWorkflowFilter: Socket Flow의 null draft는 "필터 없음" 안내 문구를 반환합니다', () => {
+test('summarizeFlowFilter: Socket Flow의 null draft는 "필터 없음" 안내 문구를 반환합니다', () => {
   const draft = buildFlowDraft(buildSocketFlow())
-  assert.equal(summarizeFlowWorkflowFilter(draft.workflowFilter), '필터 없음')
+  assert.equal(summarizeFlowFilter(draft.workflowFilter), '필터 없음')
 })
 
 test('summarizeFlowActionDataIndex: SECS draft의 structured mdfTemplate은 요약 문자열을 반환합니다', () => {
@@ -115,9 +115,9 @@ test('summarizeFlowActionDataIndex: Socket Flow의 null draft는 "매핑 없음"
   assert.equal(summarizeFlowActionDataIndex(draft.actionDataIndex), '매핑 없음')
 })
 
-test('summarizeFlowWorkflowFilter: createEmptyFlowDraft의 null draft도 "필터 없음"을 반환합니다', () => {
+test('summarizeFlowFilter: createEmptyFlowDraft의 null draft도 "필터 없음"을 반환합니다', () => {
   const draft = createEmptyFlowDraft()
-  assert.equal(summarizeFlowWorkflowFilter(draft.workflowFilter), '필터 없음')
+  assert.equal(summarizeFlowFilter(draft.workflowFilter), '필터 없음')
   assert.equal(summarizeFlowActionDataIndex(draft.actionDataIndex), '매핑 없음')
 })
 

@@ -12,19 +12,19 @@ import {
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
-  buildWorkflowFilterValue,
-  createEmptyWorkflowFilterCondition,
-  createEmptyWorkflowGroup,
+  buildFlowFilterValue,
+  createEmptyFlowFilterCondition,
+  createEmptyFlowGroup,
   createTransformDraft,
   LOOKUP_SOURCE_OPTIONS,
-  parseWorkflowFilterEditor,
+  parseFlowFilterEditor,
   type TransformDraft,
-  type WorkflowComparison,
-  type WorkflowFilterEditorDraft,
-  type WorkflowGroupDraft,
-  type WorkflowLookupSource,
-  type WorkflowNodeDraft,
-  WORKFLOW_COMPARISON_OPTIONS,
+  type FlowComparison,
+  type FlowFilterEditorDraft,
+  type FlowGroupDraft,
+  type FlowLookupSource,
+  type FlowNodeDraft,
+  FLOW_COMPARISON_OPTIONS,
 } from '../lib/model-detail-editor'
 
 /**
@@ -36,7 +36,7 @@ import {
  * 만 주고받습니다 (기존 onChangeDetailValue 계약과 호환).
  */
 
-interface WorkflowFilterEditorModalProps {
+interface FlowFilterEditorModalProps {
   open: boolean
   value: string
   readOnly: boolean
@@ -46,7 +46,7 @@ interface WorkflowFilterEditorModalProps {
   onSave: (nextValue: string) => void
 }
 
-export function WorkflowFilterEditorModal({
+export function FlowFilterEditorModal({
   open,
   value,
   readOnly,
@@ -54,7 +54,7 @@ export function WorkflowFilterEditorModal({
   errorMessage,
   onClose,
   onSave,
-}: WorkflowFilterEditorModalProps) {
+}: FlowFilterEditorModalProps) {
   return (
     <Dialog
       open={open}
@@ -65,7 +65,7 @@ export function WorkflowFilterEditorModal({
       }}
     >
       {open ? (
-        <WorkflowFilterEditorModalBody
+        <FlowFilterEditorModalBody
           // key 로 open 전환 시 body 를 새로 mount — draft 가 새 value 로 자연 reset.
           key={value}
           value={value}
@@ -80,7 +80,7 @@ export function WorkflowFilterEditorModal({
   )
 }
 
-interface WorkflowFilterEditorModalBodyProps {
+interface FlowFilterEditorModalBodyProps {
   value: string
   readOnly: boolean
   titleLabel: string
@@ -89,54 +89,54 @@ interface WorkflowFilterEditorModalBodyProps {
   onSave: (nextValue: string) => void
 }
 
-function WorkflowFilterEditorModalBody({
+function FlowFilterEditorModalBody({
   value,
   readOnly,
   titleLabel,
   errorMessage,
   onClose,
   onSave,
-}: WorkflowFilterEditorModalBodyProps) {
-  const [draft, setDraft] = useState<WorkflowFilterEditorDraft>(() =>
-    parseWorkflowFilterEditor(value),
+}: FlowFilterEditorModalBodyProps) {
+  const [draft, setDraft] = useState<FlowFilterEditorDraft>(() =>
+    parseFlowFilterEditor(value),
   )
 
   const handleUpdateNode = (
     targetId: string,
-    patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
+    patcher: (targetNode: FlowNodeDraft) => FlowNodeDraft,
   ) => {
     setDraft((previousDraft) => ({
       ...previousDraft,
-      rootGroup: updateWorkflowNode(previousDraft.rootGroup, targetId, patcher) as WorkflowGroupDraft,
+      rootGroup: updateFlowNode(previousDraft.rootGroup, targetId, patcher) as FlowGroupDraft,
     }))
   }
 
   const handleAddCondition = (groupId: string) => {
     setDraft((previousDraft) => ({
       ...previousDraft,
-      rootGroup: addWorkflowChildNode(
+      rootGroup: addFlowChildNode(
         previousDraft.rootGroup,
         groupId,
-        createEmptyWorkflowFilterCondition(),
-      ) as WorkflowGroupDraft,
+        createEmptyFlowFilterCondition(),
+      ) as FlowGroupDraft,
     }))
   }
 
   const handleAddGroup = (groupId: string) => {
     setDraft((previousDraft) => ({
       ...previousDraft,
-      rootGroup: addWorkflowChildNode(
+      rootGroup: addFlowChildNode(
         previousDraft.rootGroup,
         groupId,
-        createEmptyWorkflowGroup('and'),
-      ) as WorkflowGroupDraft,
+        createEmptyFlowGroup('and'),
+      ) as FlowGroupDraft,
     }))
   }
 
   const handleRemoveNode = (nodeId: string) => {
     setDraft((previousDraft) => ({
       ...previousDraft,
-      rootGroup: removeWorkflowNode(previousDraft.rootGroup, nodeId),
+      rootGroup: removeFlowNode(previousDraft.rootGroup, nodeId),
     }))
   }
 
@@ -144,7 +144,7 @@ function WorkflowFilterEditorModalBody({
     if (readOnly) {
       return
     }
-    onSave(buildWorkflowFilterValue(draft))
+    onSave(buildFlowFilterValue(draft))
   }
 
   return (
@@ -154,7 +154,7 @@ function WorkflowFilterEditorModalBody({
     >
       <div className="flex h-full min-h-0 flex-col">
         <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
-          <DialogTitle>{titleLabel || 'Workflow 편집'}</DialogTitle>
+          <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
           <DialogDescription>
             workflow_filter를 canonical group/condition 구조로 편집합니다.
           </DialogDescription>
@@ -197,7 +197,7 @@ function WorkflowFilterEditorModalBody({
                   </div>
 
                   <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                    <WorkflowNodeEditor
+                    <FlowNodeEditor
                       node={draft.rootGroup}
                       depth={0}
                       readOnly={readOnly}
@@ -228,14 +228,14 @@ function WorkflowFilterEditorModalBody({
 // 외부 export 하지 않음 (file split 의 일부, surgical change).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ensureGroupChildren = (children: WorkflowNodeDraft[]): WorkflowNodeDraft[] =>
-  children.length > 0 ? children : [createEmptyWorkflowFilterCondition()]
+const ensureGroupChildren = (children: FlowNodeDraft[]): FlowNodeDraft[] =>
+  children.length > 0 ? children : [createEmptyFlowFilterCondition()]
 
-const updateWorkflowNode = (
-  node: WorkflowNodeDraft,
+const updateFlowNode = (
+  node: FlowNodeDraft,
   targetId: string,
-  patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
-): WorkflowNodeDraft => {
+  patcher: (targetNode: FlowNodeDraft) => FlowNodeDraft,
+): FlowNodeDraft => {
   if (node.id === targetId) {
     return patcher(node)
   }
@@ -246,15 +246,15 @@ const updateWorkflowNode = (
 
   return {
     ...node,
-    children: node.children.map((child) => updateWorkflowNode(child, targetId, patcher)),
+    children: node.children.map((child) => updateFlowNode(child, targetId, patcher)),
   }
 }
 
-const addWorkflowChildNode = (
-  node: WorkflowNodeDraft,
+const addFlowChildNode = (
+  node: FlowNodeDraft,
   groupId: string,
-  nextChild: WorkflowNodeDraft,
-): WorkflowNodeDraft => {
+  nextChild: FlowNodeDraft,
+): FlowNodeDraft => {
   if (node.nodeType === 'condition') {
     return node
   }
@@ -268,16 +268,16 @@ const addWorkflowChildNode = (
 
   return {
     ...node,
-    children: node.children.map((child) => addWorkflowChildNode(child, groupId, nextChild)),
+    children: node.children.map((child) => addFlowChildNode(child, groupId, nextChild)),
   }
 }
 
-const removeWorkflowNode = (
-  rootGroup: WorkflowGroupDraft,
+const removeFlowNode = (
+  rootGroup: FlowGroupDraft,
   targetId: string,
-): WorkflowGroupDraft => {
-  const removeChildFromGroup = (group: WorkflowGroupDraft): WorkflowGroupDraft => {
-    const nextChildren = group.children.flatMap<WorkflowNodeDraft>((child) => {
+): FlowGroupDraft => {
+  const removeChildFromGroup = (group: FlowGroupDraft): FlowGroupDraft => {
+    const nextChildren = group.children.flatMap<FlowNodeDraft>((child) => {
       if (child.id === targetId) {
         return []
       }
@@ -298,7 +298,7 @@ const removeWorkflowNode = (
   if (rootGroup.id === targetId) {
     return {
       ...rootGroup,
-      children: [createEmptyWorkflowFilterCondition()],
+      children: [createEmptyFlowFilterCondition()],
     }
   }
 
@@ -314,20 +314,20 @@ const updateTransforms = (
     transform.id === targetId ? { ...transform, ...patch } : transform,
   )
 
-interface WorkflowNodeEditorProps {
-  node: WorkflowNodeDraft
+interface FlowNodeEditorProps {
+  node: FlowNodeDraft
   depth: number
   readOnly: boolean
   onUpdateNode: (
     targetId: string,
-    patcher: (targetNode: WorkflowNodeDraft) => WorkflowNodeDraft,
+    patcher: (targetNode: FlowNodeDraft) => FlowNodeDraft,
   ) => void
   onAddCondition: (groupId: string) => void
   onAddGroup: (groupId: string) => void
   onRemoveNode: (nodeId: string) => void
 }
 
-function WorkflowNodeEditor({
+function FlowNodeEditor({
   node,
   depth,
   readOnly,
@@ -335,7 +335,7 @@ function WorkflowNodeEditor({
   onAddCondition,
   onAddGroup,
   onRemoveNode,
-}: WorkflowNodeEditorProps) {
+}: FlowNodeEditorProps) {
   if (node.nodeType === 'condition') {
     return (
       <div
@@ -372,7 +372,7 @@ function WorkflowNodeEditor({
                   targetNode.nodeType === 'condition'
                     ? {
                         ...targetNode,
-                        from: event.target.value as WorkflowLookupSource,
+                        from: event.target.value as FlowLookupSource,
                       }
                     : targetNode,
                 )
@@ -416,7 +416,7 @@ function WorkflowNodeEditor({
                   targetNode.nodeType === 'condition'
                     ? {
                         ...targetNode,
-                        comparison: event.target.value as WorkflowComparison,
+                        comparison: event.target.value as FlowComparison,
                       }
                     : targetNode,
                 )
@@ -424,7 +424,7 @@ function WorkflowNodeEditor({
               className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
               disabled={readOnly}
             >
-              {WORKFLOW_COMPARISON_OPTIONS.map((comparison) => (
+              {FLOW_COMPARISON_OPTIONS.map((comparison) => (
                 <option key={comparison} value={comparison}>
                   {comparison}
                 </option>
@@ -558,7 +558,7 @@ function WorkflowNodeEditor({
                 targetNode.nodeType === 'group'
                   ? {
                       ...targetNode,
-                      groupType: event.target.value as WorkflowGroupDraft['groupType'],
+                      groupType: event.target.value as FlowGroupDraft['groupType'],
                     }
                   : targetNode,
               )
@@ -605,7 +605,7 @@ function WorkflowNodeEditor({
 
       <div className="mt-4 space-y-3">
         {node.children.map((childNode) => (
-          <WorkflowNodeEditor
+          <FlowNodeEditor
             key={childNode.id}
             node={childNode}
             depth={depth + 1}

@@ -1,13 +1,13 @@
 import type { ModelDcopItem, ModelFlow, ModelFlowUpdateRequest } from '../types/model.types.ts'
 import {
   type ActionDataIndexEditorDraft,
-  type WorkflowFilterEditorDraft,
+  type FlowFilterEditorDraft,
   buildActionDataIndexValue,
-  buildWorkflowFilterValue,
+  buildFlowFilterValue,
   parseActionDataIndexEditor,
-  parseWorkflowFilterEditor,
+  parseFlowFilterEditor,
   summarizeActionDataIndexValue,
-  summarizeWorkflowFilterValue,
+  summarizeFlowFilterValue,
 } from './model-detail-editor.ts'
 
 /**
@@ -33,7 +33,7 @@ export interface FlowDraft {
   messageName: string
   eventId: string | null
   transactionId: string | null
-  workflowFilter: WorkflowFilterEditorDraft | null
+  workflowFilter: FlowFilterEditorDraft | null
   actionName: string
   actionDataIndex: ActionDataIndexEditorDraft | null
   dcopItems: readonly ModelDcopItem[]
@@ -52,7 +52,7 @@ export const buildFlowDraft = (flow: ModelFlow): FlowDraft => ({
   eventId: flow.eventId,
   transactionId: flow.transactionId,
   workflowFilter:
-    flow.workflowFilter === null ? null : parseWorkflowFilterEditor(flow.workflowFilter),
+    flow.workflowFilter === null ? null : parseFlowFilterEditor(flow.workflowFilter),
   actionName: flow.actionName,
   actionDataIndex:
     flow.actionDataIndex === null ? null : parseActionDataIndexEditor(flow.actionDataIndex),
@@ -67,7 +67,7 @@ export const buildFlowDraft = (flow: ModelFlow): FlowDraft => ({
  */
 export const serializeFlowDraft = (draft: FlowDraft): ModelFlowUpdateRequest => {
   const workflowFilterValue =
-    draft.workflowFilter === null ? null : buildWorkflowFilterValue(draft.workflowFilter)
+    draft.workflowFilter === null ? null : buildFlowFilterValue(draft.workflowFilter)
   const actionDataIndexValue =
     draft.actionDataIndex === null ? null : buildActionDataIndexValue(draft.actionDataIndex)
 
@@ -114,19 +114,19 @@ export const createEmptyFlowDraft = (): FlowDraft => ({
  * draft 의 structured root group 을 1 줄 요약. raw 모드면 첫 줄을 그대로 노출.
  * draft 가 null 이면 "필터 없음" — protocol 무관 비어 있는 Flow.
  */
-export const summarizeFlowWorkflowFilter = (
-  draft: WorkflowFilterEditorDraft | null,
+export const summarizeFlowFilter = (
+  draft: FlowFilterEditorDraft | null,
 ): string => {
   if (draft === null) {
     return '필터 없음'
   }
 
-  const serialized = buildWorkflowFilterValue(draft)
+  const serialized = buildFlowFilterValue(draft)
   if (serialized.length === 0) {
     return '필터 없음'
   }
 
-  const summary = summarizeWorkflowFilterValue(serialized)
+  const summary = summarizeFlowFilterValue(serialized)
   return summary.length > 0 ? summary : '필터 없음'
 }
 
@@ -179,7 +179,7 @@ export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean
  */
 export const draftToFlow = (draft: FlowDraft): ModelFlow => {
   const workflowFilterValue =
-    draft.workflowFilter === null ? null : buildWorkflowFilterValue(draft.workflowFilter)
+    draft.workflowFilter === null ? null : buildFlowFilterValue(draft.workflowFilter)
   const actionDataIndexValue =
     draft.actionDataIndex === null ? null : buildActionDataIndexValue(draft.actionDataIndex)
 
