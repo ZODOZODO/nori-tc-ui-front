@@ -39,6 +39,11 @@ import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard, type FlowCardHandle } from './FlowCard'
 import { DcopItemPickerModal } from './DcopItemPickerModal'
+import {
+  SelectableTable,
+  type ColumnDef,
+  type SelectableTableActionColumn,
+} from '@/shared/components/SelectableTable'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
 import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
@@ -251,6 +256,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const isDeprecatedBranch =
     isBranchModel && activeModel?.status.trim().toUpperCase() === 'DEPRECATED'
   const isReadOnly = !isEditMode || isLockedByOtherUser
+  // SPEC selectable-table-rollout R1: model-parameter 노드는 SelectableTable 기본 적용.
+  // R3 에서 나머지 detail 노드도 SelectableTable 로 일괄 전환됩니다.
+  const isModelParameterNode = normalizedDetailNode === 'model-parameter'
   const isFlowEditorOpen = flowTextEditor !== null && normalizedDetailNode === 'workflow'
   const isFilterEditorOpen =
     isFlowEditorOpen && isFilterColumn(flowTextEditor?.columnName)
@@ -935,7 +943,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
             ) : (
               <div className="flex h-full min-h-0 flex-col">
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-[#213028]">
+                  <h2 className="flex items-center gap-2 text-base font-semibold text-[#213028]">
                     {MODEL_DETAIL_NODE_LABELS[normalizedDetailNode ?? 'model-parameter']}
                   </h2>
 
@@ -952,6 +960,91 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   ) : null}
                 </div>
 
+                {isModelParameterNode ? (
+                  (() => {
+                    const modelParameterColumns: ColumnDef<ModelDetailRow>[] =
+                      visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => ({
+                        key: `${columnName}-${visibleIndex}`,
+                        header: columnName,
+                        accessor: (row) => row.values[columnIndex] ?? '',
+                        editable: !isReadOnly,
+                        sticky: visibleIndex === 0,
+                        width: detailColumnWidths[columnIndex],
+                        renderCell: (row, _rowIdx, _colIdx, { isEditing, endEdit }) => {
+                          const rawValue = row.values[columnIndex] ?? ''
+                          if (isReadOnly || !isEditing) {
+                            return (
+                              <span
+                                className={cn(
+                                  'min-w-0 truncate text-sm text-[#22322B]',
+                                  rawValue ? null : 'text-[#8A8A8A]',
+                                )}
+                                title={rawValue}
+                              >
+                                {rawValue || '—'}
+                              </span>
+                            )
+                          }
+                          return (
+                            <Input
+                              autoFocus
+                              value={rawValue}
+                              onChange={(event) =>
+                                onChangeDetailValue(row.id, columnIndex, event.target.value)
+                              }
+                              onBlur={endEdit}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault()
+                                  endEdit()
+                                }
+                              }}
+                              className="h-7 w-full min-w-0"
+                            />
+                          )
+                        },
+                      }))
+
+                    const modelParameterActionColumn:
+                      | SelectableTableActionColumn<ModelDetailRow>
+                      | undefined = canEditTableRows
+                      ? {
+                          width: '92px',
+                          render: (row) => (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                              onClick={() => onDeleteDetailRow(row.id)}
+                              aria-label={`${row.values[0] || '새 row'} 삭제`}
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
+                          ),
+                        }
+                      : undefined
+
+                    return (
+                      <SelectableTable
+                        columns={modelParameterColumns}
+                        rows={detailRows}
+                        rowKey={(row) => row.id}
+                        features={{ rangeCopy: true, rangePaste: !isReadOnly }}
+                        actionColumn={modelParameterActionColumn}
+                        onCellPaste={(row, columnIndex, value) =>
+                          onChangeDetailValue(row.id, columnIndex, value)
+                        }
+                        emptyState={
+                          canEditTableRows
+                            ? '편집 중인 상세 데이터가 없습니다. 행 추가로 row를 추가하거나 Undo로 체크아웃을 취소해 주세요.'
+                            : '표시할 상세 데이터가 없습니다.'
+                        }
+                        testId="selectable-table-model-parameter"
+                      />
+                    )
+                  })()
+                ) : (
                 <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   <Table className={MODEL_DETAIL_TABLE_CLASS}>
                     <colgroup>
@@ -1244,6 +1337,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     </TableBody>
                   </Table>
                 </div>
+                )}
               </div>
             )}
           </div>
