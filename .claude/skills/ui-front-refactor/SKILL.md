@@ -67,7 +67,11 @@ find <target> -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + | sor
 
 **안티패턴 탐지**:
 - `key={index}` / `key={i}` / `key={idx}` (Grep)
-- inline-object/inline-array prop — Grep multiline `<\w+ \w+={\{` (false positive 가능, 후보로만)
+- inline-object/inline-array prop — Grep multiline `<\w+ \w+={\{`
+  - 주의: 정상 객체 리터럴 prop / 정상 사용 케이스가 다수 매치되어 **false positive 높음**
+  - 결과는 report 에만 기록하고 **PASS/FAIL 판정에서 제외** (refactor 3 종 SKILL 의 중첩 깊이
+    heuristic 과 동일 정책)
+  - 임계값 표 (Step 2) 에서 inline-prop 항목은 분리 표기 — P3 (기록만) 카테고리로 한정
 
 ### 1-2. 런타임 baseline (audit-full)
 ```bash
@@ -77,6 +81,14 @@ OUTPUT_PATH=".claude/perf/measurements/refactor-baseline-${TS}.json" \
 ```
 
 분할 후 **regression 검증** 용도. 분할 자체로 응답 시간 / 청크 분포가 의도치 않게 바뀌면 안 됨.
+
+> **NOTE — baseline 파일명 prefix 컨벤션** (refactor / perf 트랙 분리):
+> - refactor 트랙: `refactor-baseline-<TS>.json` / `refactor-after-<TS>.json` (본 SKILL)
+> - perf 트랙: `baseline-<TS>.json` / `after-<TS>.json` (ui-front-perf SKILL)
+>
+> 같은 폴더 `.claude/perf/measurements/` 에 저장되지만 **파일명 prefix 로 분리** 한다.
+> cross-reference 시 (예: ui-backend-perf 의 ui-front baseline JSON 인용) perf 트랙
+> `baseline-` prefix 만 매치해야 refactor 측정값과 섞이지 않는다.
 
 ### 1-3. 빌드 baseline
 ```bash
