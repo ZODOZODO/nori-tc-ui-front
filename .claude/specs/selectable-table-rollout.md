@@ -80,9 +80,11 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 ### 전체 (모든 phase 공통)
 
 - `cd nori-tc-ui-front && npx tsc -b` PASS (사전 존재 AppProvider.tsx 의 query-core 중복 에러는 별 SPEC 영역 — 제외)
-- `cd nori-tc-ui-front && pnpm lint` PASS (eslint 에러 0)
+- `cd nori-tc-ui-front && npm run lint` PASS (eslint 에러 변경 파일 0건; 사전 존재 deploy / group 2건은 별 영역)
 - 변경된 파일에 한해 새 ESLint warning 0
+- `cd nori-tc-ui-front && npx vite build` PASS (bundle 빌드 회귀 없음)
 - 페이지별 기존 Playwright e2e (`tests/`) 회귀 PASS
+- **신규 / 변경 Playwright e2e 의 `page.on('console', msg => msg.type() === 'error')` 및 `page.on('pageerror', ...)` error level 메시지 0건** (글로벌 CLAUDE.md 14번 — assertion 통과 + console.error/pageerror 0 모두 동시 충족만 PASS). 각 e2e test 마지막에 `expect(consoleBucket.errors).toEqual([])` 명시
 
 ### R1 — 제네릭 추출
 
@@ -92,8 +94,14 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 ### R2 — 단순 read-only
 
-- [ ] DLQ / Deploy / EQP 각 1개 페이지에서 range copy → 클립보드 TSV 형식 검증 (Playwright e2e 1개 — 대표적으로 `BusinessDlqPanel` 또는 `EqpInfoTable`)
-- [ ] 각 페이지 기존 액션 버튼 (재시도·격리 해제·deploy 액션·EQP 액션) 회귀 없음 — 기존 e2e PASS
+각 카테고리 대표 1 파일에 대해 단일 e2e + console.error/pageerror 0 명시. 다른 파일은 회귀 e2e PASS 로 검증.
+
+- [ ] DLQ 대표 `BusinessDlqPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (행=`\n`, 셀=`\t`, 4 셀 fixture 정합) (Playwright e2e + console.error/pageerror 0)
+- [ ] Deploy 대표 `DeployMonitorPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0)
+- [ ] EQP 대표 `EqpInfoTable` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0)
+- [ ] DLQ 5 패널 (`DashboardPanel` / `RepairTaskPanel` / `QuarantinePanel` / `GatewayDlqPanel` / `BusinessDlqPanel`) 기존 액션 (재시도 / 격리 해제) 회귀 없음 — 기존 e2e PASS
+- [ ] `DeployMonitorPanel` 기존 액션 (deploy 액션 / 모니터 액션) 회귀 없음 — 기존 e2e PASS
+- [ ] EQP 4 종 (`EqpInfoTable` / `EqpParamTable` / `BusinessGroupModelTable` / `GatewayGroupTable`) 기존 액션 회귀 없음 — 기존 e2e PASS
 
 ### R3.1 — ModelDetailPanel 8 노드 마이그레이션
 
@@ -102,22 +110,33 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 ### R3.2 — ModelCheckInDiffModal / ParentModelCommitModal (별 PR — R3 범위 외)
 
-- [ ] `ModelCheckInDiffModal` diff 색상 cell 유지 + range copy 동작 — 별 PR (이번 Implement 미포함)
+- [ ] `ModelCheckInDiffModal` — diff 색상 cell renderer (추가/삭제/수정 행별 background) 유지 + 2x2 영역 range copy → 클립보드 TSV (Playwright e2e + console.error/pageerror 0). 별 PR
+- [ ] `ParentModelCommitModal` — diff 색상 cell renderer 유지 + 2x2 영역 range copy → 클립보드 TSV (Playwright e2e + console.error/pageerror 0). 별 PR
 
 ### R4 — 행 클릭 → 더블클릭 전환
 
-- [ ] `ModelInfoTable` / `UserListTable` / `GroupListTable` — Playwright e2e 1개에서 단일 클릭 = 셀 anchor 지정, **더블클릭 = 행 열기** 동작 확인
-- [ ] 기존 단일 클릭으로 행 열기를 가정한 e2e 가 있으면 더블클릭으로 업데이트
+3 파일 각각 명시적 e2e + console.error 0. UX 변경이라 회귀 면적 큼 — 파일별 검증 강제.
+
+- [ ] `ModelInfoTable` — 단일 클릭 시 셀 anchor 지정 + 더블클릭 시 행 열기 동작 (Playwright e2e + console.error/pageerror 0)
+- [ ] `UserListTable` — 단일 클릭 시 셀 anchor 지정 + 더블클릭 시 행 열기 동작 (Playwright e2e + console.error/pageerror 0)
+- [ ] `GroupListTable` — 단일 클릭 시 셀 anchor 지정 + 더블클릭 시 행 열기 동작 (Playwright e2e + console.error/pageerror 0)
+- [ ] 기존 단일 클릭으로 행 열기를 가정한 e2e 가 있으면 더블클릭으로 업데이트 (파일별 변경 명시)
 
 ### R5 — 복잡 편집 (의사결정 산출물)
 
-- [ ] DeployRegisterPanel / LiveMapDemoModal / FlowCard / CheckInModal 각각에 대해 "전환" 또는 "보존" 결정과 근거가 SPEC Validate 단계에서 문서화
+각 파일별 별 sub-AC. 결정은 "전환" 또는 "보존" 둘 중 하나 — 결정 시점 / 검토자 / 근거 모두 SPEC Validate 단계에서 명시.
+
+- [ ] `DeployRegisterPanel` — 전환 결정 시: Playwright e2e + console.error/pageerror 0. 보존 결정 시: 결정 사유 + 검토 일자 + 결정자 SPEC Validate 섹션에 명시
+- [ ] `LiveMapDemoModal` — 전환 결정 시: Playwright e2e + console.error/pageerror 0. 보존 결정 시: 결정 사유 + 검토 일자 + 결정자 SPEC Validate 섹션에 명시
+- [ ] `FlowCard` — 전환 결정 시: Playwright e2e + console.error/pageerror 0. 보존 결정 시: 결정 사유 + 검토 일자 + 결정자 SPEC Validate 섹션에 명시
+- [ ] `CheckInModal` — 전환 결정 시: Playwright e2e + console.error/pageerror 0. 보존 결정 시: 결정 사유 + 검토 일자 + 결정자 SPEC Validate 섹션에 명시
 
 ### R6 — 가상화 / 정렬 / 리사이즈
 
-- [ ] `SelectableTable` 의 `features.virtualization` 활성 시 1,000 행 렌더 후 스크롤 60fps 유지 (Playwright trace 또는 수동 측정)
-- [ ] header 클릭 → 정렬 토글 동작 (Playwright e2e)
-- [ ] header 우측 경계 drag → 컬럼 width 변경 (Playwright e2e)
+- [ ] 가상화 라이브러리 1차 PoC 결과 (`react-window` vs `@tanstack/react-virtual`) — 선택 라이브러리 + 근거 + peer dependency 검증 결과 SPEC update commit
+- [ ] `SelectableTable` 의 `features.virtualization` 활성 시 1,000 행 렌더 후 스크롤 60fps 유지 — Playwright trace 측정 (마지막 5~10줄 인용 + 60fps 평균값 명시)
+- [ ] header 클릭 → 정렬 토글 (asc → desc → off 3 단계) 동작 (Playwright e2e + console.error/pageerror 0)
+- [ ] header 우측 경계 drag → 컬럼 width 변경 동작 (Playwright e2e + console.error/pageerror 0)
 
 ## Out of Scope
 
