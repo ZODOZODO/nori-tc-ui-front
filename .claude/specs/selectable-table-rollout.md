@@ -40,8 +40,12 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [ ] EQP 정보 테이블 4 종 (`EqpInfoTable`, `EqpParamTable`, `BusinessGroupModelTable`, `GatewayGroupTable`) — range copy 활성
 
 ### R3 — Phase 3: model detail 나머지 노드 + diff modal 전환
-- [ ] `ModelDetailPanel` 의 model-parameter 외 노드 (workflow / dcop-itemes / secs-message / socket-message / mes-message / variableides / reportides / eventides) — range copy + 기존 picker·select·flow modal 분기 보존
-- [ ] `ModelCheckInDiffModal` / `ParentModelCommitModal` — diff 색상 cell renderer 유지하면서 range copy 활성
+
+#### R3.1 — ModelDetailPanel 8 노드 마이그레이션
+- [x] `ModelDetailPanel` 의 model-parameter 외 노드 (workflow / dcop-itemes / secs-message / socket-message / mes-message / variableides / reportides / eventides) — range copy + 기존 picker·select·flow modal 분기 보존. workflow 는 dead path ([ModelDetailPanel.tsx:787](../../src/features/model/components/ModelDetailPanel.tsx#L787) `detailNodes.filter((node) => node !== 'workflow')`, git 80605b4) 라 자연 진입 e2e 불가 — createWorkflowColumns factory 는 reference workflow 복원 시 재사용 자산으로 보존.
+
+#### R3.2 — ModelCheckInDiffModal / ParentModelCommitModal (별 PR — R3 범위 외)
+- [ ] `ModelCheckInDiffModal` / `ParentModelCommitModal` — diff 색상 cell renderer 유지하면서 range copy 활성 (별 PR — R3 Validate 시점 미진입)
 
 ### R4 — Phase 4: 행 클릭 테이블 UX 전환
 - [ ] `ModelInfoTable`, `UserListTable`, `GroupListTable` — 단일 클릭은 셀 선택, **더블클릭으로 행 열기**
@@ -91,11 +95,14 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [ ] DLQ / Deploy / EQP 각 1개 페이지에서 range copy → 클립보드 TSV 형식 검증 (Playwright e2e 1개 — 대표적으로 `BusinessDlqPanel` 또는 `EqpInfoTable`)
 - [ ] 각 페이지 기존 액션 버튼 (재시도·격리 해제·deploy 액션·EQP 액션) 회귀 없음 — 기존 e2e PASS
 
-### R3 — model detail + diff modal
+### R3.1 — ModelDetailPanel 8 노드 마이그레이션
 
-- [ ] ModelDetailPanel 의 9 개 detail node 각각에서 range copy 동작 — Playwright e2e 1개 (대표 노드 `socket-message` 또는 `workflow`)
-- [ ] picker / select / flow modal 셀 클릭 → 기존 모달 / dropdown 동작 회귀 0 (drag 와 click 충돌 없음)
-- [ ] `ModelCheckInDiffModal` diff 색상 cell 유지 + range copy 동작
+- [~] 부분 — ModelDetailPanel 의 9 개 detail node 각각에서 range copy 동작 — Playwright e2e 1개 (대표 노드 `socket-message` 또는 `workflow`). 충족: `dcop-itemes` 로 대체 검증 (`tests/e2e/selectable-table-model-workflow.spec.ts` `R3-AC-1` 2x2 range copy → TSV PASS) + `R3-AC-6` (7 노드 testId 노출 PASS) + `R3-AC-1` / `R3-AC-3` 에 console.error/pageerror 0 assertion 통과. 미충족: SPEC 이 명시한 대표 노드 `workflow` / `socket-message` 자연 e2e 진입 — `workflow` 는 dead path (사이드바 진입 불가, git 80605b4 — C1 결정 (c) 보존), `socket-message` 는 reference 사이드바 진입 가능하나 본 e2e 에 별도 케이스 미추가 (createGenericInputColumns 공유 경로라 dcop-itemes / model-parameter 가 같은 factory 패턴 검증).
+- [~] 부분 — picker / select / flow modal 셀 클릭 → 기존 모달 / dropdown 동작 회귀 0 (drag 와 click 충돌 없음). 충족: `R3-AC-3` (dcop-itemes EventId dropdown) PASS + console.error 0. 미충족: workflow 노드의 modal trigger / Message Name select / Flow Name 중복 always-edit Input — dead path 라 e2e 자연 진입 불가. 코드 인스펙션으로만 검증 (`createWorkflowColumns` modal column `editable: false` — drag↔modal 충돌 차단).
+
+### R3.2 — ModelCheckInDiffModal / ParentModelCommitModal (별 PR — R3 범위 외)
+
+- [ ] `ModelCheckInDiffModal` diff 색상 cell 유지 + range copy 동작 — 별 PR (이번 Implement 미포함)
 
 ### R4 — 행 클릭 → 더블클릭 전환
 
@@ -125,7 +132,9 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 ## SDD 진행 상태
 
-- [x] **Specify** — 이 SPEC.md 작성 완료 (2026-05-23)
-- [ ] **Plan** — 별 세션에서 Plan Mode 로 구현 계획 수립 (R1 부터)
-- [ ] **Implement** — Phase 별 별 세션. R1 → R2 → R3 → R4 → R5 → R6 순. 각 Phase 머지 후 사용자 confirm.
-- [ ] **Validate** — 별 세션에서 SPEC 대비 자동 검증, 위 체크박스 업데이트, R5 의 의사결정 결과 문서화
+전체 SPEC 은 phase R1~R7 다단계라 [x] / [ ] 는 phase 단위로 표기한다. 현재는 R3.1 한정 사이클 완료.
+
+- [x] **Specify (R1~R7 전체)** — 이 SPEC.md 작성 완료 (2026-05-23)
+- [x] **Plan (R3.1 한정)** — R3.1 Plan 확정 (2026-05-26, `.claude/progress/selectable-table-rollout-r3.md`). R1 / R2 / R3.2 / R4 / R5 / R6 / R7 미수행.
+- [x] **Implement (R3.1 한정)** — ModelDetailPanel 8 노드 마이그레이션 완료 (2026-05-26). R3.2 (ModelCheckInDiffModal) + 후속 Phase 미진행.
+- [~] **Validate (R3.1 한정, 부분)** — R3.1 Validate 완료 (2026-05-26, `.claude/progress/selectable-table-rollout-r3-validate.md`). 충족: e2e 3 PASS + console.error 0 + tsc / vite build / lint PASS (변경 파일 한정). 미충족: workflow 자연 e2e 진입 (dead path — 코드 인스펙션 보완), `socket-message` 자연 e2e 케이스 미추가. R3.2 (ModelCheckInDiffModal) 별 PR 보류.

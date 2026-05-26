@@ -5,7 +5,6 @@ import { useModelFlowDetail } from '../hooks/useModelFlowDetail'
 import { useModelFlowMutations } from '../hooks/useModelFlowMutations'
 import {
   Loader2,
-  MoreHorizontal,
   Plus,
   RotateCcw,
   Trash2,
@@ -13,10 +12,9 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   summarizeActionDataIndexValue,
   summarizeFlowFilterValue,
@@ -44,17 +42,18 @@ import {
   type ColumnDef,
   type SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
+import {
+  createDcopItemsColumns,
+  createGenericInputColumns,
+  createModelParameterColumns,
+  createWorkflowColumns,
+} from './modelDetailColumnDefs'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
 import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
 
 const FLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
 
-/**
- * 모든 model 상세 테이블이 동일한 가시 프레임을 유지하도록 공통 최소 폭을 강제합니다.
- * 내용이 길어도 바깥 패널이 아니라 테이블 viewport 내부에서만 스크롤되도록 고정합니다.
- */
-const MODEL_DETAIL_TABLE_CLASS = 'min-w-max table-auto'
 const MODEL_DETAIL_TEXT_FIELD_MIN_WIDTH_CH = 26
 const MODEL_DETAIL_TEXT_FIELD_PADDING_CH = 14
 const MODEL_DETAIL_MODAL_PREVIEW_WIDTH = '180px'
@@ -140,50 +139,6 @@ const isDataIndexColumn = (columnName: string | undefined): boolean =>
 const isMessageNameColumn = (columnName: string | undefined): boolean =>
   (columnName ?? '').trim().toLowerCase() === 'message name'
 
-const isEventIdColumn = (columnName: string | undefined): boolean =>
-  (columnName ?? '').trim().toLowerCase() === 'eventid'
-
-const isDcopCollectionRuleColumn = (columnName: string | undefined): boolean =>
-  (columnName ?? '').trim() === 'Collection Rule'
-
-/** dcop-itemes의 Collection Rule 선택 옵션 (기본값: LAST) */
-const DCOP_COLLECTION_RULE_OPTIONS = ['LAST', 'FIRST', 'AVERAGE', 'MIN', 'MAX'] as const
-
-/**
- * workflow 테이블에서 Flow Name(첫 번째 컬럼) 입력값이 다른 행에 중복되는지 확인합니다.
- *
- * @param value 현재 입력값
- * @param rowId 현재 row의 id (자기 자신 제외용)
- * @param allRows 전체 row 목록
- * @returns 중복이 있으면 true
- */
-const hasDuplicateFlowName = (value: string, rowId: string, allRows: ModelDetailRow[]): boolean => {
-  const normalized = value.trim()
-  if (!normalized) {
-    return false
-  }
-  return allRows.some((other) => other.id !== rowId && (other.values[0] ?? '').trim() === normalized)
-}
-
-const resolveFlowPreviewValue = (row: ModelDetailRow, columnIndex: number, columnName: string): string => {
-  const storedPreview = row.previewValues[columnIndex]?.trim()
-  if (storedPreview) {
-    return storedPreview
-  }
-
-  const rawValue = row.values[columnIndex] ?? ''
-  if (isFilterColumn(columnName)) {
-    return summarizeFlowFilterValue(rawValue)
-  }
-
-  if (isDataIndexColumn(columnName)) {
-    return summarizeActionDataIndexValue(rawValue)
-  }
-
-  return rawValue
-}
-
-
 /**
  * Model Version 상세 패널입니다.
  */
@@ -256,9 +211,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const isDeprecatedBranch =
     isBranchModel && activeModel?.status.trim().toUpperCase() === 'DEPRECATED'
   const isReadOnly = !isEditMode || isLockedByOtherUser
-  // SPEC selectable-table-rollout R1: model-parameter 노드는 SelectableTable 기본 적용.
-  // R3 에서 나머지 detail 노드도 SelectableTable 로 일괄 전환됩니다.
-  const isModelParameterNode = normalizedDetailNode === 'model-parameter'
   const isFlowEditorOpen = flowTextEditor !== null && normalizedDetailNode === 'workflow'
   const isFilterEditorOpen =
     isFlowEditorOpen && isFilterColumn(flowTextEditor?.columnName)
@@ -960,52 +912,73 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   ) : null}
                 </div>
 
-                {isModelParameterNode ? (
+                {isDetailLoading ? (
+                  // W7-B: 옛 분기의 8 행 skeleton UX 보존. SelectableTable 자체에는
+                  // loading skeleton 책임 없음 — 호출 바깥에서 분기.
+                  <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                    <Table className="min-w-max table-auto">
+                      <TableBody>
+                        {Array.from({ length: 8 }).map((_, rowIndex) => (
+                          <TableRow
+                            key={`model-detail-skeleton-${rowIndex}`}
+                            data-testid="model-detail-skeleton"
+                          >
+                            {Array.from({
+                              length: visibleColumnCount + (canEditTableRows ? 1 : 0),
+                            }).map((_, cellIndex) => (
+                              <TableCell key={cellIndex}>
+                                <Skeleton className="h-4 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : detailErrorMessage ? (
+                  <p className="py-10 text-center text-sm text-[#C5534B]">
+                    {detailErrorMessage}
+                  </p>
+                ) : (
                   (() => {
-                    const modelParameterColumns: ColumnDef<ModelDetailRow>[] =
-                      visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => ({
-                        key: `${columnName}-${visibleIndex}`,
-                        header: columnName,
-                        accessor: (row) => row.values[columnIndex] ?? '',
-                        editable: !isReadOnly,
-                        sticky: visibleIndex === 0,
-                        width: detailColumnWidths[columnIndex],
-                        renderCell: (row, _rowIdx, _colIdx, { isEditing, endEdit }) => {
-                          const rawValue = row.values[columnIndex] ?? ''
-                          if (isReadOnly || !isEditing) {
-                            return (
-                              <span
-                                className={cn(
-                                  'min-w-0 truncate text-sm text-[#22322B]',
-                                  rawValue ? null : 'text-[#8A8A8A]',
-                                )}
-                                title={rawValue}
-                              >
-                                {rawValue || '—'}
-                              </span>
-                            )
-                          }
-                          return (
-                            <Input
-                              autoFocus
-                              value={rawValue}
-                              onChange={(event) =>
-                                onChangeDetailValue(row.id, columnIndex, event.target.value)
-                              }
-                              onBlur={endEdit}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault()
-                                  endEdit()
-                                }
-                              }}
-                              className="h-7 w-full min-w-0"
-                            />
-                          )
-                        },
-                      }))
+                    const detailColumns: ColumnDef<ModelDetailRow>[] =
+                      normalizedDetailNode === 'workflow'
+                        ? createWorkflowColumns({
+                            visibleColumns,
+                            detailColumnWidths,
+                            isReadOnly,
+                            modalPreviewWidth: MODEL_DETAIL_MODAL_PREVIEW_WIDTH,
+                            allRows: detailRows,
+                            messageOptions: allMessageOptions,
+                            eventIdOptions: flowEventIdOptions,
+                            onChangeDetailValue,
+                            onOpenFlowTextEditor: handleOpenFlowTextEditor,
+                            summarizeFlowFilterValue,
+                            summarizeActionDataIndexValue,
+                          })
+                        : normalizedDetailNode === 'dcop-itemes'
+                          ? createDcopItemsColumns({
+                              visibleColumns,
+                              detailColumnWidths,
+                              isReadOnly,
+                              eventIdOptions: flowEventIdOptions,
+                              onChangeDetailValue,
+                            })
+                          : normalizedDetailNode === 'model-parameter'
+                            ? createModelParameterColumns({
+                                visibleColumns,
+                                detailColumnWidths,
+                                isReadOnly,
+                                onChangeDetailValue,
+                              })
+                            : createGenericInputColumns({
+                                visibleColumns,
+                                detailColumnWidths,
+                                isReadOnly,
+                                onChangeDetailValue,
+                              })
 
-                    const modelParameterActionColumn:
+                    const detailActionColumn:
                       | SelectableTableActionColumn<ModelDetailRow>
                       | undefined = canEditTableRows
                       ? {
@@ -1027,11 +1000,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
                     return (
                       <SelectableTable
-                        columns={modelParameterColumns}
+                        columns={detailColumns}
                         rows={detailRows}
                         rowKey={(row) => row.id}
                         features={{ rangeCopy: true, rangePaste: !isReadOnly }}
-                        actionColumn={modelParameterActionColumn}
+                        actionColumn={detailActionColumn}
                         onCellPaste={(row, columnIndex, value) =>
                           onChangeDetailValue(row.id, columnIndex, value)
                         }
@@ -1040,303 +1013,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                             ? '편집 중인 상세 데이터가 없습니다. 행 추가로 row를 추가하거나 Undo로 체크아웃을 취소해 주세요.'
                             : '표시할 상세 데이터가 없습니다.'
                         }
-                        testId="selectable-table-model-parameter"
+                        testId={`selectable-table-${normalizedDetailNode ?? 'model-parameter'}`}
                       />
                     )
                   })()
-                ) : (
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-                  <Table className={MODEL_DETAIL_TABLE_CLASS}>
-                    <colgroup>
-                      {visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => {
-                        const isModalEditableColumn = isFlowModalEditableColumn(
-                          normalizedDetailNode,
-                          columnName,
-                        )
-                        const columnWidth = detailColumnWidths[columnIndex]
-
-                        return (
-                          <col
-                            key={`${columnName}-${visibleIndex}`}
-                            style={{
-                              width: columnWidth,
-                              minWidth: columnWidth,
-                              maxWidth: isModalEditableColumn ? columnWidth : undefined,
-                            }}
-                          />
-                        )
-                      })}
-                      {canEditTableRows ? <col style={{ width: '92px', minWidth: '92px' }} /> : null}
-                    </colgroup>
-                    <TableHeader>
-                        <TableRow className="bg-[#F6F9F7]">
-                        {visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => (
-                          <TableHead
-                            key={`${columnName}-${visibleIndex}`}
-                            className={cn(
-                              'whitespace-nowrap',
-                              visibleIndex === 0
-                                ? 'sticky left-0 z-30 bg-[#F6F9F7] shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
-                                : null,
-                            )}
-                            style={{
-                              width: detailColumnWidths[columnIndex],
-                              minWidth: detailColumnWidths[columnIndex],
-                              maxWidth: isFlowModalEditableColumn(normalizedDetailNode, columnName)
-                                ? detailColumnWidths[columnIndex]
-                                : undefined,
-                              ...(visibleIndex === 0
-                                ? {
-                                    left: 0,
-                                    position: 'sticky',
-                                    top: 0,
-                                    zIndex: 40,
-                                  }
-                                : {}),
-                            }}
-                          >
-                            {columnName}
-                          </TableHead>
-                        ))}
-                        {canEditTableRows ? <TableHead className="w-[92px] whitespace-nowrap">작업</TableHead> : null}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isDetailLoading ? (
-                        Array.from({ length: 8 }).map((_, rowIndex) => (
-                          <TableRow key={`model-detail-skeleton-${rowIndex}`} data-testid="model-detail-skeleton">
-                            {Array.from({ length: visibleColumnCount + (canEditTableRows ? 1 : 0) }).map((_, cellIndex) => (
-                              <TableCell key={cellIndex}>
-                                <Skeleton className="h-4 w-full" />
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))
-                      ) : detailErrorMessage ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
-                            className="py-10 text-center text-sm text-[#C5534B]"
-                          >
-                            {detailErrorMessage}
-                          </TableCell>
-                        </TableRow>
-                      ) : detailRows.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={visibleColumnCount + (canEditTableRows ? 1 : 0)}
-                            className="py-10 text-center text-sm text-[#647169]"
-                          >
-                            {canEditTableRows
-                              ? '편집 중인 상세 데이터가 없습니다. 행 추가로 row를 추가하거나 Undo로 체크아웃을 취소해 주세요.'
-                              : '표시할 상세 데이터가 없습니다.'}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        detailRows.map((row, rowIndex) => {
-                          return (
-                          <TableRow key={row.id}>
-                            {visibleColumns.map(({ columnName, columnIndex }) => {
-                              const rawValue = row.values[columnIndex] ?? ''
-                              const isModalEditable = isFlowModalEditableColumn(
-                                normalizedDetailNode,
-                                columnName,
-                              )
-                              const displayValue = isModalEditable
-                                ? resolveFlowPreviewValue(row, columnIndex, columnName)
-                                : rawValue
-
-                              // Flow Name 중복 여부 (workflow 노드의 첫 번째 컬럼)
-                              const isDuplicate =
-                                isFlowNode &&
-                                columnIndex === 0 &&
-                                hasDuplicateFlowName(rawValue, row.id, detailRows)
-
-                              return (
-                                <TableCell
-                                  key={`${row.id}-${columnIndex}`}
-                                  className={cn(
-                                    columnIndex === 0
-                                      ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
-                                      : null,
-                                    isModalEditable
-                                      ? 'overflow-hidden'
-                                      : 'whitespace-nowrap',
-                                  )}
-                                  style={{
-                                    width: detailColumnWidths[columnIndex],
-                                    minWidth: detailColumnWidths[columnIndex],
-                                    maxWidth: isModalEditable
-                                      ? detailColumnWidths[columnIndex]
-                                      : undefined,
-                                    ...(columnIndex === 0
-                                      ? {
-                                          left: 0,
-                                          position: 'sticky',
-                                          zIndex: 20,
-                                        }
-                                      : {}),
-                                  }}
-                                >
-                                  {isModalEditable ? (
-                                    <div
-                                      className="group flex min-h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-[#DCE5E0] bg-white px-2 py-1.5"
-                                      onDoubleClick={() =>
-                                        handleOpenFlowTextEditor(row, rowIndex, columnIndex)
-                                      }
-                                    >
-                                      <span
-                                        className={cn(
-                                          'min-w-0 flex-1 text-sm text-[#22322B]',
-                                          displayValue ? 'truncate' : 'text-[#8A8A8A]',
-                                        )}
-                                        title={displayValue || rawValue}
-                                      >
-                                        {displayValue || '—'}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleOpenFlowTextEditor(row, rowIndex, columnIndex)
-                                        }
-                                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[#5B6962] transition hover:border-[#DCE5E0] hover:bg-[#F3F7F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                        aria-label={`${row.values[0] ?? 'flow'} ${columnName} 편집`}
-                                      >
-                                        <MoreHorizontal className="size-3.5" />
-                                      </button>
-                                    </div>
-                                  ) : isReadOnly ? (
-                                    <span
-                                      className={cn(
-                                        'inline-block whitespace-nowrap text-sm text-[#22322B]',
-                                        displayValue ? null : 'text-[#8A8A8A]',
-                                      )}
-                                      title={displayValue || rawValue}
-                                    >
-                                      {displayValue || '—'}
-                                    </span>
-                                  ) : isFlowNode && isMessageNameColumn(columnName) ? (
-                                    // Message Name: secs-message / socket-message 목록 드롭다운
-                                    <select
-                                      value={rawValue}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                    >
-                                      <option value="">—</option>
-                                      {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue &&
-                                        !allMessageOptions.some((option) => option.value === rawValue) && (
-                                        <option value={rawValue}>{rawValue}</option>
-                                      )}
-                                      {allMessageOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : isFlowNode && isEventIdColumn(columnName) ? (
-                                    // EventId: eventides 목록 드롭다운 (SECS 모델 전용)
-                                    <select
-                                      value={rawValue}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                    >
-                                      <option value="">—</option>
-                                      {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !flowEventIdOptions.includes(rawValue) && (
-                                        <option value={rawValue}>{rawValue}</option>
-                                      )}
-                                      {flowEventIdOptions.map((id) => (
-                                        <option key={id} value={id}>
-                                          {id}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : isDcopItemsNode && isEventIdColumn(columnName) ? (
-                                    // dcop-itemes EventId: eventides 목록 드롭다운 (SECS 모델 전용)
-                                    <select
-                                      value={rawValue}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                    >
-                                      <option value="">—</option>
-                                      {/* 현재 값이 목록에 없으면 fallback option으로 보존 */}
-                                      {rawValue && !flowEventIdOptions.includes(rawValue) && (
-                                        <option value={rawValue}>{rawValue}</option>
-                                      )}
-                                      {flowEventIdOptions.map((id) => (
-                                        <option key={id} value={id}>
-                                          {id}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : isDcopItemsNode && isDcopCollectionRuleColumn(columnName) ? (
-                                    // dcop-itemes Collection Rule: LAST / FIRST / AVERAGE / MIN / MAX 선택
-                                    // 값이 없으면 기본값 LAST로 표시 (신규 행 추가 시 handleAddDetailRow에서도 LAST 주입)
-                                    <select
-                                      value={rawValue || 'LAST'}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                                    >
-                                      {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
-                                        <option key={rule} value={rule}>
-                                          {rule}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    // 일반 Input (Flow Name 은 중복 시 에러 표시)
-                                    <Input
-                                      value={rawValue}
-                                      onChange={(event) =>
-                                        onChangeDetailValue(row.id, columnIndex, event.target.value)
-                                      }
-                                      className={cn(
-                                        'h-8 w-full min-w-0',
-                                        isDuplicate
-                                          ? 'border-[#C5534B] focus-visible:ring-[#C5534B]/30'
-                                          : null,
-                                      )}
-                                      title={
-                                        isDuplicate
-                                          ? '다른 행에 동일한 Flow Name이 있습니다.'
-                                          : undefined
-                                      }
-                                    />
-                                  )}
-                                </TableCell>
-                              )
-                            })}
-
-                            {canEditTableRows ? (
-                              <TableCell className="whitespace-nowrap">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
-                                  onClick={() => onDeleteDetailRow(row.id)}
-                                  aria-label={`${row.values[0] || '새 row'} 삭제`}
-                                >
-                                  <Trash2 className="size-4" aria-hidden="true" />
-                                </Button>
-                              </TableCell>
-                            ) : null}
-                          </TableRow>
-                          )
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
                 )}
               </div>
             )}

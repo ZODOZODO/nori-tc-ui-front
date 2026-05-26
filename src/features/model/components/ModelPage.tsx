@@ -1508,7 +1508,7 @@ export function ModelPage() {
       />
 
       <BranchModelCreateModal
-        key={`${branchCreateTargetModel?.modelKey ?? 'none'}-${isBranchCreateModalOpen ? 'open' : 'closed'}`}
+        key={`branch-create-${branchCreateTargetModel?.modelKey ?? 'none'}-${isBranchCreateModalOpen ? 'open' : 'closed'}`}
         open={isBranchCreateModalOpen}
         parentModel={branchCreateTargetModel}
         sourceVersions={branchCreateSourceVersions}
@@ -1521,7 +1521,7 @@ export function ModelPage() {
       />
 
       <ParentModelCommitModal
-        key={`${parentCommitTargetModel?.modelKey ?? 'none'}-${isParentCommitModalOpen ? 'open' : 'closed'}`}
+        key={`parent-commit-${parentCommitTargetModel?.modelKey ?? 'none'}-${isParentCommitModalOpen ? 'open' : 'closed'}`}
         open={isParentCommitModalOpen}
         branchModel={parentCommitTargetModel}
         parentVersions={parentCommitParentVersions}

@@ -44,6 +44,7 @@ export interface ColumnDef<TRow> {
   ) => ReactNode
   editable?: boolean
   width?: string
+  maxWidth?: string
   sticky?: boolean
   // R6 에서 활성화. R1 시점에는 type 만 선언.
   sortable?: boolean

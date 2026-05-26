@@ -246,6 +246,7 @@ export const SelectableTable = <TRow,>({
                 style={{
                   width: column.width,
                   minWidth: column.width,
+                  maxWidth: column.maxWidth,
                   ...(stickyHeadStyle(column.sticky) ?? {}),
                 }}
               >
@@ -303,6 +304,7 @@ export const SelectableTable = <TRow,>({
                       style={{
                         width: column.width,
                         minWidth: column.width,
+                        maxWidth: column.maxWidth,
                         ...(stickyCellStyle(column.sticky) ?? {}),
                       }}
                       data-row-idx={rowIdx}
