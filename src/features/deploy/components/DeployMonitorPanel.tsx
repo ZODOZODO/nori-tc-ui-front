@@ -27,6 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { EqpModelOption } from '@/features/eqp/types/eqp.types'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployHistoryList } from '../hooks/useDeployHistoryList'
@@ -363,6 +365,54 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
   const isServerBackedRow = (deployKey: number) =>
     serverHistoryKeySet.has(deployKey) || serverBackedDeployKeys.includes(deployKey)
+
+  // react-compiler 활성 환경 — 컴포넌트 내부 deps (isServerBackedRow) closure 캡처는
+  // 자동 memoization 에 위임한다. 명시 useMemo 는 manual/inferred deps 불일치로
+  // react-hooks/preserve-manual-memoization 위반 (compile skip).
+  const deployHistoryColumns: ReadonlyArray<ColumnDef<DeployHistoryItem>> = [
+    {
+      key: 'deployName',
+      header: 'Deploy Name',
+      accessor: (row) => row.deployName,
+      renderCell: (row) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{row.deployName}</span>
+          <Badge variant={isServerBackedRow(row.deployKey) ? 'info' : 'secondary'}>
+            {isServerBackedRow(row.deployKey) ? 'SERVER' : 'LOCAL'}
+          </Badge>
+        </div>
+      ),
+    },
+    { key: 'eventType', header: 'Event Type', accessor: (row) => row.eventType },
+    {
+      key: 'deployStatus',
+      header: 'Status',
+      accessor: (row) => row.deployStatus,
+      renderCell: (row) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={resolveStatusVariant(row.deployStatus)}>{row.deployStatus}</Badge>
+          {row.pauseRequested ? <Badge variant="warning">Hold 요청됨</Badge> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'targetTotal',
+      header: 'Target Count',
+      accessor: (row) => row.targetSummary.total.toString(),
+    },
+    {
+      key: 'targetCompleted',
+      header: 'Completed',
+      accessor: (row) => row.targetSummary.completed.toString(),
+    },
+    {
+      key: 'targetFailed',
+      header: 'Failed',
+      accessor: (row) => row.targetSummary.failed.toString(),
+    },
+    { key: 'requestedBy', header: 'Requested By', accessor: (row) => row.requestedBy },
+    { key: 'createdAt', header: 'Created At', accessor: (row) => formatDateTime(row.createdAt) },
+  ]
 
   const commentHistoryItem = useMemo(
     () => resolvedHistoryItems.find((item) => item.deployKey === commentDeployKey) ?? null,
@@ -1200,162 +1250,145 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           ) : null}
         </div>
 
-        <div className="overflow-x-auto px-6 py-5">
-          <Table>
-            <TableHeader className="bg-[#F6F8F6]">
-              <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-                <TableHead>Deploy Name</TableHead>
-                <TableHead>Event Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Target Count</TableHead>
-                <TableHead>Completed</TableHead>
-                <TableHead>Failed</TableHead>
-                <TableHead>Requested By</TableHead>
-                <TableHead>Created At</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deployHistoryQuery.isLoading ? (
-                Array.from({ length: 8 }).map((_, rowIndex) => (
-                  <TableRow key={`deploy-monitor-history-skeleton-${rowIndex}`} data-testid="deploy-monitor-history-skeleton">
-                    {Array.from({ length: 8 }).map((_, cellIndex) => (
-                      <TableCell key={cellIndex}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
+        <div className="px-6 py-5">
+          {deployHistoryQuery.isLoading ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#F6F8F6]">
+                  <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+                    <TableHead>Deploy Name</TableHead>
+                    <TableHead>Event Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Target Count</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Failed</TableHead>
+                    <TableHead>Requested By</TableHead>
+                    <TableHead>Created At</TableHead>
                   </TableRow>
-                ))
-              ) : resolvedHistoryItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-[#7B8781]">
-                    {historyOnly ? '완료된 Deploy 이력이 없습니다.' : '표시할 Deploy 데이터가 없습니다.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                resolvedHistoryItems.map((item) => {
-                  const tableRow = (
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 8 }).map((_, rowIndex) => (
                     <TableRow
-                      key={item.deployKey}
+                      key={`deploy-monitor-history-skeleton-${rowIndex}`}
+                      data-testid="deploy-monitor-history-skeleton"
+                    >
+                      {Array.from({ length: 8 }).map((_, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : resolvedHistoryItems.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[#7B8781]">
+              {historyOnly ? '완료된 Deploy 이력이 없습니다.' : '표시할 Deploy 데이터가 없습니다.'}
+            </p>
+          ) : (
+            <SelectableTable<DeployHistoryItem>
+              testId="deploy-monitor-history"
+              columns={deployHistoryColumns}
+              rows={resolvedHistoryItems}
+              rowKey={(row) => row.deployKey}
+              wrapRow={(item, _rowIdx, children) => (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
                       data-state={activeDeployKey === item.deployKey ? 'selected' : undefined}
                       className="cursor-pointer"
                       onClick={() => setActiveDeployKey(item.deployKey)}
                       onContextMenu={() => setActiveDeployKey(item.deployKey)}
                     >
-                      <TableCell className="min-w-[240px]">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>{item.deployName}</span>
-                          <Badge variant={isServerBackedRow(item.deployKey) ? 'info' : 'secondary'}>
-                            {isServerBackedRow(item.deployKey) ? 'SERVER' : 'LOCAL'}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.eventType}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={resolveStatusVariant(item.deployStatus)}>{item.deployStatus}</Badge>
-                          {item.pauseRequested ? (
-                            <Badge variant="warning">Hold 요청됨</Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.targetSummary.total}</TableCell>
-                      <TableCell>{item.targetSummary.completed}</TableCell>
-                      <TableCell>{item.targetSummary.failed}</TableCell>
-                      <TableCell>{item.requestedBy}</TableCell>
-                      <TableCell>{formatDateTime(item.createdAt)}</TableCell>
+                      {children}
                     </TableRow>
-                  )
-
-                  return (
-                    <ContextMenu key={item.deployKey}>
-                      <ContextMenuTrigger asChild>{tableRow}</ContextMenuTrigger>
-                      <ContextMenuContent className="w-40">
-                        {historyOnly ? (
-                          <>
-                            <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                              View
-                            </ContextMenuItem>
-                            <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
-                              Redeploy
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              variant="destructive"
-                              onSelect={() => handleRequestDelete(item.deployKey)}
-                            >
-                              Delete
-                            </ContextMenuItem>
-                          </>
-                        ) : isServerBackedRow(item.deployKey) ? (
-                          item.deployStatus === 'READY' ? (
-                            <>
-                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                                View
-                              </ContextMenuItem>
-                              <ContextMenuItem onSelect={() => void handleStart(item.deployKey)}>
-                                Deploy
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                variant="destructive"
-                                onSelect={() => handleRequestDelete(item.deployKey)}
-                              >
-                                Delete
-                              </ContextMenuItem>
-                            </>
-                          ) : item.deployStatus === 'PLANNING' ? (
-                            <>
-                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                                View
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                variant="destructive"
-                                onSelect={() => handleRequestDelete(item.deployKey)}
-                              >
-                                Delete
-                              </ContextMenuItem>
-                            </>
-                          ) : item.deployStatus === 'RUNNING' ? (
-                            <>
-                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                                View
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                disabled={item.pauseRequested}
-                                onSelect={() => void handleHold(item.deployKey)}
-                              >
-                                {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
-                              </ContextMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                                View
-                              </ContextMenuItem>
-                              <ContextMenuItem disabled>동작 없음</ContextMenuItem>
-                            </>
-                          )
-                        ) : (
-                          <>
-                            <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
-                              View
-                            </ContextMenuItem>
-                            <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
-                              Deploy
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              variant="destructive"
-                              onSelect={() => handleRequestDelete(item.deployKey)}
-                            >
-                              Delete
-                            </ContextMenuItem>
-                          </>
-                        )}
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  )
-                })
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-40">
+                    {historyOnly ? (
+                      <>
+                        <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                          View
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
+                          Redeploy
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          variant="destructive"
+                          onSelect={() => handleRequestDelete(item.deployKey)}
+                        >
+                          Delete
+                        </ContextMenuItem>
+                      </>
+                    ) : isServerBackedRow(item.deployKey) ? (
+                      item.deployStatus === 'READY' ? (
+                        <>
+                          <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                            View
+                          </ContextMenuItem>
+                          <ContextMenuItem onSelect={() => void handleStart(item.deployKey)}>
+                            Deploy
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            variant="destructive"
+                            onSelect={() => handleRequestDelete(item.deployKey)}
+                          >
+                            Delete
+                          </ContextMenuItem>
+                        </>
+                      ) : item.deployStatus === 'PLANNING' ? (
+                        <>
+                          <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                            View
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            variant="destructive"
+                            onSelect={() => handleRequestDelete(item.deployKey)}
+                          >
+                            Delete
+                          </ContextMenuItem>
+                        </>
+                      ) : item.deployStatus === 'RUNNING' ? (
+                        <>
+                          <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                            View
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            disabled={item.pauseRequested}
+                            onSelect={() => void handleHold(item.deployKey)}
+                          >
+                            {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
+                          </ContextMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                            View
+                          </ContextMenuItem>
+                          <ContextMenuItem disabled>동작 없음</ContextMenuItem>
+                        </>
+                      )
+                    ) : (
+                      <>
+                        <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
+                          View
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
+                          Deploy
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          variant="destructive"
+                          onSelect={() => handleRequestDelete(item.deployKey)}
+                        >
+                          Delete
+                        </ContextMenuItem>
+                      </>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
               )}
-            </TableBody>
-          </Table>
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-[#EDF1EE] px-6 py-4 text-xs text-[#5C6A63] md:flex-row md:items-center md:justify-between">

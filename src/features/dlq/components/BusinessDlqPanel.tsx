@@ -1,18 +1,38 @@
 import { useMemo, useState } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
 import { DLQ_PAGE_SIZE, formatDlqTime } from '../lib/dlq-format'
 import type { BusinessDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const TRUNCATE_CELL_CLASS = 'max-w-[24em] truncate'
+const BUSINESS_DLQ_COLUMNS: ReadonlyArray<ColumnDef<BusinessDlqEntry>> = [
+  { key: 'dlqId', header: 'ID', accessor: (row) => row.dlqId, maxWidth: '24em' },
+  { key: 'source', header: '출처', accessor: (row) => row.source ?? '-' },
+  { key: 'stage', header: '단계', accessor: (row) => row.stage ?? '-' },
+  { key: 'topic', header: '토픽', accessor: (row) => row.topic ?? '-', maxWidth: '24em' },
+  { key: 'partition', header: '파티션', accessor: (row) => row.partition?.toString() ?? '-' },
+  { key: 'offset', header: '오프셋', accessor: (row) => row.offset?.toString() ?? '-' },
+  { key: 'eqpId', header: '설비', accessor: (row) => row.eqpId ?? '-' },
+  { key: 'messageType', header: '타입', accessor: (row) => row.messageType ?? '-' },
+  { key: 'messageName', header: '이름', accessor: (row) => row.messageName ?? '-' },
+  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+  {
+    key: 'reasonMessage',
+    header: '사유',
+    accessor: (row) => row.reasonMessage ?? '-',
+    maxWidth: '24em',
+  },
+  { key: 'occurredAt', header: '발생 시각', accessor: (row) => formatDlqTime(row.occurredAt) },
+  {
+    key: 'payloadRef',
+    header: 'payload 참조',
+    accessor: (row) => row.payloadRef ?? '-',
+    maxWidth: '24em',
+  },
+  { key: 'ttlSeconds', header: 'TTL', accessor: (row) => row.ttlSeconds?.toString() ?? '-' },
+]
 
 export function BusinessDlqPanel() {
   const query = useBusinessDlq()
@@ -55,60 +75,15 @@ export function BusinessDlqPanel() {
       onMovePage={setPageIndex}
       emptyMessage="표시할 항목이 없습니다."
     >
-      <Table>
-        <TableHeader className="bg-[#F6F8F6]">
-          <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-            <TableHead>ID</TableHead>
-            <TableHead>출처</TableHead>
-            <TableHead>단계</TableHead>
-            <TableHead>토픽</TableHead>
-            <TableHead>파티션</TableHead>
-            <TableHead>오프셋</TableHead>
-            <TableHead>설비</TableHead>
-            <TableHead>타입</TableHead>
-            <TableHead>이름</TableHead>
-            <TableHead>사유 코드</TableHead>
-            <TableHead>사유</TableHead>
-            <TableHead>발생 시각</TableHead>
-            <TableHead>payload 참조</TableHead>
-            <TableHead>TTL</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pageItems.map((item) => (
-            <TableRow key={item.dlqId} data-testid={`dlq-row-business-${item.dlqId}`}>
-              <TableCell className={TRUNCATE_CELL_CLASS} title={item.dlqId}>
-                {item.dlqId}
-              </TableCell>
-              <TableCell>{item.source ?? '-'}</TableCell>
-              <TableCell>{item.stage ?? '-'}</TableCell>
-              <TableCell className={TRUNCATE_CELL_CLASS} title={item.topic ?? ''}>
-                {item.topic ?? '-'}
-              </TableCell>
-              <TableCell>{item.partition ?? '-'}</TableCell>
-              <TableCell>{item.offset ?? '-'}</TableCell>
-              <TableCell>{item.eqpId ?? '-'}</TableCell>
-              <TableCell>{item.messageType ?? '-'}</TableCell>
-              <TableCell>{item.messageName ?? '-'}</TableCell>
-              <TableCell>{item.reasonCode ?? '-'}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.reasonMessage ?? ''}
-              >
-                {item.reasonMessage ?? '-'}
-              </TableCell>
-              <TableCell>{formatDlqTime(item.occurredAt)}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.payloadRef ?? ''}
-              >
-                {item.payloadRef ?? '-'}
-              </TableCell>
-              <TableCell>{item.ttlSeconds ?? '-'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <SelectableTable<BusinessDlqEntry>
+        testId="selectable-table-business-dlq"
+        columns={BUSINESS_DLQ_COLUMNS}
+        rows={pageItems}
+        rowKey={(row) => row.dlqId}
+        wrapRow={(row, _rowIdx, children) => (
+          <TableRow data-testid={`dlq-row-business-${row.dlqId}`}>{children}</TableRow>
+        )}
+      />
     </DlqTableShell>
   )
 }

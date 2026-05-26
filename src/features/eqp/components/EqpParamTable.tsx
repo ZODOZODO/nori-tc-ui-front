@@ -1,9 +1,21 @@
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type {
+  ColumnDef,
+  SelectableTableActionColumn,
+} from '@/shared/components/SelectableTable'
 import type { EqpParamRow } from '../types/eqp.types'
 
 const EQP_PARAM_SKELETON_ROW_COUNT = 8
@@ -36,7 +48,90 @@ export const EqpParamTable = memo(function EqpParamTable({
   onDeleteRow,
 }: EqpParamTableProps) {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
-  const effectiveSelectedRowId = selectedRowId ?? (rows[0] ? (rows[0].rowId ?? rows[0].paramName) : null)
+  const effectiveSelectedRowId =
+    selectedRowId ?? (rows[0] ? (rows[0].rowId ?? rows[0].paramName) : null)
+
+  const columns = useMemo<ReadonlyArray<ColumnDef<EqpParamTableRow>>>(
+    () => [
+      {
+        key: 'paramName',
+        header: 'Param Name',
+        accessor: (row) => row.paramName,
+        renderCell: (row) =>
+          isEditMode && row.rowId ? (
+            <Input
+              value={row.paramName}
+              onChange={(event) => onChangeParamName(row.rowId as string, event.target.value)}
+              className="h-8 rounded-lg border-[#D4DDD7]"
+              placeholder="Param Name"
+            />
+          ) : (
+            <span className="min-w-[240px]">{row.paramName}</span>
+          ),
+      },
+      {
+        key: 'paramValue',
+        header: 'Param Value',
+        accessor: (row) => row.paramValue,
+        renderCell: (row) =>
+          isEditMode && row.rowId ? (
+            <Input
+              value={row.paramValue}
+              onChange={(event) => onChangeValue(row.rowId as string, event.target.value)}
+              className="h-8 rounded-lg border-[#D4DDD7]"
+              placeholder="Param Value"
+            />
+          ) : (
+            row.paramValue || '—'
+          ),
+      },
+      {
+        key: 'description',
+        header: 'Description',
+        accessor: (row) => row.description,
+        renderCell: (row) =>
+          isEditMode && row.rowId ? (
+            <Input
+              value={row.description}
+              onChange={(event) => onChangeDescription(row.rowId as string, event.target.value)}
+              className="h-8 rounded-lg border-[#D4DDD7]"
+              placeholder="Description"
+            />
+          ) : (
+            <span className="min-w-[280px]">{row.description || '—'}</span>
+          ),
+      },
+    ],
+    [isEditMode, onChangeParamName, onChangeValue, onChangeDescription],
+  )
+
+  const actionColumn = useMemo<SelectableTableActionColumn<EqpParamTableRow> | undefined>(
+    () =>
+      isEditMode
+        ? {
+            header: '작업',
+            width: '92px',
+            render: (row) =>
+              row.rowId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                  onClick={() => onDeleteRow(row.rowId as string)}
+                  aria-label={`${row.paramName || '새 파라미터'} 행 삭제`}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              ) : null,
+          }
+        : undefined,
+    [isEditMode, onDeleteRow],
+  )
+
+  const emptyMessage = isEditMode
+    ? '편집 중인 파라미터가 없습니다. 행 추가로 새 파라미터를 작성하거나 Undo로 체크아웃을 취소해 주세요.'
+    : '설정된 파라미터가 없습니다.'
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -57,102 +152,55 @@ export const EqpParamTable = memo(function EqpParamTable({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <Table className="min-w-[960px]">
-          <TableHeader>
-            <TableRow className="bg-[#F6F9F7]">
-              <TableHead>Param Name</TableHead>
-              <TableHead>Param Value</TableHead>
-              <TableHead>Description</TableHead>
-              {isEditMode ? <TableHead className="w-[92px]">작업</TableHead> : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: EQP_PARAM_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
-                <TableRow key={`eqp-param-skeleton-${rowIndex}`} data-testid="eqp-param-skeleton">
+        {isLoading ? (
+          <Table className="min-w-[960px]">
+            <TableHeader>
+              <TableRow className="bg-[#F6F9F7]">
+                <TableHead>Param Name</TableHead>
+                <TableHead>Param Value</TableHead>
+                <TableHead>Description</TableHead>
+                {isEditMode ? <TableHead className="w-[92px]">작업</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: EQP_PARAM_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow
+                  key={`eqp-param-skeleton-${rowIndex}`}
+                  data-testid="eqp-param-skeleton"
+                >
                   {Array.from({ length: isEditMode ? 4 : 3 }).map((_, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isEditMode ? 4 : 3}
-                  className="py-10 text-center text-sm text-[#647169]"
-                >
-                  {isEditMode
-                    ? '편집 중인 파라미터가 없습니다. 행 추가로 새 파라미터를 작성하거나 Undo로 체크아웃을 취소해 주세요.'
-                    : '설정된 파라미터가 없습니다.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
+              ))}
+            </TableBody>
+          </Table>
+        ) : rows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-[#647169]">{emptyMessage}</p>
+        ) : (
+          <SelectableTable<EqpParamTableRow>
+            testId="selectable-table-eqp-param"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.rowId ?? row.paramName}
+            actionColumn={actionColumn}
+            tableClassName="min-w-[960px]"
+            wrapRow={(row, _rowIdx, children) => {
+              const rowId = row.rowId ?? row.paramName
+              return (
                 <TableRow
-                  key={row.rowId ?? row.paramName}
-                  data-state={effectiveSelectedRowId === (row.rowId ?? row.paramName) ? 'selected' : undefined}
-                  onClick={() => setSelectedRowId(row.rowId ?? row.paramName)}
-                  onContextMenu={() => setSelectedRowId(row.rowId ?? row.paramName)}
+                  data-state={effectiveSelectedRowId === rowId ? 'selected' : undefined}
+                  onClick={() => setSelectedRowId(rowId)}
+                  onContextMenu={() => setSelectedRowId(rowId)}
                 >
-                  <TableCell className="min-w-[240px]">
-                    {isEditMode && row.rowId ? (
-                      <Input
-                        value={row.paramName}
-                        onChange={(event) => onChangeParamName(row.rowId as string, event.target.value)}
-                        className="h-8 rounded-lg border-[#D4DDD7]"
-                        placeholder="Param Name"
-                      />
-                    ) : (
-                      row.paramName
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditMode && row.rowId ? (
-                      <Input
-                        value={row.paramValue}
-                        onChange={(event) => onChangeValue(row.rowId as string, event.target.value)}
-                        className="h-8 rounded-lg border-[#D4DDD7]"
-                        placeholder="Param Value"
-                      />
-                    ) : (
-                      row.paramValue || '—'
-                    )}
-                  </TableCell>
-                  <TableCell className="min-w-[280px]">
-                    {isEditMode && row.rowId ? (
-                      <Input
-                        value={row.description}
-                        onChange={(event) => onChangeDescription(row.rowId as string, event.target.value)}
-                        className="h-8 rounded-lg border-[#D4DDD7]"
-                        placeholder="Description"
-                      />
-                    ) : (
-                      row.description || '—'
-                    )}
-                  </TableCell>
-                  {isEditMode ? (
-                    <TableCell>
-                      {row.rowId ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
-                          onClick={() => onDeleteRow(row.rowId as string)}
-                          aria-label={`${row.paramName || '새 파라미터'} 행 삭제`}
-                        >
-                          <Trash2 className="size-4" aria-hidden="true" />
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  ) : null}
+                  {children}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              )
+            }}
+          />
+        )}
       </div>
     </div>
   )

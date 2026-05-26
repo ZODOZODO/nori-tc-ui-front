@@ -1,18 +1,26 @@
 import { useMemo, useState } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useRepairTasks } from '../hooks/useRepairTasks'
 import { DLQ_PAGE_SIZE, formatDlqTime } from '../lib/dlq-format'
 import type { RepairTaskEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const TRUNCATE_CELL_CLASS = 'max-w-[24em] truncate'
+const REPAIR_TASK_COLUMNS: ReadonlyArray<ColumnDef<RepairTaskEntry>> = [
+  { key: 'taskId', header: 'Task ID', accessor: (row) => row.taskId, maxWidth: '24em' },
+  { key: 'eqpId', header: '설비', accessor: (row) => row.eqpId },
+  { key: 'commandType', header: '커맨드', accessor: (row) => row.commandType },
+  { key: 'repairAction', header: '액션', accessor: (row) => row.repairAction },
+  { key: 'errorCode', header: '에러 코드', accessor: (row) => row.errorCode ?? '-' },
+  {
+    key: 'errorMessage',
+    header: '에러 메시지',
+    accessor: (row) => row.errorMessage ?? '-',
+    maxWidth: '24em',
+  },
+  { key: 'createdAt', header: '생성 시각', accessor: (row) => formatDlqTime(row.createdAt) },
+]
 
 export function RepairTaskPanel() {
   const query = useRepairTasks()
@@ -59,39 +67,15 @@ export function RepairTaskPanel() {
       onMovePage={setPageIndex}
       emptyMessage="표시할 항목이 없습니다."
     >
-      <Table>
-        <TableHeader className="bg-[#F6F8F6]">
-          <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-            <TableHead>Task ID</TableHead>
-            <TableHead>설비</TableHead>
-            <TableHead>커맨드</TableHead>
-            <TableHead>액션</TableHead>
-            <TableHead>에러 코드</TableHead>
-            <TableHead>에러 메시지</TableHead>
-            <TableHead>생성 시각</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pageItems.map((item) => (
-            <TableRow key={item.taskId} data-testid={`dlq-row-repair-task-${item.taskId}`}>
-              <TableCell className={TRUNCATE_CELL_CLASS} title={item.taskId}>
-                {item.taskId}
-              </TableCell>
-              <TableCell>{item.eqpId}</TableCell>
-              <TableCell>{item.commandType}</TableCell>
-              <TableCell>{item.repairAction}</TableCell>
-              <TableCell>{item.errorCode ?? '-'}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.errorMessage ?? ''}
-              >
-                {item.errorMessage ?? '-'}
-              </TableCell>
-              <TableCell>{formatDlqTime(item.createdAt)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <SelectableTable<RepairTaskEntry>
+        testId="selectable-table-repair-task"
+        columns={REPAIR_TASK_COLUMNS}
+        rows={pageItems}
+        rowKey={(row) => row.taskId}
+        wrapRow={(row, _rowIdx, children) => (
+          <TableRow data-testid={`dlq-row-repair-task-${row.taskId}`}>{children}</TableRow>
+        )}
+      />
     </DlqTableShell>
   )
 }

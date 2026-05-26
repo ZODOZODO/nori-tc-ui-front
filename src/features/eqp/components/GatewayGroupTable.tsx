@@ -12,7 +12,16 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
 import type { EqpInfo, EqpManageDetail } from '../types/eqp.types'
@@ -90,6 +99,82 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   )
 }
 
+interface GatewayGroupRow {
+  eqp: EqpInfo
+  detail: EqpManageDetail | undefined
+  isMissingFromBatch: boolean
+}
+
+const GATEWAY_GROUP_COLUMNS: ReadonlyArray<ColumnDef<GatewayGroupRow>> = [
+  {
+    key: 'eqpId',
+    header: 'EQPID',
+    accessor: (row) => row.eqp.eqpId,
+    renderCell: (row) => (
+      <div className="flex items-center gap-2">
+        <span>{row.eqp.eqpId}</span>
+        {row.isMissingFromBatch ? (
+          <Badge variant="warning" title="DB에서 설비를 찾을 수 없음 (삭제되었을 수 있음)">
+            미확인
+          </Badge>
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    key: 'businessApp',
+    header: 'Business App',
+    accessor: (row) => resolveBusinessAppName(row.eqp.routePartition) ?? '—',
+  },
+  {
+    key: 'commInterface',
+    header: 'Comm Interface',
+    accessor: (row) => row.eqp.commInterface,
+    renderCell: (row) => (
+      <Badge variant={row.eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
+        {row.eqp.commInterface}
+      </Badge>
+    ),
+  },
+  { key: 'commMode', header: 'Comm Mode', accessor: (row) => row.eqp.commMode },
+  {
+    key: 'socketProtocol',
+    header: 'Socket Protocol',
+    accessor: (row) => row.detail?.socketSettings?.socketProtocolType ?? '—',
+  },
+  {
+    key: 'routePartition',
+    header: 'Route Partition',
+    accessor: (row) => row.eqp.routePartition?.toString() ?? '—',
+  },
+  { key: 'eqpIp', header: 'IP', accessor: (row) => row.eqp.eqpIp },
+  { key: 'eqpPort', header: 'Port', accessor: (row) => row.eqp.eqpPort?.toString() ?? '—' },
+  {
+    key: 'enabled',
+    header: 'Enabled',
+    accessor: (row) => resolveEquipmentVisualState(row.detail?.runtimeState ?? null),
+    renderCell: (row) => (
+      <EquipmentStatusIndicator status={resolveEquipmentVisualState(row.detail?.runtimeState ?? null)} />
+    ),
+  },
+  { key: 'modelName', header: 'Model', accessor: (row) => row.detail?.modelBinding?.modelName ?? '—' },
+  {
+    key: 'modelVersion',
+    header: 'Model Version',
+    accessor: (row) => row.detail?.modelBinding?.modelVersion ?? '—',
+  },
+  {
+    key: 'gatewayJar',
+    header: 'Gateway Jarfile',
+    accessor: (row) => row.detail?.jars?.gatewayJarFileName ?? '—',
+  },
+  {
+    key: 'businessJar',
+    header: 'Business Jarfile',
+    accessor: (row) => row.detail?.jars?.businessJarFileName ?? '—',
+  },
+]
+
 /**
  * Gateway / gateway_app 선택 시 해당 설비 목록을
  * 설비 정보 테이블과 동일한 컬럼 구조로 다중 행 표시합니다.
@@ -155,6 +240,16 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
     void detailBatchQuery.refetch()
   }, [detailBatchQuery])
 
+  const tableRows = useMemo<GatewayGroupRow[]>(
+    () =>
+      sortedEqpItems.map((eqp) => ({
+        eqp,
+        detail: detailByEqpId.get(eqp.eqpId),
+        isMissingFromBatch: missingEqpIdSet.has(eqp.eqpId),
+      })),
+    [sortedEqpItems, detailByEqpId, missingEqpIdSet],
+  )
+
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -163,131 +258,106 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <Table className="min-w-[1280px]">
-          <TableHeader>
-            <TableRow className="bg-[#F6F9F7]">
-              <TableHead>EQPID</TableHead>
-              <TableHead>Business App</TableHead>
-              <TableHead>Comm Interface</TableHead>
-              <TableHead>Comm Mode</TableHead>
-              <TableHead>Socket Protocol</TableHead>
-              <TableHead>Route Partition</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Port</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Model Version</TableHead>
-              <TableHead>Gateway Jarfile</TableHead>
-              <TableHead>Business Jarfile</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedEqpItems.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={13} className="py-10 text-center text-sm text-[#647169]">
-                  이 그룹에 속한 설비가 없습니다.
-                </TableCell>
+        {sortedEqpItems.length === 0 ? (
+          <p className="py-10 text-center text-sm text-[#647169]">이 그룹에 속한 설비가 없습니다.</p>
+        ) : isInitialLoading ? (
+          <Table className="min-w-[1280px]">
+            <TableHeader>
+              <TableRow className="bg-[#F6F9F7]">
+                <TableHead>EQPID</TableHead>
+                <TableHead>Business App</TableHead>
+                <TableHead>Comm Interface</TableHead>
+                <TableHead>Comm Mode</TableHead>
+                <TableHead>Socket Protocol</TableHead>
+                <TableHead>Route Partition</TableHead>
+                <TableHead>IP</TableHead>
+                <TableHead>Port</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Model</TableHead>
+                <TableHead>Model Version</TableHead>
+                <TableHead>Gateway Jarfile</TableHead>
+                <TableHead>Business Jarfile</TableHead>
               </TableRow>
-            ) : isInitialLoading ? (
-              Array.from({ length: GATEWAY_GROUP_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
-                <TableRow key={`gateway-group-skeleton-${rowIndex}`} data-testid="gateway-group-skeleton">
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: GATEWAY_GROUP_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                <TableRow
+                  key={`gateway-group-skeleton-${rowIndex}`}
+                  data-testid="gateway-group-skeleton"
+                >
                   {Array.from({ length: GATEWAY_GROUP_COLUMN_COUNT }).map((_, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              sortedEqpItems.map((eqp) => {
-                const detail = detailByEqpId.get(eqp.eqpId)
-                const runtimeState = detail?.runtimeState ?? null
-                const lifecycleCommandVisibility = resolveLifecycleCommandVisibility(eqp, runtimeState)
-                const hasLifecycleCommand =
-                  lifecycleCommandVisibility.canStart
-                  || lifecycleCommandVisibility.canEnd
-                  || lifecycleCommandVisibility.canRestart
-                const isMissingFromBatch = missingEqpIdSet.has(eqp.eqpId)
-
-                return (
-                  <ContextMenu key={eqp.eqpId}>
-                    <ContextMenuTrigger asChild>
-                      <TableRow
-                        data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
-                        className={isMissingFromBatch ? 'bg-[#FFF7F6]' : undefined}
-                        onClick={() => setSelectedEqpId(eqp.eqpId)}
-                        onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span>{eqp.eqpId}</span>
-                            {isMissingFromBatch ? (
-                              <Badge variant="warning" title="DB에서 설비를 찾을 수 없음 (삭제되었을 수 있음)">
-                                미확인
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant={eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
-                            {eqp.commInterface}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{eqp.commMode}</TableCell>
-                        <TableCell>{detail?.socketSettings?.socketProtocolType ?? '—'}</TableCell>
-                        <TableCell>{eqp.routePartition ?? '—'}</TableCell>
-                        <TableCell>{eqp.eqpIp}</TableCell>
-                        <TableCell>{eqp.eqpPort}</TableCell>
-                        <TableCell>
-                          <EquipmentStatusIndicator
-                            status={resolveEquipmentVisualState(runtimeState)}
-                          />
-                        </TableCell>
-                        <TableCell>{detail?.modelBinding?.modelName ?? '—'}</TableCell>
-                        <TableCell>{detail?.modelBinding?.modelVersion ?? '—'}</TableCell>
-                        <TableCell>{detail?.jars?.gatewayJarFileName ?? '—'}</TableCell>
-                        <TableCell>{detail?.jars?.businessJarFileName ?? '—'}</TableCell>
-                      </TableRow>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-44">
-                      <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
-                      {hasLifecycleCommand ? (
-                        <>
-                          <ContextMenuSeparator />
-                          {lifecycleCommandVisibility.canStart ? (
-                            <ContextMenuItem
-                              disabled={isLifecyclePending}
-                              onSelect={() => onLifecycleAction?.(eqp, 'start')}
-                            >
-                              Eqp Start
-                            </ContextMenuItem>
-                          ) : null}
-                          {lifecycleCommandVisibility.canEnd ? (
-                            <ContextMenuItem
-                              disabled={isLifecyclePending}
-                              onSelect={() => onLifecycleAction?.(eqp, 'end')}
-                            >
-                              Eqp End
-                            </ContextMenuItem>
-                          ) : null}
-                          {lifecycleCommandVisibility.canRestart ? (
-                            <ContextMenuItem
-                              disabled={isLifecyclePending}
-                              onSelect={() => onLifecycleAction?.(eqp, 'restart')}
-                            >
-                              Eqp Restart
-                            </ContextMenuItem>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </ContextMenuContent>
-                  </ContextMenu>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <SelectableTable<GatewayGroupRow>
+            testId="selectable-table-gateway-group"
+            columns={GATEWAY_GROUP_COLUMNS}
+            rows={tableRows}
+            rowKey={(row) => row.eqp.eqpId}
+            tableClassName="min-w-[1280px]"
+            wrapRow={(row, _rowIdx, children) => {
+              const eqp = row.eqp
+              const runtimeState = row.detail?.runtimeState ?? null
+              const lifecycleCommandVisibility = resolveLifecycleCommandVisibility(eqp, runtimeState)
+              const hasLifecycleCommand =
+                lifecycleCommandVisibility.canStart
+                || lifecycleCommandVisibility.canEnd
+                || lifecycleCommandVisibility.canRestart
+              return (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
+                      className={row.isMissingFromBatch ? 'bg-[#FFF7F6]' : undefined}
+                      onClick={() => setSelectedEqpId(eqp.eqpId)}
+                      onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
+                    >
+                      {children}
+                    </TableRow>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-44">
+                    <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
+                    {hasLifecycleCommand ? (
+                      <>
+                        <ContextMenuSeparator />
+                        {lifecycleCommandVisibility.canStart ? (
+                          <ContextMenuItem
+                            disabled={isLifecyclePending}
+                            onSelect={() => onLifecycleAction?.(eqp, 'start')}
+                          >
+                            Eqp Start
+                          </ContextMenuItem>
+                        ) : null}
+                        {lifecycleCommandVisibility.canEnd ? (
+                          <ContextMenuItem
+                            disabled={isLifecyclePending}
+                            onSelect={() => onLifecycleAction?.(eqp, 'end')}
+                          >
+                            Eqp End
+                          </ContextMenuItem>
+                        ) : null}
+                        {lifecycleCommandVisibility.canRestart ? (
+                          <ContextMenuItem
+                            disabled={isLifecyclePending}
+                            onSelect={() => onLifecycleAction?.(eqp, 'restart')}
+                          >
+                            Eqp Restart
+                          </ContextMenuItem>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </ContextMenuContent>
+                </ContextMenu>
+              )
+            }}
+          />
+        )}
       </div>
 
       {isFetching && !isInitialLoading && !hasDetailError ? (

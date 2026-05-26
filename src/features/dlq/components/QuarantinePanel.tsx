@@ -1,18 +1,28 @@
 import { useMemo, useState } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useQuarantine } from '../hooks/useQuarantine'
 import { DLQ_PAGE_SIZE, formatDlqTime } from '../lib/dlq-format'
 import type { QuarantineEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const TRUNCATE_CELL_CLASS = 'max-w-[24em] truncate'
+const QUARANTINE_COLUMNS: ReadonlyArray<ColumnDef<QuarantineEntry>> = [
+  { key: 'equipmentId', header: '설비', accessor: (row) => row.equipmentId },
+  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+  {
+    key: 'reasonMessage',
+    header: '사유',
+    accessor: (row) => row.reasonMessage ?? '-',
+    maxWidth: '24em',
+  },
+  {
+    key: 'quarantinedAt',
+    header: '격리 시각',
+    accessor: (row) => formatDlqTime(row.quarantinedAt),
+  },
+  { key: 'ttlSeconds', header: 'TTL', accessor: (row) => row.ttlSeconds?.toString() ?? '-' },
+]
 
 export function QuarantinePanel() {
   const query = useQuarantine()
@@ -59,36 +69,17 @@ export function QuarantinePanel() {
       onMovePage={setPageIndex}
       emptyMessage="표시할 항목이 없습니다."
     >
-      <Table>
-        <TableHeader className="bg-[#F6F8F6]">
-          <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-            <TableHead>설비</TableHead>
-            <TableHead>사유 코드</TableHead>
-            <TableHead>사유</TableHead>
-            <TableHead>격리 시각</TableHead>
-            <TableHead>TTL</TableHead>
+      <SelectableTable<QuarantineEntry>
+        testId="selectable-table-quarantine"
+        columns={QUARANTINE_COLUMNS}
+        rows={pageItems}
+        rowKey={(row) => row.equipmentId}
+        wrapRow={(row, _rowIdx, children) => (
+          <TableRow data-testid={`dlq-row-quarantine-${row.equipmentId}`}>
+            {children}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pageItems.map((item) => (
-            <TableRow
-              key={item.equipmentId}
-              data-testid={`dlq-row-quarantine-${item.equipmentId}`}
-            >
-              <TableCell>{item.equipmentId}</TableCell>
-              <TableCell>{item.reasonCode ?? '-'}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.reasonMessage ?? ''}
-              >
-                {item.reasonMessage ?? '-'}
-              </TableCell>
-              <TableCell>{formatDlqTime(item.quarantinedAt)}</TableCell>
-              <TableCell>{item.ttlSeconds ?? '-'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+        )}
+      />
     </DlqTableShell>
   )
 }

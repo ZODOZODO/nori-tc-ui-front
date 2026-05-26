@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -31,6 +32,17 @@ interface SelectableTableProps<TRow> {
   testId?: string
   containerClassName?: string
   tableClassName?: string
+  /**
+   * 행 단위 wrapper. 셀들의 ReactNode (TableCell 묶음 + actionCell) 를 받아 페이지별로
+   * `<TableRow>` 합성을 가져간다. row 단위 `data-testid` (DLQ 패널), shadcn `<ContextMenu>`
+   * `<ContextMenuTrigger asChild>` (DeployMonitorPanel / EqpInfoTable / GatewayGroupTable),
+   * `data-state` 선택 표식 (BusinessGroupModelTable / EqpParamTable) 등 페이지 책임의
+   * row level 분기를 보존하기 위한 escape hatch.
+   *
+   * `children` 은 `TableCell` 들의 fragment 이며, wrapper 는 자기 `<TableRow ...>{children}</TableRow>`
+   * 를 만들어 반환한다. 미지정 시 SelectableTable 이 기본 `<TableRow>` 로 렌더.
+   */
+  wrapRow?: (row: TRow, rowIdx: number, children: ReactNode) => ReactNode
 }
 
 /**
@@ -103,6 +115,7 @@ export const SelectableTable = <TRow,>({
   testId,
   containerClassName,
   tableClassName,
+  wrapRow,
 }: SelectableTableProps<TRow>) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const {
@@ -274,67 +287,77 @@ export const SelectableTable = <TRow,>({
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row, rowIdx) => (
-              <TableRow key={rowKey(row, rowIdx)}>
-                {columns.map((column, colIdx) => {
-                  const isAnchor = isAnchorCell(rowIdx, colIdx)
-                  const inRange = isCellInRange(rowIdx, colIdx)
-                  const isEditing =
-                    editing?.rowIdx === rowIdx && editing.colIdx === colIdx
-                  const helpers = {
-                    isEditing,
-                    beginEdit: () => beginEdit(rowIdx, colIdx),
-                    endEdit,
-                  }
-                  const cellContent = column.renderCell
-                    ? column.renderCell(row, rowIdx, colIdx, helpers)
-                    : (column.accessor(row) || '—')
-                  const handleCellDoubleClick = column.editable
-                    ? () => beginEdit(rowIdx, colIdx)
-                    : undefined
-                  return (
-                    <TableCell
-                      key={`${column.key}-${colIdx}`}
-                      className={cn(
-                        'whitespace-nowrap p-1',
-                        column.sticky
-                          ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
-                          : null,
-                      )}
-                      style={{
-                        width: column.width,
-                        minWidth: column.width,
-                        maxWidth: column.maxWidth,
-                        ...(stickyCellStyle(column.sticky) ?? {}),
-                      }}
-                      data-row-idx={rowIdx}
-                      data-col-idx={colIdx}
-                    >
-                      <div
-                        onPointerDown={handleCellPointerDown(rowIdx, colIdx)}
-                        onPointerEnter={handleCellPointerEnter(rowIdx, colIdx)}
-                        onDoubleClick={handleCellDoubleClick}
+            rows.map((row, rowIdx) => {
+              const rowChildren = (
+                <>
+                  {columns.map((column, colIdx) => {
+                    const isAnchor = isAnchorCell(rowIdx, colIdx)
+                    const inRange = isCellInRange(rowIdx, colIdx)
+                    const isEditing =
+                      editing?.rowIdx === rowIdx && editing.colIdx === colIdx
+                    const helpers = {
+                      isEditing,
+                      beginEdit: () => beginEdit(rowIdx, colIdx),
+                      endEdit,
+                    }
+                    const cellContent = column.renderCell
+                      ? column.renderCell(row, rowIdx, colIdx, helpers)
+                      : (column.accessor(row) || '—')
+                    const handleCellDoubleClick = column.editable
+                      ? () => beginEdit(rowIdx, colIdx)
+                      : undefined
+                    return (
+                      <TableCell
+                        key={`${column.key}-${colIdx}`}
                         className={cn(
-                          'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
-                          isAnchor
-                            ? 'border-[#1C7F59] bg-[#EAF5EE]'
-                            : inRange
-                              ? 'border-[#1C7F59]/30 bg-[#1C7F59]/10'
-                              : 'border-transparent bg-transparent hover:bg-[#F3F7F5]',
+                          'whitespace-nowrap p-1',
+                          column.sticky
+                            ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                            : null,
                         )}
+                        style={{
+                          width: column.width,
+                          minWidth: column.width,
+                          maxWidth: column.maxWidth,
+                          ...(stickyCellStyle(column.sticky) ?? {}),
+                        }}
+                        data-row-idx={rowIdx}
+                        data-col-idx={colIdx}
                       >
-                        {cellContent}
-                      </div>
+                        <div
+                          onPointerDown={handleCellPointerDown(rowIdx, colIdx)}
+                          onPointerEnter={handleCellPointerEnter(rowIdx, colIdx)}
+                          onDoubleClick={handleCellDoubleClick}
+                          className={cn(
+                            'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
+                            isAnchor
+                              ? 'border-[#1C7F59] bg-[#EAF5EE]'
+                              : inRange
+                                ? 'border-[#1C7F59]/30 bg-[#1C7F59]/10'
+                                : 'border-transparent bg-transparent hover:bg-[#F3F7F5]',
+                          )}
+                        >
+                          {cellContent}
+                        </div>
+                      </TableCell>
+                    )
+                  })}
+                  {showActionColumn && actionColumn ? (
+                    <TableCell className="whitespace-nowrap">
+                      {actionColumn.render(row, rowIdx)}
                     </TableCell>
-                  )
-                })}
-                {showActionColumn && actionColumn ? (
-                  <TableCell className="whitespace-nowrap">
-                    {actionColumn.render(row, rowIdx)}
-                  </TableCell>
-                ) : null}
-              </TableRow>
-            ))
+                  ) : null}
+                </>
+              )
+              const key = rowKey(row, rowIdx)
+              return (
+                <Fragment key={key}>
+                  {wrapRow
+                    ? wrapRow(row, rowIdx, rowChildren)
+                    : <TableRow>{rowChildren}</TableRow>}
+                </Fragment>
+              )
+            })
           )}
         </TableBody>
       </Table>

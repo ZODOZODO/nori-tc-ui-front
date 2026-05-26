@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import {
   ContextMenu,
@@ -9,9 +9,16 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
-const EQP_INFO_COLUMN_COUNT = 12
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { EqpInfo, EqpModelInfo, EqpRuntimeState } from '../types/eqp.types'
 import { resolveBusinessAppName } from '../utils/eqp-group.util'
 import {
@@ -19,6 +26,8 @@ import {
   resolveEquipmentVisualState,
   resolveLifecycleCommandVisibility,
 } from '../utils/eqp-runtime-state.util'
+
+const EQP_INFO_COLUMN_COUNT = 12
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
@@ -85,6 +94,55 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   )
 }
 
+interface EqpInfoRow {
+  eqp: EqpInfo
+  modelInfo: EqpModelInfo | null
+  runtimeState: EqpRuntimeState | null
+}
+
+const EQP_INFO_COLUMNS: ReadonlyArray<ColumnDef<EqpInfoRow>> = [
+  { key: 'eqpId', header: 'EQPID', accessor: (row) => row.eqp.eqpId },
+  {
+    key: 'businessApp',
+    header: 'Business App',
+    accessor: (row) => resolveBusinessAppName(row.eqp.routePartition) ?? '—',
+  },
+  {
+    key: 'commInterface',
+    header: 'Comm Interface',
+    accessor: (row) => row.eqp.commInterface,
+    renderCell: (row) => (
+      <Badge variant={row.eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
+        {row.eqp.commInterface}
+      </Badge>
+    ),
+  },
+  { key: 'commMode', header: 'Comm Mode', accessor: (row) => row.eqp.commMode },
+  {
+    key: 'routePartition',
+    header: 'Route Partition',
+    accessor: (row) => row.eqp.routePartition?.toString() ?? '—',
+  },
+  { key: 'eqpIp', header: 'IP', accessor: (row) => row.eqp.eqpIp },
+  { key: 'eqpPort', header: 'Port', accessor: (row) => row.eqp.eqpPort?.toString() ?? '—' },
+  {
+    key: 'enabled',
+    header: 'Enabled',
+    accessor: (row) => resolveEquipmentVisualState(row.runtimeState),
+    renderCell: (row) => (
+      <EquipmentStatusIndicator status={resolveEquipmentVisualState(row.runtimeState)} />
+    ),
+  },
+  { key: 'modelName', header: 'Model', accessor: (row) => row.modelInfo?.modelName ?? '—' },
+  {
+    key: 'modelVersion',
+    header: 'Model Version',
+    accessor: (row) => row.modelInfo?.modelVersion ?? '—',
+  },
+  { key: 'gatewayJar', header: 'Gateway Jarfile', accessor: () => '—' },
+  { key: 'businessJar', header: 'Business Jarfile', accessor: () => '—' },
+]
+
 /**
  * 선택된 설비의 단건 정보를 표시하는 상단 테이블입니다.
  * Check Out/Check In 버튼은 design.pen의 DetailLayout(version section)에서 제어합니다.
@@ -98,8 +156,6 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   isLifecyclePending = false,
   onLifecycleAction,
 }: EqpInfoTableProps) {
-  const commInterfaceBadgeVariant =
-    eqp?.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'
   const lifecycleCommandVisibility = eqp
     ? resolveLifecycleCommandVisibility(eqp, runtimeState)
     : { canStart: false, canEnd: false, canRestart: false }
@@ -108,6 +164,11 @@ export const EqpInfoTable = memo(function EqpInfoTable({
     || lifecycleCommandVisibility.canEnd
     || lifecycleCommandVisibility.canRestart
 
+  const tableRows = useMemo<EqpInfoRow[]>(
+    () => (eqp ? [{ eqp, modelInfo, runtimeState }] : []),
+    [eqp, modelInfo, runtimeState],
+  )
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -115,25 +176,25 @@ export const EqpInfoTable = memo(function EqpInfoTable({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <Table className="min-w-[1180px]">
-          <TableHeader>
-            <TableRow className="bg-[#F6F9F7]">
-              <TableHead>EQPID</TableHead>
-              <TableHead>Business App</TableHead>
-              <TableHead>Comm Interface</TableHead>
-              <TableHead>Comm Mode</TableHead>
-              <TableHead>Route Partition</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Port</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Model Version</TableHead>
-              <TableHead>Gateway Jarfile</TableHead>
-              <TableHead>Business Jarfile</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
+        {isLoading ? (
+          <Table className="min-w-[1180px]">
+            <TableHeader>
+              <TableRow className="bg-[#F6F9F7]">
+                <TableHead>EQPID</TableHead>
+                <TableHead>Business App</TableHead>
+                <TableHead>Comm Interface</TableHead>
+                <TableHead>Comm Mode</TableHead>
+                <TableHead>Route Partition</TableHead>
+                <TableHead>IP</TableHead>
+                <TableHead>Port</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Model</TableHead>
+                <TableHead>Model Version</TableHead>
+                <TableHead>Gateway Jarfile</TableHead>
+                <TableHead>Business Jarfile</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               <TableRow data-testid="eqp-info-skeleton">
                 {Array.from({ length: EQP_INFO_COLUMN_COUNT }).map((_, cellIndex) => (
                   <TableCell key={cellIndex}>
@@ -141,31 +202,21 @@ export const EqpInfoTable = memo(function EqpInfoTable({
                   </TableCell>
                 ))}
               </TableRow>
-            ) : eqp ? (
-                <ContextMenu>
-                  <ContextMenuTrigger asChild>
-                    <TableRow
-                      data-state="selected"
-                    >
-                    <TableCell>{eqp.eqpId}</TableCell>
-                    <TableCell>{resolveBusinessAppName(eqp.routePartition) ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={commInterfaceBadgeVariant}>{eqp.commInterface}</Badge>
-                    </TableCell>
-                    <TableCell>{eqp.commMode}</TableCell>
-                    <TableCell>{eqp.routePartition ?? '—'}</TableCell>
-                    <TableCell>{eqp.eqpIp}</TableCell>
-                    <TableCell>{eqp.eqpPort}</TableCell>
-                    <TableCell>
-                      <EquipmentStatusIndicator
-                        status={resolveEquipmentVisualState(runtimeState)}
-                      />
-                    </TableCell>
-                    <TableCell>{modelInfo?.modelName ?? '—'}</TableCell>
-                    <TableCell>{modelInfo?.modelVersion ?? '—'}</TableCell>
-                    <TableCell>—</TableCell>
-                    <TableCell>—</TableCell>
-                  </TableRow>
+            </TableBody>
+          </Table>
+        ) : !eqp ? (
+          <p className="py-10 text-center text-sm text-[#647169]">표시할 설비를 선택해 주세요.</p>
+        ) : (
+          <SelectableTable<EqpInfoRow>
+            testId="selectable-table-eqp-info"
+            columns={EQP_INFO_COLUMNS}
+            rows={tableRows}
+            rowKey={(row) => row.eqp.eqpId}
+            tableClassName="min-w-[1180px]"
+            wrapRow={(_row, _rowIdx, children) => (
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <TableRow data-state="selected">{children}</TableRow>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-44">
                   <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
@@ -200,15 +251,9 @@ export const EqpInfoTable = memo(function EqpInfoTable({
                   ) : null}
                 </ContextMenuContent>
               </ContextMenu>
-            ) : (
-              <TableRow>
-                <TableCell colSpan={12} className="py-10 text-center text-sm text-[#647169]">
-                  표시할 설비를 선택해 주세요.
-                </TableCell>
-              </TableRow>
             )}
-          </TableBody>
-        </Table>
+          />
+        )}
       </div>
 
       {isFetching && !isLoading ? (

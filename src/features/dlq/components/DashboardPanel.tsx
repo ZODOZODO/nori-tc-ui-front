@@ -1,23 +1,20 @@
 import { Beaker, Cpu, Lock, RotateCcw } from 'lucide-react'
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { cn } from '@/lib/utils'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
 import { useGatewayDlq } from '../hooks/useGatewayDlq'
 import { useQuarantine } from '../hooks/useQuarantine'
 import { useRepairTasks } from '../hooks/useRepairTasks'
-import { buildDashboardFeed, type DashboardCategory } from '../lib/dlq-feed'
+import {
+  buildDashboardFeed,
+  type DashboardCategory,
+  type DashboardFeedItem,
+} from '../lib/dlq-feed'
 import { formatDlqTime } from '../lib/dlq-format'
-
-const TRUNCATE_CELL_CLASS = 'max-w-[24em] truncate'
 
 interface CategoryStyle {
   label: string
@@ -60,6 +57,50 @@ const CATEGORY_STYLES: Record<DashboardCategory, CategoryStyle> = {
 
 const CARD_BASE_CLASS =
   'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
+
+const FEED_COLUMNS: ReadonlyArray<ColumnDef<DashboardFeedItem>> = [
+  {
+    key: 'timestamp',
+    header: '발생 시각',
+    accessor: (row) => formatDlqTime(row.timestamp),
+  },
+  {
+    key: 'category',
+    header: '카테고리',
+    accessor: (row) => CATEGORY_STYLES[row.category].label,
+    renderCell: (row) => {
+      const style = CATEGORY_STYLES[row.category]
+      const Icon = style.icon
+      return (
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+            style.badgeClass,
+          )}
+        >
+          <Icon className="size-3" />
+          {style.label}
+        </span>
+      )
+    },
+  },
+  {
+    key: 'equipmentId',
+    header: '설비',
+    accessor: (row) => row.equipmentId ?? '-',
+  },
+  {
+    key: 'reasonCode',
+    header: '사유 코드',
+    accessor: (row) => row.reasonCode ?? '-',
+  },
+  {
+    key: 'reasonMessage',
+    header: '사유',
+    accessor: (row) => row.reasonMessage ?? '-',
+    maxWidth: '24em',
+  },
+]
 
 interface KpiCardProps {
   category: DashboardCategory
@@ -221,57 +262,23 @@ export function DashboardPanel() {
           <p className="text-xs text-[#6C7B72]">시간 역순 상위 20건</p>
         </div>
 
-        <div className="overflow-x-auto px-6 py-5">
+        <div className="px-6 py-5">
           {!allSettled ? (
             <div className="py-8 text-center text-sm text-[#6C7B72]">불러오는 중입니다.</div>
           ) : feed.length === 0 ? (
             <div className="py-8 text-center text-sm text-[#7B8781]">최근 장애 없음</div>
           ) : (
-            <Table>
-              <TableHeader className="bg-[#F6F8F6]">
-                <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-                  <TableHead>발생 시각</TableHead>
-                  <TableHead>카테고리</TableHead>
-                  <TableHead>설비</TableHead>
-                  <TableHead>사유 코드</TableHead>
-                  <TableHead>사유</TableHead>
+            <SelectableTable<DashboardFeedItem>
+              testId="selectable-table-dashboard-feed"
+              columns={FEED_COLUMNS}
+              rows={feed}
+              rowKey={(row) => row.id}
+              wrapRow={(row, _rowIdx, children) => (
+                <TableRow data-testid="dlq-dashboard-feed-row" data-timestamp={row.timestamp}>
+                  {children}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {feed.map((item) => {
-                  const style = CATEGORY_STYLES[item.category]
-                  const Icon = style.icon
-                  return (
-                    <TableRow
-                      key={item.id}
-                      data-testid="dlq-dashboard-feed-row"
-                      data-timestamp={item.timestamp}
-                    >
-                      <TableCell>{formatDlqTime(item.timestamp)}</TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                            style.badgeClass,
-                          )}
-                        >
-                          <Icon className="size-3" />
-                          {style.label}
-                        </span>
-                      </TableCell>
-                      <TableCell>{item.equipmentId ?? '-'}</TableCell>
-                      <TableCell>{item.reasonCode ?? '-'}</TableCell>
-                      <TableCell
-                        className={TRUNCATE_CELL_CLASS}
-                        title={item.reasonMessage ?? ''}
-                      >
-                        {item.reasonMessage ?? '-'}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+              )}
+            />
           )}
         </div>
       </section>

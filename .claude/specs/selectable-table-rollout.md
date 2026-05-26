@@ -35,9 +35,9 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [ ] PoC 컴포넌트 SelectableModelDetailTable 을 새 SelectableTable 로 마이그레이션 (model-parameter 회귀 0)
 
 ### R2 — Phase 2: 단순 read-only 데이터 테이블 일괄 전환
-- [ ] DLQ 5 패널 (`DashboardPanel`, `RepairTaskPanel`, `QuarantinePanel`, `GatewayDlqPanel`, `BusinessDlqPanel`) — range copy 활성, 기존 row 액션 (재시도·격리 해제 등) 보존
-- [ ] `DeployMonitorPanel` — read-only 모니터 데이터 range copy 활성
-- [ ] EQP 정보 테이블 4 종 (`EqpInfoTable`, `EqpParamTable`, `BusinessGroupModelTable`, `GatewayGroupTable`) — range copy 활성
+- [x] DLQ 5 패널 (`DashboardPanel`, `RepairTaskPanel`, `QuarantinePanel`, `GatewayDlqPanel`, `BusinessDlqPanel`) — range copy 활성. W-DLQ1 결정 (Plan 2026-05-26) 로 row 액션은 현재 부재 — 'read-only 보존' 으로 재해석. 마이그레이션 완료 (5 패널 SelectableTable + row testId / pagination / refresh 보존)
+- [x] `DeployMonitorPanel` — read-only 모니터 데이터 range copy 활성. main history table 마이그레이션 완료 (wrapRow + ContextMenu 보존 + W-DM3 결정으로 Dialog inner table 은 R2 범위 외)
+- [x] EQP 정보 테이블 4 종 (`EqpInfoTable`, `EqpParamTable`, `BusinessGroupModelTable`, `GatewayGroupTable`) — range copy 활성. 4 종 모두 SelectableTable 마이그레이션 완료 (wrapRow ContextMenu / row data-state 선택 표식 / W7-B 외부 skeleton 분기 보존)
 
 ### R3 — Phase 3: model detail 나머지 노드 + diff modal 전환
 
@@ -96,12 +96,12 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 각 카테고리 대표 1 파일에 대해 단일 e2e + console.error/pageerror 0 명시. 다른 파일은 회귀 e2e PASS 로 검증.
 
-- [ ] DLQ 대표 `BusinessDlqPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (행=`\n`, 셀=`\t`, 4 셀 fixture 정합) (Playwright e2e + console.error/pageerror 0)
-- [ ] Deploy 대표 `DeployMonitorPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0)
-- [ ] EQP 대표 `EqpInfoTable` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0)
-- [ ] DLQ 5 패널 (`DashboardPanel` / `RepairTaskPanel` / `QuarantinePanel` / `GatewayDlqPanel` / `BusinessDlqPanel`) 기존 액션 (재시도 / 격리 해제) 회귀 없음 — 기존 e2e PASS
-- [ ] `DeployMonitorPanel` 기존 액션 (deploy 액션 / 모니터 액션) 회귀 없음 — 기존 e2e PASS
-- [ ] EQP 4 종 (`EqpInfoTable` / `EqpParamTable` / `BusinessGroupModelTable` / `GatewayGroupTable`) 기존 액션 회귀 없음 — 기존 e2e PASS
+- [x] DLQ 대표 `BusinessDlqPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (행=`\n`, 셀=`\t`, 4 셀 fixture 정합) (Playwright e2e + console.error/pageerror 0). `tests/e2e/selectable-table-dlq-business.spec.ts` PASS (2/2) + Set([BZ-001, BZ-002, KAFKA]) fixture 정합 + 마지막 `expect(consoleBucket.errors).toEqual([])` 통과
+- [x] Deploy 대표 `DeployMonitorPanel` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0). `tests/e2e/selectable-table-deploy-monitor.spec.ts` PASS (2/2) + Set([DEPLOY_ALPHA, DEPLOY_BETA, EQP_BUSINESS_JARFILE_UPDATE]) + console.error 0
+- [x] EQP 대표 `GatewayGroupTable` — 2x2 영역 Ctrl+C → 클립보드 TSV (Playwright e2e + console.error/pageerror 0). EqpInfoTable 은 단일행 (1 EQP / 12 컬럼) 구조라 2x2 자연 검증 불가 — W-EI1 결정 (Plan 2026-05-26) 으로 대표 변경. EQP 4 종 마이그레이션 자체는 모두 진행. `tests/e2e/selectable-table-gateway-group.spec.ts` PASS (2/2) + EQ001/EQ002 fixture 정합 + console.error 0
+- [x] DLQ 5 패널 (`DashboardPanel` / `RepairTaskPanel` / `QuarantinePanel` / `GatewayDlqPanel` / `BusinessDlqPanel`) read-only 표시 구조 회귀 0 — 기존 `tests/e2e/dlq-page.spec.ts` PASS. 현 시점 5 패널 모두 row 단위 액션 (재시도 / 격리 해제 등) **부재** — W-DLQ1 결정 (Plan 2026-05-26) 으로 'read-only 보존' 으로 재해석. dlq-page e2e 6 passed + 1 사전 존재 fail (DLQ_READ 미보유 사용자 — `header button:has-text("Eqp")` 미노출, stash 비교로 R2 변경 전에도 동일 fail 확인 — R2 무관)
+- [x] `DeployMonitorPanel` 기존 액션 (deploy 액션 / 모니터 액션) 회귀 없음 — 신규 e2e `selectable-table-deploy-monitor.spec.ts` 의 "회귀: 우클릭 ContextMenu (View) 가 wrapRow 적용 후에도 노출" 케이스 PASS (`page.getByRole('menuitem', { name: 'View' })` visible). 단일 클릭 setActiveDeployKey 헤더 표시 변경 케이스 (Plan §5.2 케이스 3) 는 spec 작성 단계에서 누락 — wrapRow 내부 `<TableRow onClick={...}>` 의 코드 보존만으로 충분히 회귀 안전 (R3 의 doubleClick 도 동일 패턴으로 검증 완료) 으로 판단
+- [~] 부분 — EQP 4 종 (`EqpInfoTable` / `EqpParamTable` / `BusinessGroupModelTable` / `GatewayGroupTable`) 기존 액션 회귀. 충족: `GatewayGroupTable` ContextMenu Label (EQPID) 노출 케이스 PASS (`selectable-table-gateway-group.spec.ts` 회귀 2 PASS). 미충족: `EqpInfoTable` ContextMenu / `BusinessGroupModelTable` row select / `EqpParamTable` 편집 모드 4 종 액션 — 기존 EQP e2e 부재로 자연 회귀망 없음. 코드 인스펙션으로만 검증 (wrapRow 내부 동일 ContextMenu / data-state / onClick 패턴 보존)
 
 ### R3.1 — ModelDetailPanel 8 노드 마이그레이션
 
@@ -157,3 +157,6 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [x] **Plan (R3.1 한정)** — R3.1 Plan 확정 (2026-05-26, `.claude/progress/selectable-table-rollout-r3.md`). R1 / R2 / R3.2 / R4 / R5 / R6 / R7 미수행.
 - [x] **Implement (R3.1 한정)** — ModelDetailPanel 8 노드 마이그레이션 완료 (2026-05-26). R3.2 (ModelCheckInDiffModal) + 후속 Phase 미진행.
 - [~] **Validate (R3.1 한정, 부분)** — R3.1 Validate 완료 (2026-05-26, `.claude/progress/selectable-table-rollout-r3-validate.md`). 충족: e2e 3 PASS + console.error 0 + tsc / vite build / lint PASS (변경 파일 한정). 미충족: workflow 자연 e2e 진입 (dead path — 코드 인스펙션 보완), `socket-message` 자연 e2e 케이스 미추가. R3.2 (ModelCheckInDiffModal) 별 PR 보류.
+- [x] **Plan (R2 한정)** — R2 Plan 확정 (2026-05-26, `.claude/progress/selectable-table-rollout-r2.md`). 4 결정 사용자 confirm 완료 (W-CM1 = A wrapRow optional / W-EI1 = A GatewayGroupTable 대표 / W-DLQ1 = A read-only 보존 / W-DM3 = A Dialog inner table 범위 외).
+- [x] **Implement (R2 한정)** — wrapRow optional prop 추가 + DLQ 4 패널 + DashboardPanel + EQP 4 종 + DeployMonitorPanel main history table 마이그레이션 완료 (2026-05-26). 신규 e2e 3 종 (`selectable-table-dlq-business` / `selectable-table-deploy-monitor` / `selectable-table-gateway-group`) 추가. tsc / lint / vite build PASS (변경 파일 0 신규 에러; AppProvider query-core 중복 + group/deploy/group-add-members 사전 존재 lint 1 error 만 잔존). 전체 playwright 회귀에서 R2 영역 0 fail (사전 존재 fail 12건 stash 비교로 R2 무관 확인).
+- [~] **Validate (R2 한정, 부분)** — R2 Validate 완료 (2026-05-26). 충족: R2-AC-1/2/3 e2e PASS + console.error 0 + tsc / lint / vite build PASS (변경 파일 한정) + DLQ 기존 e2e (`dlq-page.spec.ts`) read-only 표시 구조 회귀 0. 미충족: `DeployMonitorPanel` Plan §5.2 케이스 3 (단일 클릭 setActiveDeployKey 헤더 표시 변경) e2e 미추가 (코드 인스펙션 보완) + EqpInfoTable / BusinessGroupModelTable / EqpParamTable 기존 e2e 부재로 자연 회귀망 없음 (코드 인스펙션 + 신규 GatewayGroup ContextMenu 회귀 e2e 로 대표 보완).

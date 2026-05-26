@@ -1,18 +1,34 @@
 import { useMemo, useState } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useGatewayDlq } from '../hooks/useGatewayDlq'
 import { DLQ_PAGE_SIZE, formatDlqTime } from '../lib/dlq-format'
 import type { GatewayDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const TRUNCATE_CELL_CLASS = 'max-w-[24em] truncate'
+const GATEWAY_DLQ_COLUMNS: ReadonlyArray<ColumnDef<GatewayDlqEntry>> = [
+  { key: 'dlqId', header: 'ID', accessor: (row) => row.dlqId, maxWidth: '24em' },
+  { key: 'equipmentId', header: '설비', accessor: (row) => row.equipmentId },
+  { key: 'commInterfaceType', header: 'IF', accessor: (row) => row.commInterfaceType ?? '-' },
+  { key: 'socketType', header: '소켓', accessor: (row) => row.socketType ?? '-' },
+  { key: 'stage', header: '단계', accessor: (row) => row.stage ?? '-' },
+  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+  {
+    key: 'reasonMessage',
+    header: '사유',
+    accessor: (row) => row.reasonMessage ?? '-',
+    maxWidth: '24em',
+  },
+  { key: 'occurredAt', header: '발생 시각', accessor: (row) => formatDlqTime(row.occurredAt) },
+  {
+    key: 'payloadRefKey',
+    header: 'payload 참조',
+    accessor: (row) => row.payloadRefKey ?? '-',
+    maxWidth: '24em',
+  },
+  { key: 'ttlSeconds', header: 'TTL', accessor: (row) => row.ttlSeconds?.toString() ?? '-' },
+]
 
 export function GatewayDlqPanel() {
   const query = useGatewayDlq()
@@ -55,50 +71,15 @@ export function GatewayDlqPanel() {
       onMovePage={setPageIndex}
       emptyMessage="표시할 항목이 없습니다."
     >
-      <Table>
-        <TableHeader className="bg-[#F6F8F6]">
-          <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
-            <TableHead>ID</TableHead>
-            <TableHead>설비</TableHead>
-            <TableHead>IF</TableHead>
-            <TableHead>소켓</TableHead>
-            <TableHead>단계</TableHead>
-            <TableHead>사유 코드</TableHead>
-            <TableHead>사유</TableHead>
-            <TableHead>발생 시각</TableHead>
-            <TableHead>payload 참조</TableHead>
-            <TableHead>TTL</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pageItems.map((item) => (
-            <TableRow key={item.dlqId} data-testid={`dlq-row-gateway-${item.dlqId}`}>
-              <TableCell className={TRUNCATE_CELL_CLASS} title={item.dlqId}>
-                {item.dlqId}
-              </TableCell>
-              <TableCell>{item.equipmentId}</TableCell>
-              <TableCell>{item.commInterfaceType ?? '-'}</TableCell>
-              <TableCell>{item.socketType ?? '-'}</TableCell>
-              <TableCell>{item.stage ?? '-'}</TableCell>
-              <TableCell>{item.reasonCode ?? '-'}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.reasonMessage ?? ''}
-              >
-                {item.reasonMessage ?? '-'}
-              </TableCell>
-              <TableCell>{formatDlqTime(item.occurredAt)}</TableCell>
-              <TableCell
-                className={TRUNCATE_CELL_CLASS}
-                title={item.payloadRefKey ?? ''}
-              >
-                {item.payloadRefKey ?? '-'}
-              </TableCell>
-              <TableCell>{item.ttlSeconds ?? '-'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <SelectableTable<GatewayDlqEntry>
+        testId="selectable-table-gateway-dlq"
+        columns={GATEWAY_DLQ_COLUMNS}
+        rows={pageItems}
+        rowKey={(row) => row.dlqId}
+        wrapRow={(row, _rowIdx, children) => (
+          <TableRow data-testid={`dlq-row-gateway-${row.dlqId}`}>{children}</TableRow>
+        )}
+      />
     </DlqTableShell>
   )
 }
