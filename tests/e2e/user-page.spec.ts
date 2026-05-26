@@ -7,6 +7,13 @@ import { expect, test, type Page, type Request } from '@playwright/test'
  * 는 현재 미배포 가능성이 있으므로 본 spec 은 mock-only 통합을 검증합니다.
  */
 
+interface MockUserGroupRow {
+  userPk: number
+  groupId: number
+  groupCode: string
+  groupName: string
+}
+
 interface MockUserRow {
   userPk: number
   userId: string
@@ -20,13 +27,9 @@ interface MockUserRow {
   updatedAt: string
   createdBy: string
   updatedBy: string
-}
-
-interface MockUserGroupRow {
-  userPk: number
-  groupId: number
-  groupCode: string
-  groupName: string
+  // user.api.ts:115 isUserListItem 은 groups: UserGroupSummary[] 를 필수로 검사한다.
+  // 누락 시 normalizeUserPagePayload 가 행을 필터링해 목록이 비어 user-row-* 가 사라진다.
+  groups: MockUserGroupRow[]
 }
 
 const PERMISSIONED_ME = {
@@ -68,6 +71,7 @@ const buildUser = (overrides: Partial<MockUserRow>): MockUserRow => ({
   updatedAt: overrides.updatedAt ?? '2025-05-01T00:00:00Z',
   createdBy: overrides.createdBy ?? 'system',
   updatedBy: overrides.updatedBy ?? 'system',
+  groups: overrides.groups ?? [],
 })
 
 interface UserApiMockState {
