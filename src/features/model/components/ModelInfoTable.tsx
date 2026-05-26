@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
 import type { ModelInfo } from '../types/model.types'
 
 const MODEL_INFO_COLUMN_COUNT = 6
@@ -62,8 +63,9 @@ const resolveStatusBadgeVariant = (status: string): 'default' | 'info' | 'warnin
 /**
  * design.pen의 Model 정보 테이블을 렌더링합니다.
  * - updatedAt 내림차순 정렬
- * - row click: 선택
- * - row double click: Version 화면(탭) 오픈
+ * - 단일 클릭: cell anchor + row select (wrapRow onClick → onSelectRow)
+ * - 더블 클릭: Version 화면(탭) 오픈 (wrapRow onDoubleClick → onOpenDetail)
+ * - 셀 영역 Ctrl+C → 클립보드 TSV (SelectableTable rangeCopy)
  */
 export const ModelInfoTable = memo(function ModelInfoTable({
   models,
@@ -74,10 +76,48 @@ export const ModelInfoTable = memo(function ModelInfoTable({
   onSelectRow,
   onOpenDetail,
 }: ModelInfoTableProps) {
-  // updated_at 내림차순 정렬 (최근 수정 순)
   const sortedModels = useMemo(
     () => [...models].sort((firstItem, secondItem) => secondItem.updatedAt.localeCompare(firstItem.updatedAt)),
     [models],
+  )
+
+  const columns = useMemo<ColumnDef<ModelInfo>[]>(
+    () => [
+      {
+        key: 'modelName',
+        header: 'Model Name',
+        accessor: (row) => row.modelName,
+      },
+      {
+        key: 'modelVersion',
+        header: 'Model Version',
+        accessor: (row) => row.modelVersion,
+      },
+      {
+        key: 'status',
+        header: 'status',
+        accessor: (row) => row.status,
+        renderCell: (row) => (
+          <Badge variant={resolveStatusBadgeVariant(row.status)}>{row.status}</Badge>
+        ),
+      },
+      {
+        key: 'description',
+        header: 'description',
+        accessor: (row) => row.description ?? '—',
+      },
+      {
+        key: 'updatedBy',
+        header: 'updated_by',
+        accessor: (row) => row.updatedBy,
+      },
+      {
+        key: 'updatedAt',
+        header: 'updated_at',
+        accessor: (row) => formatDateTime(row.updatedAt),
+      },
+    ],
+    [],
   )
 
   return (
@@ -86,21 +126,21 @@ export const ModelInfoTable = memo(function ModelInfoTable({
         <h2 className="text-base font-semibold text-[#213028]">Model 정보</h2>
       </div>
 
-      <div className={cn('overflow-auto', compactHeight ? 'max-h-[300px]' : 'flex-1')}>
-        <Table className="min-w-[980px]">
-          <TableHeader>
-            <TableRow className="bg-[#F6F9F7]">
-              <TableHead>Model Name</TableHead>
-              <TableHead>Model Version</TableHead>
-              <TableHead>status</TableHead>
-              <TableHead>description</TableHead>
-              <TableHead>updated_by</TableHead>
-              <TableHead>updated_at</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: MODEL_INFO_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+      {isLoading ? (
+        <div className={cn('overflow-auto', compactHeight ? 'max-h-[300px]' : 'flex-1')}>
+          <Table className="min-w-[980px]">
+            <TableHeader>
+              <TableRow className="bg-[#F6F9F7]">
+                <TableHead>Model Name</TableHead>
+                <TableHead>Model Version</TableHead>
+                <TableHead>status</TableHead>
+                <TableHead>description</TableHead>
+                <TableHead>updated_by</TableHead>
+                <TableHead>updated_at</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: MODEL_INFO_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
                 <TableRow key={`model-info-skeleton-${rowIndex}`} data-testid="model-info-skeleton">
                   {Array.from({ length: MODEL_INFO_COLUMN_COUNT }).map((_, cellIndex) => (
                     <TableCell key={cellIndex}>
@@ -108,36 +148,34 @@ export const ModelInfoTable = memo(function ModelInfoTable({
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
-            ) : sortedModels.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={MODEL_INFO_COLUMN_COUNT} className="py-10 text-center text-sm text-[#647169]">
-                  표시할 모델이 없습니다.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedModels.map((model) => (
-                <TableRow
-                  key={model.modelVersionKey}
-                  data-state={selectedModelVersionKey === model.modelVersionKey ? 'selected' : undefined}
-                  onClick={() => onSelectRow(model.modelVersionKey)}
-                  onDoubleClick={() => onOpenDetail(model)}
-                  className="cursor-pointer"
-                >
-                  <TableCell>{model.modelName}</TableCell>
-                  <TableCell>{model.modelVersion}</TableCell>
-                  <TableCell>
-                    <Badge variant={resolveStatusBadgeVariant(model.status)}>{model.status}</Badge>
-                  </TableCell>
-                  <TableCell>{model.description ?? '—'}</TableCell>
-                  <TableCell>{model.updatedBy}</TableCell>
-                  <TableCell>{formatDateTime(model.updatedAt)}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <SelectableTable
+          columns={columns}
+          rows={sortedModels}
+          rowKey={(row) => row.modelVersionKey}
+          features={{ rangeCopy: true }}
+          testId="selectable-table-model-info"
+          containerClassName={cn(compactHeight ? 'max-h-[300px]' : 'flex-1')}
+          tableClassName="min-w-[980px]"
+          emptyState="표시할 모델이 없습니다."
+          wrapRow={(model, _rowIdx, children) => (
+            <TableRow
+              data-state={
+                selectedModelVersionKey === model.modelVersionKey ? 'selected' : undefined
+              }
+              onClick={() => onSelectRow(model.modelVersionKey)}
+              onDoubleClick={() => onOpenDetail(model)}
+              className="cursor-pointer"
+            >
+              {children}
+            </TableRow>
+          )}
+        />
+      )}
 
       {isFetching && !isLoading ? (
         <p className="mt-2 text-xs text-[#7A8680]">모델 데이터를 동기화 중입니다.</p>
