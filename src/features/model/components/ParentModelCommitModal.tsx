@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
 import {
   MODEL_DETAIL_NODE_LABELS,
   type ModelDiffItem,
@@ -143,15 +144,49 @@ const resolveDiffTableTone = (
  * diff 테이블 단일 블록입니다.
  */
 function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTableProps) {
+  const visibleColumnIndexes = useMemo(
+    () => resolveVisibleColumnIndexes(columns, hiddenColumns),
+    [columns, hiddenColumns],
+  )
+  const tableColumns = useMemo(
+    () => resolveDiffTableColumns(columns, mode, visibleColumnIndexes),
+    [columns, mode, visibleColumnIndexes],
+  )
+  const tableRows = useMemo(
+    () => resolveDiffTableRows(items, mode, visibleColumnIndexes),
+    [items, mode, visibleColumnIndexes],
+  )
+  const tone = useMemo(() => resolveDiffTableTone(mode), [mode])
+  const diffValueColumnCount = visibleColumnIndexes.length
+
+  // changed 모드는 columnIndex 위치별로 셀 className 이 달라진다 (0='항목' default,
+  // 1..diffValueColumnCount=Parent strikethrough, diffValueColumnCount+1..=Branch green).
+  // added/deleted 는 tone.valueClassName 단일.
+  const selectableColumns = useMemo<ColumnDef<string[]>[]>(
+    () =>
+      tableColumns.map((columnName, columnIndex) => ({
+        key: `${columnName}-${columnIndex}`,
+        header: columnName,
+        accessor: (row) => row[columnIndex] ?? '',
+        renderCell: (row) => {
+          const value = row[columnIndex] || '—'
+          const cellClassName =
+            mode !== 'changed'
+              ? tone.valueClassName
+              : columnIndex > diffValueColumnCount
+                ? 'font-medium text-[#1C7F59]'
+                : columnIndex > 0
+                  ? 'text-[#97A39C] line-through'
+                  : 'text-[#22322B]'
+          return <span className={cellClassName}>{value}</span>
+        },
+      })),
+    [tableColumns, mode, tone.valueClassName, diffValueColumnCount],
+  )
+
   if (items.length === 0) {
     return null
   }
-
-  const visibleColumnIndexes = resolveVisibleColumnIndexes(columns, hiddenColumns)
-  const tableColumns = resolveDiffTableColumns(columns, mode, visibleColumnIndexes)
-  const tableRows = resolveDiffTableRows(items, mode, visibleColumnIndexes)
-  const tone = resolveDiffTableTone(mode)
-  const diffValueColumnCount = visibleColumnIndexes.length
 
   return (
     <div className="rounded-xl border border-[#E4EAE6] bg-white">
@@ -165,37 +200,22 @@ function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTabl
       </div>
 
       <div className="overflow-auto">
-        <Table className="min-w-[720px]">
-          <TableHeader>
-            <TableRow className="bg-[#F6F9F7]">
-              {tableColumns.map((columnName) => (
-                <TableHead key={`${title}-${columnName}`}>{columnName}</TableHead>
-              ))}
+        <SelectableTable<string[]>
+          testId={`parent-commit-diff-table-${mode}`}
+          columns={selectableColumns}
+          rows={tableRows}
+          rowKey={(_row, rowIndex) => `${title}-${rowIndex}`}
+          features={{ rangeCopy: true }}
+          tableClassName="min-w-[720px]"
+          wrapRow={(_row, rowIdx, children) => (
+            <TableRow
+              data-testid={`parent-commit-diff-row-${mode}-${rowIdx}`}
+              className={tone.rowClassName}
+            >
+              {children}
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tableRows.map((row, rowIndex) => (
-              <TableRow key={`${title}-${rowIndex}`} className={tone.rowClassName}>
-                {tableColumns.map((_, columnIndex) => (
-                  <TableCell
-                    key={`${title}-${rowIndex}-${columnIndex}`}
-                    className={
-                      mode !== 'changed'
-                        ? tone.valueClassName
-                        : columnIndex > diffValueColumnCount
-                          ? 'font-medium text-[#1C7F59]'
-                          : columnIndex > 0
-                            ? 'text-[#97A39C] line-through'
-                            : 'text-[#22322B]'
-                    }
-                  >
-                    {row[columnIndex] || '—'}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          )}
+        />
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+import { useMemo, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -8,7 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
+import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
 import { MODEL_DETAIL_NODE_LABELS } from '../types/model.types'
 import type { ModelDiffSection } from '../types/model.types'
 
@@ -22,6 +24,180 @@ interface ModelCheckInDiffModalProps {
   onCancel: () => void
   /** OK 버튼 클릭 시 호출. version/description 입력 모달로 이동합니다. */
   onOk: () => void
+}
+
+type CheckInDiffRowKind = 'added' | 'changed' | 'deleted'
+
+/**
+ * section 별 added/changed/deleted 를 한 배열로 정규화한 row 모델입니다.
+ * SelectableTable 의 단일 rows prop 에 맞추기 위한 로컬 표현.
+ */
+interface NormalizedCheckInDiffRow {
+  kind: CheckInDiffRowKind
+  identity: string
+  branchValues: string[]
+  parentValues: string[]
+}
+
+const KIND_BADGE_LABEL: Record<CheckInDiffRowKind, string> = {
+  added: '추가',
+  changed: '변경',
+  deleted: '삭제',
+}
+
+const KIND_BADGE_CLASS: Record<CheckInDiffRowKind, string> = {
+  added: 'bg-[#D1F5E7] text-[#1C7F59]',
+  changed: 'bg-[#FFF0C0] text-[#7A5800]',
+  deleted: 'bg-[#FAD9D7] text-[#B4483F]',
+}
+
+const KIND_ROW_CLASS: Record<CheckInDiffRowKind, string> = {
+  added: 'bg-[#F0FFF7] hover:bg-[#F0FFF7]',
+  changed: 'bg-[#FFFDF0] hover:bg-[#FFFDF0]',
+  deleted: 'bg-[#FFF7F7] hover:bg-[#FFF7F7]',
+}
+
+const normalizeSectionRows = (section: ModelDiffSection): NormalizedCheckInDiffRow[] => [
+  ...section.added.map<NormalizedCheckInDiffRow>((item) => ({
+    kind: 'added',
+    identity: item.identity,
+    branchValues: item.branchValues,
+    parentValues: item.parentValues,
+  })),
+  ...section.changed.map<NormalizedCheckInDiffRow>((item) => ({
+    kind: 'changed',
+    identity: item.identity,
+    branchValues: item.branchValues,
+    parentValues: item.parentValues,
+  })),
+  ...section.deleted.map<NormalizedCheckInDiffRow>((item) => ({
+    kind: 'deleted',
+    identity: item.identity,
+    branchValues: item.branchValues,
+    parentValues: item.parentValues,
+  })),
+]
+
+/**
+ * 단일 section 의 SelectableTable 을 렌더링합니다. ColumnDef 는 inline useMemo —
+ * section.columns 가 동적이라 다른 모달과 공유 불가 (Plan W-FAC1 = B inline 결정).
+ */
+function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
+  const normalizedRows = useMemo(() => normalizeSectionRows(section), [section])
+  const sectionColumns = section.columns
+
+  const columns = useMemo<ColumnDef<NormalizedCheckInDiffRow>[]>(() => {
+    const kindColumn: ColumnDef<NormalizedCheckInDiffRow> = {
+      key: 'kind',
+      header: '구분',
+      width: '6rem',
+      accessor: (row) => KIND_BADGE_LABEL[row.kind],
+      renderCell: (row) => (
+        <span
+          className={`rounded px-1.5 py-0.5 text-xs font-semibold ${KIND_BADGE_CLASS[row.kind]}`}
+        >
+          {KIND_BADGE_LABEL[row.kind]}
+        </span>
+      ),
+    }
+
+    const identityColumn: ColumnDef<NormalizedCheckInDiffRow> = {
+      key: 'identity',
+      header: '식별자',
+      width: '10rem',
+      accessor: (row) => row.identity,
+      renderCell: (row) => (
+        <span
+          className={
+            row.kind === 'deleted'
+              ? 'text-xs text-[#97A39C] line-through'
+              : 'text-xs text-[#22322B]'
+          }
+        >
+          {row.identity}
+        </span>
+      ),
+    }
+
+    const valueColumns: ColumnDef<NormalizedCheckInDiffRow>[] = sectionColumns.map(
+      (columnName, columnIndex) => ({
+        key: `${columnName}-${columnIndex}`,
+        header: columnName,
+        // accessor 는 truncate 전 full string — TSV copy 는 디스플레이 축약과 분리 (Plan W-DIFF-TRUNCATE)
+        accessor: (row) => {
+          if (row.kind === 'deleted') {
+            return row.parentValues[columnIndex] ?? ''
+          }
+          return row.branchValues[columnIndex] ?? ''
+        },
+        renderCell: (row) => {
+          if (row.kind === 'added') {
+            const value = row.branchValues[columnIndex] ?? ''
+            return (
+              <span className="text-xs text-[#22322B]">
+                <DiffCellValue value={value} />
+              </span>
+            )
+          }
+          if (row.kind === 'deleted') {
+            const value = row.parentValues[columnIndex] ?? ''
+            return (
+              <span className="text-xs text-[#97A39C] line-through">
+                <DiffCellValue value={value} />
+              </span>
+            )
+          }
+          const current = row.branchValues[columnIndex] ?? ''
+          const previous = row.parentValues[columnIndex] ?? ''
+          const isChanged = current !== previous
+          if (!isChanged) {
+            return (
+              <span className="text-xs text-[#22322B]">
+                <DiffCellValue value={current} />
+              </span>
+            )
+          }
+          return (
+            <div className="space-y-1 text-xs">
+              <div className="text-[#97A39C] line-through">
+                <DiffCellValue value={previous} />
+              </div>
+              <div className="text-[#1C7F59] font-medium">
+                <DiffCellValue value={current} />
+              </div>
+            </div>
+          )
+        },
+      }),
+    )
+
+    return [kindColumn, identityColumn, ...valueColumns]
+  }, [sectionColumns])
+
+  const wrapRow = (
+    row: NormalizedCheckInDiffRow,
+    _rowIdx: number,
+    children: ReactNode,
+  ): ReactNode => (
+    <TableRow
+      data-testid={`check-in-diff-row-${row.kind}-${row.identity}`}
+      className={KIND_ROW_CLASS[row.kind]}
+    >
+      {children}
+    </TableRow>
+  )
+
+  return (
+    <SelectableTable<NormalizedCheckInDiffRow>
+      testId={`selectable-table-check-in-diff-${section.detailNode}`}
+      columns={columns}
+      rows={normalizedRows}
+      rowKey={(row) => `${row.kind}-${row.identity}`}
+      features={{ rangeCopy: true }}
+      tableClassName="min-w-max"
+      wrapRow={wrapRow}
+    />
+  )
 }
 
 /**
@@ -95,89 +271,7 @@ export function ModelCheckInDiffModal({
                   </div>
 
                   <div className="overflow-x-auto">
-                    <Table className="min-w-max">
-                    <TableHeader>
-                      <TableRow className="bg-[#FAFCFB]">
-                        <TableHead className="w-24">구분</TableHead>
-                        <TableHead className="w-40">식별자</TableHead>
-                        {section.columns.map((col) => (
-                          <TableHead key={col}>{col}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {/* 추가된 항목: 이전 버전에 없고 현재 버전에 있음 */}
-                      {section.added.map((item) => (
-                        <TableRow key={`added-${item.identity}`} className="bg-[#F0FFF7]">
-                          <TableCell>
-                            <span className="rounded px-1.5 py-0.5 text-xs font-semibold bg-[#D1F5E7] text-[#1C7F59]">
-                              추가
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-[#22322B]">{item.identity}</TableCell>
-                          {item.branchValues.map((value, index) => (
-                            <TableCell key={index} className="text-xs text-[#22322B]">
-                              <DiffCellValue value={value} />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-
-                      {/* 변경된 항목: 이전 버전과 현재 버전 모두에 있지만 값이 다름 */}
-                      {section.changed.map((item) => (
-                        <TableRow key={`changed-${item.identity}`} className="bg-[#FFFDF0]">
-                          <TableCell>
-                            <span className="rounded px-1.5 py-0.5 text-xs font-semibold bg-[#FFF0C0] text-[#7A5800]">
-                              변경
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-[#22322B]">{item.identity}</TableCell>
-                          {section.columns.map((_, index) => {
-                            const current = item.branchValues[index] ?? ''
-                            const previous = item.parentValues[index] ?? ''
-                            const isChanged = current !== previous
-                            return (
-                              <TableCell key={index} className="text-xs">
-                                {isChanged ? (
-                                  <div className="space-y-1">
-                                    {/* 이전 값 */}
-                                    <div className="text-[#97A39C] line-through">
-                                      <DiffCellValue value={previous} />
-                                    </div>
-                                    {/* 현재 값 */}
-                                    <div className="text-[#1C7F59] font-medium">
-                                      <DiffCellValue value={current} />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-[#22322B]">
-                                    <DiffCellValue value={current} />
-                                  </span>
-                                )}
-                              </TableCell>
-                            )
-                          })}
-                        </TableRow>
-                      ))}
-
-                      {/* 삭제된 항목: 이전 버전에 있고 현재 버전에 없음 */}
-                      {section.deleted.map((item) => (
-                        <TableRow key={`deleted-${item.identity}`} className="bg-[#FFF7F7]">
-                          <TableCell>
-                            <span className="rounded px-1.5 py-0.5 text-xs font-semibold bg-[#FAD9D7] text-[#B4483F]">
-                              삭제
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-[#97A39C] line-through">{item.identity}</TableCell>
-                          {item.parentValues.map((value, index) => (
-                            <TableCell key={index} className="text-xs text-[#97A39C] line-through">
-                              <DiffCellValue value={value} />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    </Table>
+                    <CheckInDiffSectionTable section={section} />
                   </div>
                 </div>
               )
