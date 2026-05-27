@@ -152,6 +152,18 @@ const createDefaultMockState = (): DlqApiMockState => ({
 })
 
 const setupMocks = async (page: Page, state: DlqApiMockState) => {
+  // 일부 테스트는 /eqp 출발점에서 topbar 메뉴 노출/권한을 검증한다.
+  // /eqp 진입 시 EqpPage 가 호출하는 /api/eqp* / /api/model 이 mock 되지 않으면 unmocked
+  // 요청이 401 을 받아 api-client interceptor 가 /login 으로 redirect → topbar 가 사라진다.
+  // 출발점 /eqp 가 빈 목록으로 정상 렌더되도록 eqp / model 계열을 빈 응답으로 mock.
+  await page.route(/.*\/api\/(eqp|model)(\/.*)?(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(apiSuccess({ items: [], missingEqpIds: [], offset: 0, limit: 500, count: 0 })),
+    })
+  })
+
   await page.route('**/api/auth/csrf', async (route) => {
     await route.fulfill({
       status: 200,

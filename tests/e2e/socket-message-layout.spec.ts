@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-test.use({
-  baseURL: 'http://127.0.0.1:3001',
-})
+// baseURL 은 playwright.config.ts 의 webServer (127.0.0.1:3000) 를 상속한다.
+// 과거 3001 하드코딩 override 는 해당 포트에 서버가 없어 ERR_CONNECTION_REFUSED 로 항상 실패했다.
 
 const createApiResponse = <TData>(data: TData) => ({
   success: true,
