@@ -4,7 +4,7 @@
 > 단계: Specify (Plan / Implement / Validate 후속)
 > 대상 레포: `nori-tc-ui-front` (단일 레포 — backend 변경 없음)
 > 출처: 사용자 요청 — model detail Reference 테이블에서 Excel 영역 복사·붙여넣기 가능 여부 문의 → 전체 페이지·모달의 모든 테이블 일괄 도입으로 확장
-> 선행 PoC: model-parameter 노드에 [SelectableModelDetailTable](../../src/features/model/components/SelectableModelDetailTable.tsx) + [useGridRangeSelection](../../src/features/model/hooks/useGridRangeSelection.ts) hook 으로 검증 완료 (브라우저 동작 확인)
+> 선행 PoC: model-parameter 노드에 SelectableModelDetailTable + useGridRangeSelection hook 으로 검증 완료 (브라우저 동작 확인). R1 에서 PoC 는 제네릭 [SelectableTable](../../src/shared/components/SelectableTable/SelectableTable.tsx) + [useGridRangeSelection](../../src/shared/hooks/useGridRangeSelection.ts) 로 흡수 (SelectableModelDetailTable.tsx 삭제, ModelDetailPanel 이 SelectableTable 직접 사용).
 
 ## Why
 
@@ -26,13 +26,13 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 ## Requirements
 
 ### R1 — 제네릭 SelectableTable 컴포넌트 추출
-- [ ] `src/shared/components/SelectableTable/` 디렉터리 생성
-- [ ] `SelectableTable<TRow>` 컴포넌트 — shadcn `<Table>` 기반, range selection / Ctrl+C TSV / Excel TSV paste / 더블클릭 편집·행 열기 지원
-- [ ] `ColumnDef<TRow>` 타입 — `key`, `header`, `accessor: (row: TRow) => string`, `renderCell?`, `editable?`, `width?`, `sticky?`, `sortable?`, `resizable?` 등
-- [ ] `SelectableTableFeatures` prop — `{ rangeCopy, rangePaste, sortable, resizable, virtualization, doubleClickToOpen, doubleClickToEdit }` boolean / config
-- [ ] [useGridRangeSelection](../../src/features/model/hooks/useGridRangeSelection.ts) hook 을 `src/shared/hooks/` 로 이관
-- [ ] 신규 `useGridSort` / `useGridResize` / `useGridVirtual` hook 분리 (single-responsibility)
-- [ ] PoC 컴포넌트 SelectableModelDetailTable 을 새 SelectableTable 로 마이그레이션 (model-parameter 회귀 0)
+- [x] `src/shared/components/SelectableTable/` 디렉터리 생성 (R1 commit 7957e2f)
+- [x] `SelectableTable<TRow>` 컴포넌트 — shadcn `<Table>` 기반, range selection / Ctrl+C TSV / Excel TSV paste / 더블클릭 편집·행 열기 지원 (SelectableTable.tsx 341줄, R1 7957e2f)
+- [x] `ColumnDef<TRow>` 타입 — `key`, `header`, `accessor: (row: TRow) => string`, `renderCell?`, `editable?`, `width?`, `sticky?`, `sortable?`, `resizable?` 등 ([types.ts:35-52](../../src/shared/components/SelectableTable/types.ts#L35) — maxWidth 포함 전부 존재)
+- [~] 부분 — `SelectableTableFeatures` prop. 충족: `{ rangeCopy, rangePaste, sortable, resizable, virtualization }` ([types.ts:58-65](../../src/shared/components/SelectableTable/types.ts#L58)). 미충족: `doubleClickToOpen` / `doubleClickToEdit` boolean 플래그 미도입 — double-click 은 플래그 대신 `wrapRow` `onDoubleClick`(행 열기, R4 W-MI1=A) + `handleCellDoubleClick`/renderCell `beginEdit·endEdit` helpers(셀 편집)로 구현. 기능 충족하나 명시 플래그 형태 아니므로 [x] 미단정.
+- [x] [useGridRangeSelection](../../src/shared/hooks/useGridRangeSelection.ts) hook 을 `src/shared/hooks/` 로 이관 (R1 7957e2f — 옛 `features/model/hooks/` 부재 확인)
+- [x] 신규 `useGridSort` / `useGridResize` / `useGridVirtual` hook 분리 (single-responsibility) — R6 에서 구현 (`src/shared/hooks/useGridSort.ts`/`useGridResize.ts`/`useGridVirtual.ts`)
+- [x] PoC 컴포넌트 SelectableModelDetailTable 을 새 SelectableTable 로 마이그레이션 (model-parameter 회귀 0) — L92 대안 경로: SelectableModelDetailTable.tsx 삭제 + ModelDetailPanel 이 SelectableTable 직접 사용 ([ModelDetailPanel.tsx:996](../../src/features/model/components/ModelDetailPanel.tsx#L996)). model-parameter e2e 회귀 0
 
 ### R2 — Phase 2: 단순 read-only 데이터 테이블 일괄 전환
 - [x] DLQ 5 패널 (`DashboardPanel`, `RepairTaskPanel`, `QuarantinePanel`, `GatewayDlqPanel`, `BusinessDlqPanel`) — range copy 활성. W-DLQ1 결정 (Plan 2026-05-26) 로 row 액션은 현재 부재 — 'read-only 보존' 으로 재해석. 마이그레이션 완료 (5 패널 SelectableTable + row testId / pagination / refresh 보존)
@@ -44,8 +44,8 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 #### R3.1 — ModelDetailPanel 8 노드 마이그레이션
 - [x] `ModelDetailPanel` 의 model-parameter 외 노드 (workflow / dcop-itemes / secs-message / socket-message / mes-message / variableides / reportides / eventides) — range copy + 기존 picker·select·flow modal 분기 보존. workflow 는 dead path ([ModelDetailPanel.tsx:787](../../src/features/model/components/ModelDetailPanel.tsx#L787) `detailNodes.filter((node) => node !== 'workflow')`, git 80605b4) 라 자연 진입 e2e 불가 — createWorkflowColumns factory 는 reference workflow 복원 시 재사용 자산으로 보존.
 
-#### R3.2 — ModelCheckInDiffModal / ParentModelCommitModal (별 PR — R3 범위 외)
-- [ ] `ModelCheckInDiffModal` / `ParentModelCommitModal` — diff 색상 cell renderer 유지하면서 range copy 활성 (별 PR — R3 Validate 시점 미진입)
+#### R3.2 — ModelCheckInDiffModal / ParentModelCommitModal (별 PR — 완료)
+- [x] `ModelCheckInDiffModal` / `ParentModelCommitModal` — diff 색상 cell renderer 유지하면서 range copy 활성. R3.2 별 PR 로 완료 (commit 27c8a04) — 상세 AC 는 아래 §R3.2 (L113-114) PASS 참조
 
 ### R4 — Phase 4: 행 클릭 테이블 UX 전환
 - [ ] `ModelInfoTable`, `UserListTable`, `GroupListTable` — 단일 클릭은 셀 선택, **더블클릭으로 행 열기**
@@ -61,8 +61,8 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [ ] 필터 / 가로 스크롤 행 고정 / 컬럼 그룹화 — **이 SPEC 의 Out of Scope**
 
 ### R7 — 회귀 안전망
-- [ ] 각 phase 의 PR 은 *해당 카테고리만* 다루고 다른 카테고리는 건드리지 않는다 — 충돌 시 즉시 롤백 가능
-- [ ] Phase 별 PR 머지 후 dev 환경에서 사용자 1회 confirm 후 다음 phase 진입
+- [x] 각 phase 의 PR 은 *해당 카테고리만* 다루고 다른 카테고리는 건드리지 않는다 — 충돌 시 즉시 롤백 가능. **사후 audit 완료 (2026-05-27, `.claude/progress/selectable-table-rollout-r7.md`)**: R2~R6 11 commit `git show --stat` 대조 → cross-category 오염 **0건**. R3.1 의 ModelPage(modal key C5)는 model 자기 부모, SelectableTable `maxWidth?`(W5-B)는 공유 컴포넌트 additive optional — 다른 feature 카테고리 production 코드 미접촉. 끼인 인프라 commit (e6fcb08 user-page fixture / 29ce33e eqp mock+별 SPEC) 은 production 0·selectable-table 무관.
+- [~] 부분 — Phase 별 PR 머지 후 dev 환경에서 사용자 1회 confirm 후 다음 phase 진입. 미충족: dev 환경 육안 confirm 미수행 (2026-05-27 사용자 결정 = '추후 확인'). 대체 안전망 충족: phase 격리 audit 0 오염 + selectable-table-* e2e **31 passed (55.6s)** 회귀 0 + 각 phase Validate 시 console.error/pageerror 0. dev 육안 confirm 체크리스트 9 항목은 progress R7 §R7-2 에 보존 — 육안 확인 후 [x] 로 갱신.
 
 ## Constraints
 
@@ -88,9 +88,9 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 ### R1 — 제네릭 추출
 
-- [ ] `src/shared/components/SelectableTable/index.ts` 가 `SelectableTable`, `ColumnDef`, `SelectableTableFeatures` export
-- [ ] `src/features/model/components/SelectableModelDetailTable.tsx` 는 새 컴포넌트의 thin wrapper 로 축소 (또는 삭제 + ModelDetailPanel 이 SelectableTable 직접 사용)
-- [ ] **Playwright e2e** `tests/e2e/selectable-table-model-parameter.spec.ts` — 사각형 선택 → Ctrl+C → 클립보드에 TSV 형식 (행 \n, 셀 \t) 일치 / Excel TSV → Ctrl+V → 셀들 onChangeDetailValue 호출 확인
+- [x] `src/shared/components/SelectableTable/index.ts` 가 `SelectableTable`, `ColumnDef`, `SelectableTableFeatures` export — [index.ts](../../src/shared/components/SelectableTable/index.ts) 3 심볼 모두 export 확인
+- [x] `src/features/model/components/SelectableModelDetailTable.tsx` 는 새 컴포넌트의 thin wrapper 로 축소 (또는 삭제 + ModelDetailPanel 이 SelectableTable 직접 사용) — **삭제 경로**: 파일 부재 + ModelDetailPanel 이 SelectableTable 직접 사용 ([ModelDetailPanel.tsx:996](../../src/features/model/components/ModelDetailPanel.tsx#L996))
+- [x] **Playwright e2e** `tests/e2e/selectable-table-model-parameter.spec.ts` — 사각형 선택 → Ctrl+C → 클립보드에 TSV 형식 (행 \n, 셀 \t) 일치 / Excel TSV → Ctrl+V → 셀들 onChangeDetailValue 호출 확인. R1-AC-1(단일셀 `EQP_01`) / R1-AC-2(TSV `EQP_01\t설비 아이디\nAUTO\t동작 모드`) / R1-AC-3(paste → NEW_EQP_VALUE 등 반영) 3 케이스 — selectable-table-* 31 passed 에 포함
 
 ### R2 — 단순 read-only
 
@@ -154,12 +154,12 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 
 ## SDD 진행 상태
 
-전체 SPEC 은 phase R1~R7 다단계라 [x] / [ ] 는 phase 단위로 표기한다. 현재는 R3.1 한정 사이클 완료.
+전체 SPEC 은 phase R1~R7 다단계라 [x] / [ ] 는 phase 단위로 표기한다. **R1~R7 전체 사이클 종료 (2026-05-27)** — 아래 phase 별 항목 참조. 잔여 미충족은 dev 육안 confirm(R7-2, 추후) 1건뿐이며 audit + e2e 31 PASS 안전망으로 대체.
 
 - [x] **Specify (R1~R7 전체)** — 이 SPEC.md 작성 완료 (2026-05-23)
 - [x] **Plan (R3.1 한정)** — R3.1 Plan 확정 (2026-05-26, `.claude/progress/selectable-table-rollout-r3.md`). R1 / R2 / R3.2 / R4 / R5 / R6 / R7 미수행.
 - [x] **Implement (R3.1 한정)** — ModelDetailPanel 8 노드 마이그레이션 완료 (2026-05-26). R3.2 (ModelCheckInDiffModal) + 후속 Phase 미진행.
-- [~] **Validate (R3.1 한정, 부분)** — R3.1 Validate 완료 (2026-05-26, `.claude/progress/selectable-table-rollout-r3-validate.md`). 충족: e2e 3 PASS + console.error 0 + tsc / vite build / lint PASS (변경 파일 한정). 미충족: workflow 자연 e2e 진입 (dead path — 코드 인스펙션 보완), `socket-message` 자연 e2e 케이스 미추가. R3.2 (ModelCheckInDiffModal) 별 PR 보류.
+- [~] **Validate (R3.1 한정, 부분)** — R3.1 Validate 완료 (2026-05-26, `.claude/progress/selectable-table-rollout-r3-validate.md`). 충족: e2e 3 PASS + console.error 0 + tsc / vite build / lint PASS (변경 파일 한정). 미충족: workflow 자연 e2e 진입 (dead path — 코드 인스펙션 보완), `socket-message` 자연 e2e 케이스 미추가. R3.2 (ModelCheckInDiffModal) 별 PR 로 후속 완료 (L166-168 참조).
 - [x] **Plan (R2 한정)** — R2 Plan 확정 (2026-05-26, `.claude/progress/selectable-table-rollout-r2.md`). 4 결정 사용자 confirm 완료 (W-CM1 = A wrapRow optional / W-EI1 = A GatewayGroupTable 대표 / W-DLQ1 = A read-only 보존 / W-DM3 = A Dialog inner table 범위 외).
 - [x] **Implement (R2 한정)** — wrapRow optional prop 추가 + DLQ 4 패널 + DashboardPanel + EQP 4 종 + DeployMonitorPanel main history table 마이그레이션 완료 (2026-05-26). 신규 e2e 3 종 (`selectable-table-dlq-business` / `selectable-table-deploy-monitor` / `selectable-table-gateway-group`) 추가. tsc / lint / vite build PASS (변경 파일 0 신규 에러; AppProvider query-core 중복 + group/deploy/group-add-members 사전 존재 lint 1 error 만 잔존). 전체 playwright 회귀에서 R2 영역 0 fail (사전 존재 fail 12건 stash 비교로 R2 무관 확인).
 - [~] **Validate (R2 한정, 부분)** — R2 Validate 완료 (2026-05-26). 충족: R2-AC-1/2/3 e2e PASS + console.error 0 + tsc / lint / vite build PASS (변경 파일 한정) + DLQ 기존 e2e (`dlq-page.spec.ts`) read-only 표시 구조 회귀 0. 미충족: `DeployMonitorPanel` Plan §5.2 케이스 3 (단일 클릭 setActiveDeployKey 헤더 표시 변경) e2e 미추가 (코드 인스펙션 보완) + EqpInfoTable / BusinessGroupModelTable / EqpParamTable 기존 e2e 부재로 자연 회귀망 없음 (코드 인스펙션 + 신규 GatewayGroup ContextMenu 회귀 e2e 로 대표 보완).
@@ -175,3 +175,6 @@ PoC 결과 무료 OSS grid 라이브러리 중 React 19 호환 + range/copy/past
 - [x] **Implement (R6 한정)** — branch `feature/selectable-table-r6` 3 커밋 (30d8a82 정렬 / 2d50d5a 리사이즈 / fccd3a4 가상화) 각 test-first. SelectableTable.tsx 에 sortable/resizable/virtualization 소비 wiring + DEV 전용 fixture(`SelectableTableFixture.tsx` + Router `import.meta.env.DEV` 가드) 추가. R6 diff 11 파일 — group/user/deploy feature 0 (도구 확인).
 - [~] **Validate (R6 한정, 부분)** — R6 독립 검증 완료 (2026-05-27, 독립 세션). 충족: AC L136-139 모두 충족 — react-virtual 3.13.26 + peer(react 19.2.0) 검증 / fps prod preview avgFps 60.0·maxInterval 16.8ms·드롭 0 (`_virtual_fps_measure.mjs` 직접 재실행, dev 49.6fps 와 갭은 StrictMode·비압축 교차 확인) / `selectable-table-sort` + `selectable-table-resize` + `selectable-table-virtual`(2) e2e PASS + 각 `expect(consoleBucket.errors).toEqual([])` 통과 / `npx tsc -b`(에러 1건=AppProvider query-core 사전 존재 제외, R6 파일 0) / `eslint`(R6 9파일 exit 0; 전체 2 error=DeployMonitorPanel+GroupAddMembersModal 사전 존재·R6 미접촉) / `vite build ✓ 8.16s` / selectable-table-* 전체 **31 passed 0 fail** / 전체 75 중 73 passed·2 fail(group-page 멤버 추가제거 + user-page 그룹 매핑) 은 main(3c6cc69, R6 직전) checkout 재실행에서도 동일 fail → R6 무관 사전 존재 재확인. **명시 한계 (fixture-only)**: 11 production 호출처 전부 `rangeCopy` only 라 sortable/resizable/virtualization 자연 진입 화면 부재 → DEV fixture `/__fixtures/selectable-table` 로만 검증 (R6 정의 범위 = 공유 컴포넌트 feature 추가, 호출처 활성화는 후속 phase). 60fps 는 fixture DEV-only 라 가드 임시 노출→build→preview 측정 후 원복한 prod 값. surgical: R6 커밋 + 본 Validate commit 은 SPEC 만 추가 — FlowCard.tsx / ModelDetailPanel.tsx / model-flow.spec.ts 워킹트리 미커밋(별 작업) 미접촉 확인.
 - [x] **Validate (R5 한정)** — R5 독립 검증 완료 (2026-05-27, 독립 세션). 충족: AC-R5-CI-1/2 e2e PASS 2/2 (`npx playwright test selectable-table-check-in` → `2 passed (6.5s)`; 2x2 range copy `Set(['ITEM_ADD','val_added','ITEM_CHG','val_branch'])` 정합 + added/changed/deleted 배경 `#F0FFF7`/`#FFFDF0`/`#FFF7F7` + changed parent line-through/branch green font-medium + deleted Param Name line-through + 각 케이스 `expect(consoleBucket.errors).toEqual([])` 통과) + tsc(`AppProvider query-core 중복 1건만, EXIT 0`) / eslint(변경 2파일 EXIT 0, 신규 0) / vite build(`✓ built in 9.59s`, EXIT 0) PASS + selectable-table-* 전체 회귀 27/27 PASS. surgical: R5 커밋(a1080b2/3c6cc69)은 SPEC + CheckInModal.tsx + 신규 e2e 3파일만 변경 — EqpPage/eqp-ui.store/eqp.types/SelectableTable.tsx/types.ts 무변경 + CheckInModal Description textarea·save 핸들러(표 밖) 미접촉 git diff 로 확인. 보존: DR1/LM1/FC1 R5 커밋 변경 0 + L129-131 결정 사유/검토일(2026-05-27)/결정자(DongGeon) 명시 확인. FlowCard.tsx 워킹트리 변경(미커밋)은 SelectableTable 흔적 0 — R5 무관 별 작업(progress §7) 확인. 미충족/위반 없음.
+- [x] **Validate (R1 한정, doc-only 마킹)** — R1 자산 사후 확인 (2026-05-27, `.claude/progress/selectable-table-rollout-r7.md` §R1). 충족: index.ts 3 심볼 export / ColumnDef 9 필드 / useGridRangeSelection 이관 (옛 위치 부재) / useGridSort·Resize·Virtual (R6) / SelectableModelDetailTable 삭제 + ModelDetailPanel 직접 사용 / model-parameter e2e 3 케이스 — selectable-table-* 31 passed 포함. 미충족: L32 `SelectableTableFeatures` 의 `doubleClickToOpen`/`doubleClickToEdit` 플래그 미도입 — double-click 은 wrapRow onDoubleClick + handleCellDoubleClick/renderCell beginEdit 로 구현 (기능 충족, 명시 플래그 형태 아님 → R1 Requirements L32 [~]).
+- [x] **Validate (R7 한정)** — R7 검증 완료 (2026-05-27, `.claude/progress/selectable-table-rollout-r7.md`). 충족: R7-1 phase 격리 audit — R2~R6 11 commit cross-category 오염 **0건** + selectable-table-* e2e **31 passed (55.6s)** 회귀 0 (코드 변경 0 doc-only 라 tsc/lint/build 회귀 검증 불요). 미충족: R7-2 dev 환경 육안 confirm 미수행 (2026-05-27 사용자 결정 '추후 확인') — audit 0 오염 + e2e 31 PASS + phase 별 console.error 0 안전망으로 대체, 체크리스트 9 항목 progress §R7-2 보존.
+- [x] **전체 SDD 종료 선언 (R1~R7)** — 2026-05-27. Specify(R1~R7) / Plan·Implement·Validate(R1·R2·R3.1·R3.2·R4·R5·R6·R7) 전 phase 완료. 잔여 [~] 부분 항목 = R1 L32(플래그 형태 편차, 기능 충족) / R2·R3.1 Validate(자연 e2e 진입 불가 코드 인스펙션 보완) / R6 Validate(fixture-only 한계) / R7-2(dev 육안 confirm 추후) — 모두 사유 명시 + 대체 검증/안전망 보유. selectable-table-* e2e 31 passed 0 fail 최종 회귀 PASS.
