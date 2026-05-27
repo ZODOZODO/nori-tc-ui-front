@@ -14,6 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useGridRangeSelection } from '@/shared/hooks/useGridRangeSelection'
+import { useGridResize } from '@/shared/hooks/useGridResize'
 import { useGridSort } from '@/shared/hooks/useGridSort'
 import type {
   ColumnDef,
@@ -145,6 +146,30 @@ export const SelectableTable = <TRow,>({
   const sortEnabled = features?.sortable ?? false
   const { sort, toggleColumn } = useGridSort()
 
+  const resizeEnabled = features?.resizable ?? false
+  const { widths, beginResize } = useGridResize()
+
+  const handleResizePointerDown = useCallback(
+    (columnKey: string) => (event: PointerEvent<HTMLSpanElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const headCell = event.currentTarget.closest('th')
+      const startWidth = headCell ? headCell.getBoundingClientRect().width : 0
+      beginResize(columnKey, event.clientX, startWidth)
+    },
+    [beginResize],
+  )
+
+  // px override 가 있으면 헤더/셀에 동일 px 를 강제해 컬럼 정렬을 유지한다.
+  const columnSizeStyle = (column: ColumnDef<TRow>): CSSProperties => {
+    const override = widths[column.key]
+    if (override !== undefined) {
+      const px = `${override}px`
+      return { width: px, minWidth: px, maxWidth: px }
+    }
+    return { width: column.width, minWidth: column.width, maxWidth: column.maxWidth }
+  }
+
   // 정렬 활성 시 단일 정렬 배열을 만들어 buildTsv / range / rowKey / wrapRow / paste 모두
   // 같은 배열을 쓰게 한다 (rowIdx ↔ row 정합 유지). 정렬 off(기본) 면 원본 순서 그대로.
   const displayedRows = useMemo<readonly TRow[]>(() => {
@@ -271,16 +296,15 @@ export const SelectableTable = <TRow,>({
             {columns.map((column) => (
               <TableHead
                 key={column.key}
+                data-col-key={column.key}
                 className={cn(
-                  'whitespace-nowrap',
+                  'relative whitespace-nowrap',
                   column.sticky
                     ? 'sticky left-0 z-30 bg-[#F6F9F7] shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
                     : null,
                 )}
                 style={{
-                  width: column.width,
-                  minWidth: column.width,
-                  maxWidth: column.maxWidth,
+                  ...columnSizeStyle(column),
                   ...(stickyHeadStyle(column.sticky) ?? {}),
                 }}
               >
@@ -304,6 +328,13 @@ export const SelectableTable = <TRow,>({
                 ) : (
                   column.header
                 )}
+                {resizeEnabled && column.resizable ? (
+                  <span
+                    data-resize-handle={column.key}
+                    onPointerDown={handleResizePointerDown(column.key)}
+                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-[#1C7F59]/40"
+                  />
+                ) : null}
               </TableHead>
             ))}
             {showActionColumn ? (
@@ -356,9 +387,7 @@ export const SelectableTable = <TRow,>({
                             : null,
                         )}
                         style={{
-                          width: column.width,
-                          minWidth: column.width,
-                          maxWidth: column.maxWidth,
+                          ...columnSizeStyle(column),
                           ...(stickyCellStyle(column.sticky) ?? {}),
                         }}
                         data-row-idx={rowIdx}
