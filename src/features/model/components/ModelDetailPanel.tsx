@@ -50,7 +50,6 @@ import {
 } from './modelDetailColumnDefs'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { draftToFlow } from '../lib/model-flow-editor'
-import { extractMdfMessageOptions } from '../lib/mdf-message-parser'
 
 const FLOW_MODAL_EDITABLE_COLUMNS = new Set(['filter', 'data index'])
 
@@ -552,11 +551,6 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     [flowEventIdOptions],
   )
 
-  // FlowCard Action MDF Template dropdown 옵션 — flowMdfContents 안 message[name] 추출.
-  const flowCardMdfTemplateOptions = useMemo<readonly { name: string }[]>(
-    () => extractMdfMessageOptions(flowMdfContents).map((option) => ({ name: option.messageName })),
-    [flowMdfContents],
-  )
   const activeFlowMutation = isDraftMode ? createFlowMutation : updateFlowMutation
   const flowSaveStatus: 'idle' | 'saving' | 'error' = activeFlowMutation.isPending
     ? 'saving'
@@ -815,9 +809,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 ref={flowCardRef}
                 flow={draftToFlow(draftFlow)}
                 protocol={flowProtocol}
+                readOnly={isReadOnly}
                 messageOptions={flowCardMessageOptions}
                 eventOptions={flowCardEventOptions}
-                mdfTemplateOptions={flowCardMdfTemplateOptions}
                 onSave={handleSaveFlow}
                 saveStatus={flowSaveStatus}
                 errorMessage={flowSaveErrorMessage}
@@ -837,9 +831,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   ref={flowCardRef}
                   flow={flowDetail}
                   protocol={flowProtocol}
+                  readOnly={isReadOnly}
                   messageOptions={flowCardMessageOptions}
                   eventOptions={flowCardEventOptions}
-                  mdfTemplateOptions={flowCardMdfTemplateOptions}
                   onSave={handleSaveFlow}
                   saveStatus={flowSaveStatus}
                   errorMessage={flowSaveErrorMessage}

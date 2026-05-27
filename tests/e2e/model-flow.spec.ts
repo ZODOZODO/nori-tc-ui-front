@@ -611,7 +611,7 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
   await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
 
   // Identity 의 Message Name dropdown — shadcn Radix Select 트리거는 role="combobox".
-  // 화면 안 SelectTrigger 가 여러 개 (MDF Template 등) 이므로 Identity 섹션 컨테이너로 좁힌
+  // 화면 안 SelectTrigger 가 여러 개 (Trigger Event Id 등) 이므로 Identity 섹션 컨테이너로 좁힌
   // 첫 combobox 를 사용합니다. 초기값은 'S6F11'.
   const identitySection = page
     .locator('section')

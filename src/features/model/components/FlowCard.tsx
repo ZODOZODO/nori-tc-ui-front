@@ -52,16 +52,6 @@ export interface FlowCardEventOption {
 }
 
 /**
- * Action 섹션 MDF Template dropdown 옵션입니다.
- *
- * 실제 mdfTemplateName 편집은 [편집...] 모달 (F4 에서 ModelDetailPanel 분리 예정)
- * 에서 이뤄지며, F2 단계에서는 summary 옆 readonly 표시 목적.
- */
-export interface FlowCardMdfTemplateOption {
-  name: string
-}
-
-/**
  * FlowCard 의 imperative handle.
  *
  * 우상단 통합 Save 버튼이 FlowCard 내부 draft state 에 접근하기 위해 노출하는
@@ -88,9 +78,15 @@ interface FlowCardProps {
    * 아니라 부모가 명시적으로 주입 (Plan 위험표 관련).
    */
   protocol: 'SECS' | 'SOCKET'
+  /**
+   * 모델이 읽기 전용인지 (= `!isEditMode || isLockedByOtherUser`). 부모
+   * (ModelDetailPanel) 의 `isReadOnly` 와 동일한 의미 — true 면 카드 내부의 모든
+   * 편집 컨트롤 (입력 / dropdown / DCOP 추가 / [편집...] 버튼) 을 비활성화합니다.
+   * draft 카드는 checkout 상태에서만 생성되므로 항상 false 로 주입됩니다.
+   */
+  readOnly: boolean
   messageOptions: readonly FlowCardMessageOption[]
   eventOptions: readonly FlowCardEventOption[]
-  mdfTemplateOptions: readonly FlowCardMdfTemplateOption[]
   onSave: (payload: ModelFlowUpdateRequest) => void
   saveStatus: 'idle' | 'saving' | 'error'
   errorMessage: string | null
@@ -134,9 +130,9 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
   {
     flow,
     protocol,
+    readOnly,
     messageOptions,
     eventOptions,
-    mdfTemplateOptions,
     onSave,
     saveStatus,
     errorMessage,
@@ -269,7 +265,11 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#1E3D33]">Message Name</label>
-            <Select value={messageDropdownValue} onValueChange={handleSelectMessageName}>
+            <Select
+              value={messageDropdownValue}
+              onValueChange={handleSelectMessageName}
+              disabled={readOnly}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="메시지를 선택하세요" />
               </SelectTrigger>
@@ -297,6 +297,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               <Select
                 value={draft.eventId ?? MESSAGE_NAME_PLACEHOLDER}
                 onValueChange={handleSelectEventId}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="EventId 를 선택하세요" />
@@ -317,6 +318,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
                 value={draft.transactionId ?? ''}
                 onChange={(event) => handleChangeTransactionId(event.target.value)}
                 placeholder="(빈 값 = wildcard)"
+                readOnly={readOnly}
               />
               <p className="text-[11px] text-[#97A39C]">
                 값을 비우면 모든 transactionId 에 매칭됩니다.
@@ -343,6 +345,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               variant="outline"
               size="sm"
               onClick={handleClickEditFlowFilter}
+              disabled={readOnly}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               편집...
@@ -358,42 +361,14 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
       </FlowCardSection>
 
       <FlowCardSection title="Action" description="이 Flow 가 실행하는 동작입니다.">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">Action Name</label>
-            <Input
-              value={draft.actionName}
-              onChange={(event) => handleChangeActionName(event.target.value)}
-              placeholder="예: TOOL_CONDITION_REPLY"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">MDF Template</label>
-            <Select
-              value={draft.actionDataIndex?.mdfTemplateName?.trim() || MESSAGE_NAME_PLACEHOLDER}
-              onValueChange={(value) => {
-                /*
-                 * MDF 변경은 fields 매핑을 함께 다뤄야 하므로 [편집...] 모달에서만 가능.
-                 * 본 dropdown 은 현재 값 표시 + 모달 진입 트리거. 직접 선택 시
-                 * 빠른 빈 매핑 entry 만 만들고 모달에서 fields 작성.
-                 */
-                handleClickEditActionDataIndex()
-                void value
-              }}
-            >
-              <SelectTrigger aria-label="MDF Template">
-                <SelectValue placeholder="MDF Template 을 선택하세요" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={MESSAGE_NAME_PLACEHOLDER}>(선택 안 함)</SelectItem>
-                {mdfTemplateOptions.map((option) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-[#1E3D33]">Action Name</label>
+          <Input
+            value={draft.actionName}
+            onChange={(event) => handleChangeActionName(event.target.value)}
+            placeholder="예: TOOL_CONDITION_REPLY"
+            readOnly={readOnly}
+          />
         </div>
 
         <div className="mt-4 space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
@@ -409,6 +384,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               variant="outline"
               size="sm"
               onClick={handleClickEditActionDataIndex}
+              disabled={readOnly}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               편집...
@@ -432,9 +408,15 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             variant="outline"
             size="sm"
             onClick={onAddDcopItem}
-            disabled={isDraftCard}
-            aria-disabled={isDraftCard ? 'true' : undefined}
-            title={isDraftCard ? 'Flow 저장 후 DCOP 추가 가능' : undefined}
+            disabled={readOnly || isDraftCard}
+            aria-disabled={readOnly || isDraftCard ? 'true' : undefined}
+            title={
+              readOnly
+                ? '편집 모드(Check Out)에서만 DCOP 추가 가능'
+                : isDraftCard
+                  ? 'Flow 저장 후 DCOP 추가 가능'
+                  : undefined
+            }
           >
             <Plus className="size-3.5" aria-hidden="true" />
             DCOP 추가
