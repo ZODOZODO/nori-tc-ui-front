@@ -36,6 +36,12 @@ const DlqPage = lazy(async () => {
   return { default: module.DlqPage }
 })
 
+// R6 (정렬 / 리사이즈 / 가상화) e2e 전용 fixture — DEV 빌드에서만 라우트 등록.
+const SelectableTableFixture = lazy(async () => {
+  const module = await import('@/dev/SelectableTableFixture')
+  return { default: module.SelectableTableFixture }
+})
+
 function RouteLoadingFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] px-6 text-sm text-[#4B5A52]">
@@ -56,6 +62,9 @@ export function Router() {
         <Route path="/deploy" element={<DeployPage />} />
         <Route path="/dlq" element={<DlqPage />} />
         <Route path="/user" element={<UserManagementPage />} />
+        {import.meta.env.DEV ? (
+          <Route path="/__fixtures/selectable-table" element={<SelectableTableFixture />} />
+        ) : null}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Suspense>

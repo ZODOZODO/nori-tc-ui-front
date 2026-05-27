@@ -2,6 +2,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
@@ -13,6 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useGridRangeSelection } from '@/shared/hooks/useGridRangeSelection'
+import { useGridSort } from '@/shared/hooks/useGridSort'
 import type {
   ColumnDef,
   GridRange,
@@ -140,6 +142,25 @@ export const SelectableTable = <TRow,>({
   const rangePasteEnabled =
     features?.rangePaste ?? Boolean(onCellPaste && columns.some((column) => column.editable))
 
+  const sortEnabled = features?.sortable ?? false
+  const { sort, toggleColumn } = useGridSort()
+
+  // 정렬 활성 시 단일 정렬 배열을 만들어 buildTsv / range / rowKey / wrapRow / paste 모두
+  // 같은 배열을 쓰게 한다 (rowIdx ↔ row 정합 유지). 정렬 off(기본) 면 원본 순서 그대로.
+  const displayedRows = useMemo<readonly TRow[]>(() => {
+    if (!sortEnabled || !sort.columnKey || !sort.direction) {
+      return rows
+    }
+    const column = columns.find((candidate) => candidate.key === sort.columnKey)
+    if (!column) {
+      return rows
+    }
+    const sorted = [...rows].sort((a, b) =>
+      column.accessor(a).localeCompare(column.accessor(b)),
+    )
+    return sort.direction === 'desc' ? sorted.reverse() : sorted
+  }, [sortEnabled, sort.columnKey, sort.direction, columns, rows])
+
   const beginEdit = useCallback((rowIdx: number, colIdx: number) => {
     setEditing({ rowIdx, colIdx })
   }, [])
@@ -175,11 +196,11 @@ export const SelectableTable = <TRow,>({
       if (isNativeInteractiveTarget(event.target)) {
         return
       }
-      const tsv = buildTsv(rows, columns, range)
+      const tsv = buildTsv(displayedRows, columns, range)
       event.clipboardData?.setData('text/plain', tsv)
       event.preventDefault()
     },
-    [rangeCopyEnabled, range, rows, columns],
+    [rangeCopyEnabled, range, displayedRows, columns],
   )
 
   const handlePaste = useCallback(
@@ -198,7 +219,7 @@ export const SelectableTable = <TRow,>({
       const matrix = parseTsv(text)
       matrix.forEach((cells, rowOffset) => {
         const targetRowIdx = anchor.rowIdx + rowOffset
-        const targetRow = rows[targetRowIdx]
+        const targetRow = displayedRows[targetRowIdx]
         if (!targetRow) {
           return
         }
@@ -212,7 +233,7 @@ export const SelectableTable = <TRow,>({
         })
       })
     },
-    [rangePasteEnabled, onCellPaste, anchor, rows, columns],
+    [rangePasteEnabled, onCellPaste, anchor, displayedRows, columns],
   )
 
   const handleKeyDown = useCallback(
@@ -263,7 +284,26 @@ export const SelectableTable = <TRow,>({
                   ...(stickyHeadStyle(column.sticky) ?? {}),
                 }}
               >
-                {column.header}
+                {sortEnabled && column.sortable ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleColumn(column.key)}
+                    className="flex items-center gap-1 font-medium outline-none hover:text-[#1C7F59] focus-visible:text-[#1C7F59]"
+                  >
+                    {column.header}
+                    <span aria-hidden className="text-[10px] text-[#1C7F59]">
+                      {sort.columnKey === column.key
+                        ? sort.direction === 'asc'
+                          ? '▲'
+                          : sort.direction === 'desc'
+                            ? '▼'
+                            : ''
+                        : ''}
+                    </span>
+                  </button>
+                ) : (
+                  column.header
+                )}
               </TableHead>
             ))}
             {showActionColumn ? (
@@ -277,7 +317,7 @@ export const SelectableTable = <TRow,>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.length === 0 ? (
+          {displayedRows.length === 0 ? (
             <TableRow>
               <TableCell
                 colSpan={columns.length + (showActionColumn ? 1 : 0)}
@@ -287,7 +327,7 @@ export const SelectableTable = <TRow,>({
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row, rowIdx) => {
+            displayedRows.map((row, rowIdx) => {
               const rowChildren = (
                 <>
                   {columns.map((column, colIdx) => {
