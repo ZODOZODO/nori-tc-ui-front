@@ -46,4 +46,10 @@ biome: [biome.json](../../biome.json) 존재하나 package.json scripts 미연�
 - [x] Step 1 baseline (4축)
 - [x] P1 #1 — live-map-data.test.ts stale 단언 갱신 (+22/+60 → +24/+24+52). unit 85→86 PASS (exit 0). 프로덕션 미변경.
 - [x] P1 #2 — DeployMonitorPanel:615 useMemo deps 정렬. commentHistoryItem 3개 sub-prop → 전체 객체(React Compiler 추론 일치). 출력 동일 순수함수. eslint 2→1, build GREEN, deploy-monitor e2e 2/2 PASS.
-- [ ] P1 #3 — eslint GroupAddMembersModal:51 set-state-in-effect
+- [x] P1 #3 — GroupAddMembersModal:51 set-state-in-effect 해소. effect 내 4개 setState(모달 닫힘 시 리셋) → render 단계 prev-prop 감지 패턴(React 공식 권장)으로 전환. useEffect import 제거. eslint 2→**0 errors**, build GREEN.
+  - 모달 전용 e2e(group-page Group-AC-7)는 **pre-existing 실패**로 검증 불가 — stash 로 clean 코드에서도 동일 실패 확인. 원인은 무관(아래 신규 발견).
+
+## 신규 발견 (이번 측정 중)
+- **stale e2e — Group-AC-7 "그룹 멤버 추가/제거"** ([group-page.spec.ts:364](../../tests/e2e/group-page.spec.ts#L364)): `getByTestId('group-member-panel')` 가시성 실패. src 에 `group-member-panel` testid 부재(현재 `group-row-members-{id}` 등만 존재) → testid 리네임 후 테스트 미갱신 추정. **P1 후보 (다음)**. 코드 회귀 vs 테스트 stale 추가 진단 필요.
+
+## eslint 최종: 0 errors (P1 #2,#3 로 2→0 해소)

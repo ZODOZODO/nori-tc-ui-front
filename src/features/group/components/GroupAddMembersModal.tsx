@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -46,14 +46,18 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [resultSummary, setResultSummary] = useState<AddResultSummary | null>(null)
 
-  useEffect(() => {
+  // 모달이 닫히면 다음 오픈을 위해 입력 상태를 초기화한다. effect 대신 render 중
+  // prop 변화 감지로 처리 — cascading render 회피 (react-hooks/set-state-in-effect).
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
     if (!open) {
       setSearchKeyword('')
       setSelectedUserPks(new Set())
       setErrorMessage(null)
       setResultSummary(null)
     }
-  }, [open])
+  }
 
   const existingMemberUserPks = useMemo<ReadonlySet<number>>(() => {
     const items = groupMembersQuery.data?.items ?? []
