@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
 
 export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
 
@@ -115,23 +116,15 @@ export function CheckInModal({
                 이전 버전과 비교하여 변경된 설비 파라미터가 없습니다.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="min-w-[760px]">
-                  <TableHeader>
-                    <TableRow className="bg-[#FAFCFB] hover:bg-[#FAFCFB]">
-                      <TableHead className="w-24">구분</TableHead>
-                      <TableHead className="w-48">Param Name</TableHead>
-                      <TableHead>Param Value</TableHead>
-                      <TableHead>Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {diffRows.map((row) => (
-                      <EqpParamDiffTableRow key={`${row.status}-${row.paramName}`} row={row} />
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <SelectableTable<EqpParamDiffRow>
+                testId="selectable-table-check-in-diff"
+                columns={EQP_PARAM_DIFF_COLUMNS}
+                rows={diffRows}
+                rowKey={(row) => `${row.status}-${row.paramName}`}
+                features={{ rangeCopy: true }}
+                tableClassName="min-w-[760px]"
+                wrapRow={renderDiffRow}
+              />
             )}
           </section>
 
@@ -193,33 +186,87 @@ export function CheckInModal({
   )
 }
 
-function EqpParamDiffTableRow({ row }: { row: EqpParamDiffRow }) {
-  const tone = resolveDiffTone(row.status)
+/**
+ * 셀 영역 TSV 복사용 단일 문자열. deleted 는 parent 값, 그 외(added/changed)는 branch 값을
+ * 노출합니다 (ModelCheckInDiffModal 의 branch 우선 정책과 동일). 화면은 renderCell 의
+ * DiffValuePair 로 양값을 보여주되, accessor 는 한 셀당 한 값으로 단순화합니다.
+ */
+const resolveDiffValue = (
+  status: EqpParamDiffStatus,
+  parentValue: string,
+  branchValue: string,
+): string => (status === 'deleted' ? parentValue : branchValue)
 
-  return (
-    <TableRow className={`${tone.rowClassName} ${tone.hoverClassName}`}>
-      <TableCell>
+const EQP_PARAM_DIFF_COLUMNS: ColumnDef<EqpParamDiffRow>[] = [
+  {
+    key: 'status',
+    header: '구분',
+    width: '6rem',
+    accessor: (row) => resolveDiffTone(row.status).label,
+    renderCell: (row) => {
+      const tone = resolveDiffTone(row.status)
+      return (
         <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${tone.badgeClassName}`}>
           {tone.label}
         </span>
-      </TableCell>
-      <TableCell className={row.status === 'deleted' ? 'text-xs text-[#97A39C] line-through' : 'text-xs text-[#22322B]'}>
+      )
+    },
+  },
+  {
+    key: 'paramName',
+    header: 'Param Name',
+    width: '12rem',
+    accessor: (row) => row.paramName,
+    renderCell: (row) => (
+      <span
+        className={
+          row.status === 'deleted'
+            ? 'text-xs text-[#97A39C] line-through'
+            : 'text-xs text-[#22322B]'
+        }
+      >
         {row.paramName || '-'}
-      </TableCell>
-      <TableCell className="text-xs">
+      </span>
+    ),
+  },
+  {
+    key: 'paramValue',
+    header: 'Param Value',
+    accessor: (row) => resolveDiffValue(row.status, row.parentValue, row.branchValue),
+    renderCell: (row) => (
+      <span className="text-xs">
         <DiffValuePair
           status={row.status}
           parentValue={row.parentValue}
           branchValue={row.branchValue}
         />
-      </TableCell>
-      <TableCell className="text-xs">
+      </span>
+    ),
+  },
+  {
+    key: 'description',
+    header: 'Description',
+    accessor: (row) => resolveDiffValue(row.status, row.parentDescription, row.branchDescription),
+    renderCell: (row) => (
+      <span className="text-xs">
         <DiffValuePair
           status={row.status}
           parentValue={row.parentDescription}
           branchValue={row.branchDescription}
         />
-      </TableCell>
+      </span>
+    ),
+  },
+]
+
+const renderDiffRow = (row: EqpParamDiffRow, _rowIdx: number, children: ReactNode): ReactNode => {
+  const tone = resolveDiffTone(row.status)
+  return (
+    <TableRow
+      data-testid={`check-in-diff-row-${row.status}-${row.paramName}`}
+      className={`${tone.rowClassName} ${tone.hoverClassName}`}
+    >
+      {children}
     </TableRow>
   )
 }
