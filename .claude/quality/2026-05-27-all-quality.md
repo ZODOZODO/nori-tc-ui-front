@@ -49,7 +49,13 @@ biome: [biome.json](../../biome.json) 존재하나 package.json scripts 미연�
 - [x] P1 #3 — GroupAddMembersModal:51 set-state-in-effect 해소. effect 내 4개 setState(모달 닫힘 시 리셋) → render 단계 prev-prop 감지 패턴(React 공식 권장)으로 전환. useEffect import 제거. eslint 2→**0 errors**, build GREEN.
   - 모달 전용 e2e(group-page Group-AC-7)는 **pre-existing 실패**로 검증 불가 — stash 로 clean 코드에서도 동일 실패 확인. 원인은 무관(아래 신규 발견).
 
-## 신규 발견 (이번 측정 중)
-- **stale e2e — Group-AC-7 "그룹 멤버 추가/제거"** ([group-page.spec.ts:364](../../tests/e2e/group-page.spec.ts#L364)): `getByTestId('group-member-panel')` 가시성 실패. src 에 `group-member-panel` testid 부재(현재 `group-row-members-{id}` 등만 존재) → testid 리네임 후 테스트 미갱신 추정. **P1 후보 (다음)**. 코드 회귀 vs 테스트 stale 추가 진단 필요.
+## 신규 발견 (이번 측정 중) — Group-AC-7 진단 완료
+- **stale e2e — Group-AC-7 "그룹 멤버 추가/제거"** ([group-page.spec.ts:356-376](../../tests/e2e/group-page.spec.ts#L356)): `getByTestId('group-member-panel')` 가시성 실패 (line 364).
+- **진단 결론: stale 테스트 (코드 회귀 아님).**
+  - 멤버 추가/제거 기능 정상 존재 — GroupAddMembersModal/GroupAdminPanel/GroupListTable.
+  - UI 마이그레이션: 구 inline-panel(`group-member-panel`/`group-member-add-input`/`group-member-chip`/`group-member-add-submit`) → SelectableTable 행 버튼(`group-row-members-{id}`) + 모달(`group-add-members-search`/`list`/`checkbox-{pk}`/`submit`).
+  - AC-7 의 5개 testid 전부 src 부재. group-page.spec AC-1~8 + selectable-table-group-list 어디에도 새 모달 흐름 e2e 커버리지 **0**.
+  - **조치 권장: 삭제 아닌 재작성** (삭제 시 멤버 추가/제거 완전 미테스트). 새 흐름: group-row-members-{id} 클릭 → 모달 → group-add-members-checkbox-{pk} 선택 → submit → addMember mock 검증.
+  - 재작성은 mock(useAllUsers/useGroupMembers/useAddGroupMember) 흐름 재구성 필요 = 비단순 e2e 작성.
 
 ## eslint 최종: 0 errors (P1 #2,#3 로 2→0 해소)
