@@ -44,8 +44,9 @@ test('clusterId 기준으로 고정 공정 카드에 자동 배치한다', () =>
   assert.equal(equipmentNodes[0]?.eqpId, 'EQP-01')
   assert.equal(equipmentNodes[1]?.eqpId, 'EQP-02')
   assert.equal(equipmentNodes[0]?.clusterId, 'cvd')
-  assert.equal(equipmentNodes[0]?.x, LIVE_MAP_CLUSTER_ITEMS[0].x + 22)
-  assert.equal(equipmentNodes[1]?.x, LIVE_MAP_CLUSTER_ITEMS[0].x + 60)
+  // x = cluster.x + LIVE_MAP_NODE_OFFSET_X(24) + columnIndex * LIVE_MAP_NODE_GAP_X(52)
+  assert.equal(equipmentNodes[0]?.x, LIVE_MAP_CLUSTER_ITEMS[0].x + 24)
+  assert.equal(equipmentNodes[1]?.x, LIVE_MAP_CLUSTER_ITEMS[0].x + 24 + 52)
 })
 
 test('정의되지 않은 공정은 ETC 카드에 배치한다', () => {
