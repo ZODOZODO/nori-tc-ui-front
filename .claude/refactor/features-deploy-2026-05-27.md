@@ -45,4 +45,9 @@ deploy 전체 5666 LOC. 안티패턴 `key={index}` **0건**.
   - 빌드: GREEN (7.99s). DeployPage chunk 71.32 kB 동일 (bundle regression 없음).
   - 런타임: rows [1,1] 불변, apiTotalCount +1 = dev 파일 분할 artifact (프로덕션 청크 동일), ms 차이 = 백엔드 run-to-run 변동. **regression 없음**.
   - 판정: 정적 개선 + regression 없음 → commit 대상.
-- [ ] 분할 #2 후보: B(SelectedEquipmentRow 추출) / C(useDeployRegisterState 훅) / DeployMonitorPanel(P2) / api·store slice
+- [x] 분할 #2 — SelectedEquipmentRow → `components/SelectedEquipmentRow.tsx` (B)
+  - 공유 const `EMPTY_SELECT_VALUE` 를 deploy-register-utils 로 이동·export (양쪽 import). 패널에서 unused 된 Trash2/useDeployEqpParamVersions import 제거.
+  - 정적: DeployRegisterPanel 1531 → 1422 LOC (-109). SelectedEquipmentRow 118 LOC. 원본 대비 누적 1650→1422 (-228, -13.8%).
+  - 빌드: GREEN (8.25s). DeployPage chunk 71.32 kB 동일.
+  - 런타임: rows [1,1] 불변. 1차 측정서 /api/eqp/options 4510ms 관측 → 재측정 53ms 복귀 = transient 백엔드 cold 변동, refactor 무관. **regression 없음**.
+- [ ] 분할 #3 후보: C(useDeployRegisterState 훅, 고위험) / DeployMonitorPanel(P2, 1424) / deploy.api(931)·deploy-ui.store(807) slice

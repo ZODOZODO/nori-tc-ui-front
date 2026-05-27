@@ -7,6 +7,8 @@ import type {
   DeployTargetItem,
 } from '../types/deploy.types'
 
+export const EMPTY_SELECT_VALUE = '__empty__'
+
 export const getErrorMessage = (error: unknown, fallbackMessage: string): string =>
   error instanceof Error && error.message ? error.message : fallbackMessage
 
