@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { useGridRangeSelection } from '@/shared/hooks/useGridRangeSelection'
 import { useGridResize } from '@/shared/hooks/useGridResize'
 import { useGridSort } from '@/shared/hooks/useGridSort'
+import { useGridVirtual } from '@/shared/hooks/useGridVirtual'
 import type {
   ColumnDef,
   GridRange,
@@ -99,6 +100,12 @@ const stickyHeadStyle = (sticky: boolean | undefined): CSSProperties | undefined
 const stickyCellStyle = (sticky: boolean | undefined): CSSProperties | undefined =>
   sticky ? { left: 0, position: 'sticky', zIndex: 20 } : undefined
 
+// 가상화 추정 행 높이(px) — 셀 inner div min-h-8(32) + py-1 + TableCell p-1 근사.
+const ESTIMATED_ROW_HEIGHT = 48
+// drag 가 컨테이너 상/하단 EDGE 안에 들어오면 자동 스크롤 (가상화 off-screen 행 선택).
+const AUTO_SCROLL_EDGE = 28
+const AUTO_SCROLL_STEP = 18
+
 /**
  * shadcn `<Table>` 기반 제네릭 셀 영역 선택 / Ctrl+C TSV / Ctrl+V paste 테이블.
  *
@@ -121,9 +128,12 @@ export const SelectableTable = <TRow,>({
   wrapRow,
 }: SelectableTableProps<TRow>) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  // 가상화 drag 중 pointer 가 spacer 위에 있어 colIdx 를 못 읽을 때 직전 colIdx 유지.
+  const lastColIdxRef = useRef<number | null>(null)
   const {
     range,
     anchor,
+    isSelecting,
     beginSelection,
     extendSelection,
     isCellInRange,
@@ -201,6 +211,7 @@ export const SelectableTable = <TRow,>({
       }
       event.preventDefault()
       containerRef.current?.focus()
+      lastColIdxRef.current = colIdx
       beginSelection({ rowIdx, colIdx })
     },
     [beginSelection],
@@ -208,6 +219,7 @@ export const SelectableTable = <TRow,>({
 
   const handleCellPointerEnter = useCallback(
     (rowIdx: number, colIdx: number) => () => {
+      lastColIdxRef.current = colIdx
       extendSelection({ rowIdx, colIdx })
     },
     [extendSelection],
@@ -276,6 +288,156 @@ export const SelectableTable = <TRow,>({
   )
 
   const showActionColumn = Boolean(actionColumn)
+  const totalColSpan = columns.length + (showActionColumn ? 1 : 0)
+
+  const virtualEnabled = features?.virtualization ?? false
+  const virtual = useGridVirtual({
+    enabled: virtualEnabled,
+    itemCount: displayedRows.length,
+    estimatedRowHeight: ESTIMATED_ROW_HEIGHT,
+    getScrollElement: () => containerRef.current,
+  })
+
+  // 가상화 시 off-screen 행은 DOM 에 없어 cell pointerEnter 가 안 뜬다. drag 중 컨테이너
+  // pointer Y → contentOffset → getRowIndexForOffset 로 rowIdx 직접 계산 + edge auto-scroll.
+  // getRowIndexForOffset 은 매 렌더 새 함수라 ref 로 받아 effect 재실행을 피한다.
+  const getRowIndexForOffsetRef = useRef(virtual.getRowIndexForOffset)
+  useEffect(() => {
+    getRowIndexForOffsetRef.current = virtual.getRowIndexForOffset
+  })
+
+  useEffect(() => {
+    if (!virtualEnabled || !isSelecting) {
+      return
+    }
+    const container = containerRef.current
+    if (!container) {
+      return
+    }
+
+    let velocity = 0
+    let pointerX = 0
+    let pointerY = 0
+    let rafId = 0
+
+    const applySelectionAtPointer = () => {
+      const target = document.elementFromPoint(pointerX, pointerY)
+      // 포인터 아래 실제 셀이 있으면 그 data-row-idx 를 신뢰(estimate 오차 회피). 없을 때만
+      // (spacer / 행 아래 빈 영역) pointer-Y → contentOffset 매핑으로 fallback.
+      const cell = target?.closest('[data-row-idx]')
+      let rowIdx: number | null
+      if (cell) {
+        rowIdx = Number(cell.getAttribute('data-row-idx'))
+      } else {
+        const rect = container.getBoundingClientRect()
+        rowIdx = getRowIndexForOffsetRef.current(container.scrollTop + (pointerY - rect.top))
+      }
+      if (rowIdx === null) {
+        return
+      }
+      const colAttr = target?.closest('[data-col-idx]')?.getAttribute('data-col-idx')
+      const colIdx = colAttr !== null && colAttr !== undefined ? Number(colAttr) : lastColIdxRef.current
+      if (colIdx === null) {
+        return
+      }
+      lastColIdxRef.current = colIdx
+      extendSelection({ rowIdx, colIdx })
+    }
+
+    const handleMove = (event: globalThis.PointerEvent) => {
+      pointerX = event.clientX
+      pointerY = event.clientY
+      const rect = container.getBoundingClientRect()
+      if (event.clientY < rect.top + AUTO_SCROLL_EDGE) {
+        velocity = -AUTO_SCROLL_STEP
+      } else if (event.clientY > rect.bottom - AUTO_SCROLL_EDGE) {
+        velocity = AUTO_SCROLL_STEP
+      } else {
+        velocity = 0
+      }
+      applySelectionAtPointer()
+    }
+
+    const tick = () => {
+      if (velocity !== 0) {
+        container.scrollBy({ top: velocity })
+        applySelectionAtPointer()
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+
+    window.addEventListener('pointermove', handleMove)
+    rafId = requestAnimationFrame(tick)
+    return () => {
+      window.removeEventListener('pointermove', handleMove)
+      cancelAnimationFrame(rafId)
+    }
+  }, [virtualEnabled, isSelecting, extendSelection])
+
+  const renderRow = (row: TRow, rowIdx: number): ReactNode => {
+    const rowChildren = (
+      <>
+        {columns.map((column, colIdx) => {
+          const isAnchor = isAnchorCell(rowIdx, colIdx)
+          const inRange = isCellInRange(rowIdx, colIdx)
+          const isEditing = editing?.rowIdx === rowIdx && editing.colIdx === colIdx
+          const helpers = {
+            isEditing,
+            beginEdit: () => beginEdit(rowIdx, colIdx),
+            endEdit,
+          }
+          const cellContent = column.renderCell
+            ? column.renderCell(row, rowIdx, colIdx, helpers)
+            : (column.accessor(row) || '—')
+          const handleCellDoubleClick = column.editable
+            ? () => beginEdit(rowIdx, colIdx)
+            : undefined
+          return (
+            <TableCell
+              key={`${column.key}-${colIdx}`}
+              className={cn(
+                'whitespace-nowrap p-1',
+                column.sticky
+                  ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                  : null,
+              )}
+              style={{
+                ...columnSizeStyle(column),
+                ...(stickyCellStyle(column.sticky) ?? {}),
+              }}
+              data-row-idx={rowIdx}
+              data-col-idx={colIdx}
+            >
+              <div
+                onPointerDown={handleCellPointerDown(rowIdx, colIdx)}
+                onPointerEnter={handleCellPointerEnter(rowIdx, colIdx)}
+                onDoubleClick={handleCellDoubleClick}
+                className={cn(
+                  'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
+                  isAnchor
+                    ? 'border-[#1C7F59] bg-[#EAF5EE]'
+                    : inRange
+                      ? 'border-[#1C7F59]/30 bg-[#1C7F59]/10'
+                      : 'border-transparent bg-transparent hover:bg-[#F3F7F5]',
+                )}
+              >
+                {cellContent}
+              </div>
+            </TableCell>
+          )
+        })}
+        {showActionColumn && actionColumn ? (
+          <TableCell className="whitespace-nowrap">{actionColumn.render(row, rowIdx)}</TableCell>
+        ) : null}
+      </>
+    )
+    const key = rowKey(row, rowIdx)
+    return (
+      <Fragment key={key}>
+        {wrapRow ? wrapRow(row, rowIdx, rowChildren) : <TableRow>{rowChildren}</TableRow>}
+      </Fragment>
+    )
+  }
 
   return (
     <div
@@ -351,82 +513,30 @@ export const SelectableTable = <TRow,>({
           {displayedRows.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={columns.length + (showActionColumn ? 1 : 0)}
+                colSpan={totalColSpan}
                 className="py-10 text-center text-sm text-[#647169]"
               >
                 {emptyState ?? '표시할 데이터가 없습니다.'}
               </TableCell>
             </TableRow>
+          ) : virtual.enabled ? (
+            <>
+              {virtual.paddingTop > 0 ? (
+                <tr aria-hidden>
+                  <td colSpan={totalColSpan} style={{ height: virtual.paddingTop, padding: 0, border: 0 }} />
+                </tr>
+              ) : null}
+              {virtual.virtualRows.map((virtualRow) =>
+                renderRow(displayedRows[virtualRow.index], virtualRow.index),
+              )}
+              {virtual.paddingBottom > 0 ? (
+                <tr aria-hidden>
+                  <td colSpan={totalColSpan} style={{ height: virtual.paddingBottom, padding: 0, border: 0 }} />
+                </tr>
+              ) : null}
+            </>
           ) : (
-            displayedRows.map((row, rowIdx) => {
-              const rowChildren = (
-                <>
-                  {columns.map((column, colIdx) => {
-                    const isAnchor = isAnchorCell(rowIdx, colIdx)
-                    const inRange = isCellInRange(rowIdx, colIdx)
-                    const isEditing =
-                      editing?.rowIdx === rowIdx && editing.colIdx === colIdx
-                    const helpers = {
-                      isEditing,
-                      beginEdit: () => beginEdit(rowIdx, colIdx),
-                      endEdit,
-                    }
-                    const cellContent = column.renderCell
-                      ? column.renderCell(row, rowIdx, colIdx, helpers)
-                      : (column.accessor(row) || '—')
-                    const handleCellDoubleClick = column.editable
-                      ? () => beginEdit(rowIdx, colIdx)
-                      : undefined
-                    return (
-                      <TableCell
-                        key={`${column.key}-${colIdx}`}
-                        className={cn(
-                          'whitespace-nowrap p-1',
-                          column.sticky
-                            ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
-                            : null,
-                        )}
-                        style={{
-                          ...columnSizeStyle(column),
-                          ...(stickyCellStyle(column.sticky) ?? {}),
-                        }}
-                        data-row-idx={rowIdx}
-                        data-col-idx={colIdx}
-                      >
-                        <div
-                          onPointerDown={handleCellPointerDown(rowIdx, colIdx)}
-                          onPointerEnter={handleCellPointerEnter(rowIdx, colIdx)}
-                          onDoubleClick={handleCellDoubleClick}
-                          className={cn(
-                            'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
-                            isAnchor
-                              ? 'border-[#1C7F59] bg-[#EAF5EE]'
-                              : inRange
-                                ? 'border-[#1C7F59]/30 bg-[#1C7F59]/10'
-                                : 'border-transparent bg-transparent hover:bg-[#F3F7F5]',
-                          )}
-                        >
-                          {cellContent}
-                        </div>
-                      </TableCell>
-                    )
-                  })}
-                  {showActionColumn && actionColumn ? (
-                    <TableCell className="whitespace-nowrap">
-                      {actionColumn.render(row, rowIdx)}
-                    </TableCell>
-                  ) : null}
-                </>
-              )
-              const key = rowKey(row, rowIdx)
-              return (
-                <Fragment key={key}>
-                  {wrapRow
-                    ? wrapRow(row, rowIdx, rowChildren)
-                    : <TableRow>{rowChildren}</TableRow>}
-                </Fragment>
-              )
-            })
+            displayedRows.map((row, rowIdx) => renderRow(row, rowIdx))
           )}
         </TableBody>
       </Table>
