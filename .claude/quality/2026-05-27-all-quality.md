@@ -45,5 +45,5 @@ biome: [biome.json](../../biome.json) 존재하나 package.json scripts 미연�
 ## 진행 로그
 - [x] Step 1 baseline (4축)
 - [x] P1 #1 — live-map-data.test.ts stale 단언 갱신 (+22/+60 → +24/+24+52). unit 85→86 PASS (exit 0). 프로덕션 미변경.
-- [ ] P1 #2 — eslint DeployMonitorPanel:615 preserve-manual-memoization
+- [x] P1 #2 — DeployMonitorPanel:615 useMemo deps 정렬. commentHistoryItem 3개 sub-prop → 전체 객체(React Compiler 추론 일치). 출력 동일 순수함수. eslint 2→1, build GREEN, deploy-monitor e2e 2/2 PASS.
 - [ ] P1 #3 — eslint GroupAddMembersModal:51 set-state-in-effect

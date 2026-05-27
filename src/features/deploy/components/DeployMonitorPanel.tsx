@@ -633,9 +633,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
     return lines
   }, [
-    commentHistoryItem?.selectedBusinessJarName,
-    commentHistoryItem?.selectedModelName,
-    commentHistoryItem?.selectedModelVersion,
+    commentHistoryItem,
     commentScenario?.name,
     commentSummaryQuery.data?.resolvedScenarioCode,
   ])
