@@ -3,6 +3,8 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n/i18n-context'
+import { LanguageToggle } from '@/i18n/LanguageToggle'
 import { authApi } from '@/features/auth/api/auth.api'
 import { dlqApi } from '@/features/dlq/api/dlq.api'
 import { eqpApi } from '@/features/eqp/api/eqp.api'
@@ -96,6 +98,7 @@ const prefetchByMenuKey = (queryClient: QueryClient, key: AppTopNavigationKey): 
 export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopBarProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t } = useI18n()
   const [isLogoutPending, setIsLogoutPending] = useState(false)
   const meQuery = useMe(true)
   const navigationItems = useMemo(
@@ -179,20 +182,22 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        <LanguageToggle />
+
         <Button
           type="button"
           variant="outline"
           className="h-[38px] rounded-full border-[#DCE5E0] px-3.5 text-sm font-medium text-[#4B5A52]"
           onClick={() => void handleLogout()}
           disabled={isLogoutPending}
-          aria-label="로그아웃"
+          aria-label={t('topbar.logout')}
         >
           {isLogoutPending ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           ) : (
             <LogOut className="size-4" aria-hidden="true" />
           )}
-          로그아웃
+          {t('topbar.logout')}
         </Button>
 
         <Button
@@ -200,7 +205,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
           variant="ghost"
           className="size-[38px] rounded-full border border-[#DCE5E0] text-[#4B5A52]"
           onClick={onOpenProfile}
-          aria-label="사용자 프로필 열기"
+          aria-label={t('topbar.openProfile')}
           disabled={isLogoutPending}
         >
           <CircleUserRound className="size-[18px]" />

@@ -2,6 +2,7 @@ import { defaultShouldDehydrateQuery, QueryClient, type Query } from '@tanstack/
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { I18nProvider } from '@/i18n/I18nProvider'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,7 +53,7 @@ export function AppProvider({ children }: AppProviderProps) {
         dehydrateOptions: { shouldDehydrateQuery },
       }}
     >
-      {children}
+      <I18nProvider>{children}</I18nProvider>
       {/* 개발 환경에서만 쿼리 상태 확인 패널 표시 */}
       <ReactQueryDevtools initialIsOpen={false} />
     </PersistQueryClientProvider>
