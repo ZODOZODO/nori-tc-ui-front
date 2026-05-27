@@ -24,8 +24,20 @@ import {
 } from '@/components/ui/table'
 import type { EqpJarOption, EqpModelOption } from '@/features/eqp/types/eqp.types'
 import { useMe } from '@/features/profile/hooks/useProfile'
-import { DeployApiError, deployApi } from '../api/deploy.api'
+import { deployApi } from '../api/deploy.api'
 import { createDeployName } from '../lib/deploy-utils'
+import {
+  delay,
+  formatActiveDeployHint,
+  formatChangeKinds,
+  formatDeployDetail,
+  getDeployErrorDetail,
+  getErrorMessage,
+  isFailedDeployOutcome,
+  mergeModelOptions,
+  resolveFailureDetail,
+  toUniqueModelOptions,
+} from '../lib/deploy-register-utils'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
 import { useCreateDeploy } from '../hooks/useCreateDeploy'
 import { useDeployEqpParamVersions } from '../hooks/useDeployEqpParamVersions'
@@ -36,7 +48,6 @@ import { useDeployUiStore } from '../stores/deploy-ui.store'
 import { useEqpList } from '@/features/eqp/hooks/useEqpList'
 import type {
   DeployCreateRequest,
-  DeployStatus,
   DeploySummary,
   DeployRegisterScenarioPreviewRequest,
   DeployRegisterScenarioPreviewResult,
@@ -52,44 +63,6 @@ const DEPLOY_EVENT_TYPE = 'EQP_REGISTER_DEPLOY'
 
 const cardClassName =
   'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
-
-const getErrorMessage = (error: unknown, fallbackMessage: string): string =>
-  error instanceof Error && error.message ? error.message : fallbackMessage
-
-const getDeployErrorDetail = (error: unknown): string | null => {
-  if (!(error instanceof DeployApiError)) {
-    return null
-  }
-
-  return error.payload.errorCode ? `오류 코드: ${error.payload.errorCode}` : null
-}
-
-const mergeModelOptions = (developModelOptions: EqpModelOption[], operateModelOptions: EqpModelOption[]) => {
-  const mergedOptionMap = new Map<number, EqpModelOption>()
-
-  for (const option of [...developModelOptions, ...operateModelOptions]) {
-    mergedOptionMap.set(option.modelVersionKey, option)
-  }
-
-  return [...mergedOptionMap.values()]
-}
-
-const compareModelNames = (left: string, right: string) =>
-  left.localeCompare(right, 'en', { numeric: true, sensitivity: 'base' })
-
-const toUniqueModelOptions = (modelOptions: EqpModelOption[]) => {
-  const uniqueModelMap = new Map<string, EqpModelOption>()
-
-  for (const option of modelOptions) {
-    if (!uniqueModelMap.has(option.modelName)) {
-      uniqueModelMap.set(option.modelName, option)
-    }
-  }
-
-  return [...uniqueModelMap.values()].sort((left, right) =>
-    compareModelNames(left.modelName, right.modelName),
-  )
-}
 
 interface SelectedEquipmentRowProps {
   item: DeployRegisterTargetItem
@@ -111,98 +84,6 @@ type ScenarioDialogState = {
   isOpen: boolean
   selectedScenarioCode: string
   preview: DeployRegisterScenarioPreviewResult | null
-}
-
-const CHANGE_KIND_LABEL: Record<string, string> = {
-  MODEL_CHANGED: 'Model',
-  BUSINESS_JAR_CHANGED: 'Business Jar',
-  EQP_PARAM_CHANGED: 'Eqp Param',
-}
-
-const formatChangeKinds = (changeKinds: string[]) =>
-  changeKinds.map((kind) => CHANGE_KIND_LABEL[kind] ?? kind).join(', ')
-
-const FAILED_DEPLOY_STATUSES = new Set<DeployStatus>(['FAILED', 'PARTIAL_FAILED', 'CANCELED'])
-const FAILED_TARGET_STATUSES = new Set([
-  'FAILED',
-  'ROLLING_BACK',
-  'ROLLED_BACK',
-  'COMPENSATION_FAILED',
-  'CANCELED',
-])
-
-const delay = (milliseconds: number) =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds)
-  })
-
-const isFailedDeployOutcome = (summary: DeploySummary, targets: DeployTargetItem[]) =>
-  FAILED_DEPLOY_STATUSES.has(summary.deployStatus) ||
-  summary.targetSummary.failed > 0 ||
-  summary.targetSummary.compensationFailed > 0 ||
-  targets.some(
-    (target) =>
-      FAILED_TARGET_STATUSES.has(target.targetStatus) ||
-      Boolean(target.lastErrorMessage) ||
-      Boolean(target.lastErrorCode),
-  )
-
-const resolveFailureDetail = (targets: DeployTargetItem[]) => {
-  const failedTarget = targets.find(
-    (target) =>
-      FAILED_TARGET_STATUSES.has(target.targetStatus) ||
-      Boolean(target.lastErrorMessage) ||
-      Boolean(target.lastErrorCode),
-  )
-
-  if (!failedTarget) {
-    return null
-  }
-
-  if (failedTarget.lastErrorMessage?.trim()) {
-    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorMessage.trim()}`
-  }
-
-  if (failedTarget.lastErrorCode?.trim()) {
-    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorCode.trim()}`
-  }
-
-  return `설비 ${failedTarget.eqpId} 처리 상태: ${failedTarget.targetStatus}`
-}
-
-const formatDeployDetail = (
-  deployKey: number,
-  deployStatus: DeployStatus,
-  extraDetail?: string | null,
-) => {
-  const baseDetail = `Deploy #${deployKey} · 상태 ${deployStatus}`
-  return extraDetail ? `${baseDetail}\n${extraDetail}` : baseDetail
-}
-
-const formatActiveDeployHint = (item: DeployRegisterTargetItem) => {
-  if (!item.blockedByActiveDeploy) {
-    return null
-  }
-
-  const detailParts: string[] = []
-
-  if (item.activeDeployKey !== null) {
-    detailParts.push(`#${item.activeDeployKey}`)
-  }
-
-  if (item.activeDeployStatus) {
-    detailParts.push(item.activeDeployStatus)
-  }
-
-  if (item.activeDeployName) {
-    detailParts.push(item.activeDeployName)
-  }
-
-  if (item.activeRequestedBy) {
-    detailParts.push(`요청자 ${item.activeRequestedBy}`)
-  }
-
-  return detailParts.join(' · ')
 }
 
 function SelectedEquipmentRow({

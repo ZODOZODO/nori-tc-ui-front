@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "measuredAt": "2026-05-27T04:39:38.053Z",
+    "baseUrl": "http://127.0.0.1:3000",
+    "pages": [
+      "DeployPage"
+    ]
+  },
+  "perPage": {
+    "DeployPage": {
+      "cold": {
+        "apiTotalCount": 11,
+        "apiSlowestMs": 78,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/api/eqp/options",
+            "status": 200,
+            "ms": 78
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "status": 200,
+            "ms": 76
+          },
+          {
+            "method": "GET",
+            "path": "/api/eqp?(...)",
+            "status": 200,
+            "ms": 76
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/user/api/user.api.ts",
+            "status": 200,
+            "ms": 56
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 53
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "",
+              "Eqp ID",
+              "Model",
+              "Model Version / Status",
+              "Business Jar File"
+            ],
+            "rowCount": 1
+          },
+          {
+            "tableIndex": 1,
+            "headerSample": [
+              "Eqp ID",
+              "Model",
+              "Selected Version",
+              "Business Jar File",
+              "Interface"
+            ],
+            "rowCount": 1
+          }
+        ]
+      },
+      "warm": {
+        "apiTotalCount": 9,
+        "apiSlowestMs": 18,
+        "top5Slowest": [
+          {
+            "method": "GET",
+            "path": "/src/features/profile/api/profile.api.ts",
+            "status": 200,
+            "ms": 44
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/user/api/user.api.ts",
+            "status": 200,
+            "ms": 43
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/model/api/model.api.ts",
+            "status": 200,
+            "ms": 38
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/eqp/api/eqp.api.ts",
+            "status": 200,
+            "ms": 37
+          },
+          {
+            "method": "GET",
+            "path": "/src/features/live-map/api/live-map.api.ts",
+            "status": 200,
+            "ms": 37
+          }
+        ],
+        "rowCounts": [
+          {
+            "tableIndex": 0,
+            "headerSample": [
+              "",
+              "Eqp ID",
+              "Model",
+              "Model Version / Status",
+              "Business Jar File"
+            ],
+            "rowCount": 1
+          },
+          {
+            "tableIndex": 1,
+            "headerSample": [
+              "Eqp ID",
+              "Model",
+              "Selected Version",
+              "Business Jar File",
+              "Interface"
+            ],
+            "rowCount": 1
+          }
+        ]
+      }
+    }
+  }
+}
