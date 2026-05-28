@@ -160,7 +160,7 @@ D1 에서 컬러·폰트만 다뤘으나, 2026 트렌드 재해석을 위해 다
 
 #### R3.3 — 도입 시점 (페이지 phase 와 결합)
 
-선 도입 금지 — 사용처 없는 의존성 부풀림 방지. 각 라이브러리는 첫 사용 phase 에서만 의존성 추가. 각 phase PR 본문에 `npm view <pkg> peerDependencies` 출력 마지막 5~10 줄 + `npm install` 출력 인용 의무.
+선 도입 금지 — 사용처 없는 의존성 부풀림 방지. 각 라이브러리는 첫 사용 phase 에서만 의존성 추가. 각 phase commit 메시지에 `npm view <pkg> peerDependencies` 출력 마지막 5~10 줄 + `npm install` 출력 인용 의무.
 
 - [ ] **Phase 1 (토큰 + Pretendard)** — 신규: `pretendard@^1.3`
 - [ ] **Phase 4 (Model)** — 신규: `@tanstack/react-table@^8.21` (SelectableTable + react-table 결합으로 summary / row checkbox / advanced filter 보강)
@@ -172,7 +172,7 @@ D1 에서 컬러·폰트만 다뤘으나, 2026 트렌드 재해석을 위해 다
 
 ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / user) 를 phase 별로 마이그레이션. 각 phase 는 **한 PR 한 페이지** (회귀 격리, selectable-table-rollout R7 패턴).
 
-**중요**: 페이지 phase 진입 전 **R7 (공유 컴포넌트 일괄 통합)** 이 머지돼야 한다. 그렇지 않으면 페이지마다 컴포넌트 시각이 어긋남.
+**중요**: 페이지 phase 진입 전 **R7 (공유 컴포넌트 일괄 통합)** 이 commit 되어야 한다. 그렇지 않으면 페이지마다 컴포넌트 시각이 어긋남.
 
 - [ ] **Phase 2: LoginPage** ([features/auth/components/LoginPage.tsx](../../src/features/auth/components/LoginPage.tsx)) — nori-client `_login.scss` 인상 (중앙 카드, 부드러운 shadow, brand color CTA) + Pretendard
 - [ ] **Phase 3: EqpPage** — 데이터 리스트 + sidebar 패턴. nori-client `_table.scss` 인상 (행 줄무늬, sticky header, row-select highlight) 반영
@@ -182,7 +182,7 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 - [ ] **Phase 7: User / UserManagement / Profile** — nori-client `_form.scss` + `_button.scss` 인상
 - [ ] **Phase 8: LiveMapPage (3D)** — `@react-three/fiber` 9 + drei 10 + three 도입. nori-client `eqp_layout` 페이지 3D 인상 참조.
 
-각 phase 의 PR 본문에 *변경 전 / 변경 후 스크린샷* 첨부 (사용자 시각 확인 게이트).
+각 phase 의 commit 메시지에 *변경 전 / 변경 후 스크린샷 경로* 명시 (사용자 시각 확인은 dev 환경에서 phase 단위).
 
 ### R5 — 회귀 안전망
 
@@ -229,7 +229,7 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 **R7 의 e2e 회귀**:
 - [ ] 각 컴포넌트의 e2e 시나리오가 존재하는 경우 회귀 0 (예: `*-dialog.spec.ts`, `selectable-table-*.spec.ts`)
-- [ ] R7 PR 본문에 11 개 컴포넌트의 storybook fixture 또는 dev 페이지 screenshot 첨부 (변경 전/후)
+- [ ] R7 commit 메시지에 11 개 컴포넌트의 storybook fixture 또는 dev 페이지 screenshot 경로 명시 (변경 전/후)
 
 ## Constraints
 
@@ -240,7 +240,8 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 - **ui-front 의 기존 라우트 / 페이지 / 기능 / API 호출 / 권한 모델 변경 금지** — 자매품화는 *시각 마이그레이션 only*. nori-client 의 페이지를 가져오는 게 아니다.
 - **nori-client 의 dark navy 헤더 (#050e26) 그대로 도입 금지** — 사용자가 "옛 느낌 빼고 세련" 명시. 현 ui-front 흰색 헤더 유지 (Q1 확정 시 변경 가능).
 - **font-fraunces 제거 금지** — N 로고 전용으로 보존.
-- **각 phase 의 PR 은 단일 페이지** — cross-page 오염 0 (selectable-table-rollout R7 패턴).
+- **각 phase 의 commit 은 단일 페이지** (또는 단일 R 단위) — cross-page 오염 0 (selectable-table-rollout R7 패턴). **phase 별 PR / MR 생성 금지**.
+- **MR 정책** — 본 SPEC 의 모든 Phase (1 / 1.5 / 2~8) 가 동일 branch (`docs/nori-client-look-and-feel-spec` 또는 후속) 에 commit 만 누적. SPEC 전체 완료 후 **단일 MR 로 branch → main 일괄 통합**. 중간 phase 머지 금지.
 - **SelectableTable 컴포넌트 자체의 비주얼 토큰만** R1 에서 한 번 갱신 (`#1C7F59` → `var(--color-brand-primary)`). 동작 / API 변경 금지.
 
 ## Acceptance Criteria
@@ -260,7 +261,7 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 - [ ] `git grep -E "var\(--color-brand-primary\)" src/` ≥ 5 곳 (도입 확산)
 - [ ] [src/index.css](../../src/index.css) 의 `--font-ui` 가 `'Pretendard'` 포함 문자열로 갱신
-- [ ] `npm view recharts react@19` peer 확인 PASS — 출력 인용 PR 본문 첨부
+- [ ] `npm view recharts react@19` peer 확인 PASS — 출력 인용 commit 메시지에 첨부
 
 ### R2 — Topbar
 
@@ -269,14 +270,14 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 ### R4 — 각 페이지 phase
 
-- [ ] 각 phase PR 본문에 변경 전 / 변경 후 스크린샷 첨부
+- [ ] 각 phase commit 메시지에 변경 전 / 변경 후 스크린샷 경로 명시
 - [ ] 해당 페이지 e2e PASS — 동작 회귀 0
 
 ### R7 — 공유 컴포넌트 일괄 통합 (Phase 1.5)
 
 - [ ] `git grep -E "#1C7F59|#D8E1DB|#93A19A|#243129|#8D9893|#EDF4EF|#F6F9F7|#EAF5EE" src/components/ui/ src/shared/components/AppPageShell.tsx` → 0 hits (옛 green 토큰 잔재 0)
-- [ ] R7 PR 본문에 11 개 shadcn primitives + AppPageShell + SelectableTable 의 변경 전/후 스크린샷 또는 dev 페이지 캡처
-- [ ] 모든 페이지 e2e 회귀 0 (R7 머지 후 페이지 phase 진입 전 baseline 확보)
+- [ ] R7 commit 메시지에 11 개 shadcn primitives + AppPageShell + SelectableTable 의 변경 전/후 스크린샷 또는 dev 페이지 캡처 경로
+- [ ] 모든 페이지 e2e 회귀 0 (R7 commit 후 페이지 phase 진입 전 baseline 확보)
 
 ## Out of Scope
 
@@ -303,7 +304,7 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 | Phase | 산출물 | 위험 | 사용자 게이트 |
 |---|---|---|---|
-| 1. 토큰 + Pretendard + AppTopBar 토큰 | R1 + R2 완료 (index.css + pretendard npm + AppTopBar 시각 갱신) | brand accent indigo hex PoC 결정 | PR 머지 후 dev 확인 |
+| 1. 토큰 + Pretendard + AppTopBar 토큰 | R1 + R2 완료 (index.css + pretendard npm + AppTopBar 시각 갱신) | brand accent indigo hex PoC 결정 | commit 후 dev 확인 |
 | **1.5. 공유 컴포넌트 시각 통합** | **R7 완료** (shadcn primitives 11 + AppPageShell + SelectableTable 토큰 갱신) | **페이지 phase 의 전제 조건 — 누락 시 페이지마다 컴포넌트 어긋남** | **시각 사용자 confirm 필수** (storybook fixture 또는 dev 페이지) |
 | 2. LoginPage | R4 Phase 2 | 최초 페이지 시각 결정 (이후 phase 의 기준) | **시각 사용자 confirm 필수** |
 | 3. EqpPage | R4 Phase 3 | sidebar 패턴 첫 적용 | dev 확인 |
