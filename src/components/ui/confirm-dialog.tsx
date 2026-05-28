@@ -44,7 +44,7 @@ function ConfirmDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="confirm-dialog-content"
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-[#E8E4DF] bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border bg-popover p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out',
           className,
         )}
         {...props}
@@ -80,7 +80,7 @@ function ConfirmDialogTitle({
   return (
     <AlertDialogPrimitive.Title
       data-slot="confirm-dialog-title"
-      className={cn('text-lg leading-none font-semibold text-[#1F2D26]', className)}
+      className={cn('text-lg leading-none font-semibold text-foreground', className)}
       {...props}
     />
   )
@@ -93,7 +93,7 @@ function ConfirmDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="confirm-dialog-description"
-      className={cn('text-sm text-[#65726B]', className)}
+      className={cn('text-sm text-muted-foreground', className)}
       {...props}
     />
   )

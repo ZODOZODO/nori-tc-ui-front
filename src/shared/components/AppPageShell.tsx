@@ -19,7 +19,7 @@ export function AppPageShell({
   className,
 }: AppPageShellProps) {
   return (
-    <div className="flex h-screen min-h-screen min-w-0 w-full flex-col overflow-hidden bg-[#F7FAF8]">
+    <div className="flex h-screen min-h-screen min-w-0 w-full flex-col overflow-hidden bg-background">
       <AppTopBar
         currentMenu={currentMenu}
         onOpenProfile={onOpenProfile}

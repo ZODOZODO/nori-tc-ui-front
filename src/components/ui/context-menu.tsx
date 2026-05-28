@@ -39,7 +39,7 @@ function ContextMenuSubTrigger({
     <ContextMenuPrimitive.SubTrigger
       data-slot="context-menu-sub-trigger"
       className={cn(
-        'flex cursor-default items-center rounded-lg px-2 py-2 text-sm outline-none select-none data-[state=open]:bg-[#EDF4EF] data-[state=open]:text-[#1C7F59] focus:bg-[#EDF4EF] focus:text-[#1C7F59]',
+        'flex cursor-default items-center rounded-lg px-2 py-2 text-sm outline-none select-none data-[state=open]:bg-accent data-[state=open]:text-brand-accent focus:bg-accent focus:text-brand-accent',
         inset && 'pl-8',
         className,
       )}
@@ -59,7 +59,7 @@ function ContextMenuSubContent({
     <ContextMenuPrimitive.SubContent
       data-slot="context-menu-sub-content"
       className={cn(
-        'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-[#E4EAE6] bg-white p-1 text-[#243129] shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
+        'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
         className,
       )}
       {...props}
@@ -76,7 +76,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-[#E4EAE6] bg-white p-1 text-[#243129] shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
+          'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
           className,
         )}
         {...props}
@@ -102,8 +102,8 @@ function ContextMenuItem({
         'relative flex cursor-default items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         inset && 'pl-8',
         variant === 'destructive'
-          ? 'text-[#C53B37] focus:bg-[#FDECEC] focus:text-[#C53B37]'
-          : 'focus:bg-[#EDF4EF] focus:text-[#1C7F59]',
+          ? 'text-destructive focus:bg-destructive/10 focus:text-destructive'
+          : 'focus:bg-accent focus:text-brand-accent',
         className,
       )}
       {...props}
@@ -121,7 +121,7 @@ function ContextMenuCheckboxItem({
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
       className={cn(
-        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-[#EDF4EF] focus:text-[#1C7F59]',
+        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-brand-accent',
         className,
       )}
       checked={checked}
@@ -146,7 +146,7 @@ function ContextMenuRadioItem({
     <ContextMenuPrimitive.RadioItem
       data-slot="context-menu-radio-item"
       className={cn(
-        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-[#EDF4EF] focus:text-[#1C7F59]',
+        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-brand-accent',
         className,
       )}
       {...props}
@@ -171,7 +171,7 @@ function ContextMenuLabel({
   return (
     <ContextMenuPrimitive.Label
       data-slot="context-menu-label"
-      className={cn('px-2 py-1.5 text-xs font-medium text-[#738078]', inset && 'pl-8', className)}
+      className={cn('px-2 py-1.5 text-xs font-medium text-muted-foreground', inset && 'pl-8', className)}
       {...props}
     />
   )
@@ -184,7 +184,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn('-mx-1 my-1 h-px bg-[#E4EAE6]', className)}
+      className={cn('-mx-1 my-1 h-px bg-border', className)}
       {...props}
     />
   )
@@ -194,7 +194,7 @@ function ContextMenuShortcut({ className, ...props }: React.ComponentProps<'span
   return (
     <span
       data-slot="context-menu-shortcut"
-      className={cn('ml-auto text-xs tracking-widest text-[#93A19A]', className)}
+      className={cn('ml-auto text-xs tracking-widest text-muted-foreground', className)}
       {...props}
     />
   )

@@ -109,8 +109,8 @@ const AUTO_SCROLL_STEP = 18
 /**
  * shadcn `<Table>` 기반 제네릭 셀 영역 선택 / Ctrl+C TSV / Ctrl+V paste 테이블.
  *
- * 디자인 토큰 (헤더 #F6F9F7, anchor #EAF5EE, range #1C7F59/10) 은 PoC
- * `SelectableModelDetailTable` 의 토큰을 그대로 옮겨 ModelDetailPanel 의 기존 셀과
+ * 디자인 토큰 (헤더 bg-muted, anchor brand-accent/15, range brand-accent/10) 은
+ * Phase 1 의 신규 토큰 시스템 (brand-accent, grid-row-stripe/select, ring) 위에
  * 시각 일관성을 유지합니다. 셀 내부 콘텐츠는 `column.renderCell` 로 위임하여
  * picker/select/Input 같은 페이지별 분기를 보존합니다 (R3 이후 활용).
  */
@@ -415,10 +415,10 @@ export const SelectableTable = <TRow,>({
                 className={cn(
                   'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
                   isAnchor
-                    ? 'border-[#1C7F59] bg-[#EAF5EE]'
+                    ? 'border-brand-accent bg-brand-accent/15'
                     : inRange
-                      ? 'border-[#1C7F59]/30 bg-[#1C7F59]/10'
-                      : 'border-transparent bg-transparent hover:bg-[#F3F7F5]',
+                      ? 'border-brand-accent/30 bg-brand-accent/10'
+                      : 'border-transparent bg-transparent hover:bg-muted',
                 )}
               >
                 {cellContent}
@@ -447,14 +447,14 @@ export const SelectableTable = <TRow,>({
       onPaste={handlePaste}
       onKeyDown={handleKeyDown}
       className={cn(
-        'min-h-0 min-w-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+        'min-h-0 min-w-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-ring',
         containerClassName,
       )}
       data-testid={testId}
     >
       <Table className={cn('min-w-max table-auto', tableClassName)}>
         <TableHeader>
-          <TableRow className="bg-[#F6F9F7]">
+          <TableRow className="bg-muted">
             {columns.map((column) => (
               <TableHead
                 key={column.key}
@@ -462,7 +462,7 @@ export const SelectableTable = <TRow,>({
                 className={cn(
                   'relative whitespace-nowrap',
                   column.sticky
-                    ? 'sticky left-0 z-30 bg-[#F6F9F7] shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                    ? 'sticky left-0 z-30 bg-muted shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
                     : null,
                 )}
                 style={{
@@ -474,10 +474,10 @@ export const SelectableTable = <TRow,>({
                   <button
                     type="button"
                     onClick={() => toggleColumn(column.key)}
-                    className="flex items-center gap-1 font-medium outline-none hover:text-[#1C7F59] focus-visible:text-[#1C7F59]"
+                    className="flex items-center gap-1 font-medium outline-none hover:text-brand-accent focus-visible:text-brand-accent"
                   >
                     {column.header}
-                    <span aria-hidden className="text-[10px] text-[#1C7F59]">
+                    <span aria-hidden className="text-[10px] text-brand-accent">
                       {sort.columnKey === column.key
                         ? sort.direction === 'asc'
                           ? '▲'
@@ -494,7 +494,7 @@ export const SelectableTable = <TRow,>({
                   <span
                     data-resize-handle={column.key}
                     onPointerDown={handleResizePointerDown(column.key)}
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-[#1C7F59]/40"
+                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-accent/40"
                   />
                 ) : null}
               </TableHead>
@@ -514,7 +514,7 @@ export const SelectableTable = <TRow,>({
             <TableRow>
               <TableCell
                 colSpan={totalColSpan}
-                className="py-10 text-center text-sm text-[#647169]"
+                className="py-10 text-center text-sm text-muted-foreground"
               >
                 {emptyState ?? '표시할 데이터가 없습니다.'}
               </TableCell>

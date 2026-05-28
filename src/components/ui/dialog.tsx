@@ -48,7 +48,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[640px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-[#E8E4DF] bg-white p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[640px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border bg-popover p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out',
           className,
         )}
         onPointerDownOutside={(event) => {
@@ -64,7 +64,7 @@ function DialogContent({
         {children}
         {showCloseButton ? (
           <DialogPrimitive.Close
-            className="absolute right-4 top-4 rounded-sm text-[#8D9893] opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+            className="absolute right-4 top-4 rounded-sm text-muted-foreground opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="닫기"
           >
             <X className="size-4" />
@@ -93,7 +93,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn('text-lg leading-none font-semibold text-[#1F2D26]', className)}
+      className={cn('text-lg leading-none font-semibold text-foreground', className)}
       {...props}
     />
   )
@@ -106,7 +106,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-[#65726B]', className)}
+      className={cn('text-sm text-muted-foreground', className)}
       {...props}
     />
   )

@@ -95,9 +95,9 @@ export function ResizableDivider({ onDrag }: ResizableDividerProps) {
       aria-label="패널 크기 조절 핸들"
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
-      className="flex h-3 w-full cursor-row-resize items-center justify-center border-y border-[#E4EAE6] bg-[#F6F9F7] hover:bg-[#EBF2EE] active:bg-[#DCE9E1]"
+      className="flex h-3 w-full cursor-row-resize items-center justify-center border-y border-border bg-muted hover:bg-accent active:bg-accent"
     >
-      <GripHorizontal className="size-3.5 text-[#9AA49E]" aria-hidden="true" />
+      <GripHorizontal className="size-3.5 text-muted-foreground" aria-hidden="true" />
     </div>
   )
 }

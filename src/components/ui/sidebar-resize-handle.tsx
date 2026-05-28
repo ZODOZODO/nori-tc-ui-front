@@ -92,9 +92,9 @@ export function SidebarResizeHandle({ onDrag }: SidebarResizeHandleProps) {
       aria-label="사이드바 크기 조절 핸들"
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
-      className="flex h-full w-3 cursor-col-resize items-center justify-center border-r border-[#E4EAE6] bg-white hover:bg-[#F3F7F5] active:bg-[#E7EEEA]"
+      className="flex h-full w-3 cursor-col-resize items-center justify-center border-r border-border bg-background hover:bg-muted active:bg-accent"
     >
-      <GripVertical className="size-3.5 text-[#9AA49E]" aria-hidden="true" />
+      <GripVertical className="size-3.5 text-muted-foreground" aria-hidden="true" />
     </div>
   )
 }
