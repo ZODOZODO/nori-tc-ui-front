@@ -35,3 +35,4 @@ blob-report/
 .claude/scheduled_tasks.lock
 .claude/progress/
 .claude/harness/
+.claude/perf/measurements
