@@ -35,20 +35,6 @@ export interface LiveMapClusterItem {
   badgeTextColor: string
 }
 
-export interface LiveMapSectorItem {
-  id: string
-  clusterId: string
-  label: string
-  x: number
-  y: number
-  width: number
-  height: number
-  accentColor: string
-  panelColor: string
-  borderColor: string
-  labelColor: string
-}
-
 export interface LiveMapEquipmentNode {
   eqpId: string
   eqpName: string
@@ -113,36 +99,6 @@ export interface LiveMapDemoRunRow extends LiveMapDemoTargetEquipment {
   currentPhase: string
   progress: number
   elapsedTicks: number
-}
-
-export interface LiveMapBufferItem {
-  id: string
-  label: string
-  usageLabel: string
-  x: number
-  y: number
-  width: number
-  height: number
-  slotColors: string[]
-  usageColor: string
-}
-
-export interface LiveMapTransportItem {
-  id: string
-  title: string
-  subtitle: string
-  x: number
-  y: number
-  width: number
-  height: number
-  podPositions: number[]
-}
-
-export interface LiveMapCarrierItem {
-  id: string
-  x: number
-  y: number
-  status: LiveMapEqpStatus
 }
 
 export interface LiveMapSummary {

@@ -191,6 +191,3 @@ export const buildLiveMapDemoRunRows = (
       elapsedTicks,
     }
   })
-
-export const isLiveMapDemoRunCompleted = (runRows: readonly LiveMapDemoRunRow[]): boolean =>
-  runRows.length > 0 && runRows.every((runRow) => runRow.progress >= 100)

@@ -71,18 +71,3 @@ export function useAddGroupMember() {
     },
   })
 }
-
-/**
- * 그룹 멤버 제거 mutation 훅입니다. (`DELETE /api/user/{userPk}/group/{groupId}`)
- */
-export function useRemoveGroupMember() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ userPk, groupId }: MembershipVariables) => groupApi.removeMember(userPk, groupId),
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['user'] })
-      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.members(variables.groupId) })
-    },
-  })
-}

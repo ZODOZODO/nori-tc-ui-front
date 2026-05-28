@@ -10,11 +10,6 @@ export const DASH_READ_PERMISSION = 'LIVE_MAP_READ'
 export const USER_READ_PERMISSION = 'USER_READ'
 
 /**
- * User / Group 관리 페이지 변경(등록/수정/삭제/그룹 매핑/비밀번호 초기화) 권한 코드입니다.
- */
-export const USER_WRITE_PERMISSION = 'USER_WRITE'
-
-/**
  * DLQ / Quarantine / Repair Task 모니터링 페이지 조회 권한 코드입니다.
  * DB seed 의 PREFIX `/api/dlq` 매칭이 신규 endpoint 도 자동 커버.
  */
