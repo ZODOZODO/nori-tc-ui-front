@@ -139,12 +139,12 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-[#E5ECE7] bg-white px-5">
+    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-white px-5">
       <div className="flex items-center gap-2.5">
         <div className="flex size-7 items-center justify-center rounded-md bg-[#d95d39]">
           <span className="font-fraunces text-sm font-medium text-white">N</span>
         </div>
-        <span className="font-fraunces text-lg text-[#2D2D2D]">Nori-TC</span>
+        <span className="font-fraunces text-lg text-foreground">Nori-TC</span>
       </div>
 
       <div className="flex min-w-0 items-center justify-center overflow-hidden">
@@ -164,15 +164,15 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
                   isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
                 }
                 className={`group relative inline-flex h-[38px] items-center px-2 text-[14px] font-medium tracking-[0.01em] transition-colors ${
-                  isCurrentMenu ? 'text-[#173f31]' : 'text-[#6A7971] hover:text-[#2B4A3F]'
+                  isCurrentMenu ? 'text-foreground' : 'text-muted-foreground hover:text-accent-foreground'
                 }`}
               >
                 <span>{menuItem.label}</span>
                 <span
                   className={`pointer-events-none absolute -bottom-px left-0 right-0 h-[2px] rounded-full transition-opacity ${
                     isCurrentMenu
-                      ? 'bg-[#1C7F59] opacity-100'
-                      : 'bg-[#1C7F59] opacity-0 group-hover:opacity-35'
+                      ? 'bg-[var(--color-brand-accent)] opacity-100'
+                      : 'bg-[var(--color-brand-accent)] opacity-0 group-hover:opacity-35'
                   }`}
                 />
               </button>
@@ -187,7 +187,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
         <Button
           type="button"
           variant="outline"
-          className="h-[38px] rounded-full border-[#DCE5E0] px-3.5 text-sm font-medium text-[#4B5A52]"
+          className="h-[38px] rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
           onClick={() => void handleLogout()}
           disabled={isLogoutPending}
           aria-label={t('topbar.logout')}
@@ -203,7 +203,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
         <Button
           type="button"
           variant="ghost"
-          className="size-[38px] rounded-full border border-[#DCE5E0] text-[#4B5A52]"
+          className="size-[38px] rounded-full border border-border text-muted-foreground"
           onClick={onOpenProfile}
           aria-label={t('topbar.openProfile')}
           disabled={isLogoutPending}
