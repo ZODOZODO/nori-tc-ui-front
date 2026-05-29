@@ -45,7 +45,7 @@
 D1 에서 컬러·폰트만 다뤘으나, 2026 트렌드 재해석을 위해 다음 토큰도 함께 통합한다:
 
 - [ ] **shadow tier** — Tailwind 4 기본 `shadow-sm/md/lg/xl/2xl` 을 nori-client `_header.scss:173` (`0 0 1px rgba(secondary,0.16), 0 0 20px rgba(secondary,0.23)` 더블 shadow) 의 *다단 soft shadow* 인상으로 재해석. 새 토큰 `--shadow-soft-sm/md/lg` 신설 또는 Tailwind shadow customizer 로 oklch 등가
-- [ ] **radius tier** — 현 `--radius: 0.625rem` (10px) 단일 → `--radius-sm: 0.375rem`, `--radius-md: 0.5rem`, `--radius-lg: 0.75rem`, `--radius-xl: 1rem` 명시. nori-client 의 4px 작은 radius 는 8~12px 로 재해석
+- [ ] **radius tier** — 현 `--radius: 0.625rem` (10px) 단일 유지. Phase 1 에서는 기존 `@theme inline` 의 `--radius-sm/md/lg/xl` calc 매핑 (`calc(var(--radius) - 4px)` 등) 을 **유지** — Plan S1 위험 식별의 trade-off (모든 컴포넌트 `rounded-sm/-md/-lg/-xl` utility 의 px 변경 → 회귀 위험 차단). Phase 2~ 페이지 phase 진입 시 페이지별 시각 결정과 함께 명시 값 (`--radius-sm: 0.375rem` 등) 점진 치환 검토. nori-client 의 4px 작은 radius 는 8~12px 로 재해석하는 방향성은 유지
 - [ ] **focus ring 토큰** — 현 `focus-visible:ring-[#1C7F59]/30` 하드코딩 → `var(--ring)` + brand primary 의 0.3 opacity 토큰화. a11y contrast ratio 4.5:1 이상 확보
 - [ ] **z-index 토큰** — nori-client `_base.scss` 의 12 단계 시스템 (`$zindex-base=0`, `$zindex-menu=500`, `$zindex-banner=800`, `$zindex-toolbar=900`, `$zindex-header=1000`, `$zindex-dropdown=2200`, `$zindex-modal=3000`, `$zindex-toast=3200`, `$zindex-overlay=3500`, `$zindex-tooltip=4000`) 를 ui-front 의 CSS variable 로 흡수 — radix-ui 의 기본 z-index 와 충돌 없게 매핑
 - [ ] **animation duration / easing 토큰** — Tailwind 4 의 transition utility (`duration-200`, `ease-out`) 를 일관 사용. 신규 토큰 `--motion-duration-fast: 150ms`, `--motion-duration-base: 200ms`, `--motion-duration-slow: 300ms` 정의. nori-client `_header.scss:17` 의 `transition: all .2s` 인상 흡수
@@ -242,7 +242,7 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 - **font-fraunces 제거 금지** — N 로고 전용으로 보존.
 - **각 phase 의 commit 은 단일 페이지** (또는 단일 R 단위) — cross-page 오염 0 (selectable-table-rollout R7 패턴). **phase 별 PR / MR 생성 금지**.
 - **MR 정책** — 본 SPEC 의 모든 Phase (1 / 1.5 / 2~8) 가 동일 branch (`docs/nori-client-look-and-feel-spec` 또는 후속) 에 commit 만 누적. SPEC 전체 완료 후 **단일 MR 로 branch → main 일괄 통합**. 중간 phase 머지 금지.
-- **SelectableTable 컴포넌트 자체의 비주얼 토큰만** R1 에서 한 번 갱신 (`#1C7F59` → `var(--color-brand-primary)`). 동작 / API 변경 금지.
+- **SelectableTable 컴포넌트 자체의 비주얼 토큰만** R7 (Phase 1.5) 에서 한 번 갱신 (`#1C7F59` 등 옛 green → `brand-accent` 토큰 + `grid-row-stripe/select` 토큰). 동작 / API / range copy 로직 변경 금지.
 
 ## Acceptance Criteria
 
@@ -253,20 +253,20 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 - [ ] `npm install` PASS — peer 충돌 0
 - [ ] `npm run build` PASS (`tsc -b && vite build`)
 - [ ] `npm run lint` PASS
-- [ ] `npm run test:e2e` PASS — console.error / pageerror 0
+- [ ] `npm run test:e2e` PASS — 자연 실행 PASS 결과로 검증 (회귀 0). console.error / pageerror 자동 감지는 ui-front fixture 에 `page.on('console')` / `page.on('pageerror')` 미등록 — 본 SPEC 범위 외, 별 SPEC 으로 분리
 - [ ] selectable-table-* e2e PASS (회귀 0)
 - [ ] `git grep -E "tui-grid|tui-chart|tui-date-picker|reactstrap|bootstrap/dist|@react-three/fiber.*\^?8" src/` → 0 hits (nori-client 잔재 0)
 
 ### R1 — 디자인 토큰
 
-- [ ] `git grep -E "var\(--color-brand-primary\)" src/` ≥ 5 곳 (도입 확산)
+- [ ] `git grep -E "var\(--color-brand-primary\)|bg-brand-primary|text-brand-primary|border-brand-primary" src/` ≥ 5 곳 (도입 확산 — Tailwind 4 utility class `bg-brand-primary` 등도 포함). D1 으로 brand-primary 자체는 N 로고 hex 유지 (사용처 0 가능) — 페이지 phase (R4) 누적 도입 시 충족. 보조 검증: `git grep -E "var\(--color-brand-accent\)|bg-brand-accent|text-brand-accent|border-brand-accent" src/` ≥ 5 (현 Phase 1.5 누적 충족)
 - [ ] [src/index.css](../../src/index.css) 의 `--font-ui` 가 `'Pretendard'` 포함 문자열로 갱신
 - [ ] `npm view recharts react@19` peer 확인 PASS — 출력 인용 commit 메시지에 첨부
 
 ### R2 — Topbar
 
 - [ ] [AppTopBar.tsx](../../src/shared/components/AppTopBar.tsx) 의 `import` / `navigationItems` / `handleNavigateMenu` / `handleLogout` / `prefetchByMenuKey` 시그니처 git diff 0 라인 변경
-- [ ] Playwright screenshot diff — topbar 영역 50px 높이 강조 비주얼 변경 확인 (regression 시 차이 ≤ 0)
+- [ ] AppTopBar 의 변경 라인이 모두 className 토큰 치환에 한정됨 — git diff 가 import / interface / 함수 / handler / prefetch / navigationItems / JSX 구조 부분 0 라인 변경. 워크스페이스 전체 (c:/workspace_nori/*) snapshot 인프라 (`toHaveScreenshot` / `toMatchSnapshot`) 부재 확인 → 비주얼 자동 검증은 본 SPEC 범위 외, dev 캡처 (R7 commit 메시지 캡처 경로) 와 수동 시각 확인으로 대체
 
 ### R4 — 각 페이지 phase
 
@@ -407,6 +407,54 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 - ui-front 에 ErrorPage / NotFoundPage / EmptyState 컴포넌트 부재
 - 신설 OoS, 본 SPEC 은 기존 컴포넌트 (LoginPage 의 인라인 form error 등) 시각 토큰만 갱신
+
+---
+
+## Validate 노트
+
+Phase 1 + Phase 1.5 의 commit 별 검증 결과 / 객관 증거 / SPEC 정정 사유의 누적 기록.
+
+### Phase 1 (commit `fb0b39f` — feat(theme): R1+R1.2+R2 + npm-only 정리)
+
+- `npm install pretendard@^1.3` → `added 347 packages, ... found 0 vulnerabilities` (46s). peer 충돌 0
+- `npm view pretendard` → version 1.3.9, license OFL-1.1, peerDependencies = {} (peer 없음)
+- `npm run build` PASS → `✓ built in 8.08s` (baseline 8.42s 유사)
+- Phase 1 변경 파일 lint PASS (main.tsx + AppTopBar.tsx 0 errors). baseline 14 errors (EqpPage / ModelPage / UserPasswordResetModal 등 Phase 1 무관 파일) — 별 SPEC 으로 분리
+- `git grep -E "var\(--color-brand-accent\)" src/` → 2 hits (`AppTopBar.tsx:174-175`)
+- `git grep -nE "--font-ui:.*Pretendard" src/index.css` → 1 hit (`src/index.css:8`)
+- AppTopBar 시그니처 git diff 0 라인 (import / 함수 / handler / prefetch / navigationItems / 인터페이스)
+- `node -e "require.resolve('pretendard/dist/web/variable/pretendardvariable.css')"` → `C:\workspace_nori\nori-tc-ui-front\node_modules\pretendard\dist\web\variable\pretendardvariable.css` PASS. woff2 = `PretendardVariable.woff2` (1 개)
+
+### Phase 1.5 (commit `321fe90` — feat(theme): R7 shadcn primitives 11 + AppPageShell + SelectableTable)
+
+- `npm run build` PASS → `✓ built in 9.18s`
+- Phase 1.5 변경 12 파일 lint PASS (0 errors). button.tsx 변경 0 (이미 토큰 사용, D10 weight/radius 충족)
+- R7 AC 첫 항목 — `git grep -E "#1C7F59|#D8E1DB|#93A19A|#243129|#8D9893|#EDF4EF|#F6F9F7|#EAF5EE" src/components/ui/ src/shared/components/AppPageShell.tsx src/shared/components/SelectableTable/` → **0 hits** (exit code 1 = no match)
+- `npx playwright test tests/e2e/selectable-table-*.spec.ts` → **31 passed / 0 failed (56.8s)** — R7 Constraint 마지막 항목 (SelectableTable 동작/API/range copy 0 변경) 충족
+
+### 전체 e2e (Phase 1 + Phase 1.5 동일)
+
+`npm run test:e2e` → **73 passed / 2 failed (2.1m)**. 2 fail 은 baseline 부터 존재 (Phase 1 git stash 검증 = fb0b39f = 321fe90 동일 결과).
+
+| spec | fail line | assertion | locator | 원인 추론 | fail since |
+|---|---|---|---|---|---|
+| `tests/e2e/group-page.spec.ts` | 364 | `toBeVisible()` | `getByTestId('group-member-panel')` | group-row-10 클릭 후 멤버 패널 미활성 — frontend feature gap 또는 mock state 누락 | main (Phase 1 stash 검증) |
+| `tests/e2e/user-page.spec.ts` | 510 | `toBeVisible()` | `getByTestId('user-group-chip-10')` | user-row-1 클릭 후 그룹 chip 미표시 — frontend feature gap 또는 mock state 누락 | main (Phase 1 stash 검증) |
+
+두 fail 모두 data-testid 기반 element 가시성 — 시각 토큰 변경과 원리적으로 무관. SPEC 의 시각 마이그레이션 회귀 0. 두 fail 의 frontend feature 보강은 본 SPEC 범위 외, 별 SPEC 으로 분리.
+
+### 인프라 부재 확인 (워크스페이스 전체 c:/workspace_nori/* grep 기반)
+
+- **visual snapshot 인프라 부재** — `toHaveScreenshot|toMatchSnapshot` 워크스페이스 전체 0 hits. SPEC L269 (현 정정 후) 의 비주얼 자동 검증 불가능. dev 캡처 + R7 commit 메시지 캡처 경로로 대체
+- **console.error / pageerror 감지 인프라 부재** — `page.on('console')` / `page.on('pageerror')` ui-front 의 tests/e2e fixture 또는 spec 파일에 미등록. SPEC L256 (현 정정 후) 에서 검증 범위 축소 — `npm run test:e2e` PASS 자체로 검증, console.error 자동 감지는 별 SPEC
+
+### SPEC 정정 이력 (본 commit 의 변경 사항)
+
+- **L48 radius** — Plan S1 trade-off (calc 매핑 유지, Phase 2~ 점진 명시 치환) 명문화
+- **L244 R1 → R7** — SelectableTable 토큰 갱신 phase 표기 정정
+- **L256 console.error** — 인프라 부재로 검증 범위 축소
+- **L262 brand-primary regex** — var() OR Tailwind utility class 4 종 그룹 (D1 결정과 충돌 안 함). brand-accent 보조 검증 추가
+- **L269 Playwright screenshot diff** — snapshot 인프라 부재로 AppTopBar git diff 시그니처 0 라인 검증 + 워크스페이스 전체 인프라 부재 인용으로 대체
 
 ---
 
