@@ -19,7 +19,7 @@ SPEC 의도 정정 (commit `072e3a4` *틀=nori-client/내용=ui-front + R8 layou
 
 - **Phase 2 LoginPage (본 문서 § Phase 2)** — 작업 시점 의도 = "*nori-client 자매품 레이아웃·인상은 거의 동일하게 유지, 색만 brand 토큰으로 치환*" (틀=ui-front 그대로). 그러나 D14 정정 후 의도 = "*틀 = nori-client 공통 shell + 내용 = ui-front 폼 위젯 재배치*". → **Phase 2 재작업 필요**.
   - 재작업 의도 차이: 기존 = LoginPage.tsx 의 인라인 hex/색만 토큰 치환 / 갱신 = R8 의 `<PageLayoutShell variant="single-card">` 으로 LoginPage wrap + 좌측 일러스트 영역 + 중앙 카드 + soft shadow + CTA 패턴 적용 (nori-client `login.jsx` / `_login.scss` 인상).
-  - **결정 보류** — 사용자 명시 확인 필요 (재작업 진행 vs Phase 2 결과 보존하고 Phase 3~8 만 D14 적용).
+  - **결정 확정 (2026-05-29 사용자)**: Phase 1.7 (R8) 완료 후 Phase 2 **재작업**. 기존 Phase 2 commit 은 git 이력에 잔존, dev-report 의 § Phase 2 작업 기록은 *D14 정정 전 의도 기록* 으로 보존. 재작업 결과는 새 dev-report § "Phase 2 — LoginPage (재작업, 2026-05-XX)" 섹션에 누적.
 
 ### 신규 Phase 진입 의도 (D14/R8/D15/R9 기준)
 
