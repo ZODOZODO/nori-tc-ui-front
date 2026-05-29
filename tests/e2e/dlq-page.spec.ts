@@ -291,6 +291,10 @@ test('DLQ_READ 미보유 사용자는 topbar Dlq 메뉴 미표시 + /dlq 직접 
   await setupMocks(page, state)
 
   await page.goto('/eqp')
+  // AppTopBar 는 lazy-load 되는 EqpPage(AppPageShell) 안에 렌더된다. 병렬 부하 시 청크 로드가
+  // 5s 기본 타임아웃을 넘기면 Suspense 폴백("화면을 불러오는 중입니다")만 떠 topbar 가 DOM 에 없다.
+  // 청크 + auth/me + 빈 eqp/model 응답이 안정될 때까지 기다린 뒤 topbar 를 단언한다.
+  await page.waitForLoadState('networkidle')
   await expect(page.locator('header button:has-text("Eqp")')).toBeVisible()
   expect(await page.locator('header button:has-text("Dlq")').count()).toBe(0)
 
