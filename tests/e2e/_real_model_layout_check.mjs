@@ -66,9 +66,9 @@ try {
   await page.goto(`${baseUrl}/login`)
   await page.waitForLoadState('networkidle')
 
-  await page.getByLabel('ID').fill('admin')
-  await page.getByLabel('Password').fill('ChangeMe123!')
-  await page.getByRole('button', { name: 'Log In' }).click()
+  await page.getByLabel('아이디', { exact: true }).fill('admin')
+  await page.getByLabel('비밀번호', { exact: true }).fill('ChangeMe123!')
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
   await page.waitForURL(/\/eqp$/, { timeout: 15000 })
   console.log(`[after-login-url] ${page.url()}`)
   console.log(`[after-login-body] ${(await page.locator('body').innerText()).trim()}`)
