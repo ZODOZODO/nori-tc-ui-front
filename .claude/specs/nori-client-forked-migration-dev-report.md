@@ -87,7 +87,36 @@ SelectableTable.tsx **미변경** — 엔진/동작/prop/testId/data-* 전부 �
 - AC R1.1 (`PageLayoutShell.tsx` + import 페이지 ≥1): ✅ 존재 + `LayoutShellFixture` 가 import (R5 phase 누적으로 실페이지 확산)
 - AC R1.2 (fixture 6 변형 렌더): ✅ 충족
 
-## Phase R2 — 토큰
+## Phase R2 — 토큰 (commit 2)
+
+### SURGICAL 대조 결과 (출발점 index.css vs SPEC R2)
+
+| SPEC R2 항목 | 출발점 상태 | 조치 |
+|---|---|---|
+| `--font-ui` Pretendard | `'Pretendard', system-ui, sans-serif` (index.css:8) | 이미 부합 — 보존 (AC R2.1) |
+| neutral 계층 (bg/card/border/fg/muted) | oklch grayscale 계층 존재 (forked slate **렌더값 미차용**, 계층만) | 보존 |
+| coral 액센트 유지 / blue 차용 금지 | `--brand-primary/accent` coral, `--info` neutral gray(blue 제거) | 보존 |
+| `--tracking-tight` + 헤딩 weight 700→600 | `--tracking-tight: -0.01em` 존재, 헤딩 `font-semibold` | 보존 |
+| soft shadow 다단 / radius tier / focus ring / motion | `--shadow-soft-{sm,md,lg}` / `--radius-{sm,md,lg,xl}` / `--ring` / `--motion-*` 존재 | 보존 |
+| **pill 태그 토큰** | **부재** | **신규** `--radius-pill: 9999px` (radius tier 완성, `.total-tag` 토큰화) |
+| status semantic (success/warning/danger/info) | oklch 매핑 완료 (info blue 제거, danger hue 분리) | 보존 |
+| `.dark` 토큰 | 블루 잔존(chart/sidebar-primary) | **OoS — 미변경** |
+
+### 변경 파일
+- `src/index.css` — `--radius-pill: 9999px` 1 토큰 추가 (`@theme inline` radius 그룹). 그 외 전부 보존.
+
+### 결정
+- "R2 신규 토큰은 사실상 pill 만" (사용자 명시) 그대로 — 나머지 토큰은 캔버스에 이미 SPEC 부합 상태라 SURGICAL 보존.
+- `--radius-pill` 은 토큰 선언 파일(index.css)의 선언적 design token (기존 `--z-*` / `--leading-relaxed` 등과 동일 성격). Badge primitive 의 `rounded-full` 과 동일 full-radius 렌더이며 pill 의 canonical 토큰. R5 phase / Badge 후속 채택 대상.
+- `.dark` 미변경 — 다크 자매품화는 OoS, 다크 회귀 0 보장.
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 9.89s` (Tailwind `--radius-pill` 토큰 정상 처리)
+- AC R2.1 (`--font-ui` Pretendard 포함): ✅ `src/index.css:8: --font-ui: 'Pretendard', system-ui, sans-serif;`
+- AC R2.2 (brand 토큰 grep ≥5): ✅ 현재 **19 hits** (R5 누적 증가)
+- e2e: R2 는 순수 additive 토큰 — 기존 토큰 값/셀렉터 변경 0 → 렌더 출력 불변. 회귀 불가 (R1/R5 phase e2e 가 토큰 적용 결과를 커버).
+
+## Phase R5 — 페이지별
 
 (대기)
 
