@@ -100,12 +100,24 @@ forked 사이드바에서 다음 *동작만* 흡수:
 
 ui-front 7 라우트를 phase 별 단일 commit 으로. **R1(shell) + R2(토큰) commit 후** 진입.
 
-- [ ] **LoginPage** (`/login`) — forked `login_new.scss` / `_login.scss` 인상(중앙 카드 / soft shadow / brand CTA). single-card 변형.
-- [ ] **EqpPage** (`/eqp`) — forked *리스트 페이지 인상*(헤더+필터+테이블+모달). EqpSidebar(좌측 slot) / EqpInfoTable·EqpParamTable(content) / 모달(액션바 진입) 재배치.
-- [ ] **ModelPage** (`/model`) — forked *상세 페이지 인상*(좌 list / 우 detail 분할 + form + 표). ModelDetailPanel / SelectableTable / 모달 재배치.
-- [ ] **DeployPage** (`/deploy`) — forked *대시보드 인상*(카드 grid + 표). 차트 도입 시 Recharts(R3).
-- [ ] **DlqPage** (`/dlq`) — forked *리스트 페이지 인상* + 공통 모달. 패널들의 표 영역 재배치.
-- [ ] **User / UserManagement / Profile** (`/user`) — forked *폼 페이지 인상* + 모달. UserListTable / GroupListTable / 멤버 모달 재배치.
+#### R5.0 구현 방식 (필수 — R5 전 phase 공통, login phase 가 기준 사례)
+
+"forked 인상"은 **기존 ui-front 마크업에 색만 바꾸는 것이 아니다 — 색치환(hex→토큰 단순 교체)은 기준 미달**. 각 페이지를 아래 순서로 **재구성**한다:
+
+1. **틀 차용** — forked 의 해당 유형 화면 구조(리스트/상세/대시보드/폼/로그인)를 R1 shell 컴포넌트(`PageLayoutShell` / `PageHeading`(+총건수 pill) / `PageFilterBar` / `PagePagination` / `PageCard`·`PageCardGrid` / `PageModal` / `PageActionBar` / `PageFooter`)로 **차용해 페이지 골격을 새로 짠다**.
+2. **콘텐츠 재배치** — ui-front 기능 위젯(표/패널/모달)을 그 골격의 slot 에 배치. 위젯 자체의 prop/state/API/TanStack hook/Zustand store/testId/data-* 는 **불변**(R6).
+3. **사이드바** — 도메인 사이드바를 shell 좌측 slot 에 + R4.2(폭 드래그 resize + collapse 토글, localStorage persist).
+4. **i18n** — 화면 텍스트는 ui-front i18n-context 에 도메인 키를 신설해 `t()` 배선(하드코딩 문자열 금지). forked 키 통합은 OoS.
+5. **색·브랜딩** — bespoke 하드코딩 hex 전량 제거 → ui-front coral/neutral 토큰. 페이지/카드/CTA 의 brand 표현은 coral.
+
+> **기준 사례 — login phase (`666091b`)**: 위 1~5 를 모두 적용. forked `login_new` 구조를 차용해 중앙 카드 재구성 + NORIMES 로고 자리에 nori-tc 로고(`public/nori-tc-logo.png`) + favicon(forked `favicon.ico` 동일) + 전 텍스트 i18n(`login.*` ko/en) + coral 토큰. **단순 색치환(1차 시도 `7a12c75`)은 기준 미달이었고, 본 phase 로 재구성됨.** 나머지 페이지도 이 수준으로 진행한다.
+
+- [x] **LoginPage** (`/login`) — forked `login_new.scss`/`_login.scss` 구조 차용해 중앙 카드 재구성. 브랜드 로고 nori-tc(`nori-tc-logo.png`) + favicon forked 동일 + 텍스트 i18n(`login.*`) + coral 토큰. 입력 아이콘(User/Lock) / 아이디 저장 / 아이디·비밀번호 찾기 모달 / 언어 토글(지구본) / copyright footer 포함. (`666091b`)
+- [ ] **EqpPage** (`/eqp`) — forked 리스트 구조(`list_page_header`+`list_pagination`+`data_table`+`common_page_modal`)를 `PageHeading`(pill)+`PageFilterBar`+`PagePagination`+`SelectableTable`+`PageModal` 로 재구성. EqpSidebar(좌측 slot, R4.2) / EqpInfoTable·EqpParamTable·GatewayGroupTable·BusinessGroupModelTable(content) / CheckInModal·EqpManageFormModal·EqpModelBindingModal(`PageActionBar` 진입) 재배치. eqp 텍스트 i18n + green bespoke hex → coral.
+- [ ] **ModelPage** (`/model`) — forked 상세 구조(`detail_pages.scss` `.ppmd-*`: location+헤더+섹션+내부 스크롤)를 `PageLayoutShell` split(좌 list / 우 detail)로 재구성. ModelInfoTable / ModelDetailPanel(2007 LOC) / SelectableTable / 모달 재배치. model 텍스트 i18n + bespoke hex → coral.
+- [ ] **DeployPage** (`/deploy`) — forked 대시보드 구조(`_dashboard.scss` 카드 grid)를 `PageCardGrid`+`PageCard` 로 재구성. DeployRegisterPanel·DeployMonitorPanel·DeployHistoryPanel 재배치. 차트는 Recharts(R3, **이 phase 에서만 도입**). deploy 텍스트 i18n + bespoke hex → coral.
+- [ ] **DlqPage** (`/dlq`) — forked 리스트 구조 + `PageModal` 로 재구성. Dashboard/Gateway/Business/Quarantine/RepairTask Panel 의 표 영역 재배치. dlq 텍스트 i18n + bespoke hex → coral.
+- [ ] **User / UserManagement / Profile** (`/user`) — forked 폼 페이지 구조 + 모달로 재구성. UserListTable·GroupListTable / UserUpsertModal·GroupUpsertModal·GroupAddMembersModal 재배치. user 텍스트 i18n + bespoke hex → coral.
 - [ ] **LiveMapPage** (`/eqp/live-map`) — **별도 구상 / 이미지 기반 진행**. 사용자가 실제 구현 시 디자인 이미지를 제공 → 그 이미지대로. 본 SPEC 에서는 상세 미확정(D-LIVEMAP).
 
 각 phase commit 메시지에 변경 전/후 스크린샷 경로 명시.
@@ -193,12 +205,13 @@ ui-front 7 라우트를 phase 별 단일 commit 으로. **R1(shell) + R2(토큰)
 - **D-TOKEN** — ui-front 토큰 정제·확장 (forked slate 구조 계층 수용, coral 액센트 유지, forked blue 차용 금지).
 - **D-PAGES** — 기존 7 라우트 전체. 공통 shell/레이아웃 우선. profile 모달 포함.
 - **D-LIVEMAP** — live-map 은 사용자 별도 구상. 실제 구현 시 디자인 이미지 제공 → 그 이미지대로. 본 SPEC 상세 미확정.
+- **D-R5-METHOD (2026-05-30 추가)** — R5 각 페이지는 **forked 구조 차용 + 콘텐츠 재배치 + 도메인 i18n 배선 + coral 토큰화**의 4단 재구성(R5.0). **단순 hex→토큰 색치환은 기준 미달**. login phase(`666091b`)가 기준 사례 — 다른 세션이 색치환만 하고 끝낸 1차 시도(`7a12c75`)는 SPEC 명세가 얇아 생긴 오구현이었고, 본 결정으로 방식을 명문화. (사용자: "login 을 forked 기반으로 수동 재구성했으니 나머지도 그 수준으로")
 
 ## SDD 진행 상태
 
 - [x] **Specify** — 본 SPEC.md 작성 (2026-05-29 인터뷰 확정). 산출물: `.claude/specs/nori-client-forked-migration.md`
 - [x] **Plan** — 2026-05-29 완료. D-GRID-ENGINE(SelectableTable 유지+시각 현대화) 확정, AC R3 react-table 항목 N/A 처리, Phase 0→R1→R2→R5(login→eqp→user→dlq→model→deploy, LiveMap 보류) 단계화. 산출물: `.claude/specs/nori-client-forked-migration-plan.md`
-- [ ] **Implement** — 별 세션. 산출물: `.claude/specs/nori-client-forked-migration-dev-report.md`
+- [~] **Implement** — 진행 중. 완료: Phase 0(baseline) / R1(layout shell `ae45c09`) / R2(토큰 `d9d2b8c`) / R5-login(forked 재구성 `666091b`, 1차 색치환 `7a12c75` 대체). 잔여: R5 eqp→user→dlq→model→deploy (R5.0 4단 재구성 방식), LiveMap 보류. 산출물: `.claude/specs/nori-client-forked-migration-dev-report.md`
 - [ ] **Validate** — 별 세션. SPEC + Plan + Dev report 셋 입력으로 검증, 체크박스 업데이트
 
 ## 다음 단계 진입 프롬프트

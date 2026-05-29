@@ -118,29 +118,29 @@ SelectableTable.tsx **미변경** — 엔진/동작/prop/testId/data-* 전부 �
 
 ## Phase R5 — 페이지별
 
-### R5-login — LoginPage (commit 3)
+### R5-login — LoginPage (최종 `666091b` = forked 구조 재구성)
 
-#### SURGICAL 대조
-- 출발점: 중앙 카드 + coral CTA 구조는 이미 존재. **단 전면 하드코딩 hex**(`#FAF8F5`/`#D95D39`/`#E8E4DF`/`#F5F3EF`/`#2D2D2D`/`#5A5A5A`/`red-500` 등) — D-TOKEN(색=ui-front 토큰) 위반 + soft shadow 부재.
-- 조치: 하드코딩 hex 전량을 ui-front 토큰으로 치환 + 카드/모달에 `shadow-soft-lg` + CTA `rounded-pill`(R2 토큰 실소비). **구조/ID/aria/role/동작(useLogin hook, ESC 핸들러, register) 전부 불변 — 시각 토큰 className 만** (R6).
+> **이력**: 1차 `7a12c75` 은 기존 마크업에 **색치환만**(hex→토큰) 수행 — D-R5-METHOD 4단 중 (5)색만 충족, (1)forked 구조 차용·(4)i18n·브랜딩 누락으로 **기준 미달**. SPEC R5 login 명세가 "single-card 변형" 한 줄로 얇아 생긴 오구현. 사용자가 대화로 직접 **forked 기반 전면 재구성** → 최종 `666091b`. 본 섹션은 `666091b` 기준으로 기록한다.
 
-#### 토큰 매핑
-- 페이지 bg `#FAF8F5` → `bg-muted` / 카드 `bg-white border-[#E8E4DF]` → `bg-card border-border shadow-soft-lg`
-- coral `#D95D39` → `bg-brand-primary`/`text-brand-primary`/`border-brand-primary`, hover `#C85332` → `hover:bg-brand-primary/90`
-- text `#2D2D2D` → `text-foreground`, `#5A5A5A`/`#6A7C74` → `text-muted-foreground`
-- input `bg-[#F5F3EF]` → `bg-muted`, ring `#D95D39/30` → `ring-ring`
-- error `red-500` → `text-danger`/`border-danger`
-- CTA radius `rounded-full` → `rounded-pill` (R2 `--radius-pill` 토큰 적용)
-- RecoveryModal: 동일 토큰 치환 (구조/role=dialog/aria-modal 보존)
+#### D-R5-METHOD 4단 적용 (`666091b`)
+1. **틀 차용** — forked `login_new`/`_login` 중앙 카드 구조를 차용해 골격 재구성. 카드 `max-w-[500px]`(forked 동일 폭) + `shadow-soft-lg` + radial-gradient 배경. 입력에 User/Lock 아이콘, password Eye/EyeOff 토글, 아이디 저장 체크, 아이디·비밀번호 찾기(RecoveryModal), 언어 토글(Globe), copyright footer 까지 forked 로그인 요소 차용.
+2. **콘텐츠 재배치** — `useLogin` hook / `register` / ESC 핸들러 등 동작 보존(prop·API 불변).
+3. **사이드바** — login 은 사이드바 없음 (해당 없음).
+4. **i18n** — 전 텍스트를 `login.*` 키로 신설·배선(ko/en 각 24키). 하드코딩 문자열 0.
+5. **색·브랜딩** — bespoke hex 전량 coral/neutral 토큰화 + CTA `rounded-pill`(R2 `--radius-pill`). **브랜딩**: NORIMES 로고 자리에 nori-tc 로고(`public/nori-tc-logo.png`, 투명 처리) + favicon(forked `favicon.ico` 동일, `index.html`).
 
-#### 변경 파일
-- `src/features/auth/components/LoginPage.tsx` — className 토큰 치환만 (로직 0 변경)
+#### 변경 파일 (`666091b`)
+- `src/features/auth/components/LoginPage.tsx` — forked 구조 재구성 (368 lines)
+- `public/nori-tc-logo.png` — nori-tc 로고 (투명, **982KB — 후속 최적화 대상**)
+- `public/favicon.ico` — forked 동일
+- `index.html` — favicon → `/favicon.ico`
+- `src/i18n/locales/ko.json` / `en.json` — `login.*` 키 신설
+- `tests/e2e/login-page.smoke.spec.ts` — locale 무관(id/role 셀렉터)
+- `tests/e2e/_live_map_layout_check.mjs` / `_perf_measure.mjs` / `_real_model_layout_check.mjs` — 로그인 셀렉터 ko 갱신
 
-#### 검증
-- `npm run build` ✅ — `✓ built in 10.02s`
-- `npx eslint src/features/auth/components/LoginPage.tsx` ✅ EXIT 0
-- `npx playwright test login-page.smoke` ✅ **1 passed (3.8s)**
-- 스크린샷 — before: `.claude/specs/screenshots/before/login.png` / after: `.claude/specs/screenshots/after/login-R5.png` (카드 soft shadow elevation + 중립 토큰 bg + coral CTA pill)
+#### 검증 (`666091b`)
+- `tsc -b` ✅ EXIT 0 (2026-05-30 재확인) / `npx eslint LoginPage.tsx` ✅ EXIT 0 / `npx playwright test login-page.smoke` ✅ 1 passed
+- 스크린샷 — before: `.claude/specs/screenshots/before/login.png` / after: `.claude/specs/screenshots/after/login-R5.png`(**1차 `7a12c75` 것 — `666091b` 기준 재캡처 필요**)
 
 ### R5 잔여 phase — 규모 발견 (2026-05-29 측정, Implement 핸드오프)
 
@@ -162,15 +162,23 @@ R5-eqp 착수 시 측정: 각 도메인이 coral 이 아닌 **bespoke 하드코�
 
 ### 다음 세션 진입 프롬프트 (R5-eqp — 사용자 결정: phase별 fresh 세션)
 
+> ⚠️ **R5-eqp 는 색치환 작업이 아니다.** login(`666091b`)이 forked 구조 재구성으로 진행된 것처럼, eqp 도 **D-R5-METHOD 4단(SPEC R5.0)** 으로 진행한다. 아래 hex 매핑은 4단 중 (4)색·브랜딩 단계의 *참고 가이드*일 뿐, 작업의 본체는 (1)forked 리스트 구조 차용 재구성이다.
+
 ```
 @.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-eqp 구현.
-이미 완료: Phase0/R1/R2/R5-login (commit ae45c09/d9d2b8c/7a12c75). baseline delta 게이트(pre-existing 14 lint + 2 e2e) 유지.
-R5-eqp 작업: src/features/eqp/ 13파일 252 hex(green 팔레트 #1C7F59/#1E3D33/#2AAE67 등) → ui-front coral/neutral 토큰 매핑.
-  매핑 가이드: green brand(#1C7F59/#166749/#2AAE67)→brand-primary, dark green text(#1E3D33/#1F2D26/#243129)→foreground,
-  muted green(#51605A/#647169/#7A8680/#8A8A8A)→muted-foreground, borders(#E4EAE6/#D8E1DB/#B8C9C1)→border,
-  light green bg(#EAF5EE/#F1F6F3/#FAFCFB/#F7FAF8)→muted 또는 brand-primary/10(선택 하이라이트), white→card,
-  error red(#C5534B/#B4483F)→danger, error bg(#FFF7F7/#F0D2D0)→danger/10.
-D-GRID-ENGINE 엄수(SelectableTable 불변). R4.2(resize/collapse)는 이미 완료 — 색 토큰만.
-기능 위젯 prop/state/API/testId/data-* 불변(R6). build + eslint(변경파일) + eqp 관련 e2e(selectable-table-check-in/gateway-group + 기타) PASS + before/after 스크린샷 + 단일 commit.
-이후 순서: user → dlq → model → deploy. LiveMap 보류.
+이미 완료: Phase0/R1/R2/R5-login (commit ae45c09/d9d2b8c/666091b). baseline delta 게이트(pre-existing 14 lint + 2 e2e) 유지.
+방식: SPEC R5.0 = D-R5-METHOD 4단 엄수 (login 666091b 기준 사례). 색치환만 하고 끝내지 말 것.
+  (1) 틀 차용 — forked 리스트 구조(list_page_header+list_pagination+data_table+common_page_modal)를
+      R1 shell(PageHeading[pill]+PageFilterBar+PagePagination+SelectableTable+PageModal)로 EqpPage 골격 재구성.
+  (2) 콘텐츠 재배치 — EqpInfoTable/EqpParamTable/GatewayGroupTable/BusinessGroupModelTable + CheckInModal/EqpManageFormModal/EqpModelBindingModal 을 골격 slot 에 배치 (prop/state/API/testId/data-* 불변, R6).
+  (3) 사이드바 — EqpSidebar 좌측 slot + R4.2(resize/collapse) — 인프라 이미 완비(AppPageShell+shared-layout store), shell 배치만 확인.
+  (4) i18n — eqp 화면 텍스트 eqp.* 키 신설 후 t() 배선 (하드코딩 0).
+  (5) 색·브랜딩 — src/features/eqp/ 13파일 252 hex(green 팔레트) → coral/neutral 토큰.
+      매핑 가이드: green brand(#1C7F59/#166749/#2AAE67)→brand-primary, dark green text(#1E3D33/#1F2D26/#243129)→foreground,
+      muted green(#51605A/#647169/#7A8680/#8A8A8A)→muted-foreground, borders(#E4EAE6/#D8E1DB/#B8C9C1)→border,
+      light green bg(#EAF5EE/#F1F6F3/#FAFCFB/#F7FAF8)→muted 또는 brand-primary/10(선택 하이라이트), white→card,
+      error red(#C5534B/#B4483F)→danger, error bg(#FFF7F7/#F0D2D0)→danger/10.
+D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className·토큰만).
+검증: build + eslint(변경파일) + eqp 관련 e2e(selectable-table-check-in/gateway-group + 기타) PASS + before/after 스크린샷 + 단일 commit.
+이후 순서: user → dlq → model → deploy (각 phase 동일 4단). LiveMap 보류.
 ```

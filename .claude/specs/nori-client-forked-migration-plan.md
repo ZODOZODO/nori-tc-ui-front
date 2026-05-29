@@ -126,19 +126,21 @@
 ### Phase R5 — 페이지별 (commit 3~8, 각 단일 페이지)
 
 > R1+R2 commit 후 진입 (R5 전제). 권장 순서 = 위험 오름차순. R4.2(사이드바 폭 드래그+collapse 흡수)는 각 페이지 사이드바에 해당 phase 에서 같이 적용.
+>
+> **작업 방식 (SPEC R5.0 = D-R5-METHOD 엄수)**: 각 페이지는 **forked 구조 차용해 골격 재구성 → ui-front 위젯 재배치 → 도메인 i18n 배선 → coral 토큰화** 의 4단. **단순 hex→토큰 색치환 금지(기준 미달)**. login(`666091b`)이 기준 사례. "forked 인상" 열의 forked 소스를 R1 shell 컴포넌트로 차용하는 것이 핵심.
 
-| # | phase | 페이지 | forked 인상 | R4.2 사이드바 | recharts |
-|---|---|---|---|---|---|
-| 3 | R5-login | LoginPage | login_new 중앙 카드 | — | — |
-| 4 | R5-eqp | EqpPage | 리스트(헤더+필터+테이블+모달) | EqpSidebar resize+collapse | — |
-| 5 | R5-user | UserManagementPage | 폼 페이지 + 모달 | UserManagementSidebar | — |
-| 6 | R5-dlq | DlqPage | 리스트 + 공통 모달 | DlqSidebar | — |
-| 7 | R5-model | ModelPage | 상세(좌 list/우 detail) | ModelSidebar | — |
-| 8 | R5-deploy | DeployPage | 대시보드 카드 grid | DeploySidebar | **recharts 도입** |
-| — | (보류) | LiveMapPage | D-LIVEMAP 미확정 | — | — |
+| # | phase | 페이지 | forked 구조 차용(→ R1 shell) | i18n 키 | R4.2 사이드바 | recharts |
+|---|---|---|---|---|---|---|
+| 3 | R5-login | LoginPage | `login_new`/`_login` → 중앙 카드 재구성 (✅ 완료 `666091b`: 로고/favicon/i18n/coral) | login.* (완료) | — | — |
+| 4 | R5-eqp | EqpPage | `list_page_header`+`list_pagination`+`data_table`+`common_page_modal` → `PageHeading`(pill)+`PageFilterBar`+`PagePagination`+`SelectableTable`+`PageModal` | eqp.* 신설 | EqpSidebar resize+collapse | — |
+| 5 | R5-user | UserManagementPage | forked 폼 페이지 + 모달 → `PageLayoutShell`+`PageModal` | user.* 신설 | UserManagementSidebar | — |
+| 6 | R5-dlq | DlqPage | forked 리스트 + `common_page_modal` → `PageHeading`+`SelectableTable`+`PageModal` | dlq.* 신설 | DlqSidebar | — |
+| 7 | R5-model | ModelPage | `detail_pages.scss` `.ppmd-*` → `PageLayoutShell` split(좌 list/우 detail) | model.* 신설 | ModelSidebar | — |
+| 8 | R5-deploy | DeployPage | `_dashboard.scss` 카드 grid → `PageCardGrid`+`PageCard` | deploy.* 신설 | DeploySidebar | **recharts 도입** |
+| — | (보류) | LiveMapPage | D-LIVEMAP 미확정 | — | — | — |
 
 - 순서 근거: Login(사이드바 없음·최소 위험, shell+토큰 실페이지 검증) → Eqp(첫 도메인 사이드바 R4.2 검증) → User/Dlq(리스트·폼) → Model(ModelDetailPanel 2007 LOC, 최대 복잡) → Deploy(recharts 신규 의존, 마지막). LiveMap 은 **본 Plan 활성 범위 밖** — 사용자 이미지 제공 시 별도.
-- 각 phase 작업: 해당 페이지를 `PageLayoutShell` + R1 컴포넌트로 재배치. 도메인 사이드바를 shell 좌측 slot 에 두고 R4.2 동작(폭 드래그 `sidebar-resize-handle` + collapse 토글, localStorage persist via `shared-layout.store`) 적용. 콘텐츠 위젯/모달/SelectableTable 는 **prop·state·API 불변**, 위치만 재배치.
+- 각 phase 작업 (D-R5-METHOD 4단): (1) forked 해당 유형 구조를 `PageLayoutShell` + R1 컴포넌트로 **골격 재구성**(기존 마크업 색치환 아님), (2) 도메인 사이드바를 shell 좌측 slot 에 + R4.2 동작(폭 드래그 `sidebar-resize-handle` + collapse 토글, localStorage persist via `shared-layout.store`), (3) 콘텐츠 위젯/모달/SelectableTable 을 골격 slot 에 **재배치**(prop·state·API·testId·data-* **불변**), (4) 화면 텍스트 도메인 i18n 키 신설 후 `t()` 배선 + bespoke hex 전량 coral/neutral 토큰화.
 - 각 phase 검증: 해당 페이지 e2e PASS (회귀 0) + `npm run build` + `eslint .`(변경 파일). commit 메시지에 변경 전/후 스크린샷 경로 + 측정 마지막 5~10줄 (AC R5).
 
 ### Phase 최종 — 통합 검증
@@ -186,11 +188,9 @@
 | R5: phase commit 스크린샷 경로 | R5 각 | commit 메시지 |
 | R5: 페이지 e2e PASS | R5 각 | 해당 e2e |
 
-## 6. SPEC owner 결정 필요 (Implement 전)
+## 6. SPEC owner 결정 (반영 완료)
 
-- **AC R3 `@tanstack/react-table peerDependencies 인용` 항목**: D-GRID-ENGINE(SelectableTable 유지) 결정으로 react-table 미도입 → 이 AC 충족 불가.
-  - 권장: 해당 AC 라인을 SPEC 에서 **N/A 처리** (사유: 검증 결과 무료+React19+range copy/paste+shadcn 디자인 동시 충족 grid 부재, SelectableTable 자체 구현이 유일 해법). recharts AC 는 유지.
-  - 이 처리는 SPEC 본문 수정이므로 Validate 단계 또는 사용자 승인 후 반영.
+- **AC R3 `@tanstack/react-table peerDependencies 인용` 항목**: D-GRID-ENGINE(SelectableTable 유지) 결정으로 react-table 미도입 → ✅ **SPEC 본문에 `[N/A]` 처리 반영됨** (SPEC AC R3, 사유: 무료+React19+range copy/paste+shadcn 디자인 동시 충족 grid 부재, SelectableTable 자체 구현이 유일 해법). recharts AC 는 유지.
 
 ## 7. 다음 단계 진입 프롬프트 (Implement)
 
