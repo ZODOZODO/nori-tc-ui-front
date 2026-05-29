@@ -42,6 +42,12 @@ const SelectableTableFixture = lazy(async () => {
   return { default: module.SelectableTableFixture }
 })
 
+// R8 (공통 layout shell pattern) 시각 확인 전용 fixture — DEV 빌드에서만 라우트 등록.
+const LayoutShellFixture = lazy(async () => {
+  const module = await import('@/dev/LayoutShellFixture')
+  return { default: module.LayoutShellFixture }
+})
+
 function RouteLoadingFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] px-6 text-sm text-[#4B5A52]">
@@ -64,6 +70,9 @@ export function Router() {
         <Route path="/user" element={<UserManagementPage />} />
         {import.meta.env.DEV ? (
           <Route path="/__fixtures/selectable-table" element={<SelectableTableFixture />} />
+        ) : null}
+        {import.meta.env.DEV ? (
+          <Route path="/__fixtures/layout-shell" element={<LayoutShellFixture />} />
         ) : null}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

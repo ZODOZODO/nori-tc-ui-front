@@ -28,6 +28,86 @@ SPEC 의도 정정 (commit `072e3a4` *틀=nori-client/내용=ui-front + R8 layou
 
 ---
 
+## Phase 1.7 — R8 layout shell pattern (본 commit, 2026-05-29)
+
+> 입력: SPEC R8 (L248-270) + D10/D14/D15 + Plan §Phase 1.7. branch `docs/nori-client-look-and-feel-spec`.
+> 페이지 phase(2~8)의 **전제 조건** — nori-client 공통 layout 위젯의 시각 패턴을 ui-front 공통 컴포넌트로 추출 (D14 틀=nori-client).
+
+### 변경 파일 (전부 신규 — 기존 페이지 0 변경)
+
+| 파일 | 역할 | nori-client 매핑 |
+|---|---|---|
+| `src/shared/layout/PageLocation.tsx` | bread crumb (Home › subtitle › name) | `components/location.jsx` |
+| `src/shared/layout/PageHeading.tsx` | icon + name + description + soft hr (h1) | `components/header_subtitle.jsx` |
+| `src/shared/layout/PageHeadingWithActions.tsx` | heading + 우측 action slot | `components/header_subtitle_btn.jsx` |
+| `src/shared/layout/PageActionBar.tsx` | 표 위 액션 영역 (children slot, 우정렬) | `components/table_common.jsx` `TableActions` |
+| `src/shared/layout/PageLayoutShell.tsx` | 통합 wrapper + 6-value variant | (조합) |
+| `src/shared/layout/PageModal.tsx` | header+body+footer 모달 (dialog.tsx 확장/compose) | `components/common_page_modal.jsx` |
+| `src/dev/LayoutShellFixture.tsx` | dev-only fixture (6 variant scene) | (신규) |
+| `src/app/Router.tsx` | DEV 가드 라우트 `/__fixtures/layout-shell` 추가 (SelectableTableFixture 선례) | — |
+
+- 신규 라이브러리: **없음**. lucide-react / radix dialog / Button 등 기존 의존만 사용.
+- LoginPage.tsx (Phase 2, 미커밋) 는 **본 commit 에서 제외** — confirm 게이트 대기 중.
+
+### 결정 기록
+
+1. **PageLayoutShell `variant` 범위 (사용자 확정 2026-05-29)** — "타입 6고정 + 스타일 최소". `variant` 타입은 `single-card | multi-section | split-tab | dashboard-grid | form-sidebar | dashboard-3d` 6값으로 고정 (Plan 위험 L51 — Phase 2~8 prop 추가 금지 충족). 단 분기 스타일은 소비자 있는 `single-card`(중앙 max-w 카드) / `multi-section`(stacked gap-6) 만 의미있게, 나머지 4값은 base(multi-section) 로 두고 각 phase 진입 시 채움 (premature abstraction 회피, CLAUDE.md rule 11).
+2. **PageModal = dialog.tsx 확장(compose)** — Dialog/DialogContent/Header/Footer/Title/Description 재사용. 대체 금지 (confirm-dialog 등 사용처 영향 0). nori-client modal 의 단일 큰 그림자 → `shadow-soft-lg` 다단 재해석.
+3. **AppPageShell 유지** — PageLayoutShell 은 AppPageShell(topbar+wrapper) 의 *내부* content shell (SPEC R8 L270 계층 분리).
+4. **PageLocation Home 비-link** — 라우팅 결합 회피 (순수 표현용). ui-front `/` → /login redirect 라 Home link 가 오도. nori-client 의 `<Link to='/Main'>` 는 미승계.
+
+### D10 (2026 재해석) 적용 위치 — 6 컴포넌트 전부
+
+- weight 700 → `font-medium`(500, PageLocation) / `font-semibold`(600, heading)
+- radius 4px → `rounded-xl` (fixture Scene / single-card 카드)
+- hr `1px solid` → `border-b border-border` (PageHeading / PageHeadingWithActions, subtle 0.5~1px)
+- dark navy(#050e26) 흡수 금지 → `bg-card` / `bg-muted` 흰·muted 유지 (D2)
+- 단일 그림자 → `shadow-soft-sm/md/lg` (PageModal / fixture)
+- 채도 절제 → 아이콘 `text-brand-primary`, 비활성 텍스트 `text-muted-foreground`
+- typography 토큰 → `leading-tight`/`leading-body`, `tracking-tight`/`tracking-wide` (인라인 bracket 0)
+
+### D15 / R9 (품질) 적용 위치
+
+- **타입**: 6 신규 파일 — `any`/`unknown`/`as` 캐스트 / `@ts-ignore` **0** (전부 명시 interface + `ReactNode`). `tsc -b` PASS.
+- **lint**: 신규 파일 0 errors (full `eslint .` 의 14 errors 는 전부 baseline — EqpManageFormModal / EqpModelBindingModal / EqpPage / LiveMapDemoModal / ModelPage / UserPasswordResetModal `set-state-in-effect`, 신규 파일 무관 grep 확인).
+- **a11y**: PageLocation `<nav aria-label="breadcrumb">` + `<ol>` + 현재 항목 `aria-current="page"` + 구분자 `aria-hidden`. PageHeading 페이지 제목 `<h1>` (heading hierarchy). PageModal 은 radix Dialog 의 aria + close button `aria-label="닫기"` 승계.
+- **LOC**: 6 컴포넌트 합 ≈ 220 LOC (단일 책임, 추상화 없음).
+
+### 검증 결과 (자동)
+
+#### `npm run build` (tsc -b && vite build) — **PASS**
+```
+dist/assets/form-vendor-BIm4yxB2.js             86.85 kB │ gzip: 26.05 kB
+dist/assets/index-B1xc7mMj.js                  186.17 kB │ gzip: 59.13 kB
+✓ built in 7.71s
+```
+- baseline anchor 8.08s 대비 ±20% 이내. **fixture 는 DEV-only(Router `import.meta.env.DEV` 가드) → production 번들 미포함** (dist 청크에 LayoutShellFixture 없음).
+
+#### `npm run lint` — 신규 파일 **0 errors**
+```
+✖ 14 problems (14 errors, 0 warnings)
+```
+- 14 전부 baseline (Phase 2 dev-report 와 동일 set). `shared/layout` / `LayoutShellFixture` / `Router` grep → 0 hit.
+
+#### `npm run test:e2e` — **73 passed / 2 failed** (회귀 0)
+```
+  2 failed
+    [chromium] › tests\e2e\group-page.spec.ts:356:1 › Group-AC-7: 그룹 멤버 추가/제거
+    [chromium] › tests\e2e\user-page.spec.ts:502:1 › 사용자 그룹 매핑 표시 + 제거
+  73 passed (2.0m)
+```
+- 2 fail 은 Phase 1+1.5 baseline 과 동일 (frontend feature gap, 시각 무관, dev-report L552-553 기록). 페이지 변경 0 → 회귀 0.
+
+#### `PageLayoutShell` 사용처 grep
+- production src 1 hit (정의 `PageLayoutShell.tsx`) + DEV fixture 1 hit (`LayoutShellFixture.tsx`). **페이지 사용처 0** (Plan §Phase 1.7 검증 L59 의도 충족 — 페이지 적용은 Phase 2~8).
+
+### 사용자 시각 confirm 게이트 (대기)
+
+- dev: `npm run dev` → `http://localhost:3000/__fixtures/layout-shell` 6 scene 육안 확인 후 Phase 2 진입.
+- 본 commit 후 screenshot 첨부 → 사용자 시각 confirm 필수 (confirm 거부 시 Phase 2 보류).
+
+---
+
 ## Phase 2 — LoginPage (2026-05-29)
 
 ### 변경 파일
