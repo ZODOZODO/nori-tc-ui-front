@@ -118,8 +118,26 @@ SelectableTable.tsx **미변경** — 엔진/동작/prop/testId/data-* 전부 �
 
 ## Phase R5 — 페이지별
 
-(대기)
+### R5-login — LoginPage (commit 3)
 
-## Phase R5 — 페이지별
+#### SURGICAL 대조
+- 출발점: 중앙 카드 + coral CTA 구조는 이미 존재. **단 전면 하드코딩 hex**(`#FAF8F5`/`#D95D39`/`#E8E4DF`/`#F5F3EF`/`#2D2D2D`/`#5A5A5A`/`red-500` 등) — D-TOKEN(색=ui-front 토큰) 위반 + soft shadow 부재.
+- 조치: 하드코딩 hex 전량을 ui-front 토큰으로 치환 + 카드/모달에 `shadow-soft-lg` + CTA `rounded-pill`(R2 토큰 실소비). **구조/ID/aria/role/동작(useLogin hook, ESC 핸들러, register) 전부 불변 — 시각 토큰 className 만** (R6).
 
-(대기)
+#### 토큰 매핑
+- 페이지 bg `#FAF8F5` → `bg-muted` / 카드 `bg-white border-[#E8E4DF]` → `bg-card border-border shadow-soft-lg`
+- coral `#D95D39` → `bg-brand-primary`/`text-brand-primary`/`border-brand-primary`, hover `#C85332` → `hover:bg-brand-primary/90`
+- text `#2D2D2D` → `text-foreground`, `#5A5A5A`/`#6A7C74` → `text-muted-foreground`
+- input `bg-[#F5F3EF]` → `bg-muted`, ring `#D95D39/30` → `ring-ring`
+- error `red-500` → `text-danger`/`border-danger`
+- CTA radius `rounded-full` → `rounded-pill` (R2 `--radius-pill` 토큰 적용)
+- RecoveryModal: 동일 토큰 치환 (구조/role=dialog/aria-modal 보존)
+
+#### 변경 파일
+- `src/features/auth/components/LoginPage.tsx` — className 토큰 치환만 (로직 0 변경)
+
+#### 검증
+- `npm run build` ✅ — `✓ built in 10.02s`
+- `npx eslint src/features/auth/components/LoginPage.tsx` ✅ EXIT 0
+- `npx playwright test login-page.smoke` ✅ **1 passed (3.8s)**
+- 스크린샷 — before: `.claude/specs/screenshots/before/login.png` / after: `.claude/specs/screenshots/after/login-R5.png` (카드 soft shadow elevation + 중립 토큰 bg + coral CTA pill)
