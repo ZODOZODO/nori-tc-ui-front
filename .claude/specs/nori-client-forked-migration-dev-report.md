@@ -141,3 +141,21 @@ SelectableTable.tsx **미변경** — 엔진/동작/prop/testId/data-* 전부 �
 - `npx eslint src/features/auth/components/LoginPage.tsx` ✅ EXIT 0
 - `npx playwright test login-page.smoke` ✅ **1 passed (3.8s)**
 - 스크린샷 — before: `.claude/specs/screenshots/before/login.png` / after: `.claude/specs/screenshots/after/login-R5.png` (카드 soft shadow elevation + 중립 토큰 bg + coral CTA pill)
+
+### R5 잔여 phase — 규모 발견 (2026-05-29 측정, Implement 핸드오프)
+
+R5-eqp 착수 시 측정: 각 도메인이 coral 이 아닌 **bespoke 하드코딩 팔레트**(eqp=green `#1C7F59`/`#1E3D33`/`#2AAE67` 등)를 전면 사용 → "색=ui-front coral 토큰"(D-TOKEN) 충족은 도메인별 수백 hex 토큰 마이그레이션 필요.
+
+| 도메인 | 하드코딩 hex | 파일 | R4.2(resize/collapse) |
+|---|---|---|---|
+| eqp | 252 | 13 | **이미 완료** (AppPageShell + EqpSidebar onToggle/onResize + shared-layout store) |
+| model | 439 | 15 | shared-layout store 공용 (확인 필요) |
+| deploy | 182 | 4 | — |
+| dlq | 33 | 4 | — |
+| user | 28 | 5 | — |
+| user-management | 12 | 2 | — |
+| **잔여 합계** | **~946** | **~43** | |
+
+- **R4.2 핵심은 eqp 에서 이미 충족** — shared-layout.store(persist) + SidebarResizeHandle + AppPageShell 인프라 완비. 잔여 phase 는 주로 색 토큰 마이그레이션 + (도메인별) 사이드바 resize/collapse 적용 여부 확인.
+- 권장 진행: phase별 fresh 세션(SDD Document-and-Clear, CLAUDE.md §10/§16). 본 dev-report 가 핸드오프 입력. 각 phase = bespoke 팔레트→coral/neutral 토큰 매핑(고유값 ~30개/도메인 → sed 가능) + build + eslint(변경파일) + 해당 e2e PASS + before/after 스크린샷 + 단일 commit.
+- 권장 순서(Plan 유지): eqp → user → dlq → model → deploy. (LiveMap 보류 — 사용자 이미지 기반 별도.)
