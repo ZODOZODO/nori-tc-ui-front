@@ -159,3 +159,18 @@ R5-eqp 착수 시 측정: 각 도메인이 coral 이 아닌 **bespoke 하드코�
 - **R4.2 핵심은 eqp 에서 이미 충족** — shared-layout.store(persist) + SidebarResizeHandle + AppPageShell 인프라 완비. 잔여 phase 는 주로 색 토큰 마이그레이션 + (도메인별) 사이드바 resize/collapse 적용 여부 확인.
 - 권장 진행: phase별 fresh 세션(SDD Document-and-Clear, CLAUDE.md §10/§16). 본 dev-report 가 핸드오프 입력. 각 phase = bespoke 팔레트→coral/neutral 토큰 매핑(고유값 ~30개/도메인 → sed 가능) + build + eslint(변경파일) + 해당 e2e PASS + before/after 스크린샷 + 단일 commit.
 - 권장 순서(Plan 유지): eqp → user → dlq → model → deploy. (LiveMap 보류 — 사용자 이미지 기반 별도.)
+
+### 다음 세션 진입 프롬프트 (R5-eqp — 사용자 결정: phase별 fresh 세션)
+
+```
+@.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-eqp 구현.
+이미 완료: Phase0/R1/R2/R5-login (commit ae45c09/d9d2b8c/7a12c75). baseline delta 게이트(pre-existing 14 lint + 2 e2e) 유지.
+R5-eqp 작업: src/features/eqp/ 13파일 252 hex(green 팔레트 #1C7F59/#1E3D33/#2AAE67 등) → ui-front coral/neutral 토큰 매핑.
+  매핑 가이드: green brand(#1C7F59/#166749/#2AAE67)→brand-primary, dark green text(#1E3D33/#1F2D26/#243129)→foreground,
+  muted green(#51605A/#647169/#7A8680/#8A8A8A)→muted-foreground, borders(#E4EAE6/#D8E1DB/#B8C9C1)→border,
+  light green bg(#EAF5EE/#F1F6F3/#FAFCFB/#F7FAF8)→muted 또는 brand-primary/10(선택 하이라이트), white→card,
+  error red(#C5534B/#B4483F)→danger, error bg(#FFF7F7/#F0D2D0)→danger/10.
+D-GRID-ENGINE 엄수(SelectableTable 불변). R4.2(resize/collapse)는 이미 완료 — 색 토큰만.
+기능 위젯 prop/state/API/testId/data-* 불변(R6). build + eslint(변경파일) + eqp 관련 e2e(selectable-table-check-in/gateway-group + 기타) PASS + before/after 스크린샷 + 단일 commit.
+이후 순서: user → dlq → model → deploy. LiveMap 보류.
+```
