@@ -23,7 +23,13 @@
 
 같은 회사 도구임에도 사용자가 두 앱을 오갈 때 *완전히 다른 회사 제품* 으로 인식되어 학습 비용 + 브랜드 일관성 손실. 동시에 nori-client 는 2010 년대 한국 SI 어드민 톤 (작은 라운드, 두꺼운 폰트, dark navy header, 작은 아이콘) 이라 그대로 따라가면 ui-front 가 *옛날 느낌* 으로 후퇴.
 
-이 SPEC 은 **nori-client 의 시각 DNA (컬러 톤, 표·카드·모달 인상, 데이터 밀도) 를 ui-front 의 디자인 토큰 시스템 (Tailwind 4 + shadcn + oklch) 안에서 *최신 트렌드로 재해석*** 하여 자매품 인상을 만든다. ui-front 의 기존 페이지 / 라우트 / 기능 / API / topbar / sidebar 패턴은 **변경하지 않는다** — 시각 마이그레이션 only.
+이 SPEC 은 **틀 = nori-client / 내용 = ui-front** 원칙으로 자매품 인상을 만든다:
+
+- **틀 (page layout shell)** — nori-client 의 *공통 layout 위젯* (`Location` bread crumb / `SubTitleHeader` heading-primary / `header_subtitle_btn` / `TableActions` (`table_common.jsx`) / `common_page_modal` 모달 패턴 / GNB+LNB drawer 인상) 의 *시각 패턴* 을 ui-front 의 신규 공통 layout 컴포넌트로 추출 → ui-front 모든 페이지에 일괄 적용. 2026 트렌드로 재해석 (D10 의 weight/radius/shadow/transition 변환 규칙 적용).
+- **내용 (page content)** — ui-front 의 기존 *기능 위젯* (EqpSidebar / EqpInfoTable / SelectableTable / ModelDetailPanel / DeployRegisterPanel / DlqPanel / 각 Modal 등) 과 라우트 / API / TanStack Query hook / Zustand store / 권한 모델 은 **변경하지 않는다**. 단 새 layout shell 안에 *재배치* 만 — 카드 영역 / 표 영역 / 액션 버튼 / 사이드 패널의 위치 / 여백 / 헤더 구조가 nori-client 처럼.
+- **현대화** — nori-client 의 2010 년대 SI 톤 (작은 라운드, 두꺼운 폰트, dark navy header, 작은 아이콘) 은 빼고 2026 트렌드 (oklch 절제, soft shadow 다단, generous spacing, micro-interaction).
+
+페이지 1:1 매핑은 *불가능* — ui-front (TC 관리) 와 nori-client (MES) 는 기능 도메인이 다름. 따라서 **공통 layout shell pattern 추출 → 모든 페이지에 일괄 적용** 이 SPEC 의 핵심.
 
 ## Requirements
 
@@ -168,25 +174,32 @@ D1 에서 컬러·폰트만 다뤘으나, 2026 트렌드 재해석을 위해 다
 - [ ] **Phase 8 (LiveMap)** — 신규: `@react-three/fiber@^9` + `@react-three/drei@^10.7` + `three@^0.184`
 - [ ] Date picker 사용처 식별 시 (각 phase) — 신규: `react-day-picker@^10.0`
 
-### R4 — 페이지별 시각 마이그레이션 (Phase 2~)
+### R4 — 페이지별 *layout shell 적용 + 내부 콘텐츠 재배치* (Phase 2~)
 
-ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / user) 를 phase 별로 마이그레이션. 각 phase 는 **한 PR 한 페이지** (회귀 격리, selectable-table-rollout R7 패턴).
+ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / user) 를 phase 별로 진행. 각 phase 는 단일 페이지 commit (selectable-table-rollout 격리 패턴 승계, phase 별 PR/머지 금지).
 
-**중요**: 페이지 phase 진입 전 **R7 (공유 컴포넌트 일괄 통합)** 이 commit 되어야 한다. 그렇지 않으면 페이지마다 컴포넌트 시각이 어긋남.
+**중요**: 페이지 phase 진입 전 **R7 (공유 컴포넌트 시각 토큰) + R8 (공통 layout shell pattern)** 이 commit 되어야 한다. R8 의 layout shell 컴포넌트 없이는 페이지 phase 진입 불가.
 
-- [ ] **Phase 2: LoginPage** ([features/auth/components/LoginPage.tsx](../../src/features/auth/components/LoginPage.tsx)) — nori-client `_login.scss` 인상 (중앙 카드, 부드러운 shadow, brand color CTA) + Pretendard
-- [ ] **Phase 3: EqpPage** — 데이터 리스트 + sidebar 패턴. nori-client `_table.scss` 인상 (행 줄무늬, sticky header, row-select highlight) 반영
-- [ ] **Phase 4: ModelPage + ModelDetailPanel** — 가장 큰 패널. nori-client `_form.scss` 폼 인상 반영
-- [ ] **Phase 5: DeployPage** — nori-client `_dashboard.scss` 카드 인상 + Recharts 도입 (도입 필요 시)
-- [ ] **Phase 6: DlqPage** — nori-client `_modal.scss` 모달 인상 + 표 줄무늬
-- [ ] **Phase 7: User / UserManagement / Profile** — nori-client `_form.scss` + `_button.scss` 인상
-- [ ] **Phase 8: LiveMapPage (3D)** — `@react-three/fiber` 9 + drei 10 + three 도입. nori-client `eqp_layout` 페이지 3D 인상 참조.
+**각 phase 의 작업 — *틀 = R8 의 layout shell 적용, 내용 = ui-front 기존 기능 위젯 재배치***:
+
+1. R8 의 `<PageLayoutShell>` (Location bread + PageHeading + ActionBar 슬롯 + Content 슬롯) 으로 해당 페이지 wrap
+2. 기존 페이지의 *내부 기능 위젯* (Sidebar / Table / Panel / Modal) 은 그대로 사용 — 단 shell 의 slot 안에 *재배치*. 기능 위젯의 prop / state / hook / API 변경 금지.
+3. nori-client 의 *해당 카테고리 페이지 인상* (대시보드 카드 grid / 표 페이지 location+heading+actions+table / 상세 페이지 sidebar+tab+form) 의 *시각 배치* 따름.
+4. D10 재해석 규칙 적용 (weight 500/600 / radius 8~12 / soft shadow / muted color / 200-300ms ease-out).
+
+- [ ] **Phase 2: LoginPage** ([features/auth/components/LoginPage.tsx](../../src/features/auth/components/LoginPage.tsx)) — nori-client `login.jsx` / `_login.scss` 인상 (중앙 카드, soft shadow, brand color CTA, 좌측 일러스트 영역). **유일하게 1:1 매핑 가능한 페이지** — 둘 다 단순 form. layout shell 의 *single-card variant* 적용.
+- [ ] **Phase 3: EqpPage** — nori-client *표 페이지 인상* (Location + PageHeading + ActionBar + 표 + Modal). ui-front 의 EqpSidebar / EqpInfoTable / EqpParamTable / 6종 Modal 모두 shell 안에 재배치. Sidebar 는 shell 의 좌측 slot, 표는 Content slot, Modal 진입 버튼은 ActionBar slot.
+- [ ] **Phase 4: ModelPage + ModelDetailPanel** — nori-client *상세 페이지 인상* (Location + PageHeading + 좌 list / 우 detail 분할 + tab + form + 표). ModelDetailPanel 의 8 노드 / SelectableTable / Modal 그대로, 배치만 nori-client 패턴.
+- [ ] **Phase 5: DeployPage** — nori-client *대시보드 인상* (Location + PageHeading + 카드 grid + Recharts 차트 + 표). Recharts 도입 (D5).
+- [ ] **Phase 6: DlqPage** — nori-client *표 페이지 인상* + Common Modal 패턴. 5 패널의 표 영역을 shell 의 multi-section variant 안에.
+- [ ] **Phase 7: User / UserManagement / Profile** — nori-client *form 페이지 인상* + Modal 패턴. UserListTable / GroupListTable / 멤버 관리 Modal 재배치.
+- [ ] **Phase 8: LiveMapPage (3D)** — nori-client `eqp_layout.jsx` 의 3D + 차트 + 표 인상. R3F v9 + drei v10 도입 (D6).
 
 각 phase 의 commit 메시지에 *변경 전 / 변경 후 스크린샷 경로* 명시 (사용자 시각 확인은 dev 환경에서 phase 단위).
 
 ### R5 — 회귀 안전망
 
-- [ ] 각 phase 는 *시각 토큰만* 교체. 페이지 로직 / 라우팅 / API / TanStack Query hook / radix prop 변경 금지.
+- [ ] 각 phase 는 *layout shell 적용 + 콘텐츠 재배치*. 페이지 로직 / 라우팅 / API / TanStack Query hook / Zustand store / radix prop / 기능 위젯의 prop·state 변경 금지.
 - [ ] 각 phase 의 e2e 회귀 (`playwright test`) 통과 + console.error / pageerror 0 건.
 - [ ] selectable-table-rollout e2e 회귀 0 (SelectableTable 컴포넌트 시각만 바뀜 — 동작 동일).
 - [ ] `tsc -b` / `eslint .` / `vite build` 통과.
@@ -230,6 +243,30 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 **R7 의 e2e 회귀**:
 - [ ] 각 컴포넌트의 e2e 시나리오가 존재하는 경우 회귀 0 (예: `*-dialog.spec.ts`, `selectable-table-*.spec.ts`)
 - [ ] R7 commit 메시지에 11 개 컴포넌트의 storybook fixture 또는 dev 페이지 screenshot 경로 명시 (변경 전/후)
+
+### R8 — 공통 layout shell pattern 신설 — **Phase 1.7 (페이지 phase 진입 전 필수)**
+
+**근거**: nori-client 의 모든 페이지 (60+) 가 `Location` + `SubTitleHeader` + `TableActions` + `Common Modal` 의 *동일 layout shell* 위에 콘텐츠를 올림 (워크스페이스 grep — boardpages / dashpages / mngpages / perfpages / procpages / prodpages / qualitypage 전수 사용). ui-front 는 이 등가 부재 (`AppPageShell` 하나만, 그것도 단순 wrapper). 페이지마다 nori-client 인상을 흉내 내려면 **shell 이 먼저 있어야 한다**. 이게 *틀 = nori-client* 의 핵심 — D14 참조.
+
+**대상 — 신규 공통 layout 컴포넌트 (`src/shared/layout/` 안)**:
+
+- [ ] `<PageLocation>` — nori-client [location.jsx](../../../nori-client/src/components/location.jsx) 인상. Home › subtitle › name bread crumb. Props: `subtitle` / `name`. 2026 재해석 — `·` 구분자 → chevron `›`, weight 700 → 500, 채도 절제.
+- [ ] `<PageHeading>` — nori-client [header_subtitle.jsx](../../../nori-client/src/components/header_subtitle.jsx) 의 `heading-primary` (icon + name + hr) 인상. Props: `icon?` / `name` / `description?`. hr → soft border, icon 색은 brand-primary muted variant.
+- [ ] `<PageHeadingWithActions>` — nori-client `header_subtitle_btn.jsx` 인상. heading + 우측 button group slot. ActionBar 슬롯과 통합 가능.
+- [ ] `<PageActionBar>` — nori-client `TableActions` ([table_common.jsx](../../../nori-client/src/components/table_common.jsx)) 인상. 표 위 액션 영역 (조회 / 등록 / 엑셀 다운로드 / 검색 / 필터). Children slot. 우측 정렬, gap, button group spacing 2026 톤.
+- [ ] `<PageLayoutShell>` — 통합 wrapper. 구조: `<PageLocation>` + `<PageHeading*>` + `<PageActionBar?>` + `<main>{children}</main>`. Props: `bread` (subtitle/name) / `heading` / `actions?` / `children` (콘텐츠). ui-front 의 모든 페이지가 이 shell 로 wrap.
+- [ ] `<PageModal>` — nori-client [common_page_modal.jsx](../../../nori-client/src/components/common_page_modal.jsx) 인상. header (title + close) + body + footer (CTA 우측 정렬). ui-front 의 기존 [dialog.tsx](../../src/components/ui/dialog.tsx) 를 *확장* (대체 금지 — confirm-dialog 등 사용처 영향 차단). variant prop 으로 nori-client 패턴 활성화.
+
+**R8 의 변환 규칙 (D10 적용)**:
+- [ ] 두꺼운 weight 700 (nori-client heading) → 500/600
+- [ ] 작은 radius (nori-client 4px / hr 1px solid) → 8~12px / hr 0.5px subtle
+- [ ] dark navy header (#050e26) 인상 흡수 금지 — 흰색 / muted grayscale 유지 (D2)
+- [ ] aria-* / role / focus ring 명시 (a11y 4.5:1)
+
+**R8 의 e2e + AC**:
+- [ ] `<PageLayoutShell>` 의 storybook fixture 또는 dev 페이지에 6 variant (bread만 / heading만 / heading+actions / single-card login / multi-section / modal) screenshot
+- [ ] 기존 페이지 e2e 회귀 0 — R8 commit 머지 전 baseline 확보 (페이지 phase 진입 전 단계)
+- [ ] AppPageShell 은 *유지* — R8 의 `<PageLayoutShell>` 은 AppPageShell 의 *상위* (AppPageShell = topbar + 콘텐츠 wrapper, PageLayoutShell = 콘텐츠 wrapper 안의 *페이지 내부 shell*). 명확한 계층 분리.
 
 ## Constraints
 
@@ -304,15 +341,16 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 | Phase | 산출물 | 위험 | 사용자 게이트 |
 |---|---|---|---|
-| 1. 토큰 + Pretendard + AppTopBar 토큰 | R1 + R2 완료 (index.css + pretendard npm + AppTopBar 시각 갱신) | brand accent indigo hex PoC 결정 | commit 후 dev 확인 |
-| **1.5. 공유 컴포넌트 시각 통합** | **R7 완료** (shadcn primitives 11 + AppPageShell + SelectableTable 토큰 갱신) | **페이지 phase 의 전제 조건 — 누락 시 페이지마다 컴포넌트 어긋남** | **시각 사용자 confirm 필수** (storybook fixture 또는 dev 페이지) |
-| 2. LoginPage | R4 Phase 2 | 최초 페이지 시각 결정 (이후 phase 의 기준) | **시각 사용자 confirm 필수** |
-| 3. EqpPage | R4 Phase 3 | sidebar 패턴 첫 적용 | dev 확인 |
-| 4. ModelPage + ModelDetailPanel | R4 Phase 4 | 가장 큰 패널, SelectableTable 첫 페이지 적용 | dev 확인 |
-| 5. DeployPage | R4 Phase 5 | Recharts 첫 도입 (chart token 매핑) | dev 확인 |
-| 6. DlqPage | R4 Phase 6 | 모달 인상 첫 적용 (R7 의 Dialog 토큰 검증) | dev 확인 |
-| 7. User / UserManagement / Profile | R4 Phase 7 | 폼 인상 | dev 확인 |
-| 8. LiveMapPage | R4 Phase 8 | @react-three/fiber 9 첫 도입 — 위험도 최고 | **dev 확인 + 사용자 confirm** |
+| 1. 토큰 + Pretendard + AppTopBar 토큰 ✅ | R1 + R2 완료 (commit `fb0b39f`) | brand accent indigo hex PoC 결정 (→ D1 재정의로 폐기) | commit 후 dev 확인 |
+| **1.5. 공유 컴포넌트 시각 통합** ✅ | R7 완료 (commit `321fe90`) — shadcn primitives 11 + AppPageShell + SelectableTable 토큰 갱신 | 페이지 phase 의 전제 조건 | 시각 사용자 confirm |
+| **1.7. 공통 layout shell pattern 신설** (R8) | `<PageLocation>` / `<PageHeading>` / `<PageActionBar>` / `<PageLayoutShell>` / `<PageModal>` 신규 컴포넌트 (`src/shared/layout/`) — D10 재해석 + nori-client 인상 | **페이지 phase 의 새 전제 조건 — D14 신설로 추가됨**. shell 없이 페이지 phase 진입 시 *내용=ui-front* 만 남고 *틀=nori-client* 가 빠짐 | **storybook fixture 6 variant + 사용자 시각 confirm 필수** |
+| 2. LoginPage | R4 Phase 2 — layout shell single-card variant 적용 + ui-front 폼 위젯 재배치 | 최초 페이지 — shell 단일 매핑 검증 | 시각 사용자 confirm 필수 |
+| 3. EqpPage | R4 Phase 3 — shell `multi-section + sidebar` + EqpSidebar/Table/Modal 재배치 | sidebar 위젯의 shell 통합 첫 적용 | dev 확인 |
+| 4. ModelPage + ModelDetailPanel | R4 Phase 4 — shell `split + tab` + ModelDetailPanel/SelectableTable 재배치 | 가장 큰 패널 — 8 노드 배치 | dev 확인 |
+| 5. DeployPage | R4 Phase 5 — shell `dashboard grid` + Recharts 도입 + 카드 + 표 재배치 | Recharts 첫 도입 (chart token 매핑) | dev 확인 |
+| 6. DlqPage | R4 Phase 6 — shell `multi-section` + 5 패널 재배치 + PageModal 적용 | 모달 변환 첫 검증 | dev 확인 |
+| 7. User / UserManagement / Profile | R4 Phase 7 — shell `form + sidebar` + UserListTable/GroupListTable/Modal 재배치 | 폼 인상 + 멤버 관리 모달 | dev 확인 |
+| 8. LiveMapPage | R4 Phase 8 — shell `dashboard 3D variant` + R3F v9 + drei 10 도입 | @react-three/fiber 9 첫 도입 — 위험도 최고 | dev 확인 + 사용자 confirm |
 
 ## Confirmed Decisions (2026-05-28 사용자 확정)
 
@@ -421,6 +459,19 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 - ui-front 에 ErrorPage / NotFoundPage / EmptyState 컴포넌트 부재
 - 신설 OoS, 본 SPEC 은 기존 컴포넌트 (LoginPage 의 인라인 form error 등) 시각 토큰만 갱신
+
+### D14 — *틀 = nori-client / 내용 = ui-front* 원칙 ✅ (2026-05-29 사용자 명시)
+
+**의도 정정**: 최초 SPEC 의 "시각 토큰만 갱신" 은 *틀 = ui-front 그대로* 였음. 사용자가 Phase 1+1.5 commit 후 시각 격차 확인 → "거의 똑같은 페이지 + 현대화" 가 의도였음을 명시 → 정정.
+
+**원칙**:
+- **틀 (page layout shell)** = nori-client 의 *공통 layout 위젯* 의 시각 패턴 → ui-front 의 신규 공통 컴포넌트로 추출 (R8). 모든 페이지가 이 shell 위에 콘텐츠를 올림.
+- **내용 (page content)** = ui-front 의 기존 *기능 위젯* (Sidebar / Table / Panel / Modal) + 라우트 + API + TanStack Query hook + Zustand store + 권한 모델. 변경 금지 — shell 안에 *재배치* 만.
+- **현대화** = D10 재해석 규칙 일관 적용. 옛 SI 톤 제거.
+
+**페이지 1:1 매핑 금지** — ui-front (TC 관리) 와 nori-client (MES) 는 기능 도메인이 다름. LoginPage 만 단일 form 으로 1:1 매핑 가능, 그 외는 *공통 shell 적용 + 콘텐츠 재배치*.
+
+**Phase 1 + 1.5 commit (`fb0b39f` / `321fe90` / `3f53e4b`) 는 기반 토큰** — D14 의 *내용* 영역 토큰만 다룬 셈. *틀* 은 R8 (Phase 1.7) 에서 신설.
 
 ---
 
