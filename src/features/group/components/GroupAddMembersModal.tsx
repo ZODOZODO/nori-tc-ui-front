@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useAllUsers } from '@/features/user/hooks/useUsers'
-import { useAddGroupMember } from '../hooks/useGroupMutations'
+import { useAddGroupMember, useRemoveGroupMember } from '../hooks/useGroupMutations'
 import { useGroupMembers } from '../hooks/useGroups'
 import { GroupApiError } from '../types/group.types'
 
@@ -40,6 +40,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
   const allUsersQuery = useAllUsers(open)
   const groupMembersQuery = useGroupMembers(groupId, open && groupId !== null)
   const addMemberMutation = useAddGroupMember()
+  const removeMemberMutation = useRemoveGroupMember()
 
   const [searchKeyword, setSearchKeyword] = useState('')
   const [selectedUserPks, setSelectedUserPks] = useState<ReadonlySet<number>>(new Set())
@@ -89,8 +90,24 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
     })
   }
 
-  const isBusy = addMemberMutation.isPending
+  const isBusy = addMemberMutation.isPending || removeMemberMutation.isPending
   const isLoading = allUsersQuery.isLoading || groupMembersQuery.isLoading
+
+  const handleRemove = async (userPk: number) => {
+    if (groupId === null) {
+      setErrorMessage('대상 그룹을 확인할 수 없습니다.')
+      return
+    }
+    setErrorMessage(null)
+    setResultSummary(null)
+    try {
+      await removeMemberMutation.mutateAsync({ userPk, groupId })
+    } catch (error) {
+      setErrorMessage(
+        error instanceof GroupApiError ? error.payload.errorMsg : '그룹 멤버 제거에 실패했습니다.',
+      )
+    }
+  }
 
   const handleClose = () => {
     if (isBusy) {
@@ -202,7 +219,15 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
                       </span>
                     </span>
                     {isAlreadyMember ? (
-                      <span className="text-xs text-[#7F8A84]">이미 멤버</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemove(user.userPk)}
+                        disabled={isBusy}
+                        className="rounded-md border border-danger/40 px-2 py-0.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        data-testid={`group-member-remove-${user.userPk}`}
+                      >
+                        멤버 제거
+                      </button>
                     ) : null}
                   </label>
                 )

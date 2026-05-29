@@ -499,20 +499,23 @@ test('/user 직접 접근 차단', async ({ page }) => {
   await expect(page).toHaveURL(/\/(login|forbidden|eqp)/)
 })
 
-test('사용자 그룹 매핑 표시 + 제거', async ({ page }) => {
+// 사용자 행에 소속 그룹을 chip(Badge) 으로 인라인 표시한다.
+// (그룹 add/remove 는 Group 페이지 모달에서 관리 — UserListTable 은 표시 전용. Group-AC-7 가 제거를 검증.)
+test('사용자 그룹 매핑 표시', async ({ page }) => {
   const state = createDefaultMockState()
+  // 기본 fixture 의 alice(userPk 1) 에 소속 그룹 부여.
+  state.users[0].groups = [
+    { userPk: 1, groupId: 10, groupCode: 'ADMINS', groupName: '관리자' },
+    { userPk: 1, groupId: 11, groupCode: 'OPS', groupName: '운영자' },
+  ]
   await setupMocks(page, state)
   await page.goto('/user')
 
   await expect(page.getByTestId('user-row-1')).toBeVisible()
-  await page.getByTestId('user-row-1').click()
 
-  await expect(page.getByTestId('user-group-chip-10')).toBeVisible()
-  await expect(page.getByTestId('user-group-chip-11')).toBeVisible()
-  await expect(page.getByTestId('user-group-chip-10')).toContainText('ADMINS')
-
-  await page.getByTestId('user-group-chip-remove-10').click()
-  await expect.poll(() => state.removeGroupCalls.length).toBeGreaterThan(0)
-  expect(state.removeGroupCalls[0]).toEqual({ userPk: 1, groupId: 10 })
-  await expect(page.getByTestId('user-group-chip-10')).toHaveCount(0)
+  // 그룹 chip 은 행에 인라인 렌더 (클릭 불필요).
+  await expect(page.getByTestId('user-row-group-1-10')).toBeVisible()
+  await expect(page.getByTestId('user-row-group-1-11')).toBeVisible()
+  await expect(page.getByTestId('user-row-group-1-10')).toContainText('ADMINS')
+  await expect(page.getByTestId('user-row-group-1-11')).toContainText('OPS')
 })
