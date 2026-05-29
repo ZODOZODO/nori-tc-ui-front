@@ -150,7 +150,8 @@ ui-front 7 라우트를 phase 별 단일 commit 으로. **R1(shell) + R2(토큰)
 - [ ] `git grep -nE "bg-brand-(primary|accent)|text-brand-(primary|accent)|border-brand-(primary|accent)" src/` ≥ 5 (R5 phase 누적 충족)
 
 ### R3 — 라이브러리
-- [ ] `npm view @tanstack/react-table peerDependencies` 출력에 `react` 19 호환 표기 — commit 메시지 인용
+- [N/A] `npm view @tanstack/react-table peerDependencies` 출력에 `react` 19 호환 표기 — commit 메시지 인용
+  - **N/A 사유 (Plan 2026-05-29, D-GRID-ENGINE)**: 검증 결과 *무료 + React 19 + Excel 다중 행·열 range copy/paste + shadcn/Tailwind 디자인* 4개를 동시 충족하는 기성 grid 부재(range copy/paste 보유 grid 는 전부 유료). SelectableTable 자체 구현 유지가 유일 해법 → `@tanstack/react-table` 미도입 → 본 AC 충족 대상 아님.
 - [ ] `npm view recharts peerDependencies` 출력 react 19 호환 — commit 메시지 인용
 
 ### R4 — topbar→sidebar 보존
@@ -196,7 +197,7 @@ ui-front 7 라우트를 phase 별 단일 commit 으로. **R1(shell) + R2(토큰)
 ## SDD 진행 상태
 
 - [x] **Specify** — 본 SPEC.md 작성 (2026-05-29 인터뷰 확정). 산출물: `.claude/specs/nori-client-forked-migration.md`
-- [ ] **Plan** — 별 세션 Plan Mode. 산출물: `.claude/specs/nori-client-forked-migration-plan.md`
+- [x] **Plan** — 2026-05-29 완료. D-GRID-ENGINE(SelectableTable 유지+시각 현대화) 확정, AC R3 react-table 항목 N/A 처리, Phase 0→R1→R2→R5(login→eqp→user→dlq→model→deploy, LiveMap 보류) 단계화. 산출물: `.claude/specs/nori-client-forked-migration-plan.md`
 - [ ] **Implement** — 별 세션. 산출물: `.claude/specs/nori-client-forked-migration-dev-report.md`
 - [ ] **Validate** — 별 세션. SPEC + Plan + Dev report 셋 입력으로 검증, 체크박스 업데이트
 

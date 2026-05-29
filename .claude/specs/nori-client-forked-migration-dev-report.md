@@ -1,0 +1,96 @@
+# DEV REPORT — nori-client-forked 자매품화 (ui-front 화면 재구성)
+
+> 작성일: 2026-05-29
+> 단계: **Implement** (SDD 3/4) — 입력: SPEC + Plan
+> 대상 레포: `nori-tc-ui-front` 단일 (branch `docs/nori-client-forked-migration`)
+> 산출물: 본 파일 — Validate 단계의 명시 입력
+
+## 0. 원칙 준수
+
+- 처음 진행하는 작업으로 간주. 출발점 코드는 *캔버스*. SPEC + Plan 만 기준.
+- SURGICAL — 출발점 파일이 SPEC 부합 시 보존, 미달분만 작성/보강.
+- D-GRID-ENGINE — SelectableTable 엔진/동작/prop 불변, 시각 className·토큰만. `@tanstack/react-table` 미도입. recharts 는 deploy phase 에서만.
+- 회귀 0 — 라우팅/API/TanStack Query hook/Zustand store/기능 위젯 prop·state 불변.
+
+## Phase 0 — Baseline (2026-05-29)
+
+### 4개 명령 결과
+
+| 명령 | 결과 | 출력 인용 |
+|---|---|---|
+| `npm install` | ✅ PASS | `up to date, audited 348 packages in 2s` / `found 0 vulnerabilities` |
+| `npm run build` | ✅ PASS | `dist/assets/index-CH3w3Kgq.js 186.17 kB │ gzip: 59.12 kB` / `✓ built in 8.87s` |
+| `npm run lint` | ❌ **14 errors** | `✖ 14 problems (14 errors, 0 warnings)` |
+| `npm run test:e2e` | ❌ **2 failed / 73 passed** | `73 passed (2.2m)` |
+
+### 회귀 게이트 기준선 결정 (사용자 승인 2026-05-29)
+
+**"기존 결함으로 기록 후 delta 게이트"** — 아래 14 lint + 2 e2e 는 출발점 캔버스의 **known pre-existing baseline**. 소스 변경 전 측정값이므로 본 작업의 회귀가 아님. 이후 회귀 게이트 = **이 baseline 대비 NEW 에러/실패 0** (R6 의 "변경 파일 한정" 스코핑과 정합). 전체 AC `lint PASS` / `e2e PASS` 는 이 pre-existing 잔존분 때문에 최종 단계에서 `[~] 부분` 표기 대상.
+
+#### Pre-existing lint 14건 (전부 `react-hooks/set-state-in-effect`)
+- `src/features/eqp/components/EqpManageFormModal.tsx` (515, 524)
+- `src/features/eqp/components/EqpModelBindingModal.tsx` (154, 169)
+- `src/features/eqp/components/EqpPage.tsx` (603, 641, 659, 676)
+- `src/features/live-map/components/LiveMapDemoModal.tsx` (215)
+- `src/features/model/components/ModelPage.tsx` (462, 506, 566, 583)
+- `src/features/user/components/UserPasswordResetModal.tsx` (45)
+
+#### Pre-existing e2e 실패 2건 (user/group 도메인)
+- `tests/e2e/group-page.spec.ts:356 › Group-AC-7: 그룹 멤버 추가/제거`
+- `tests/e2e/user-page.spec.ts:502 › 사용자 그룹 매핑 표시 + 제거`
+
+### Before 스크린샷
+
+- `.claude/specs/screenshots/before/login.png` — `/login` 정상 렌더 (Nori-TC coral 카드).
+- `.claude/specs/screenshots/before/fixture-layout-shell.png` — `/__fixtures/layout-shell` (AC R1 시각 확인 산출물 — PageLocation / PageHeading / PageHeadingWithActions+PageActionBar / single-card / multi-section 변형 렌더).
+- **authed 6 라우트 (eqp/model/deploy/dlq/user/live-map)** — generic empty-fallback mock 으로는 blank(데이터 의존 렌더). 충실한 before/after 는 각 R5 phase 에서 해당 라우트 e2e mock 재사용해 캡처 (AC R5 "phase 별 전/후" 정합). 캡처 헬퍼: `tests/e2e/_capture_screens.mjs` / `_capture_one.mjs`.
+
+### Phase 0 결론
+출발점 green: install/build PASS. lint/e2e 의 pre-existing 결함은 baseline 으로 고정 — delta 게이트로 진행. R1 진입.
+
+## Phase R1 — layout shell (commit 1)
+
+### SURGICAL 대조 결과 (출발점 캔버스 vs SPEC R1)
+
+| SPEC R1 항목 | 출발점 상태 | 조치 |
+|---|---|---|
+| 리스트 페이지 헤더 (PageHeading) | 존재하나 **총건수 pill 부재** | `total?: number` prop + secondary Badge pill 보강 (PageHeading + PageHeadingWithActions) |
+| 필터/검색 바 | 부재 | **신규** `PageFilterBar.tsx` (조건 슬롯 + 우측 액션, 카드 surface) |
+| 페이지네이션 | 부재 | **신규** `PagePagination.tsx` (forked buildPageList ellipsis + page-size [12,25,50,100] + from–to/total, active=coral) |
+| 데이터 테이블 스타일 (SelectableTable) | **이미 부합** (bg-muted 헤더/hover/sticky/정렬 ▲▼/brand-accent range) | 보존 (엔진/prop/testId 불변 — e2e 14건 보호) |
+| 공통 모달 (PageModal on dialog) | 이미 부합 | 보존 |
+| 대시보드 카드 | 부재 | **신규** `PageCard.tsx` + `PageCardGrid` (forked `.card`/`.card-header`/grid 인상) |
+| 상세 페이지 레이아웃 | PageLayoutShell `split-tab` variant 존재 (base 스타일) | R5-model phase 에서 채움 (premature abstraction 회피) |
+| 푸터 + 버튼그룹 | PageActionBar(버튼그룹) 존재, **푸터 부재** | **신규** `PageFooter.tsx` (forked copyright 인상, 연도 prop 순수성) |
+| PageLayoutShell wrapper | 이미 부합 | 보존 |
+
+### 변경 파일
+- `src/shared/layout/PageHeading.tsx` — 총건수 pill (`total` prop, Badge)
+- `src/shared/layout/PageHeadingWithActions.tsx` — 총건수 pill (`total` prop, Badge)
+- `src/shared/layout/PagePagination.tsx` — **신규**
+- `src/shared/layout/PageFilterBar.tsx` — **신규**
+- `src/shared/layout/PageCard.tsx` — **신규** (PageCard + PageCardGrid)
+- `src/shared/layout/PageFooter.tsx` — **신규**
+- `src/dev/LayoutShellFixture.tsx` — 필터(6)/테이블(7)/페이지네이션(8)/카드(9) scene 추가 + scene2 총건수 pill 시연 (AC R1.2)
+- `tests/e2e/_capture_screens.mjs` / `_capture_one.mjs` — 스크린샷 캡처 헬퍼
+
+### D-GRID-ENGINE 준수
+SelectableTable.tsx **미변경** — 엔진/동작/prop/testId/data-* 전부 불변. `@tanstack/react-table` 미도입. 이미 캔버스에 forked data_table 시각 언어(bg-muted 헤더/hover/sticky/정렬 아이콘/셀 정렬)가 적용되어 있어 SURGICAL 보존.
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 11.35s`
+- `npx eslint src/shared/layout/ src/dev/LayoutShellFixture.tsx` ✅ EXIT 0 (변경 파일 NEW 에러 0)
+- `npx playwright test` ✅ **73 passed / 2 failed** — baseline 과 동일(같은 pre-existing 2건), NEW 회귀 0
+- AC R1.2 fixture 시각 confirm ✅ — `/__fixtures/layout-shell` 에 헤더/필터/페이지네이션/테이블/모달/카드 6 변형 + 총건수 pill(240) + coral active page + danger count 렌더. 스크린샷: `.claude/specs/screenshots/after/fixture-layout-shell-R1.png`
+
+### AC 충족
+- AC R1.1 (`PageLayoutShell.tsx` + import 페이지 ≥1): ✅ 존재 + `LayoutShellFixture` 가 import (R5 phase 누적으로 실페이지 확산)
+- AC R1.2 (fixture 6 변형 렌더): ✅ 충족
+
+## Phase R2 — 토큰
+
+(대기)
+
+## Phase R5 — 페이지별
+
+(대기)
