@@ -28,8 +28,9 @@
 - **틀 (page layout shell)** — nori-client 의 *공통 layout 위젯* (`Location` bread crumb / `SubTitleHeader` heading-primary / `header_subtitle_btn` / `TableActions` (`table_common.jsx`) / `common_page_modal` 모달 패턴 / GNB+LNB drawer 인상) 의 *시각 패턴* 을 ui-front 의 신규 공통 layout 컴포넌트로 추출 → ui-front 모든 페이지에 일괄 적용. 2026 트렌드로 재해석 (D10 의 weight/radius/shadow/transition 변환 규칙 적용).
 - **내용 (page content)** — ui-front 의 기존 *기능 위젯* (EqpSidebar / EqpInfoTable / SelectableTable / ModelDetailPanel / DeployRegisterPanel / DlqPanel / 각 Modal 등) 과 라우트 / API / TanStack Query hook / Zustand store / 권한 모델 은 **변경하지 않는다**. 단 새 layout shell 안에 *재배치* 만 — 카드 영역 / 표 영역 / 액션 버튼 / 사이드 패널의 위치 / 여백 / 헤더 구조가 nori-client 처럼.
 - **현대화** — nori-client 의 2010 년대 SI 톤 (작은 라운드, 두꺼운 폰트, dark navy header, 작은 아이콘) 은 빼고 2026 트렌드 (oklch 절제, soft shadow 다단, generous spacing, micro-interaction).
+- **ui-front 우위** (D15) — "형제 제품" 이되 *ui-front 가 기술적·UI 적으로 더 뛰어나야 한다*. 단순 자매품 미러링 금지. shell 적용 / 콘텐츠 재배치 phase 마다 *리팩토링 + 품질 개선* 동반 — 타입 안전성 ↑ / lint 0 errors / 테스트 커버 ↑ / a11y (aria + focus ring + contrast) / 성능 (bundle + TTI) / LOC 절제. nori-client 의 React 18 + class component + reactstrap 패턴 대비 ui-front 가 React 19 + 함수형 + radix + TanStack 으로 *더 빠르고·더 type-safe·더 a11y·더 i18n* 임을 phase 별로 명시 측정 (R9).
 
-페이지 1:1 매핑은 *불가능* — ui-front (TC 관리) 와 nori-client (MES) 는 기능 도메인이 다름. 따라서 **공통 layout shell pattern 추출 → 모든 페이지에 일괄 적용** 이 SPEC 의 핵심.
+페이지 1:1 매핑은 *불가능* — ui-front (TC 관리) 와 nori-client (MES) 는 기능 도메인이 다름. 따라서 **공통 layout shell pattern 추출 → 모든 페이지에 일괄 적용 + 페이지별 리팩토링·품질 개선 동반** 이 SPEC 의 핵심.
 
 ## Requirements
 
@@ -268,6 +269,33 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 - [ ] 기존 페이지 e2e 회귀 0 — R8 commit 머지 전 baseline 확보 (페이지 phase 진입 전 단계)
 - [ ] AppPageShell 은 *유지* — R8 의 `<PageLayoutShell>` 은 AppPageShell 의 *상위* (AppPageShell = topbar + 콘텐츠 wrapper, PageLayoutShell = 콘텐츠 wrapper 안의 *페이지 내부 shell*). 명확한 계층 분리.
 
+### R9 — 진행 중 리팩토링 + 품질 개선 (D15 — 각 phase 동반) — **모든 phase 에 적용**
+
+**원칙**: shell 적용 + 콘텐츠 재배치 는 *기회* — 같이 진행하면서 코드 품질 개선. 이를 *별 작업으로 분리하지 않는다* (사용자 명시 — "진행하면서 리팩토링과 품질개선은 당연히 되어야한다").
+
+**측정 기준** — ui-front-quality skill 의 4 축 baseline ([../../.claude/quality/2026-05-27-all-quality.md](../quality/2026-05-27-all-quality.md)) 위에서 *각 phase 가 baseline 대비 회귀 0 + 가능한 개선* 측정. 회귀는 차단, 개선은 측정 인용:
+
+| 축 | baseline (2026-05-27) | phase 게이트 |
+|---|---|---|
+| 타입 | `tsc -b` PASS / any+unknown 113 / @ts-ignore 3 / as 캐스트 50 | phase 변경 파일 — any/unknown 추가 0, as 캐스트 추가 0, @ts-ignore 추가 0 |
+| lint | `eslint .` → 2 errors (DeployMonitorPanel:615 / GroupAddMembersModal:51) | phase 변경 파일 0 errors. 기존 2 errors 는 phase 작업 중 만나면 *기회 수정*, 못 만나면 보존 |
+| 테스트 | unit 85/86 pass (1 stale fail) / e2e 20 spec | phase 의 변경 파일이 e2e/unit 닿으면 회귀 0. stale 1 fail 만남 시 기회 수정. 신규 기능 위젯 재배치 시 e2e 시나리오 보완 |
+| a11y | `<img>` 0 / `<div onClick>` 0 (radix-ui aria) / 자동 도구 미설치 | shell 신규 컴포넌트 (R8) + phase 변경 — aria-label / role / focus-visible ring / heading hierarchy / contrast 4.5:1+ 명시. `<img alt>` / `<button aria-label>` 누락 0 |
+| 빌드 | `npm run build` GREEN 8.08s anchor | 회귀 0 — phase 후 build 시간 baseline ±20% 이내 |
+| LOC | (측정 baseline) | phase 변경 파일 — 같은 기능 LOC 증가 0. shell 적용으로 인한 *LOC 감소* 우대 (위젯 중복 추출) |
+| any/unknown 점진 제거 | hot path 113 | phase 변경 파일에서 만난 any/unknown 우선 제거 — 한 phase 당 ≥ 3 hit 개선 권장 (강제 아님) |
+
+**리팩토링 기회 우선순위 (phase 진행 중 만나면 같이 처리)**:
+- 같은 기능 위젯이 phase 진입으로 3 곳 이상 반복 → 추출 (premature abstraction 금지, 3 회 이상 반복 시만)
+- shell 적용으로 inline layout markup 이 redundant → 제거
+- React 19 패턴 미반영 코드 (예: useEffect → useTransition / useDeferredValue / use server) — *명백한* 개선 시만
+- bundle size — 새 의존성 도입 시 측정 (예: Phase 5 Recharts / Phase 8 R3F+drei)
+
+**R9 의 AC**:
+- [ ] phase 변경 파일 — `tsc -b` 0 errors / `eslint .` 0 errors (변경 파일 한정) / `npm run build` GREEN / 변경 파일 닿는 e2e 회귀 0
+- [ ] commit 메시지에 4 축 측정 결과 마지막 5~10 줄 인용 (CLAUDE.md global rule)
+- [ ] *over-refactor 금지* — phase 와 무관한 파일 리팩토링 금지 (CLAUDE.md surgical change). 만난 것만 *기회 수정*
+
 ## Constraints
 
 - **React 19.2 / Vite 7.3 / Tailwind 4.2 / radix-ui / TanStack Query 5 / Zustand 5 환경** 그대로. peer 충돌 의심 라이브러리는 도입 전 `npm view <pkg> peerDependencies` 검증.
@@ -472,6 +500,24 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 **페이지 1:1 매핑 금지** — ui-front (TC 관리) 와 nori-client (MES) 는 기능 도메인이 다름. LoginPage 만 단일 form 으로 1:1 매핑 가능, 그 외는 *공통 shell 적용 + 콘텐츠 재배치*.
 
 **Phase 1 + 1.5 commit (`fb0b39f` / `321fe90` / `3f53e4b`) 는 기반 토큰** — D14 의 *내용* 영역 토큰만 다룬 셈. *틀* 은 R8 (Phase 1.7) 에서 신설.
+
+### D15 — ui-front 기술적·UI 우위 + 진행 중 리팩토링·품질 개선 ✅ (2026-05-29 사용자 명시)
+
+**원칙**: 형제 제품이되 *ui-front 가 기술적·UI 적으로 더 뛰어나야* 한다. 단순 자매품 미러링 금지.
+
+**근거** (사용자 명시):
+> "기술적으로 ui 적으로 ui-front 가 더 뛰어나야한다. 진행하면서 리팩토링과 품질개선은 당연히 되어야한다. 누가 봐도 nori-client 와 nori-tc-ui-front 는 형제 제품이어야한다."
+
+**적용**:
+- 시각 — nori-client 의 시각 패턴 *기반* + 2026 트렌드 *재해석* (D10). 결과물은 *nori-client 보다 더 세련*.
+- 기술 — React 19 + 함수형 + radix-ui + TanStack Query 5 + Zustand 5 + Tailwind 4 + oklch 토큰 + headless table + react-virtual (nori-client = React 18 + class + reactstrap + sass + tui-grid).
+- a11y — radix aria + focus-visible ring + heading hierarchy + contrast 4.5:1+ (nori-client = aria 미흡, 수동 div onClick 다수).
+- i18n — ui-front 자체 [i18n-context](../../src/i18n/i18n-context.ts) + ko/en + Pretendard.
+- 성능 — bundle 측정 + TanStack Query prefetch + react-virtual + lazy 라우트.
+
+**R9** 가 D15 의 *측정 가능* 항목 — 각 phase 가 4 축 baseline 위에서 회귀 0 + 가능한 개선.
+
+**over-refactor 금지** — phase 와 무관한 파일 리팩토링 금지 (CLAUDE.md surgical change). *기회 수정* 만 — phase 진입으로 만난 코드만.
 
 ---
 
