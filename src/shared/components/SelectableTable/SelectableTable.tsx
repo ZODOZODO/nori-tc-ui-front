@@ -109,9 +109,9 @@ const AUTO_SCROLL_STEP = 18
 /**
  * shadcn `<Table>` 기반 제네릭 셀 영역 선택 / Ctrl+C TSV / Ctrl+V paste 테이블.
  *
- * 디자인 토큰 (헤더 bg-muted, anchor brand-accent/15, range brand-accent/10) 은
- * Phase 1 의 신규 토큰 시스템 (brand-accent, grid-row-stripe/select, ring) 위에
- * 시각 일관성을 유지합니다. 셀 내부 콘텐츠는 `column.renderCell` 로 위임하여
+ * 디자인 토큰 (헤더 bg-muted, anchor brand-accent/10, range brand-accent/5) 은
+ * Phase 1 의 신규 토큰 시스템 (brand-accent = N coral, ring brand-primary alpha) 위에
+ * 시각 일관성을 유지합니다 — "매우 옅은 N 색" 사용자 결정. 셀 내부 콘텐츠는 `column.renderCell` 로 위임하여
  * picker/select/Input 같은 페이지별 분기를 보존합니다 (R3 이후 활용).
  */
 export const SelectableTable = <TRow,>({
@@ -415,9 +415,9 @@ export const SelectableTable = <TRow,>({
                 className={cn(
                   'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
                   isAnchor
-                    ? 'border-brand-accent bg-brand-accent/15'
+                    ? 'border-brand-accent bg-brand-accent/10'
                     : inRange
-                      ? 'border-brand-accent/30 bg-brand-accent/10'
+                      ? 'border-brand-accent/25 bg-brand-accent/5'
                       : 'border-transparent bg-transparent hover:bg-muted',
                 )}
               >

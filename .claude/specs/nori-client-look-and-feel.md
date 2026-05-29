@@ -316,12 +316,26 @@ ui-front 의 7 라우트 (login / eqp / eqp/live-map / model / deploy / dlq / us
 
 ## Confirmed Decisions (2026-05-28 사용자 확정)
 
-### D1 — 컬러 시스템 재해석 강도 ✅
+### D1 — 컬러 시스템 재해석 강도 ✅ (2026-05-29 사용자 재정의)
 
-- brand primary = `#d95d39` (현 N 로고 색 유지)
-- brand accent = nori-client cerulean `#3855B3` 의 modern indigo 재해석 (예: `#3F4ECE` 또는 oklch 등가)
-- semantic (success/warning/danger/info) = nori-client palette 의 oklch 재해석
-- ui-front 의 green `#1C7F59` 은 **단계적 폐기** — 각 phase 에서 brand primary 또는 accent 로 치환
+**최초 결정** (2026-05-28): brand-accent = nori-client cerulean indigo 재해석 (`#3F4ECE`)
+**재정의** (2026-05-29): indigo 톤 사용자 시각 거부 → **N 코랄 단일 hue 통일 + 파랑 토큰 전체 제거 + N 코랄 monochrome chart palette**
+
+- brand primary = `#d95d39` (`oklch(0.62 0.16 36)` — N 로고 색 유지)
+- brand accent = `oklch(0.62 0.16 36)` — **brand-primary 와 동일 coral** (indigo 폐기)
+- link = coral, link-hover = deep coral `oklch(0.52 0.19 32)`
+- semantic — 파랑 제거 (info 는 neutral cool gray), danger 는 coral 과 hue 분리 (saturated deep red):
+  - success = `oklch(0.62 0.15 145)` green (의미 보존)
+  - warning = `oklch(0.75 0.17 75)` amber (coral 과 조화 yellow-orange)
+  - danger = `oklch(0.55 0.24 20)` deep red (coral hue 36° → 20° 분리 + saturate ↑)
+  - info = `oklch(0.55 0.02 250)` neutral cool gray (blue 제거, chroma 0.02 거의 무채색)
+- surface — cyan 제거:
+  - grid-row-stripe = `oklch(0.97 0.005 40)` 거의 흰색 + warm tint
+  - grid-row-select = `oklch(0.62 0.16 36)` coral (table.tsx alpha 적용)
+- chart 1-5 — coral monochrome 5-tone (파랑 / cerulean 제거):
+  - chart-1 = coral primary, chart-2 = amber, chart-3 = rust, chart-4 = peach/golden, chart-5 = neutral cool
+- ui-front 의 green `#1C7F59` 은 **단계적 폐기** — 각 phase 에서 brand-primary/accent 로 치환 (유지)
+- SelectableTable cell selection alpha 매우 옅게 — anchor `bg-brand-accent/10`, range `bg-brand-accent/5`, table row `bg-brand-accent/10` (사용자 시각 확정)
 
 ### D2 — 헤더 시각 톤 ✅
 
@@ -447,6 +461,23 @@ Phase 1 + Phase 1.5 의 commit 별 검증 결과 / 객관 증거 / SPEC 정정 �
 
 - **visual snapshot 인프라 부재** — `toHaveScreenshot|toMatchSnapshot` 워크스페이스 전체 0 hits. SPEC L269 (현 정정 후) 의 비주얼 자동 검증 불가능. dev 캡처 + R7 commit 메시지 캡처 경로로 대체
 - **console.error / pageerror 감지 인프라 부재** — `page.on('console')` / `page.on('pageerror')` ui-front 의 tests/e2e fixture 또는 spec 파일에 미등록. SPEC L256 (현 정정 후) 에서 검증 범위 축소 — `npm run test:e2e` PASS 자체로 검증, console.error 자동 감지는 별 SPEC
+
+### D1 재정의 (2026-05-29) — coral 통일 객관 측정
+
+dev http://127.0.0.1:3000 에서 Playwright `getComputedStyle` 실측 (Vite HMR 자동 반영):
+
+```
+[ANCHOR-V2] borderColor: oklch(0.62 0.16 36)               ← coral (= brand-accent)
+            backgroundColor: oklab(0.62 ... -0.094 / 0.1)  ← coral 10% (매우 옅음)
+[RANGE-V2]  borderColor: oklab(0.62 ... -0.094 / 0.25)    ← coral 25%
+            backgroundColor: oklab(0.62 ... -0.094 / 0.05) ← coral 5% (더 옅음)
+```
+
+- 모든 brand-accent utility class (AppTopBar underline / Input focus border / Select highlighted / ContextMenu focus / SelectableTable anchor/range/sort/resize) 가 *코드 변경 0* 로 indigo → coral 자동 업데이트
+- table.tsx 의 `<TableRow data-state="selected">` 도 `bg-brand-accent/10` 으로 변경 (cyan grid-row-select 제거)
+- SelectableTable.tsx 의 anchor `/15→/10`, range `/10→/5` 로 alpha 더 옅게 (사용자 "매우 옅은 N 색")
+- chart-1~5 coral monochrome 으로 재편 (recharts Phase 5 진입 시 정합)
+- 미적용 잔재: 페이지 파일 (ModelDetailPanel / ModelPage / EqpPage / DeployPage / DlqPage / UserPage / LiveMapPage / LoginPage / DcopItemPickerModal / 등) 의 인라인 옛 hex (`#1C7F59 / #EAF5EE / #1F2D26 / #DCE5E0 / #5B6962 / 등` 옛 green + 파랑 잔재) — R4 Phase 2~8 작업 대상
 
 ### SPEC 정정 이력 (본 commit 의 변경 사항)
 
