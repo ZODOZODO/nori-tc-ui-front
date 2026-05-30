@@ -1,7 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -13,7 +11,6 @@ import {
 } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
-import { PageFilterBar } from '@/shared/layout/PageFilterBar'
 import { PagePagination } from '@/shared/layout/PagePagination'
 import { useI18n } from '@/i18n/i18n-context'
 import type { ModelInfo } from '@/features/model/types/model.types'
@@ -88,7 +85,8 @@ const BUSINESS_GROUP_MODEL_COLUMNS: ReadonlyArray<ColumnDef<ModelInfo>> = [
 
 /**
  * business_app 선택 시 메모리상 모델 정보를 nori-client 리스트 페이지 틀
- * (헤더+총건수 pill / 검색 필터바 / 데이터 테이블 / 페이지네이션)로 표시합니다.
+ * (헤더+총건수 pill / 데이터 테이블 / 페이지네이션)로 표시합니다.
+ * 검색은 좌측 사이드바에서만 제공하므로 콘텐츠 내 검색바는 두지 않습니다.
  */
 export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   groupName,
@@ -98,7 +96,6 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
 }: BusinessGroupModelTableProps) {
   const { t } = useI18n()
   const [selectedModelVersionKey, setSelectedModelVersionKey] = useState<number | null>(null)
-  const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(BUSINESS_GROUP_MODEL_DEFAULT_PAGE_SIZE)
 
@@ -107,26 +104,13 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
     [models],
   )
 
-  // Model Name / Version 검색 필터 (nori-client 리스트 페이지 조회 조건 바).
-  const filteredModels = useMemo(() => {
-    const normalizedKeyword = searchKeyword.trim().toLowerCase()
-    if (!normalizedKeyword) {
-      return sortedModels
-    }
-    return sortedModels.filter(
-      (model) =>
-        model.modelName.toLowerCase().includes(normalizedKeyword) ||
-        model.modelVersion.toLowerCase().includes(normalizedKeyword),
-    )
-  }, [sortedModels, searchKeyword])
-
-  const pageCount = Math.max(1, Math.ceil(filteredModels.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(sortedModels.length / pageSize))
 
   const pagedModels = useMemo(() => {
     const safePage = Math.min(Math.max(page, 1), pageCount)
     const start = (safePage - 1) * pageSize
-    return filteredModels.slice(start, start + pageSize)
-  }, [filteredModels, page, pageCount, pageSize])
+    return sortedModels.slice(start, start + pageSize)
+  }, [sortedModels, page, pageCount, pageSize])
 
   const effectiveSelectedModelVersionKey =
     selectedModelVersionKey ?? pagedModels[0]?.modelVersionKey ?? null
@@ -137,25 +121,10 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold tracking-tight text-foreground">{groupName}</h2>
           <Badge variant="secondary" className="tabular-nums">
-            {filteredModels.length.toLocaleString()}
+            {sortedModels.length.toLocaleString()}
           </Badge>
         </div>
       </div>
-
-      <PageFilterBar>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchKeyword}
-            onChange={(event) => {
-              setSearchKeyword(event.target.value)
-              setPage(1)
-            }}
-            placeholder={t('eqp.filter.searchPlaceholder')}
-            className="h-9 w-64 pl-8 text-sm"
-          />
-        </div>
-      </PageFilterBar>
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
         <div className="min-h-0 flex-1 overflow-auto">
@@ -183,7 +152,7 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
                 ))}
               </TableBody>
             </Table>
-          ) : filteredModels.length === 0 ? (
+          ) : sortedModels.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {t('eqp.business.empty')}
             </p>
@@ -214,9 +183,9 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
         ) : null}
       </section>
 
-      {!isLoading && filteredModels.length > 0 ? (
+      {!isLoading && sortedModels.length > 0 ? (
         <PagePagination
-          total={filteredModels.length}
+          total={sortedModels.length}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

@@ -33,8 +33,6 @@
   "eqp.sidebar.noGatewayGroups": "표시할 게이트웨이 그룹이 없습니다.",
   "eqp.sidebar.loading": "설비 목록을 불러오는 중입니다.",
   "eqp.placeholder.select": "설비 또는 게이트웨이 그룹을 선택해 주세요.",
-  "eqp.filter.searchPlaceholder": "검색어를 입력하세요",
-  "eqp.filter.reset": "초기화",
   "eqp.info.title": "설비 정보",
   "eqp.info.selectPrompt": "표시할 설비를 선택해 주세요.",
   "eqp.param.title": "설비 파라미터",

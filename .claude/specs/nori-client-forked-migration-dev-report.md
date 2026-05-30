@@ -209,3 +209,8 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className
 
 ### Follow-up (보류 — 투명 기록)
 - **대형 모달 내부 i18n 미완** — CheckInModal / EqpModelBindingModal / EqpManageFormModal 은 **색 토큰화는 전량 완료**했으나 내부 폼 라벨·동적 메시지 i18n 은 미적용. 사유: (1) `t()` 보간 미지원으로 eqpId·카운트 임베드 동적 문자열 단일 키 변환 불가, (2) D-I18N "커스텀 i18n 유지" 경계상 shared 보간 인프라 확장은 eqp 범위 밖, (3) 분량(EqpManageFormModal 1275 LOC). → SPEC R5.0 (4)단의 "하드코딩 0" 은 **주요 표면(페이지/사이드바/테이블/dialog)에서 충족**, 대형 모달 내부는 별도 follow-up. Validate 시 `[~] 부분` 표기 권장.
+
+### 사용자 피드백 보정 (2026-05-30, a32c738 직후)
+- **(1) 콘텐츠 eqpid 검색 제거** — gateway/business 그룹 콘텐츠 테이블의 `PageFilterBar`(검색 Input) 삭제. eqpId 검색은 좌측 사이드바에서만 제공(중복 제거). GatewayGroupTable/BusinessGroupModelTable 의 searchKeyword state·필터 로직·미사용 import(Search/Input/PageFilterBar) 제거, 페이지네이션·총건수 pill 은 유지. 미사용 `eqp.filter.*` 키 2개 locale 에서 제거.
+- **(2) EqpSidebar nori-client LNB 시각 적용** (사용자 선택: "forked LNB 시각만 입히기") — forked `sidebar.jsx`/`header_sidebar.scss` 패턴 차용: Business→`Boxes`/Gateway→`Network` lucide 아이콘, flat nav(박스 카드 제거), 그룹 헤더 선택 시 solid coral(`sidebar__top` is-expanded 인상), 하위 그룹/eqp 링크 active=`brand-primary/10` + 좌측 2px 액센트(`sidebar__sublink` is-active 인상), hover 전환(transition-colors). **slate/blue 렌더값 차용 금지 → coral/neutral 토큰. 구조·라우팅·선택 동작·ContextMenu·검색·R4.2 토글/resize 불변(R4.1/R4.2). 그룹 아코디언(하위 접힘)은 R4.2 OoS 라 미도입.**
+- 검증: `npm run build` ✅ ✓ built in 7.77s / `eslint` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(사이드바 LNB + 검색바 제거 반영).

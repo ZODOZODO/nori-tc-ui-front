@@ -33,8 +33,6 @@
   "eqp.sidebar.noGatewayGroups": "No gateway groups to display.",
   "eqp.sidebar.loading": "Loading equipment list...",
   "eqp.placeholder.select": "Select an equipment or gateway group.",
-  "eqp.filter.searchPlaceholder": "Type to search",
-  "eqp.filter.reset": "Reset",
   "eqp.info.title": "Equipment info",
   "eqp.info.selectPrompt": "Select an equipment to display.",
   "eqp.param.title": "Equipment parameters",

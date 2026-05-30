@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, RotateCcw, Search } from 'lucide-react'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,7 +11,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -23,7 +22,6 @@ import {
 } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
-import { PageFilterBar } from '@/shared/layout/PageFilterBar'
 import { PagePagination } from '@/shared/layout/PagePagination'
 import { useI18n } from '@/i18n/i18n-context'
 import { eqpApi } from '../api/eqp.api'
@@ -183,7 +181,8 @@ const GATEWAY_GROUP_COLUMNS: ReadonlyArray<ColumnDef<GatewayGroupRow>> = [
 
 /**
  * Gateway / gateway_app 선택 시 해당 설비 목록을
- * nori-client 리스트 페이지 틀(헤더+총건수 pill / 검색 필터바 / 데이터 테이블 / 페이지네이션)로 표시합니다.
+ * nori-client 리스트 페이지 틀(헤더+총건수 pill / 데이터 테이블 / 페이지네이션)로 표시합니다.
+ * eqpId 검색은 좌측 사이드바에서만 제공하므로 콘텐츠 내 검색바는 두지 않습니다.
  *
  * @param eqpItems 해당 그룹에 속한 설비 목록
  * @param groupName 그룹명 (헤더에 표시)
@@ -196,7 +195,6 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
 }: GatewayGroupTableProps) {
   const { t } = useI18n()
   const [selectedEqpId, setSelectedEqpId] = useState<string | null>(null)
-  const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(GATEWAY_GROUP_DEFAULT_PAGE_SIZE)
 
@@ -206,23 +204,14 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
     [eqpItems],
   )
 
-  // EQPID 검색 필터 (nori-client 리스트 페이지 조회 조건 바).
-  const filteredEqpItems = useMemo(() => {
-    const normalizedKeyword = searchKeyword.trim().toLowerCase()
-    if (!normalizedKeyword) {
-      return sortedEqpItems
-    }
-    return sortedEqpItems.filter((eqp) => eqp.eqpId.toLowerCase().includes(normalizedKeyword))
-  }, [sortedEqpItems, searchKeyword])
-
-  // 검색/그룹 변경으로 결과 건수가 줄면 page 가 범위를 벗어날 수 있어 slice 시점에 clamp 합니다.
-  const pageCount = Math.max(1, Math.ceil(filteredEqpItems.length / pageSize))
+  // 그룹 변경으로 건수가 줄면 page 가 범위를 벗어날 수 있어 slice 시점에 clamp 합니다.
+  const pageCount = Math.max(1, Math.ceil(sortedEqpItems.length / pageSize))
 
   const pagedEqpItems = useMemo(() => {
     const safePage = Math.min(Math.max(page, 1), pageCount)
     const start = (safePage - 1) * pageSize
-    return filteredEqpItems.slice(start, start + pageSize)
-  }, [filteredEqpItems, page, pageCount, pageSize])
+    return sortedEqpItems.slice(start, start + pageSize)
+  }, [sortedEqpItems, page, pageCount, pageSize])
 
   const effectiveSelectedEqpId = selectedEqpId ?? pagedEqpItems[0]?.eqpId ?? null
 
@@ -285,29 +274,14 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold tracking-tight text-foreground">{groupName}</h2>
           <Badge variant="secondary" className="tabular-nums">
-            {filteredEqpItems.length.toLocaleString()}
+            {sortedEqpItems.length.toLocaleString()}
           </Badge>
         </div>
       </div>
 
-      <PageFilterBar>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchKeyword}
-            onChange={(event) => {
-              setSearchKeyword(event.target.value)
-              setPage(1)
-            }}
-            placeholder={t('eqp.filter.searchPlaceholder')}
-            className="h-9 w-64 pl-8 text-sm"
-          />
-        </div>
-      </PageFilterBar>
-
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
         <div className="flex-1 min-h-0 overflow-auto">
-          {filteredEqpItems.length === 0 ? (
+          {sortedEqpItems.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {t('eqp.gateway.empty')}
             </p>
@@ -442,9 +416,9 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
         ) : null}
       </section>
 
-      {filteredEqpItems.length > 0 ? (
+      {sortedEqpItems.length > 0 ? (
         <PagePagination
-          total={filteredEqpItems.length}
+          total={sortedEqpItems.length}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

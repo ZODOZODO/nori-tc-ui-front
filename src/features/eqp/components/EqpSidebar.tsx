@@ -1,5 +1,5 @@
 import { memo, useDeferredValue, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Boxes, ChevronLeft, ChevronRight, Network, Search } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -39,17 +39,33 @@ interface EqpSidebarProps {
   onResizeSidebar: (deltaX: number) => void
 }
 
-/** 트리 노드 공통 focus ring (coral) — nori-client LNB 항목 인상. */
-const NODE_FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+const NODE_FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+/** nori-client `sidebar__top` — 그룹 헤더(아이콘+라벨). 선택(is-expanded)=solid coral. */
+const groupTopClass = (selected: boolean) =>
+  cn(
+    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-bold transition-colors',
+    NODE_FOCUS_RING,
+    selected
+      ? 'bg-brand-primary text-white'
+      : 'text-foreground hover:bg-brand-primary/10 hover:text-brand-primary',
+  )
+
+/** nori-client `sidebar__sublink` — 하위 그룹 링크(들여쓰기 + active 좌측 보더). */
+const subLinkClass = (selected: boolean) =>
+  cn(
+    'block w-full rounded-md py-1.5 pr-3 text-left text-xs font-medium transition-colors',
+    NODE_FOCUS_RING,
+    selected
+      ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[30px] font-semibold text-brand-primary'
+      : 'pl-8 text-muted-foreground hover:bg-muted hover:text-foreground',
+  )
 
 /**
- * design.pen의 EqpSidebarExpanded/Collapsed 구조를 기반으로 만든 사이드바입니다.
- * 실제 EQP 데이터는 useEqpList 결과를 사용하고, 검색은 eqpId 기준으로 필터링합니다.
- *
- * Gateway / gateway_app 그룹명은 클릭 가능한 버튼으로 표시됩니다.
- * 그룹화 로직은 eqp-group.util.ts의 groupEqpItems 함수를 사용합니다.
- * self-stretch를 통해 부모 flex 컨테이너 높이 전체를 항상 채웁니다.
+ * design.pen의 EqpSidebarExpanded/Collapsed 구조 + nori-client 리뉴얼 LNB 시각 패턴
+ * (그룹 아이콘 / 들여쓴 하위 링크 / active 좌측 액센트 / hover 전환)을 입힌 사이드바입니다.
+ * 검색은 eqpId 기준 필터링, 그룹화는 eqp-group.util 의 groupEqpItems 를 사용합니다.
+ * 색은 nori-client 의 slate/blue 가 아닌 ui-front coral/neutral 토큰. 구조·라우팅·선택 동작 불변(R4.1/R4.2).
  */
 export const EqpSidebar = memo(function EqpSidebar({
   eqpItems,
@@ -108,11 +124,11 @@ export const EqpSidebar = memo(function EqpSidebar({
             type="button"
             onClick={() => onSelectEqp(eqp.eqpId)}
             className={cn(
-              'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs',
+              'flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left text-xs transition-colors',
               NODE_FOCUS_RING,
               isSelected
-                ? 'bg-brand-primary/10 font-semibold text-brand-primary'
-                : 'text-muted-foreground hover:bg-muted',
+                ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[42px] font-semibold text-brand-primary'
+                : 'pl-11 text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             <span
@@ -121,7 +137,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                 isSelected ? 'bg-brand-primary' : 'bg-muted-foreground/50',
               )}
             />
-            <span>{eqp.eqpId}</span>
+            <span className="truncate">{eqp.eqpId}</span>
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-52">
@@ -200,96 +216,61 @@ export const EqpSidebar = memo(function EqpSidebar({
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto px-2 pb-3">
-            <section className="rounded-lg border border-border bg-muted/40 p-2">
-              <button
-                type="button"
-                onClick={onSelectBusinessAll}
-                className={cn(
-                  'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold',
-                  NODE_FOCUS_RING,
-                  isBusinessSelected
-                    ? 'bg-brand-primary/10 text-brand-primary'
-                    : 'text-foreground hover:bg-muted',
-                )}
-              >
-                Business
-              </button>
-              <div className="space-y-1 pl-2">
-                {businessGroups.length === 0 ? (
-                  <p className="py-1 text-[11px] text-muted-foreground">
-                    {t('eqp.sidebar.noBusinessGroups')}
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
+            {/* Business 그룹 (nori-client LNB top + sublinks) */}
+            <button type="button" onClick={onSelectBusinessAll} className={groupTopClass(isBusinessSelected)}>
+              <Boxes className="size-[17px] shrink-0" aria-hidden="true" />
+              <span className="flex-1 truncate">Business</span>
+            </button>
+            <div className="flex flex-col gap-0.5">
+              {businessGroups.length === 0 ? (
+                <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                  {t('eqp.sidebar.noBusinessGroups')}
+                </p>
+              ) : (
+                businessGroups.map((group) => (
+                  <button
+                    key={group.appName}
+                    type="button"
+                    onClick={() => onSelectBusinessGroup(group.appIndex)}
+                    className={subLinkClass(selectedBusinessGroupIndex === group.appIndex)}
+                  >
+                    {group.appName}
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Gateway 그룹 (우클릭 ContextMenu = SECS/Socket Eqp Create) */}
+            <ContextMenu>
+              <div className="mt-2 flex flex-col gap-0.5">
+                <ContextMenuTrigger asChild>
+                  <button type="button" onClick={onSelectGatewayAll} className={groupTopClass(isGatewaySelected)}>
+                    <Network className="size-[17px] shrink-0" aria-hidden="true" />
+                    <span className="flex-1 truncate">Gateway</span>
+                  </button>
+                </ContextMenuTrigger>
+                {gatewayGroups.length === 0 ? (
+                  <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                    {t('eqp.sidebar.noGatewayGroups')}
                   </p>
                 ) : (
-                  businessGroups.map((group) => (
-                    <div key={group.appName} className="space-y-1">
+                  gatewayGroups.map((group) => (
+                    <div key={group.appName} className="flex flex-col gap-0.5">
                       <button
                         type="button"
-                        onClick={() => onSelectBusinessGroup(group.appIndex)}
-                        className={cn(
-                          'w-full rounded-md px-2 py-1 text-left text-[11px]',
-                          NODE_FOCUS_RING,
-                          selectedBusinessGroupIndex === group.appIndex
-                            ? 'bg-brand-primary/10 font-semibold text-brand-primary'
-                            : 'text-muted-foreground hover:bg-muted',
-                        )}
+                        onClick={() => onSelectGatewayGroup(group.appIndex)}
+                        className={subLinkClass(selectedGroupIndex === group.appIndex)}
                       >
                         {group.appName}
                       </button>
+                      {group.items.map((eqp) =>
+                        renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                      )}
                     </div>
                   ))
                 )}
               </div>
-            </section>
-
-            <ContextMenu>
-              <section className="rounded-lg border border-border bg-muted/40 p-2">
-                <ContextMenuTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={onSelectGatewayAll}
-                    className={cn(
-                      'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold',
-                      NODE_FOCUS_RING,
-                      isGatewaySelected
-                        ? 'bg-brand-primary/10 text-brand-primary'
-                        : 'text-foreground hover:bg-muted',
-                    )}
-                  >
-                    Gateway
-                  </button>
-                </ContextMenuTrigger>
-                <div className="space-y-1 pl-2">
-                  {gatewayGroups.length === 0 ? (
-                    <p className="py-1 text-[11px] text-muted-foreground">
-                      {t('eqp.sidebar.noGatewayGroups')}
-                    </p>
-                  ) : (
-                    gatewayGroups.map((group) => (
-                      <div key={group.appName} className="space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => onSelectGatewayGroup(group.appIndex)}
-                          className={cn(
-                            'w-full rounded-md px-2 py-1 text-left text-[11px]',
-                            NODE_FOCUS_RING,
-                            selectedGroupIndex === group.appIndex
-                              ? 'bg-brand-primary/10 font-semibold text-brand-primary'
-                              : 'text-muted-foreground hover:bg-muted',
-                          )}
-                        >
-                          {group.appName}
-                        </button>
-                        <div className="space-y-1 pl-3">
-                          {group.items.map((eqp) =>
-                            renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel>Gateway</ContextMenuLabel>
                 <ContextMenuSeparator />
@@ -299,10 +280,10 @@ export const EqpSidebar = memo(function EqpSidebar({
             </ContextMenu>
 
             {isLoading ? (
-              <p className="px-2 text-xs text-muted-foreground">{t('eqp.sidebar.loading')}</p>
+              <p className="px-3 pt-1 text-xs text-muted-foreground">{t('eqp.sidebar.loading')}</p>
             ) : null}
-            {errorMessage ? <p className="px-2 text-xs text-danger">{errorMessage}</p> : null}
-          </div>
+            {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
+          </nav>
         </div>
 
         <SidebarResizeHandle onDrag={onResizeSidebar} />
