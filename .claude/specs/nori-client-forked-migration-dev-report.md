@@ -312,3 +312,61 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, �
 검증: build + eslint(변경파일, baseline delta NEW 0) + dlq-page e2e PASS + before/after 스크린샷 + 단일 commit.
 이후 순서: model → deploy (각 phase 동일 4단). LiveMap 보류.
 ```
+
+## Phase R5-dlq — DLQ 모니터링 자매품 재구성 (2026-05-30)
+
+### 사용자 결정 (진입 시 1회 확인 — 프롬프트 명시)
+dlq 는 **클라이언트 페이지네이션** — `dlq.api`(fetchGatewayDlq/Business/Quarantine/RepairTasks)가 offset/limit/keyword 없이 **전체 배열을 메모리에** 받는다([dlq.api.ts:42-45](../../src/features/dlq/api/dlq.api.ts#L42-L45)). DlqSidebar 는 5-mode flat nav 로 **검색이 없다**([DlqSidebar.tsx](../../src/features/dlq/components/DlqSidebar.tsx)). → user/group(서버 페이지네이션+keyword 부재) 와 상황이 달라 콘텐츠 검색이 전체 데이터셋 대상으로 정확히 동작한다. 2개 도입 결정:
+- **콘텐츠 키워드 검색/필터 바 → 도입**. 전체 목록이 메모리에 있어 "현재 페이지만 필터" 문제가 없고(user/group 과 다름), 사이드바에 검색이 없어 중복도 아니다(eqp 와 다름). forked 리스트 페이지의 PageFilterBar 인상을 실제로 살려 색치환을 넘어선 재구성 달성. 컬럼 accessor 표시 텍스트 전체 대상 부분일치(`filterDlqRows` 순수함수).
+- **DlqTableShell 의 Prev/Next → forked PagePagination 으로 교체**. eqp GatewayGroupTable(동일 클라 페이지네이션)이 이미 PagePagination 채택한 선례와 정합. R1 의 PagePagination(페이지번호 1 2 3 … N + first/prev/next/last + 페이지크기 셀렉트 + from–to/total 요약, active=coral)을 사용. e2e 영향은 selectable-table-dlq-business.spec.ts 의 `dlq-panel-business-prev/next` 단언 2줄뿐(refresh testId 는 유지) — locale 무관 aria-label(`previous page`/`next page`)로 보정, 단언 의미(페이지네이션 컨트롤 노출) 동일.
+
+### D-R5-METHOD 4단 적용
+1. **틀 차용** — `DlqTableShell` 을 forked 리스트 페이지 틀로 재구성: 카드 헤더(제목 + 총건수 `Badge` pill + `마지막 갱신` 보조 + 우측 검색 `Input` + 새로고침) + 표 본체 slot + `PagePagination` 푸터. 4 리스트 패널(gateway/business/quarantine/repair-task)이 `searchKeyword`/`page`(1-base)/`pageSize` 로컬 state 를 소유하고 sort → `filterDlqRows` 필터 → slice 시점 `safePage` clamp(effect 미사용 — `react-hooks/set-state-in-effect` 회피). DashboardPanel 은 KPI 4 카드 + 최근 장애 top-20 피드 구조(리스트 아님)라 검색/페이지네이션 비대상 — 색·i18n 만.
+2. **콘텐츠 재배치** — SelectableTable testId(`selectable-table-{gateway-dlq,business-dlq,quarantine,repair-task,dashboard-feed}`)/columns/wrapRow/`dlq-row-*` data-testid/data-* 불변, 4 hook(useGatewayDlq 등)·dlq.api·dlq-ui.store·권한(DLQ_READ) 불변(R6). SelectableTable 엔진/rangeCopy/wrapRow 불변(D-GRID-ENGINE). 페이지 레벨 표현 state(search/page/pageSize) 추가는 eqp 결정과 동일 근거로 허용(기능 위젯 내부 prop·state 불변).
+3. **사이드바** — `DlqSidebar` 에 forked 리뉴얼 LNB 시각: flat nav / **아이콘 없음**(ChevronDown 제거) / active = `border-l-2 border-brand-primary` + `bg-brand-primary/10` + coral 텍스트 / 비active hover `transition-colors`. 헤더 `t('dlq.sidebar.title')`. UserManagementSidebar 와 동일 패턴. **자식 트리 없음 → 아코디언 미도입**. mode 전환 동작·5 testId(`dlq-sidebar-{dashboard,gateway,business,quarantine,repair-task}`) 불변(R4.1).
+4. **i18n** — 정적 한국어를 `dlq.*` 키로 신설(ko/en 각 30키): 사이드바 제목/5 라벨("장애 대시보드"/"격리 설비" 등), 대시보드 제목/부제/최근장애/empty/loading/kpiError/refresh/syncing, 4 패널 제목, 테이블 lastUpdated/syncing/refresh/retry/empty/searchNoResult/searchPlaceholder/loadError/loadingAria, 페이지 loading. **동적 메시지(없음 — dlq 는 카운트/id 임베드 표시가 없어 정적 키로 전량 커버)**. KPI/피드의 카테고리 라벨(`CATEGORY_STYLES.label`)은 KPI 카드 + 피드 "카테고리" 컬럼 공유 식별자(영문 도메인 용어 주류 + "격리 설비" 1건)로 보존 — follow-up.
+5. **색** — dlq **4파일 33 hex 전량 → 시맨틱 토큰**(DashboardPanel 13 / DlqTableShell 7 / DlqSidebar 6 / DlqPage 1, grep 0 잔존). green/neutral(`#243129`/`#1F2D26`→foreground, `#516058`/`#6C7B72`/`#7B8781`/`#5C6A63`/`#4B5A52`→muted-foreground, `#E2E9E4`/`#EDF1EE`/`#DCE5DB`/`#E4EAE6`→border, `#EAF5EE`(active)→brand-primary/10, `#F6FBF8`(bg)→background, white→card, `#EDF1EE`(skeleton)→muted), error red `#C5534B`→danger. **DashboardPanel 의 카테고리 semantic 색(gateway=blue/business=amber/quarantine=red/repair=violet tailwind 유틸 + ⚙ 아이콘 badge)은 카테고리 식별 semantic 이라 brand coral 치환 금지 — 보존**(after 스크린샷에서 blue "Gateway DLQ" badge 보존 확인).
+
+### 변경 파일 (12 tracked + 4 screenshot)
+- `src/features/dlq/lib/dlq-format.ts` — `filterDlqRows<TRow>(rows, columns, keyword)` 순수함수 신규(컬럼 accessor 표시 텍스트 부분일치)
+- `src/features/dlq/components/DlqTableShell.tsx` — forked 리스트 틀 재구성(총건수 pill + 검색 Input + PagePagination + 토큰 + i18n)
+- `src/features/dlq/components/{Gateway,Business,Quarantine,RepairTask}DlqPanel.tsx` (4) — search/page/pageSize state + filterDlqRows + i18n title
+- `src/features/dlq/components/DashboardPanel.tsx` — 토큰화 + i18n(카테고리 색 보존)
+- `src/features/dlq/components/DlqSidebar.tsx` — forked LNB 시각 + i18n(아이콘 제거)
+- `src/features/dlq/components/DlqPage.tsx` — 로딩 bg/text 토큰 + i18n
+- `src/i18n/locales/ko.json` / `en.json` — `dlq.*` 30키 신설
+- `tests/e2e/selectable-table-dlq-business.spec.ts` — prev/next 단언을 PagePagination aria-label(locale 무관)로 보정(단언 의미 동일)
+- 스크린샷: `.claude/specs/screenshots/{before,after}/dlq-dashboard-R5.png`·`dlq-gateway-R5.png`
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 7.88s` (tsc 0 errors)
+- `npx eslint src/features/dlq/ tests/e2e/selectable-table-dlq-business.spec.ts` ✅ **EXIT 0** — NEW 에러 0 (dlq 파일은 baseline pre-existing lint 대상 아님; pre-existing 은 UserPasswordResetModal:45 단일).
+- `npx playwright test` (전체) ✅ **75 passed / 0 failed** (2.0m). 대상 spec(dlq-page 7건 + selectable-table-dlq-business 2건) 포함 cross-page 회귀 0. selectable-table-dlq-business 는 `page.on('console','error')`/`pageerror` 0건 단언 통과(글로벌 CLAUDE.md §14).
+- hex 잔존: `grep -rnoE '#[0-9A-Fa-f]{3,8}' src/features/dlq/` → **0** (33→0 전량 토큰화).
+- before/after 스크린샷: playwright test 러너 + 내부 section scroll-reset 캡처, before 는 `git stash`(추적 변경만) 로 parent 상태. **before**=녹색 LNB("Dlq"+ChevronDown+한글 하드코딩)+pill/검색 없는 헤더 / **after**=coral LNB(좌측 액센트, "DLQ Monitoring"+i18n EN 라벨)+총건수 pill(25)+검색바(Search keyword)+Refresh+PagePagination.
+
+### Follow-up (보류 — 투명 기록)
+- **카테고리 라벨 i18n 미완** — `CATEGORY_STYLES.label`(Gateway DLQ/Business DLQ/Repair Task/격리 설비)은 KPI 카드 + 피드 "카테고리" 컬럼 accessor(모듈 레벨 const, hook 불가)에서 공유돼 t() 직결이 어렵다. 영문 도메인 용어 주류라 보존. 사이드바·패널 제목·테이블은 전량 i18n 충족. Validate 시 `[~] 부분` 표기 가능.
+- **status/카테고리 semantic 색 보존** — 4 카테고리 식별 색(blue/amber/red/violet)은 의도적 보존(SPEC R5.0 (5)·instruction 준수). brand coral 미치환.
+
+## eqp/user/dlq 세션 공통 컨벤션 보강 (이후 phase 재사용)
+- **클라이언트 페이지네이션 도메인** — API 가 전체 배열을 메모리에 받는 도메인(dlq)은 콘텐츠 키워드 검색이 전체 데이터셋 대상으로 정확히 동작 → 검색바·PagePagination 도입이 기술적으로 적절(현재 페이지만 필터하는 서버 페이지네이션 user/group 과 반대). 진입 시 사용자 1회 확인 후 도입.
+- **공유 shell 변경의 e2e 전파** — DlqTableShell 처럼 N 패널 공유 shell 의 컨트롤(Prev/Next→PagePagination)을 바꾸면 그 testId 를 단언하는 e2e 가 닿는다. testId 자체는 R6 불변이되, 사라지는 컨트롤을 단언하던 테스트는 동등 의미의 locale 무관 셀렉터(aria-label)로 보정.
+
+## 다음 세션 진입 프롬프트 (R5-model — phase별 fresh 세션)
+
+> ⚠️ R5-model 은 색치환 작업이 아니다. eqp/user/dlq 처럼 **D-R5-METHOD 4단(SPEC R5.0)** 으로. ModelPage 는 forked **상세 페이지 구조**(`detail_pages.scss` `.ppmd-*`: location + 헤더 + 섹션 + 내부 스크롤)를 `PageLayoutShell` split(좌 list / 우 detail)로 재구성하는 phase — 리스트형(eqp/user/dlq)과 틀이 다르다. ModelDetailPanel 2007 LOC 가 최대 복잡 — 위젯 prop/state/import 동결(R6) + model-flow·selectable-table-model-* e2e 5건 회귀 게이트.
+
+```
+@.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-model 구현.
+이미 완료: Phase0/R1/R2/R5-login/R5-eqp/R5-user/R5-dlq + 글로벌 chrome(AppTopBar nori-tc-logo). baseline delta 게이트(pre-existing lint: UserPasswordResetModal.tsx:45 set-state-in-effect / e2e 0 failed) 유지.
+방식: SPEC R5.0 = D-R5-METHOD 4단 엄수. dev-report 의 "공통 컨벤션" 그대로 따를 것. 색치환만 하고 끝내지 말 것.
+  (1) 틀 — forked 상세 구조(detail_pages.scss .ppmd-*)를 PageLayoutShell split(좌 list / 우 detail)로 ModelPage 골격 재구성.
+  (2) 콘텐츠 재배치 — ModelInfoTable/ModelDetailPanel(2007 LOC)/SelectableTable/모달을 골격 slot 에 (prop/state/API/TanStack hook/Zustand store/testId/data-* 불변, R6). SelectableTable 엔진/rangeCopy/wrapRow 불변(D-GRID-ENGINE).
+  (3) 사이드바 — ModelSidebar 에 forked LNB 시각만. 자식 트리 구조면 eqp gateway 식 클릭 아코디언, 단순 nav 면 아코디언 불필요. 선택/라우팅/testId 불변(R4.1).
+  (4) i18n — model.* 정적 키 신설 후 t() 배선. 동적 메시지(버전·id 임베드)는 t() 보간 미지원으로 보류(follow-up 기록). i18n 배선 시 e2e heading 텍스트 단언은 locale 무관 testId 로 보정.
+  (5) 색 — model 439 hex(15파일) → coral/neutral 토큰. status/diff/심각도 semantic 색은 brand coral 치환 금지 보존.
+D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, 시각 className·토큰만).
+검증: build + eslint(변경파일, baseline delta NEW 0) + model-flow/selectable-table-model-* e2e PASS + before/after 스크린샷(playwright test 러너 + scroll-reset, before 는 git stash) + 단일 commit.
+이후 순서: deploy (recharts 도입, 동일 4단). LiveMap 보류.
+```

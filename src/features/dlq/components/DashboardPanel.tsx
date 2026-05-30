@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { TableRow } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { cn } from '@/lib/utils'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
 import { useGatewayDlq } from '../hooks/useGatewayDlq'
@@ -55,8 +56,7 @@ const CATEGORY_STYLES: Record<DashboardCategory, CategoryStyle> = {
   },
 }
 
-const CARD_BASE_CLASS =
-  'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
+const CARD_BASE_CLASS = 'rounded-xl border border-border bg-card shadow-soft-sm'
 
 const FEED_COLUMNS: ReadonlyArray<ColumnDef<DashboardFeedItem>> = [
   {
@@ -115,6 +115,7 @@ interface KpiCardProps {
  * settled 후의 정확한 카운트를 단언하게 한다 (PLAN §5 위험 6).
  */
 function KpiCard({ category, count, isPending, isError }: KpiCardProps) {
+  const { t } = useI18n()
   const style = CATEGORY_STYLES[category]
   const Icon = style.icon
 
@@ -129,20 +130,20 @@ function KpiCard({ category, count, isPending, isError }: KpiCardProps) {
         >
           <Icon className="size-4" />
         </span>
-        <span className="text-xs font-medium text-[#516058]">{style.label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{style.label}</span>
       </div>
       {isError ? (
-        <span className="text-sm text-[#C5534B]">불러올 수 없습니다</span>
+        <span className="text-sm text-danger">{t('dlq.dashboard.kpiError')}</span>
       ) : isPending ? (
         <span
-          className="inline-block h-7 w-12 animate-pulse rounded bg-[#EDF1EE]"
+          className="inline-block h-7 w-12 animate-pulse rounded bg-muted"
           aria-hidden="true"
         />
       ) : (
         <span
           data-testid={style.testId}
           data-value={count}
-          className="text-2xl font-semibold text-[#1F2D26]"
+          className="text-2xl font-semibold text-foreground"
         >
           {count}
         </span>
@@ -157,6 +158,7 @@ function KpiCard({ category, count, isPending, isError }: KpiCardProps) {
  * 우상단 새로고침 버튼만 trigger.
  */
 export function DashboardPanel() {
+  const { t } = useI18n()
   const gatewayQuery = useGatewayDlq()
   const businessQuery = useBusinessDlq()
   const quarantineQuery = useQuarantine()
@@ -207,11 +209,12 @@ export function DashboardPanel() {
       className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6"
     >
       <section className={CARD_BASE_CLASS}>
-        <div className="flex flex-col gap-3 border-b border-[#EDF1EE] px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-[#243129]">장애 대시보드</h2>
-            <p className="text-xs text-[#6C7B72]">
-              4 카테고리 통합 현황{anyFetching ? ' · 동기화 중...' : ''}
+            <h2 className="text-sm font-semibold text-foreground">{t('dlq.dashboard.title')}</h2>
+            <p className="text-xs text-muted-foreground">
+              {t('dlq.dashboard.subtitle')}
+              {anyFetching ? ` · ${t('dlq.dashboard.syncing')}` : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -223,7 +226,7 @@ export function DashboardPanel() {
               disabled={anyFetching}
               data-testid="dlq-dashboard-refresh"
             >
-              새로고침
+              {t('dlq.dashboard.refresh')}
             </Button>
           </div>
         </div>
@@ -257,16 +260,20 @@ export function DashboardPanel() {
       </section>
 
       <section data-testid="dlq-dashboard-feed" className={CARD_BASE_CLASS}>
-        <div className="border-b border-[#EDF1EE] px-6 py-4">
-          <h3 className="text-sm font-semibold text-[#243129]">최근 장애</h3>
-          <p className="text-xs text-[#6C7B72]">시간 역순 상위 20건</p>
+        <div className="border-b border-border px-6 py-4">
+          <h3 className="text-sm font-semibold text-foreground">{t('dlq.dashboard.recentTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{t('dlq.dashboard.recentSubtitle')}</p>
         </div>
 
         <div className="px-6 py-5">
           {!allSettled ? (
-            <div className="py-8 text-center text-sm text-[#6C7B72]">불러오는 중입니다.</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              {t('dlq.dashboard.loading')}
+            </div>
           ) : feed.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[#7B8781]">최근 장애 없음</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              {t('dlq.dashboard.feedEmpty')}
+            </div>
           ) : (
             <SelectableTable<DashboardFeedItem>
               testId="selectable-table-dashboard-feed"

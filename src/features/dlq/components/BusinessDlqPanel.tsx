@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { TableRow } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
-import { DLQ_PAGE_SIZE, formatDlqTime } from '../lib/dlq-format'
+import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
 import type { BusinessDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
@@ -35,29 +36,36 @@ const BUSINESS_DLQ_COLUMNS: ReadonlyArray<ColumnDef<BusinessDlqEntry>> = [
 ]
 
 export function BusinessDlqPanel() {
+  const { t } = useI18n()
   const query = useBusinessDlq()
-  const [pageIndex, setPageIndex] = useState(0)
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
 
   const sortedEntries = useMemo<BusinessDlqEntry[]>(() => {
     const items = query.data ?? []
     return [...items].sort((left, right) => right.occurredAt - left.occurredAt)
   }, [query.data])
 
-  const totalCount = sortedEntries.length
-  const pageCount = Math.max(1, Math.ceil(totalCount / DLQ_PAGE_SIZE))
-  const safePageIndex = Math.min(pageIndex, pageCount - 1)
-  const pageItems = sortedEntries.slice(
-    safePageIndex * DLQ_PAGE_SIZE,
-    safePageIndex * DLQ_PAGE_SIZE + DLQ_PAGE_SIZE,
+  const filteredEntries = useMemo(
+    () => filterDlqRows(sortedEntries, BUSINESS_DLQ_COLUMNS, searchKeyword),
+    [sortedEntries, searchKeyword],
   )
+
+  const totalCount = filteredEntries.length
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize))
+  const safePage = Math.min(Math.max(page, 1), pageCount)
+  const pageItems = filteredEntries.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const lastUpdatedAt =
     query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null
   const errorMessage = query.error instanceof Error ? query.error.message : null
+  const emptyMessage =
+    searchKeyword.trim() === '' ? t('dlq.table.empty') : t('dlq.table.searchNoResult')
 
   return (
     <DlqTableShell
-      title="Business DLQ"
+      title={t('dlq.panel.business')}
       testId="dlq-panel-business"
       totalCount={totalCount}
       isLoading={query.isPending}
@@ -68,12 +76,19 @@ export function BusinessDlqPanel() {
         void query.refetch()
       }}
       lastUpdatedAt={lastUpdatedAt}
-      pageIndex={safePageIndex}
-      pageCount={pageCount}
-      canGoPrev={safePageIndex > 0}
-      canGoNext={safePageIndex + 1 < pageCount}
-      onMovePage={setPageIndex}
-      emptyMessage="표시할 항목이 없습니다."
+      searchKeyword={searchKeyword}
+      onSearchChange={(value) => {
+        setSearchKeyword(value)
+        setPage(1)
+      }}
+      page={safePage}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(size) => {
+        setPageSize(size)
+        setPage(1)
+      }}
+      emptyMessage={emptyMessage}
     >
       <SelectableTable<BusinessDlqEntry>
         testId="selectable-table-business-dlq"

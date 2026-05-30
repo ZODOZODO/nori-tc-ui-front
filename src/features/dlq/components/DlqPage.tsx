@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
+import { useI18n } from '@/i18n/i18n-context'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { DLQ_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { useDlqUiStore } from '../stores/dlq-ui.store'
@@ -35,6 +36,7 @@ const renderPanel = (mode: DlqMode) => {
  * 좌측 사이드바에서 Gateway / Business / Quarantine / Repair Task 모드를 전환합니다.
  */
 export function DlqPage() {
+  const { t } = useI18n()
   const meQuery = useMe(true)
   const mode = useDlqUiStore((state) => state.mode)
   const setMode = useDlqUiStore((state) => state.setMode)
@@ -45,8 +47,8 @@ export function DlqPage() {
 
   if (meQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] text-sm text-[#4B5A52]">
-        사용자 정보를 확인하는 중입니다.
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        {t('dlq.page.loading')}
       </div>
     )
   }

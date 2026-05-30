@@ -198,9 +198,11 @@ test('Selectable-Table-R2-AC-1 회귀: BusinessDlqPanel row testId / pagination 
   await expect(page.getByTestId('dlq-row-business-BZ-001')).toBeVisible()
   await expect(page.getByTestId('dlq-row-business-BZ-001')).toContainText('tc.business.in')
 
-  // DlqTableShell 의 pagination / refresh 컨트롤이 그대로 노출
-  await expect(page.getByTestId('dlq-panel-business-prev')).toBeVisible()
-  await expect(page.getByTestId('dlq-panel-business-next')).toBeVisible()
+  // DlqTableShell 의 pagination(PagePagination) / refresh 컨트롤이 그대로 노출.
+  // R5-dlq 에서 prev/next 버튼이 forked PagePagination(이전/다음 페이지 + 페이지번호 + 사이즈셀렉트)로
+  // 교체됨 — 단언 의미(페이지네이션 컨트롤 노출) 동일, locale 무관 aria-label 로 보정.
+  await expect(page.getByRole('button', { name: 'previous page' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'next page' })).toBeVisible()
   await expect(page.getByTestId('dlq-panel-business-refresh')).toBeVisible()
 
   expect(consoleBucket.errors, consoleBucket.errors.join('\n')).toEqual([])
