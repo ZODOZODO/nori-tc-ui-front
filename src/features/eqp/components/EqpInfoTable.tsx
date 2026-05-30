@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -156,6 +157,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   isLifecyclePending = false,
   onLifecycleAction,
 }: EqpInfoTableProps) {
+  const { t } = useI18n()
   const lifecycleCommandVisibility = eqp
     ? resolveLifecycleCommandVisibility(eqp, runtimeState)
     : { canStart: false, canEnd: false, canRestart: false }
@@ -170,16 +172,18 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   )
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4">
+    <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#213028]">설비 정보</h2>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {t('eqp.info.title')}
+        </h2>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading ? (
           <Table className="min-w-[1180px]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
+              <TableRow className="bg-muted">
                 <TableHead>EQPID</TableHead>
                 <TableHead>Business App</TableHead>
                 <TableHead>Comm Interface</TableHead>
@@ -205,7 +209,9 @@ export const EqpInfoTable = memo(function EqpInfoTable({
             </TableBody>
           </Table>
         ) : !eqp ? (
-          <p className="py-10 text-center text-sm text-[#647169]">표시할 설비를 선택해 주세요.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {t('eqp.info.selectPrompt')}
+          </p>
         ) : (
           <SelectableTable<EqpInfoRow>
             testId="selectable-table-eqp-info"
@@ -257,7 +263,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
       </div>
 
       {isFetching && !isLoading ? (
-        <p className="mt-2 text-xs text-[#7A8680]">선택된 설비 데이터를 동기화 중입니다.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t('eqp.info.syncing')}</p>
       ) : null}
     </section>
   )

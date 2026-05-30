@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n/i18n-context'
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
@@ -20,10 +21,11 @@ interface EqpLifecycleResultDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-const ACTION_RESULT_TITLES: Record<EqpLifecycleAction, { success: string; failure: string }> = {
-  start: { success: '설비 시작 완료', failure: '설비 시작 실패' },
-  end: { success: '설비 종료 완료', failure: '설비 종료 실패' },
-  restart: { success: '설비 재시작 완료', failure: '설비 재시작 실패' },
+/** action × status → i18n 키 (정적 제목). 결과 메시지는 eqpId 임베드라 동적 유지. */
+const ACTION_RESULT_TITLE_KEYS: Record<EqpLifecycleAction, { success: string; failure: string }> = {
+  start: { success: 'eqp.lifecycle.startSuccess', failure: 'eqp.lifecycle.startFailure' },
+  end: { success: 'eqp.lifecycle.endSuccess', failure: 'eqp.lifecycle.endFailure' },
+  restart: { success: 'eqp.lifecycle.restartSuccess', failure: 'eqp.lifecycle.restartFailure' },
 }
 
 const ACTION_RESULT_MESSAGES: Record<EqpLifecycleAction, { success: string; failure: string }> = {
@@ -40,8 +42,11 @@ export function EqpLifecycleResultDialog({
   message,
   onOpenChange,
 }: EqpLifecycleResultDialogProps) {
+  const { t } = useI18n()
   const isSuccess = status === 'success'
-  const title = isSuccess ? ACTION_RESULT_TITLES[action].success : ACTION_RESULT_TITLES[action].failure
+  const title = isSuccess
+    ? t(ACTION_RESULT_TITLE_KEYS[action].success)
+    : t(ACTION_RESULT_TITLE_KEYS[action].failure)
   const resolvedMessage =
     message ??
     `${eqpId ?? '선택한 설비'} ${
@@ -54,22 +59,22 @@ export function EqpLifecycleResultDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             {isSuccess ? (
-              <CheckCircle2 className="size-5 text-[#1C7F59]" aria-hidden="true" />
+              <CheckCircle2 className="size-5 text-success" aria-hidden="true" />
             ) : (
-              <XCircle className="size-5 text-[#B4483F]" aria-hidden="true" />
+              <XCircle className="size-5 text-danger" aria-hidden="true" />
             )}
             <DialogTitle>{title}</DialogTitle>
           </div>
           <DialogDescription>
-            결과: {isSuccess ? 'PASS' : 'FAIL'}
+            {t('eqp.result.label')}: {isSuccess ? 'PASS' : 'FAIL'}
           </DialogDescription>
         </DialogHeader>
 
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             isSuccess
-              ? 'border-[#CAE7D8] bg-[#F4FBF7] text-[#1E5B43]'
-              : 'border-[#F0D2D0] bg-[#FFF7F7] text-[#B4483F]'
+              ? 'border-success/30 bg-success/10 text-foreground'
+              : 'border-danger/30 bg-danger/5 text-danger'
           }`}
         >
           {resolvedMessage}
@@ -77,7 +82,7 @@ export function EqpLifecycleResultDialog({
 
         <DialogFooter>
           <Button type="button" onClick={() => onOpenChange(false)}>
-            확인
+            {t('eqp.common.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

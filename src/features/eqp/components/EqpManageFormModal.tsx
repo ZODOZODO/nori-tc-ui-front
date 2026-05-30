@@ -366,10 +366,10 @@ const createInitialFormState = (
 
 function FormSection({ title, description, children }: SectionProps) {
   return (
-    <section className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4">
+    <section className="rounded-2xl border border-border bg-muted/40 p-4">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-[#1F2D26]">{title}</h3>
-        {description ? <p className="mt-1 text-xs text-[#65726B]">{description}</p> : null}
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -379,12 +379,12 @@ function FormSection({ title, description, children }: SectionProps) {
 function Field({ label, required = false, children, hint }: FieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-[#1E3D33]">
+      <label className="text-xs font-semibold text-foreground">
         {label}
-        {required ? <span className="ml-1 text-[#C5534B]">*</span> : null}
+        {required ? <span className="ml-1 text-danger">*</span> : null}
       </label>
       {children}
-      {hint ? <p className="text-[11px] text-[#738078]">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
   )
 }
@@ -392,7 +392,7 @@ function Field({ label, required = false, children, hint }: FieldProps) {
 function ReadOnlyField({ label, value, hint }: ReadOnlyFieldProps) {
   return (
     <Field label={label} hint={hint}>
-      <div className="flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+      <div className="flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
         {value || '-'}
       </div>
     </Field>
@@ -402,18 +402,18 @@ function ReadOnlyField({ label, value, hint }: ReadOnlyFieldProps) {
 function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold text-[#1E3D33]">{label}</span>
+      <span className="text-xs font-semibold text-foreground">{label}</span>
       <label
         className={cn(
-          'flex min-h-11 items-center justify-between rounded-xl border border-[#D8E1DB] px-3 transition-colors',
-          disabled ? 'bg-[#F4F7F5] opacity-70' : 'bg-white',
+          'flex min-h-11 items-center justify-between rounded-xl border border-input px-3 transition-colors',
+          disabled ? 'bg-muted opacity-70' : 'bg-card',
         )}
       >
-        <span className="text-sm text-[#243129]">{checked ? '사용' : '미사용'}</span>
+        <span className="text-sm text-foreground">{checked ? '사용' : '미사용'}</span>
         <span
           className={cn(
             'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-            checked ? 'bg-[#1C7F59]' : 'bg-[#C3CEC8]',
+            checked ? 'bg-brand-primary' : 'bg-muted-foreground/40',
           )}
         >
           <span
@@ -431,7 +431,7 @@ function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldPr
           onChange={(event) => onChange(event.target.checked)}
         />
       </label>
-      {hint ? <p className="text-[11px] text-[#738078]">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
   )
 }
@@ -759,7 +759,7 @@ export function EqpManageFormModal({
         showCloseButton={!isPending}
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogHeader className="shrink-0 border-b border-[#E4EAE6] px-6 py-5">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
             <DialogTitle>{mode === 'create' ? `${resolvedInterfaceType} Eqp Create` : 'Eqp Info Update'}</DialogTitle>
             <DialogDescription>
               {mode === 'create'
@@ -770,7 +770,7 @@ export function EqpManageFormModal({
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-5">
             {mode === 'update' && isLoading && !detail ? (
-              <div className="flex min-h-60 items-center justify-center text-sm text-[#65726B]">
+              <div className="flex min-h-60 items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
                 설비 관리 정보를 불러오는 중입니다.
               </div>
@@ -971,7 +971,7 @@ export function EqpManageFormModal({
                     </div>
 
                     {modelNameOptions.length === 0 ? (
-                      <p className="mt-3 rounded-xl border border-[#F0D9C7] bg-[#FFF7F1] px-3 py-2 text-sm text-[#A7662B]">
+                      <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
                         현재 조건에 맞는 model/version 옵션이 없습니다. is_dev 또는 모델 데이터를 확인해 주세요.
                       </p>
                     ) : null}
@@ -1240,7 +1240,7 @@ export function EqpManageFormModal({
                 )}
 
                 {mergedErrorMessage ? (
-                  <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+                  <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                     {mergedErrorMessage}
                   </p>
                 ) : null}
@@ -1248,11 +1248,11 @@ export function EqpManageFormModal({
             )}
           </div>
 
-          <DialogFooter className="shrink-0 border-t border-[#E4EAE6] px-6 py-4 sm:justify-end">
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4 sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="h-10 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+              className="h-10 rounded-full border-border px-4 text-xs font-semibold"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
@@ -1260,7 +1260,7 @@ export function EqpManageFormModal({
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+              className="h-10 rounded-full bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary/90"
               onClick={() => void handleSave()}
               disabled={saveDisabled}
             >

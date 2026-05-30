@@ -62,7 +62,7 @@ export function EqpLifecycleActionDialog({
         </DialogHeader>
 
         {errorMessage ? (
-          <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}

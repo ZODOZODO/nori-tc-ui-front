@@ -303,9 +303,10 @@ test('AC-R5-CI-1: CheckInModal 2x2 range copy → TSV (added / changed 행)', as
 
 /**
  * AC-R5-CI-2: diff 색상 / strikethrough 보존.
- * - added 행: bg-[#F0FFF7]
- * - changed 행: bg-[#FFFDF0] + 셀 내 parent 값 line-through + branch 값 green font-medium
- * - deleted 행: bg-[#FFF7F7] + paramName line-through
+ * nori-client-forked 자매품화(R5-eqp) 로 bespoke hex → 시맨틱 토큰 치환:
+ * - added 행: bg-success/5
+ * - changed 행: bg-warning/5 + 셀 내 parent 값 line-through + branch 값 success font-medium
+ * - deleted 행: bg-danger/5 + paramName line-through
  */
 test('AC-R5-CI-2: CheckInModal diff 색상 + strikethrough 보존', async ({ page }) => {
   const consoleBucket = attachConsoleErrorListeners(page)
@@ -316,9 +317,9 @@ test('AC-R5-CI-2: CheckInModal diff 색상 + strikethrough 보존', async ({ pag
   const changedRow = page.getByTestId('check-in-diff-row-changed-ITEM_CHG')
   const deletedRow = page.getByTestId('check-in-diff-row-deleted-ITEM_DEL')
 
-  await expect(addedRow).toHaveClass(/bg-\[#F0FFF7\]/)
-  await expect(changedRow).toHaveClass(/bg-\[#FFFDF0\]/)
-  await expect(deletedRow).toHaveClass(/bg-\[#FFF7F7\]/)
+  await expect(addedRow).toHaveClass(/bg-success\/5/)
+  await expect(changedRow).toHaveClass(/bg-warning\/5/)
+  await expect(deletedRow).toHaveClass(/bg-danger\/5/)
 
   // changed 행의 parent 값 (val_parent) 은 line-through
   const previousValue = changedRow.locator('.line-through', { hasText: 'val_parent' })

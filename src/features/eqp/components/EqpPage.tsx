@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n/i18n-context'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
@@ -55,7 +56,6 @@ import { modelQueryKeys } from '@/features/model/lib/model-query-keys'
 import type { ModelInfo } from '@/features/model/types/model.types'
 
 const EMPTY_VERSION_VALUE = ''
-const NO_VERSION_OPTION_LABEL = '버전 없음'
 
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
@@ -284,6 +284,7 @@ const computeEqpParamDiffRows = (
  * - eqp: 개별 설비 클릭 → 설비 정보 + ResizableDivider + 파라미터/Checkout 영역 표시
  */
 export function EqpPage() {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
 
   const selection = useEqpUiStore((state) => state.selection)
@@ -487,25 +488,29 @@ export function EqpPage() {
     }
 
     if (selectedEqpManageDetailQuery.isLoading && !selectedEqpManageDetailQuery.data) {
-      return { version: '불러오는 중...', description: '불러오는 중...' }
+      return { version: t('eqp.version.loading'), description: t('eqp.version.loading') }
     }
 
     if (selectedEqpManageDetailQuery.error) {
-      return { version: '확인 불가', description: '확인 불가' }
+      return { version: t('eqp.version.unavailable'), description: t('eqp.version.unavailable') }
     }
 
     const appliedVersion = selectedEqpManageDetailQuery.data?.appliedParamVersion?.trim()
     const appliedDescription = selectedEqpManageDetailQuery.data?.appliedParamDescription?.trim()
 
     return {
-      version: appliedVersion && appliedVersion.length > 0 ? appliedVersion : '미적용',
-      description: appliedDescription && appliedDescription.length > 0 ? appliedDescription : '설명 없음',
+      version: appliedVersion && appliedVersion.length > 0 ? appliedVersion : t('eqp.version.notApplied'),
+      description:
+        appliedDescription && appliedDescription.length > 0
+          ? appliedDescription
+          : t('eqp.version.noDesc'),
     }
   }, [
     selectedEqpId,
     selectedEqpManageDetailQuery.data,
     selectedEqpManageDetailQuery.error,
     selectedEqpManageDetailQuery.isLoading,
+    t,
   ])
 
   // Gateway/gateway_group 선택 시 표시할 이름입니다.
@@ -1201,12 +1206,12 @@ export function EqpPage() {
   const modeDescriptionText = useMemo(() => {
     if (isEditMode || checkoutStatus.isCheckedOut) {
       const checkedOutBy = checkoutStatus.checkedOutBy
-      return checkedOutBy ? `${checkedOutBy}님이 편집 중` : '편집 중'
+      return checkedOutBy ? `${checkedOutBy}님이 편집 중` : t('eqp.mode.editing')
     }
     // 읽기 모드: 첫 번째 파라미터의 description 표시
     const firstParam = readParamsQuery.data?.[0]
     return firstParam?.description ?? ''
-  }, [isEditMode, checkoutStatus, readParamsQuery.data])
+  }, [isEditMode, checkoutStatus, readParamsQuery.data, t])
 
   const listErrorMessage = eqpListQuery.error
     ? resolveErrorMessage(eqpListQuery.error, '설비 목록을 불러오지 못했습니다.')
@@ -1284,8 +1289,8 @@ export function EqpPage() {
             {/* 가운데 영역: selection 유형에 따라 콘텐츠 분기 */}
             {selection.type === 'none' ? (
               /* 초기 진입 / 선택 없음: 안내 문구만 표시 */
-              <div className="flex flex-1 items-center justify-center text-sm text-[#8A8A8A]">
-                설비 또는 게이트웨이 그룹을 선택해 주세요.
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                {t('eqp.placeholder.select')}
               </div>
             ) : selection.type === 'gateway_all' || selection.type === 'gateway_group' ? (
               /* Gateway 또는 gateway_app 그룹 선택: 설비 목록 테이블 (파라미터/Checkout 없음) */
@@ -1342,17 +1347,17 @@ export function EqpPage() {
                   style={{ height: `${100 - topPanelHeightPercent}%` }}
                   className="min-h-0 p-3 pt-0 md:p-4 md:pt-0"
                 >
-                  <section className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4">
+                  <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex h-[34px] items-center gap-1.5">
                         <select
                           value={appliedVersion}
                           onChange={(event) => setAppliedVersion(event.target.value)}
                           disabled={isEditMode || versionOptions.length === 0 || eqpParamVersionsQuery.isLoading}
-                          className="h-8 min-w-[232px] rounded-lg border border-[#97A8A1] bg-white px-2.5 text-xs font-medium text-[#1E3D33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30 disabled:cursor-not-allowed disabled:bg-[#F5F8F6] disabled:text-[#8A8A8A]"
+                          className="h-8 min-w-[232px] rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                         >
                           {versionOptions.length === 0 ? (
-                            <option value={EMPTY_VERSION_VALUE}>{NO_VERSION_OPTION_LABEL}</option>
+                            <option value={EMPTY_VERSION_VALUE}>{t('eqp.version.noOption')}</option>
                           ) : (
                             versionOptions.map((version) => (
                               <option key={version} value={version}>
@@ -1370,7 +1375,7 @@ export function EqpPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                              className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                               onClick={() => void handleUndoCheckout()}
                               disabled={undoCheckoutMutation.isPending || saveEditParamsMutation.isPending}
                             >
@@ -1385,7 +1390,7 @@ export function EqpPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                              className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                               onClick={() => void handleSaveEditParams()}
                               disabled={isSaveDisabled}
                             >
@@ -1398,7 +1403,7 @@ export function EqpPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                              className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                               onClick={handleRequestCheckIn}
                               disabled={!eqpDetailQuery.data || checkinMutation.isPending}
                             >
@@ -1410,7 +1415,7 @@ export function EqpPage() {
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                            className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                             onClick={() => void handleCheckOut()}
                             disabled={isCheckoutDisabled}
                             title={
@@ -1428,17 +1433,21 @@ export function EqpPage() {
                       </div>
                     </div>
 
-                    <div className="mt-2 rounded-xl border border-[#E4EAE6] bg-[#F7FAF8] px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#6D7F76]">
-                        Current Applied Eqp Parameter
+                    <div className="mt-2 rounded-xl border border-border bg-muted px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                        {t('eqp.version.currentApplied')}
                       </div>
-                      <div className="mt-2 grid gap-1 text-xs text-[#1E3D33]">
+                      <div className="mt-2 grid gap-1 text-xs text-foreground">
                         <div className="flex flex-wrap gap-1.5">
-                          <span className="font-semibold text-[#5A6D63]">Version</span>
+                          <span className="font-semibold text-muted-foreground">
+                            {t('eqp.version.labelVersion')}
+                          </span>
                           <span>{appliedParamSummary.version}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          <span className="font-semibold text-[#5A6D63]">Desc</span>
+                          <span className="font-semibold text-muted-foreground">
+                            {t('eqp.version.labelDesc')}
+                          </span>
                           <span>{appliedParamSummary.description}</span>
                         </div>
                       </div>
@@ -1446,24 +1455,24 @@ export function EqpPage() {
 
                     {/* Mode 텍스트 영역: 읽기 모드는 첫 파라미터 description, 편집 모드는 "누구님이 편집 중" */}
                     <div className="mt-2 flex items-center gap-1 text-xs">
-                      <span className={`${isEditMode ? 'font-medium text-[#7C9082]' : 'text-[#8A8A8A]'}`}>
+                      <span className={isEditMode ? 'font-medium text-foreground' : 'text-muted-foreground'}>
                         {modeDescriptionText}
                       </span>
                     </div>
 
                     {checkInErrorMessage ? (
-                      <p className="mt-2 text-xs text-[#C5534B]">{checkInErrorMessage}</p>
+                      <p className="mt-2 text-xs text-danger">{checkInErrorMessage}</p>
                     ) : null}
 
                     {versionErrorMessage ? (
-                      <p className="mt-2 text-xs text-[#C5534B]">{versionErrorMessage}</p>
+                      <p className="mt-2 text-xs text-danger">{versionErrorMessage}</p>
                     ) : null}
 
                     {!checkInErrorMessage && paramEditValidationMessage ? (
-                      <p className="mt-2 text-xs text-[#C5534B]">{paramEditValidationMessage}</p>
+                      <p className="mt-2 text-xs text-danger">{paramEditValidationMessage}</p>
                     ) : null}
 
-                    <div className="mt-3 min-h-0 flex-1 border-t border-[#E4EAE6] pt-3">
+                    <div className="mt-3 min-h-0 flex-1 border-t border-border pt-3">
                       <EqpParamTable
                         key={`${selectedEqpId ?? 'eqp-param'}-${appliedVersion}-${isEditMode ? 'edit' : 'read'}`}
                         rows={displayParamRows}

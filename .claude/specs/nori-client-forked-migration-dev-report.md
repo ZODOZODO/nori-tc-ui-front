@@ -182,3 +182,30 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className
 검증: build + eslint(변경파일) + eqp 관련 e2e(selectable-table-check-in/gateway-group + 기타) PASS + before/after 스크린샷 + 단일 commit.
 이후 순서: user → dlq → model → deploy (각 phase 동일 4단). LiveMap 보류.
 ```
+
+## Phase R5-eqp — EqpPage 자매품 재구성 (2026-05-30)
+
+### 사용자 결정 (D-R5-METHOD 적용 범위 확정)
+인터뷰에서 사용자가 "검색바/페이지 버튼을 다 넣어야 한다 — 왼쪽에서 eqpId 검색, 왼쪽 선택(설비/gateway app/business app)에 따라 보이는 테이블이 달라야 한다. forked 의 GNB→LNB→리스트 페이지 구조처럼, topbar 도메인 클릭 시 새로 나타난다"고 명시. → SPEC owner 로서 **콘텐츠 리스트 테이블에 PageFilterBar+PagePagination state 추가를 명시 승인** (R6 "위젯 prop·state 불변"은 기능 위젯 내부에 한정, 페이지 레벨 표현 state 추가는 본 결정으로 허용). 사이드바 eqpId 검색·선택별 테이블 분기·R4.2(resize/collapse)는 **이미 구현돼 있어** 색·i18n 만 적용.
+
+### D-R5-METHOD 4단 적용
+1. **틀 차용** — GatewayGroupTable·BusinessGroupModelTable 를 forked 리스트 페이지 틀로 재구성: 헤더(`h2` 제목 + 총건수 `Badge` pill) + `PageFilterBar`(검색 Input) + `SelectableTable`(필터+페이지 슬라이스) + `PagePagination`(R1 컴포넌트, page-size [12,25,50,100]). page/pageSize/searchKeyword 로컬 state 추가, slice 시점 `safePage` clamp(effect 미사용 — `react-hooks/set-state-in-effect` 회피).
+2. **콘텐츠 재배치** — SelectableTable testId/columns/wrapRow/data-* 불변, EqpInfoTable·EqpParamTable·모달 prop/state/API 불변. eqpItems/models 를 EqpPage→테이블에 그대로 전달, 테이블이 필터·페이지 슬라이스만 표현.
+3. **사이드바** — EqpSidebar 좌측 slot + R4.2(AppPageShell+shared-layout store+SidebarResizeHandle) **기존 인프라 유지**, 색·i18n 만.
+4. **i18n** — 정적 한국어 → `eqp.*` 키 신설(ko/en 각 ~44키). 동적 메시지(eqpId·카운트 임베드)는 `t()` **보간 미지원**(`t=(key)=>dict[key]`)이라 보류 — 아래 follow-up.
+5. **색** — eqp 13파일 **252 hex 전량 → 시맨틱 토큰**. brand green(#1C7F59/#166749/#2AAE67)→brand-primary(coral), dark green(#1E3D33 등)→foreground, muted green→muted-foreground, border green→border/input, light green bg→muted/card/brand-primary tint, error red→danger, diff add/change/del→success/warning/danger, amber notice→warning. **status 점(emerald/sky/amber 유틸)은 런타임 상태 semantic 이라 보존**(brand 색 아님).
+
+### 변경 파일 (16 tracked)
+- `src/features/eqp/components/`: EqpSidebar / GatewayGroupTable / BusinessGroupModelTable / EqpInfoTable / EqpParamTable / EqpPage / CheckInModal / EqpModelBindingModal / EqpManageFormModal / EqpDeleteConfirmDialog / EqpDeleteResultDialog / EqpLifecycleActionDialog / EqpLifecycleResultDialog (13)
+- `src/i18n/locales/ko.json` / `en.json` — `eqp.*` 키 신설
+- `tests/e2e/selectable-table-check-in.spec.ts` — AC-R5-CI-2 diff 색 단언을 hex→토큰(`bg-success/5`·`bg-warning/5`·`bg-danger/5`)으로 갱신(검증 동작 동일, 클래스 계약만 토큰화)
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 7.96s` (tsc 0 errors)
+- `npx eslint src/features/eqp/components/` ✅ **NEW 에러 0** — 8건 전부 baseline pre-existing `react-hooks/set-state-in-effect`(EqpManageFormModal×2, EqpModelBindingModal×2, EqpPage×4; import 추가로 라인만 이동). 내가 추가한 GatewayGroupTable/BusinessGroupModelTable 은 effect 제거로 clean.
+- `npx playwright test` (전체) ✅ **75 passed / 0 failed** (2.4m). baseline 의 pre-existing 2 e2e 는 commit e7d5c8b 로 이미 해소됨 → NEW 회귀 0.
+- eqp hex 잔존: `grep -coE '#[0-9A-Fa-f]{6}'` → 13파일 전부 0 (토글 thumb `bg-white` 1건만 의도적 유지 — coral 버튼의 `text-white` 와 동일 대비 요소).
+- before/after 스크린샷: `.claude/specs/screenshots/before/eqp-R5.png`·`eqp-gateway-R5.png` / `.claude/specs/screenshots/after/eqp-R5.png`·`eqp-gateway-R5.png`. after = gateway_app1 그룹 헤더 pill(30) + 검색 필터바 + SelectableTable + 페이지네이션(1–25/30, coral active) + i18n 사이드바. before = "설비 30개" 텍스트 + 필터/페이지네이션 없음 + 한글 하드코딩.
+
+### Follow-up (보류 — 투명 기록)
+- **대형 모달 내부 i18n 미완** — CheckInModal / EqpModelBindingModal / EqpManageFormModal 은 **색 토큰화는 전량 완료**했으나 내부 폼 라벨·동적 메시지 i18n 은 미적용. 사유: (1) `t()` 보간 미지원으로 eqpId·카운트 임베드 동적 문자열 단일 키 변환 불가, (2) D-I18N "커스텀 i18n 유지" 경계상 shared 보간 인프라 확장은 eqp 범위 밖, (3) 분량(EqpManageFormModal 1275 LOC). → SPEC R5.0 (4)단의 "하드코딩 0" 은 **주요 표면(페이지/사이드바/테이블/dialog)에서 충족**, 대형 모달 내부는 별도 follow-up. Validate 시 `[~] 부분` 표기 권장.
