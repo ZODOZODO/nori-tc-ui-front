@@ -140,11 +140,8 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-white px-5">
-      <div className="flex items-center gap-2.5">
-        <div className="flex size-7 items-center justify-center rounded-md bg-brand-primary">
-          <span className="font-fraunces text-sm font-medium text-white">N</span>
-        </div>
-        <span className="font-fraunces text-lg text-foreground">Nori-TC</span>
+      <div className="flex items-center">
+        <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-8 w-auto" />
       </div>
 
       <div className="flex min-w-0 items-center justify-center overflow-hidden">

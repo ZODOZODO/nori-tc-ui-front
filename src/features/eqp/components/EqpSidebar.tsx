@@ -122,8 +122,38 @@ export const EqpSidebar = memo(function EqpSidebar({
   const [gatewayOpen, setGatewayOpen] = useState(
     () => isGatewaySelected || selectedGroupIndex !== null || selectedEqpId !== null,
   )
-  // 검색 중에는 결과가 접혀 안 보이는 걸 막기 위해 양 그룹을 강제로 펼친다(파생값, effect 미사용).
+  // gateway_app 별 하위 eqp 노드 펼침/접힘 (2단계 아코디언). gateway_app 헤더 클릭으로 토글.
+  // 초기값: 선택된 gateway 그룹 + 선택된 eqp 가 속한 그룹은 펼쳐 보여준다.
+  const [expandedGatewayGroups, setExpandedGatewayGroups] = useState<Set<number>>(() => {
+    const initial = new Set<number>()
+    if (selectedGroupIndex !== null) {
+      initial.add(selectedGroupIndex)
+    }
+    if (selectedEqpId) {
+      const owner = gatewayGroups.find((group) =>
+        group.items.some((eqp) => eqp.eqpId === selectedEqpId),
+      )
+      if (owner) {
+        initial.add(owner.appIndex)
+      }
+    }
+    return initial
+  })
+  // 검색 중에는 결과가 접혀 안 보이는 걸 막기 위해 모든 그룹을 강제로 펼친다(파생값, effect 미사용).
   const hasSearch = deferredSearchKeyword.trim().length > 0
+
+  const toggleGatewayGroup = (appIndex: number) => {
+    onSelectGatewayGroup(appIndex)
+    setExpandedGatewayGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(appIndex)) {
+        next.delete(appIndex)
+      } else {
+        next.add(appIndex)
+      }
+      return next
+    })
+  }
 
   const renderEqpNode = (eqp: EqpInfo, key: string) => {
     const isSelected = selectedEqpId === eqp.eqpId
@@ -285,14 +315,16 @@ export const EqpSidebar = memo(function EqpSidebar({
                       <div key={group.appName} className="flex flex-col gap-0.5">
                         <button
                           type="button"
-                          onClick={() => onSelectGatewayGroup(group.appIndex)}
+                          onClick={() => toggleGatewayGroup(group.appIndex)}
                           className={subLinkClass(selectedGroupIndex === group.appIndex)}
                         >
                           {group.appName}
                         </button>
-                        {group.items.map((eqp) =>
-                          renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                        )}
+                        {expandedGatewayGroups.has(group.appIndex) || hasSearch
+                          ? group.items.map((eqp) =>
+                              renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                            )
+                          : null}
                       </div>
                     ))
                   )

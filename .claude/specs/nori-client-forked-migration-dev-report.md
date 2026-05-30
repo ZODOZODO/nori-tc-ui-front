@@ -220,3 +220,9 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className
 - **(2) 그룹 아이콘 제거** — Business→Boxes / Gateway→Network lucide 아이콘 삭제(사용자 요청), import 제거.
 - **e2e 보정** — 아코디언 기본 접힘으로 `selectable-table-gateway-group`(×2) / `selectable-table-check-in`(openCheckInModal) 이 gateway_app1·EQP 노드를 직접 클릭하던 흐름이 깨져, 각 테스트에 "Gateway 헤더 클릭으로 펼침" 단계를 선행 추가. 동작 검증 의미 동일.
 - 검증: `npm run build` ✅ ✓ built in 7.76s / `eslint EqpSidebar` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(기본 접힘 + 아이콘 제거 반영).
+
+### 사용자 피드백 보정 3 (2026-05-30)
+- **(1) gateway_app 2단계 아코디언** — Gateway 펼침 시 gateway_app1/2/3 는 보이되, 각 gateway_app 의 **하위 eqp 노드는 해당 gateway_app 헤더 클릭 시에만 펼침**. `expandedGatewayGroups: Set<number>`(appIndex 집합) 로컬 state, gateway_app 클릭 = `onSelectGatewayGroup`(전체선택 유지) + 토글. 초기값 lazy init(선택 그룹 + 선택 eqp 소속 그룹 펼침), 검색 중 강제 펼침(파생값). business_app 은 하위가 없어 그대로.
+- **(2) 상단 브랜드 로고 교체** — `AppTopBar` 의 "N 박스 + Nori-TC 텍스트" → login 과 동일한 `public/nori-tc-logo.png` 이미지(`<img h-8 w-auto>`). 브랜드 자산 스왑이며 `navigationItems`/`resolveVisibleAppNavigationItems`/라우팅/prefetch 는 **미변경**(AC R4 git diff 0 유지).
+- **e2e 보정** — gateway_app 아코디언으로 `selectable-table-check-in` 의 EQP 노드가 gateway_app1 펼침 전엔 숨음 → openCheckInModal 에 `Gateway → gateway_app1 → EQP` 순 클릭으로 보정. gateway-group e2e 는 그룹 테이블 콘텐츠 검증이라 영향 없음.
+- 검증: `npm run build` ✅ ✓ built in 7.83s / `eslint EqpSidebar+AppTopBar` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(2단계 아코디언 + 로고 반영).
