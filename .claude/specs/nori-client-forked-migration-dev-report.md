@@ -349,6 +349,14 @@ dlq 는 **클라이언트 페이지네이션** — `dlq.api`(fetchGatewayDlq/Bus
 - **카테고리 라벨 i18n 미완** — `CATEGORY_STYLES.label`(Gateway DLQ/Business DLQ/Repair Task/격리 설비)은 KPI 카드 + 피드 "카테고리" 컬럼 accessor(모듈 레벨 const, hook 불가)에서 공유돼 t() 직결이 어렵다. 영문 도메인 용어 주류라 보존. 사이드바·패널 제목·테이블은 전량 i18n 충족. Validate 시 `[~] 부분` 표기 가능.
 - **status/카테고리 semantic 색 보존** — 4 카테고리 식별 색(blue/amber/red/violet)은 의도적 보존(SPEC R5.0 (5)·instruction 준수). brand coral 미치환.
 
+### 사용자 피드백 보정 (R4.2 — dlq/user 사이드바 접기/리사이즈 추가, 2026-05-30 R5-dlq commit 직후)
+- **계기** — 사용자가 "dlq/user 사이드바 상단 우측에 eqp 처럼 `<` 접기 아이콘이 왜 없냐, 사이드바를 공통 컴포넌트로 안 쓰냐" 질문. 검증 결과: 사이드바 컴포넌트는 도메인별 별도(설계 — R4 "각 도메인 좌측 Sidebar")이나, **R4.2(접기/리사이즈) 인프라는 공유**(`useSharedLayoutStore` persist + `SidebarResizeHandle` + `AppPageShell`)이고 eqp/model 만 배선·dlq/user 는 R5 phase 프롬프트가 "시각만"으로 R4.2 를 범위 밖에 둬 미배선이었음. 사용자 결정: **dlq + user 둘 다 추가**.
+- **적용** — eqp 배선 패턴을 그대로 답습: (1) `DlqSidebar`/`UserManagementSidebar` 에 `sidebarOpen`/`sidebarWidth`/`onToggleSidebar`/`onResizeSidebar` prop 추가 → collapsed rail(`>` 펼치기, width=SIDEBAR_COLLAPSED_WIDTH_PX 56px) + expanded 헤더 `<` 접기 버튼 + 우측 `SidebarResizeHandle`(폭 드래그), 고정 `w-[240px]` → `style={{ width: sidebarWidth }}`. (2) `DlqPage`/`UserManagementPage` 에 `useSharedLayoutStore`(sidebarOpen/width/toggle/setWidth) + `handleSidebarDrag`(clampSidebarWidth, effect 미사용) 배선. **eqp/model 과 동일한 `shared-sidebar-layout` localStorage 키 공유** → 폭·개폐 상태가 도메인 간 일관(단일 사이드바 선호). 모드 전환 동작·5/2 testId·라우팅 불변(R4.1).
+- **i18n** — `dlq.sidebar.expand`/`collapse`, `userMgmt.sidebar.expand`/`collapse` 키 신설(ko/en, eqp 와 동일 문구 "사이드바 펼치기"/"축소").
+- **변경 파일** — `src/features/dlq/components/DlqSidebar.tsx`·`DlqPage.tsx`, `src/features/user-management/components/UserManagementSidebar.tsx`·`UserManagementPage.tsx`, `src/i18n/locales/ko.json`·`en.json`. 스크린샷: `.claude/specs/screenshots/after/dlq-sidebar-{expanded,collapsed}-R42.png`.
+- **검증** — `npm run build` ✅ ✓ built in 8.95s (tsc 0) / `eslint src/features/{dlq,user-management}` ✅ EXIT 0 / `playwright test` 전체 ✅ **75 passed / 0 failed** (2.0m). 사이드바 testId 불변이라 기존 e2e 무수정 통과. 접기/펼치기 + 56px rail 렌더 스크린샷 확인.
+- **공통 컨벤션 보강** — *도메인 사이드바는 별도 컴포넌트지만 R4.2(접기/리사이즈) 인프라는 shared-layout store + SidebarResizeHandle 로 공유*. 신규 도메인 사이드바도 이 4 prop + 페이지 store 배선만으로 eqp 일관 동작 확보. model phase 도 동일 store 이미 사용 중.
+
 ## eqp/user/dlq 세션 공통 컨벤션 보강 (이후 phase 재사용)
 - **클라이언트 페이지네이션 도메인** — API 가 전체 배열을 메모리에 받는 도메인(dlq)은 콘텐츠 키워드 검색이 전체 데이터셋 대상으로 정확히 동작 → 검색바·PagePagination 도입이 기술적으로 적절(현재 페이지만 필터하는 서버 페이지네이션 user/group 과 반대). 진입 시 사용자 1회 확인 후 도입.
 - **공유 shell 변경의 e2e 전파** — DlqTableShell 처럼 N 패널 공유 shell 의 컨트롤(Prev/Next→PagePagination)을 바꾸면 그 testId 를 단언하는 e2e 가 닿는다. testId 자체는 R6 불변이되, 사라지는 컨트롤을 단언하던 테스트는 동등 의미의 locale 무관 셀렉터(aria-label)로 보정.
