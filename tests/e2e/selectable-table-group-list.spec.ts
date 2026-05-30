@@ -169,7 +169,9 @@ const OPS_GROUP = buildGroup({
 const navigateToGroupPanel = async (page: Page) => {
   await page.goto('/user')
   await page.getByTestId('user-management-sidebar-group').click()
-  await expect(page.getByRole('heading', { name: '그룹 관리' })).toBeVisible()
+  // 패널 제목이 i18n(t('group.title'))로 배선돼 locale 따라 텍스트가 바뀌므로,
+  // locale 무관한 group-list-table testId 로 Group 패널 활성을 확인한다 (단언 의미 동일).
+  await expect(page.getByTestId('group-list-table')).toBeVisible()
 }
 
 test.beforeEach(async ({ context }) => {

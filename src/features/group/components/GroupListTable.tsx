@@ -16,6 +16,7 @@ import {
   type ColumnDef,
   type SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { useGroups } from '../hooks/useGroups'
 import { useGroupUiStore } from '../stores/group-ui.store'
 import type { GroupInfo } from '../types/group.types'
@@ -31,6 +32,7 @@ const GROUP_TABLE_COLUMN_COUNT = 6
  * - 행 더블클릭 → openEditModal (R4 W-GL1=A 결정 — Pencil 액션 보존)
  */
 export function GroupListTable() {
+  const { t } = useI18n()
   const listOffset = useGroupUiStore((state) => state.listOffset)
   const setListOffset = useGroupUiStore((state) => state.setListOffset)
   const openEditModal = useGroupUiStore((state) => state.openEditModal)
@@ -84,7 +86,7 @@ export function GroupListTable() {
 
   const actionColumn = useMemo<SelectableTableActionColumn<GroupInfo>>(
     () => ({
-      header: '액션',
+      header: t('group.table.action'),
       render: (row) => (
         <div className="flex justify-end gap-1">
           <Button
@@ -120,13 +122,13 @@ export function GroupListTable() {
         </div>
       ),
     }),
-    [openAddMembersModal, openEditModal, openDeleteDialog],
+    [t, openAddMembersModal, openEditModal, openDeleteDialog],
   )
 
   const isInitialLoading = groupListQuery.isLoading && items.length === 0
 
   return (
-    <div className="flex flex-col gap-3 rounded-[18px] border border-[#E2E9E4] bg-white">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card">
       <div className="overflow-x-auto" data-testid="group-list-table">
         {isInitialLoading ? (
           <Table>
@@ -137,7 +139,7 @@ export function GroupListTable() {
                 <TableHead>description</TableHead>
                 <TableHead>isActive</TableHead>
                 <TableHead>updatedAt</TableHead>
-                <TableHead className="text-right">액션</TableHead>
+                <TableHead className="text-right">{t('group.table.action')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -160,7 +162,7 @@ export function GroupListTable() {
             actionColumn={actionColumn}
             features={{ rangeCopy: true }}
             testId="selectable-table-group-list"
-            emptyState="표시할 그룹이 없습니다."
+            emptyState={t('group.table.empty')}
             wrapRow={(group, _rowIdx, children) => (
               <TableRow
                 data-testid={`group-row-${group.groupId}`}
@@ -174,12 +176,12 @@ export function GroupListTable() {
         )}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-[#EDF1EE] px-6 py-3 text-xs text-[#5C6A63] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 border-t border-border px-6 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
         <span data-testid="group-list-pagination-summary">
           총 {totalCount}건 · {currentPage} / {totalPages} 페이지
         </span>
         <div className="flex items-center gap-2">
-          {groupListQuery.isFetching ? <span>동기화 중...</span> : null}
+          {groupListQuery.isFetching ? <span>{t('group.table.syncing')}</span> : null}
           <Button
             type="button"
             variant="outline"

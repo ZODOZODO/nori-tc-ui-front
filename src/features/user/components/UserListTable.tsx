@@ -16,6 +16,7 @@ import {
   type ColumnDef,
   type SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
 import type { UserListItem } from '../types/user.types'
@@ -34,6 +35,7 @@ export const USER_PAGE_SIZE = 20
  * - 행 더블클릭 → openEditModal (R4 W-UL1=A 결정 — Pencil 액션 보존)
  */
 export function UserListTable() {
+  const { t } = useI18n()
   const listOffset = useUserUiStore((state) => state.listOffset)
   const setListOffset = useUserUiStore((state) => state.setListOffset)
   const openEditModal = useUserUiStore((state) => state.openEditModal)
@@ -67,7 +69,7 @@ export function UserListTable() {
         accessor: (row) => row.groups.map((group) => group.groupCode).join('|'),
         renderCell: (row) =>
           row.groups.length === 0 ? (
-            <span className="text-xs text-[#7F8A84]">-</span>
+            <span className="text-xs text-muted-foreground">-</span>
           ) : (
             <div className="flex flex-wrap gap-1" data-testid={`user-row-groups-${row.userPk}`}>
               {row.groups.map((group) => (
@@ -98,7 +100,7 @@ export function UserListTable() {
 
   const actionColumn = useMemo<SelectableTableActionColumn<UserListItem>>(
     () => ({
-      header: '액션',
+      header: t('user.table.action'),
       render: (row) => (
         <div className="flex justify-end gap-1">
           <Button
@@ -134,13 +136,13 @@ export function UserListTable() {
         </div>
       ),
     }),
-    [openEditModal, openPasswordResetModal, openDeleteDialog],
+    [t, openEditModal, openPasswordResetModal, openDeleteDialog],
   )
 
   const isInitialLoading = userListQuery.isLoading && items.length === 0
 
   return (
-    <div className="flex flex-col gap-3 rounded-[18px] border border-[#E2E9E4] bg-white">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card">
       <div className="overflow-x-auto" data-testid="user-list-table">
         {isInitialLoading ? (
           <Table>
@@ -151,7 +153,7 @@ export function UserListTable() {
                 <TableHead>group</TableHead>
                 <TableHead>company</TableHead>
                 <TableHead>department</TableHead>
-                <TableHead className="text-right">액션</TableHead>
+                <TableHead className="text-right">{t('user.table.action')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -174,7 +176,7 @@ export function UserListTable() {
             actionColumn={actionColumn}
             features={{ rangeCopy: true }}
             testId="selectable-table-user-list"
-            emptyState="표시할 사용자가 없습니다."
+            emptyState={t('user.table.empty')}
             wrapRow={(user, _rowIdx, children) => (
               <TableRow
                 data-testid={`user-row-${user.userPk}`}
@@ -188,12 +190,12 @@ export function UserListTable() {
         )}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-[#EDF1EE] px-6 py-3 text-xs text-[#5C6A63] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 border-t border-border px-6 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
         <span data-testid="user-list-pagination-summary">
           총 {totalCount}건 · {currentPage} / {totalPages} 페이지
         </span>
         <div className="flex items-center gap-2">
-          {userListQuery.isFetching ? <span>동기화 중...</span> : null}
+          {userListQuery.isFetching ? <span>{t('user.table.syncing')}</span> : null}
           <Button
             type="button"
             variant="outline"

@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
+import { PageHeadingWithActions } from '@/shared/layout/PageHeadingWithActions'
+import { useI18n } from '@/i18n/i18n-context'
 import { useGroups } from '../hooks/useGroups'
 import { useGroupUiStore } from '../stores/group-ui.store'
 import { GroupAddMembersModal } from './GroupAddMembersModal'
@@ -8,6 +10,7 @@ import { GROUP_PAGE_SIZE, GroupListTable } from './GroupListTable'
 import { GroupUpsertModal } from './GroupUpsertModal'
 
 export function GroupAdminPanel() {
+  const { t } = useI18n()
   const listOffset = useGroupUiStore((state) => state.listOffset)
   const activeGroupId = useGroupUiStore((state) => state.activeGroupId)
   const isUpsertModalOpen = useGroupUiStore((state) => state.isUpsertModalOpen)
@@ -43,17 +46,16 @@ export function GroupAdminPanel() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1F2D26]">그룹 관리</h1>
-          <p className="text-xs text-[#6C7872]">
-            사용자 권한 그룹을 등록 / 수정 / 삭제하고 행의 사용자 버튼으로 멤버를 추가합니다.
-          </p>
-        </div>
-        <Button type="button" data-testid="group-create-button" onClick={() => openCreateModal()}>
-          그룹 등록
-        </Button>
-      </header>
+      <PageHeadingWithActions
+        name={t('group.title')}
+        description={t('group.description')}
+        total={groupListQuery.data?.count ?? 0}
+        actions={
+          <Button type="button" data-testid="group-create-button" onClick={() => openCreateModal()}>
+            {t('group.create')}
+          </Button>
+        }
+      />
 
       <GroupListTable />
 

@@ -345,7 +345,9 @@ test('topbar User 클릭 시 /user 로 라우팅', async ({ page }) => {
   await userMenu.click()
 
   await expect(page).toHaveURL(/\/user$/)
-  await expect(page.getByRole('heading', { name: '사용자 관리' })).toBeVisible()
+  // 패널 제목이 i18n(t('user.title'))로 배선돼 locale 따라 텍스트가 바뀌므로,
+  // locale 무관한 user-list-table testId 로 User 패널 활성을 확인한다 (단언 의미 동일).
+  await expect(page.getByTestId('user-list-table')).toBeVisible()
 })
 
 test('사용자 목록 표시', async ({ page }) => {

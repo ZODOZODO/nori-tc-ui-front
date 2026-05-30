@@ -117,7 +117,7 @@ export function UserPasswordResetModal({
             data-testid="user-password-reset-value"
             readOnly
             value={generatedPassword ?? ''}
-            className="h-11 w-full rounded-md border border-[#DCE5E0] bg-[#F8FAF9] px-3 font-mono text-base text-[#1F2D26]"
+            className="h-11 w-full rounded-md border border-input bg-muted px-3 font-mono text-base text-foreground"
           />
           <Button
             type="button"
@@ -133,23 +133,23 @@ export function UserPasswordResetModal({
         </div>
 
         {resetStatus === 'pending' ? (
-          <p className="flex items-center gap-2 text-sm text-[#5D6963]">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             서버에 비밀번호 변경을 적용하는 중...
           </p>
         ) : null}
 
         {resetStatus === 'error' && errorMessage ? (
-          <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}
 
         {copyState === 'success' ? (
-          <p className="text-xs text-[#1C7F59]">클립보드에 복사되었습니다.</p>
+          <p className="text-xs text-success">클립보드에 복사되었습니다.</p>
         ) : null}
         {copyState === 'error' ? (
-          <p className="text-xs text-[#B4483F]">클립보드 복사에 실패했습니다. 직접 선택해 복사해 주세요.</p>
+          <p className="text-xs text-danger">클립보드 복사에 실패했습니다. 직접 선택해 복사해 주세요.</p>
         ) : null}
 
         <DialogFooter>

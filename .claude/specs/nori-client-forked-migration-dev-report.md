@@ -255,3 +255,60 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, �
 검증: build + eslint(변경파일, baseline delta NEW 0) + user-page/group-page/selectable-table-user-list/selectable-table-group-list e2e PASS + before/after 스크린샷(playwright test 러너로 캡처, before 는 git stash) + 단일 commit.
 이후 순서: dlq → model → deploy (각 phase 동일 4단). LiveMap 보류.
 ```
+
+## Phase R5-user — UserManagement 자매품 재구성 (2026-05-30)
+
+### 사용자 결정 (진입 시 1회 확인 — 프롬프트 명시)
+인터뷰에서 2개 도입 결정을 확인. 근거는 코드 직접 확인:
+- **콘텐츠 검색/필터 바 → 추가 안 함**. User/Group 목록은 **서버사이드 페이지네이션**이고 `getUserList(offset, limit)` / `getGroupList(offset, limit)` 에 **keyword 파라미터 없음**([user.api.ts:201](../../src/features/user/api/user.api.ts#L201)). 클라이언트 검색은 현재 페이지(20건)만 필터해 "전체 검색"으로 오해를 유발하고, 백엔드 파라미터 추가는 R6(API 불변) 위반. eqp(사이드바 검색 중복) 와 사유는 다르나 결론은 동일(콘텐츠 검색 없음).
+- **페이지네이션 → 기존 Prev/Next 유지**(forked PagePagination 미도입). [user-page.spec.ts:449-480](../../tests/e2e/user-page.spec.ts) 이 `user-list-prev`/`user-list-next` testId + `user-list-pagination-summary` 의 `1 / 3` 포맷 + `offset=20`(페이지크기 20) 서버 동작을 단언. 유지하면 e2e 무수정 + R6 testId 불변. forked 자매품 인상은 **헤더 총건수 pill + 카드 surface + 사이드바 LNB + coral 토큰**으로 달성.
+
+### D-R5-METHOD 4단 적용
+1. **틀 차용** — UserAdminPanel / GroupAdminPanel 헤더를 forked 리스트 페이지 헤더 틀(`PageHeadingWithActions` = 제목 + 총건수 pill + 우측 액션 슬롯)로 재구성. 기존 `<header><h1 text-2xl>+<Button>` → `PageHeadingWithActions name/description/total/actions`. 총건수 pill = 해당 query 의 `count`(서버 total). 사이드바는 forked LNB 시각.
+2. **콘텐츠 재배치** — UserListTable / GroupListTable + 6 모달/다이얼로그(UserUpsert/UserPasswordReset/UserDeleteConfirm/GroupUpsert/GroupAddMembers/GroupDeleteConfirm)의 prop/state/API/TanStack hook/Zustand store/testId/data-* **불변**. SelectableTable 엔진·rangeCopy·wrapRow·더블클릭 불변(D-GRID-ENGINE).
+3. **사이드바** — UserManagementSidebar 에 forked 리뉴얼 LNB 시각: flat nav / **아이콘 없음**(사용자 선호) / active = `bg-brand-primary/10` + 좌측 2px `border-l-2 border-brand-primary` 액센트 + coral 텍스트 / 비active hover `transition-colors`. 헤더 `t('userMgmt.sidebar.title')`. **자식 트리 없음 → 아코디언 미도입**. mode 전환 동작·testId(`user-management-sidebar-user|group`) 불변(R4.1). R4.2(resize/collapse)는 프롬프트 범위 밖(시각만) — 미도입.
+4. **i18n** — 정적 한국어를 `user.*` / `group.* `/ `userMgmt.*` 키로 신설(ko/en 각 15키): 사이드바 제목, 패널 제목/설명/등록버튼, 테이블 action/empty/syncing, 페이지 로딩. 동적 메시지(userId·카운트 임베드 `총 N건 · X / Y 페이지`, 삭제 확인 `사용자 ${id}...`)는 `t()` 보간 미지원이라 하드코딩 보류. **대형 모달 내부 폼 라벨 i18n 은 eqp 컨벤션대로 follow-up**(색 토큰화는 전량 완료).
+5. **색** — user/group/user-management **45 hex 전량 → 시맨틱 토큰**. green brand(#1C7F59 등)→brand-primary(coral), dark green text(#1F2D26/#243129 등)→foreground, muted green(#4A5A52/#5C6A63/#7F8A84 등)→muted-foreground, border green(#E2E9E4/#DCE5DB/#EDF1EE 등)→border/input, light green bg(#EAF5EE active)→brand-primary/10, white→card/background, error red(#B4483F/#F0D2D0/#FFF7F7)→danger/danger-20/danger-5, copy-success(#1C7F59)·result box(#2D5543/#EAF3EE/#CFE1D8)→success 계열. **status/diff semantic(success/danger)은 brand coral 치환 금지** — 보존.
+
+### 변경 파일 (17 tracked + 4 screenshot)
+- `src/features/user-management/components/`: UserManagementSidebar(LNB) / UserManagementPage(로딩 토큰+i18n)
+- `src/features/user/components/`: UserAdminPanel(PageHeading) / UserListTable(토큰+i18n) / UserUpsertModal / UserPasswordResetModal / UserDeleteConfirmDialog (색토큰)
+- `src/features/group/components/`: GroupAdminPanel(PageHeading) / GroupListTable(토큰+i18n) / GroupUpsertModal / GroupAddMembersModal / GroupDeleteConfirmDialog (색토큰)
+- `src/i18n/locales/ko.json` / `en.json` — `userMgmt.*`/`user.*`/`group.*` 키 신설
+- `tests/e2e/`: user-page / group-page / selectable-table-group-list — heading 텍스트 단언 보정(아래)
+- 스크린샷: `.claude/specs/screenshots/{before,after}/user-R5.png`·`group-R5.png`
+
+### e2e 보정 (단언 의미 동일, locale 무관화)
+패널 제목을 `t('user.title')`/`t('group.title')`로 i18n 배선하면서, 테스트 기본 로케일이 EN(`navigator.language` 기반, Playwright en-US)이라 heading 이 "User/Group Management"로 렌더 → 기존 `getByRole('heading', {name:'사용자 관리'|'그룹 관리'})` 단언이 실패. **login/eqp 에서 확립한 "e2e 는 locale 무관 셀렉터" 컨벤션**대로, heading 텍스트 단언을 locale 무관 testId(`user-list-table`/`group-list-table`, 패널 활성 확인)로 보정. 단언 의미(해당 패널 활성)는 동일. testId/data-* 는 불변(R6) — 테스트가 참조하는 셀렉터만 더 견고하게.
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 8.58s` (tsc 0 errors)
+- `npx eslint src/features/{user,group,user-management}` ✅ **NEW 에러 0** — 1건은 baseline pre-existing `UserPasswordResetModal.tsx:45` set-state-in-effect(effect 미변경, className 만 토큰화).
+- `npx playwright test` (전체) ✅ **75 passed / 0 failed** (2.0m). 4 대상 spec(user-page/group-page/selectable-table-user-list/selectable-table-group-list) 포함 cross-page 회귀 0.
+- hex 잔존: `grep -rnoE '#[0-9A-Fa-f]{6}' src/features/{user,group,user-management}` → **0** (45→0 전량 토큰화).
+- before/after 스크린샷: `.claude/specs/screenshots/{before,after}/user-R5.png`·`group-R5.png` (playwright test 러너 + scroll-reset 캡처, before 는 git stash 로 parent 상태). before=녹색 LNB+pill 없는 헤더+"액션", after=coral LNB(좌측 액센트)+32 총건수 pill 헤더+"Add user"+i18n.
+
+### Follow-up (보류 — 투명 기록)
+- **모달 내부 폼 라벨 i18n 미완** — 6 모달/다이얼로그는 색 토큰화 전량 완료했으나, 폼 필드 라벨(회사/부서/그룹 코드 등)·동적 메시지(userId·카운트 임베드)·삭제 확인 텍스트는 미적용. 사유: (1) `t()` 보간 미지원, (2) eqp 컨벤션(대형 모달 내부 i18n follow-up). 주요 표면(페이지/사이드바/테이블)은 충족. Validate 시 `[~] 부분` 표기 권장.
+
+## eqp/user 세션 공통 컨벤션 보강 (이후 phase 재사용)
+- **i18n 도입 시 e2e locale 무관화** — 패널 제목을 i18n 배선하면 테스트 기본 로케일(EN)에서 텍스트가 바뀌어 `getByRole('heading',{name:'한글'})` 단언이 깨진다. 닿는 e2e 의 텍스트 단언을 **존재하는 testId(패널 활성 확인)** 로 보정(단언 의미 동일, testId 자체는 R6 불변). login/eqp/user 일관.
+- **서버 페이지네이션 도메인** — 콘텐츠 검색바는 API keyword 파라미터가 있을 때만 의미. 없으면(User/Group) 클라 검색은 현재 페이지만 필터해 오해 유발 → 미도입(R6 API 불변). forked 인상은 총건수 pill + 카드 + LNB + coral 로 달성.
+
+## 다음 세션 진입 프롬프트 (R5-dlq — phase별 fresh 세션)
+
+> ⚠️ R5-dlq 는 색치환 작업이 아니다. user/eqp 처럼 **D-R5-METHOD 4단(SPEC R5.0)** 으로. DlqSidebar 는 mode 전환형 — 콘텐츠 리스트 검색/페이지네이션 도입 여부는 dlq API 가 keyword/offset 파라미터를 지원하는지 확인 후 진입 시 사용자에게 1회 확인(user 처럼 서버 페이지네이션+keyword 부재면 미도입).
+
+```
+@.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-dlq 구현.
+이미 완료: Phase0/R1/R2/R5-login/R5-eqp/R5-user + 글로벌 chrome(AppTopBar nori-tc-logo). baseline delta 게이트(pre-existing lint: UserPasswordResetModal.tsx:45 set-state-in-effect / e2e 0 failed) 유지.
+방식: SPEC R5.0 = D-R5-METHOD 4단 엄수. dev-report 의 "공통 컨벤션" 그대로 따를 것(특히 i18n e2e locale 무관화 / 서버 페이지네이션 검색 판단). 색치환만 하고 끝내지 말 것.
+  (1) 틀 — forked 리스트 구조를 R1 shell(PageHeading[pill]/PageFilterBar/PagePagination/SelectableTable/PageModal)로 DlqPage 골격 재구성.
+  (2) 콘텐츠 재배치 — Dashboard/Gateway/Business/Quarantine/RepairTask Panel 의 표 영역을 골격 slot 에 (prop/state/API/testId/data-* 불변, R6).
+  (3) 사이드바 — DlqSidebar 에 forked LNB 시각(active 좌측 액센트+hover transition+flat, 아이콘 없음). mode 전환 동작/testId 불변(R4.1).
+  (4) i18n — dlq.* 정적 키 신설 후 t() 배선. 동적 메시지는 보류.
+  (5) 색 — dlq 33 hex → coral/neutral 토큰. status/뱃지 semantic 색은 보존.
+D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, 시각 className·토큰만).
+검증: build + eslint(변경파일, baseline delta NEW 0) + dlq-page e2e PASS + before/after 스크린샷 + 단일 commit.
+이후 순서: model → deploy (각 phase 동일 4단). LiveMap 보류.
+```

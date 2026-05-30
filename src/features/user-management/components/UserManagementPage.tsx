@@ -5,6 +5,7 @@ import { GroupAdminPanel } from '@/features/group/components/GroupAdminPanel'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { UserAdminPanel } from '@/features/user/components/UserAdminPanel'
 import { AppPageShell } from '@/shared/components/AppPageShell'
+import { useI18n } from '@/i18n/i18n-context'
 import { hasPermission, USER_READ_PERMISSION } from '@/shared/lib/permission'
 import { useUserManagementUiStore } from '../stores/user-management-ui.store'
 import type { UserManagementMode } from '../types/user-management.types'
@@ -26,6 +27,7 @@ const renderPanel = (mode: UserManagementMode) => {
  * 좌측 사이드바에서 User / Group 모드를 전환합니다.
  */
 export function UserManagementPage() {
+  const { t } = useI18n()
   const meQuery = useMe(true)
   const mode = useUserManagementUiStore((state) => state.mode)
   const setMode = useUserManagementUiStore((state) => state.setMode)
@@ -36,8 +38,8 @@ export function UserManagementPage() {
 
   if (meQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] text-sm text-[#4B5A52]">
-        사용자 정보를 확인하는 중입니다.
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        {t('user.loading')}
       </div>
     )
   }

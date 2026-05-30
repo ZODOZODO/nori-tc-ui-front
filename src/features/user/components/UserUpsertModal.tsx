@@ -193,7 +193,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-company" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-company" className="text-xs font-semibold text-muted-foreground">
               회사
             </label>
             <Input
@@ -204,7 +204,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-department" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-department" className="text-xs font-semibold text-muted-foreground">
               부서
             </label>
             <Input
@@ -215,7 +215,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-user-name" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-user-name" className="text-xs font-semibold text-muted-foreground">
               이름
             </label>
             <Input
@@ -226,7 +226,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-user-id" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-user-id" className="text-xs font-semibold text-muted-foreground">
               아이디
             </label>
             <Input
@@ -237,7 +237,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-email" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-email" className="text-xs font-semibold text-muted-foreground">
               이메일
             </label>
             <Input
@@ -249,7 +249,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-upsert-password" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-password" className="text-xs font-semibold text-muted-foreground">
               비밀번호 {mode === 'create' ? '(필수)' : '(미입력 시 유지)'}
             </label>
             <Input
@@ -262,7 +262,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
-            <label htmlFor="user-upsert-status" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="user-upsert-status" className="text-xs font-semibold text-muted-foreground">
               상태
             </label>
             <Select
@@ -289,7 +289,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
         </div>
 
         {errorMessage ? (
-          <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}

@@ -59,7 +59,7 @@ export function GroupDeleteConfirmDialog({
       onConfirm={() => void handleConfirm()}
     >
       {errorMessage ? (
-        <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+        <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
           {errorMessage}
         </p>
       ) : null}

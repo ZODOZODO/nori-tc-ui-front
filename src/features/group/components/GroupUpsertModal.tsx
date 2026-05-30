@@ -138,7 +138,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-upsert-code" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="group-upsert-code" className="text-xs font-semibold text-muted-foreground">
               그룹 코드
             </label>
             <Input
@@ -149,7 +149,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-upsert-name" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="group-upsert-name" className="text-xs font-semibold text-muted-foreground">
               그룹 이름
             </label>
             <Input
@@ -160,7 +160,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
-            <label htmlFor="group-upsert-description" className="text-xs font-semibold text-[#4A5A52]">
+            <label htmlFor="group-upsert-description" className="text-xs font-semibold text-muted-foreground">
               설명
             </label>
             <Input
@@ -178,16 +178,16 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
               checked={resolvedFormState.isActive}
               onChange={(event) => handleChange('isActive', event.target.checked)}
               disabled={isBusy}
-              className="size-4 rounded border-[#CFD8D2]"
+              className="size-4 rounded border-input"
             />
-            <label htmlFor="group-upsert-is-active" className="text-xs text-[#4A5A52]">
+            <label htmlFor="group-upsert-is-active" className="text-xs text-muted-foreground">
               활성화 (사용자에게 부여 가능)
             </label>
           </div>
         </div>
 
         {errorMessage ? (
-          <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}
