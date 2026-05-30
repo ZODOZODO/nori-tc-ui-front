@@ -494,3 +494,91 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, �
 - **대시보드 도메인(deploy)** — forked `_dashboard.scss` 카드 grid 는 `PageCardGrid`+`PageCard`(accent-bar 헤더)로 실현. 차트는 recharts(단일 용도 직접 사용), status/배포상태는 semantic 토큰(success/danger/info)·중립은 chart-1~5 로 매핑(coral 단색 치환 금지). 신규 API 호출 없이 기존 in-memory 데이터(targetSummary) 클라이언트 집계로 시각화(R6).
 - **R4.2 6 도메인 일관 완료** — eqp/model/dlq/user/deploy 5 도메인(+login 사이드바 없음) 사이드바가 `shared-sidebar-layout` 단일 키로 접기·폭 공유. 신규 도메인 사이드바는 4 prop(sidebarOpen/width/onToggle/onResize) + 페이지 `useSharedLayoutStore` 배선만으로 동작 확보.
 - **PageCard 가 forked 카드의 canonical** — accent-bar(`h-4 w-[3px] bg-brand-primary`) + 제목 + `bg-muted/40` 헤더 + `rounded-xl border bg-card shadow-soft-sm`. R1 fixture 와 deploy 실페이지가 공유. 패널 내부 패딩 보존이 필요하면 `bodyClassName="p-0"`.
+
+## Phase R5-livemap — LiveMapPage 이미지 기반 재구성 + 전역 다크/라이트 테마 (2026-05-30)
+
+### 진입 결정 (D-LIVEMAP 이행 + 신규 전역 테마 — 세션 인터뷰 2건)
+LiveMap 은 forked 차용이 아니라 **첨부 디자인 이미지(`new_dash_theme.png`) 기반**(SPEC D-LIVEMAP). 이미지는 전체 다크지만 지시는 "색은 ui-front coral/neutral 토큰(382 hex 전량→토큰, status/설비상태 semantic 색 보존)". 두 결정을 AskUserQuestion 으로 확정:
+- **(Q1) 팔레트** → 사용자: "전체 페이지 모두 다크/라이트 모드가 있어야 하고, live-map 은 그걸 반영". 즉 라이트/다크 하드코딩이 아니라 **테마 반응형 시맨틱 토큰**(index.css `:root`/`.dark` 양쪽 정의된 surface 토큰). 검증: surface(background/card/muted/border/foreground/input)는 양 테마 정의 완비, semantic(success/danger/warning/info/brand-primary)은 `.dark` 재정의 없이 `:root` 상속(중간 명도라 양 테마 안정).
+- **(Q2) 레이아웃** → 사용자: "이미지 계층 재배치". draggable cluster 엔진·store·mock 10클러스터·testId 는 R6 보존하되 이미지 계층(KPI 스트립 + 공정 그룹 보드 + 좌 세로 아이콘 rail + 우 "설비 상세")으로 재배치.
+- **(Q1-scope) 전역 토글** → 사용자: "live-map 테마 반응형 + 전역 토글 둘 다". 앱 전역 다크/라이트 토글이 부재(`.dark` 적용 코드 없음)했으므로 이 phase 에서 **신규 구현**. SPEC "단일 페이지 commit/cross-page 오염 0" 및 ".dark 갱신 OoS" 와 일부 충돌하나 사용자 명시 결정으로 해제(전역 chrome 포함).
+
+### B. 전역 다크/라이트 테마 (신규 기능)
+- `src/shared/stores/theme.store.ts` — **신규** Zustand store. `theme: 'light'|'dark'`, localStorage(`nori-tc-theme`) persist, `document.documentElement` 의 `.dark` 클래스 토글. 모듈 로드 시점 즉시 적용(main.tsx import 로 첫 페인트 전 반영).
+- `src/shared/components/ThemeToggle.tsx` — **신규** Sun/Moon 토글 버튼(LanguageToggle 패턴 미러, `theme.toLight`/`theme.toDark` aria).
+- `src/shared/components/AppTopBar.tsx` — `<ThemeToggle/>` 추가(additive, LanguageToggle 좌측) + `bg-white`→`bg-card`(시각 토큰만, R4 navigationItems/라우팅/prefetch git diff 0 유지).
+- `src/main.tsx` — `import '@/shared/stores/theme.store'`(모듈 부작용으로 라우트 무관 첫 페인트 전 테마 적용 — login 포함).
+- `src/index.css` — `.dark` 블록의 chart-1~5 + sidebar-primary 를 블루/퍼플 → **coral monochrome 보정**(:root 와 hue 일치). 다른 surface/semantic 토큰은 기존 정의 보존.
+- `src/i18n/locales/{ko,en}.json` — `theme.toLight`/`theme.toDark` 2키.
+
+### A. live-map 382 hex → 테마 반응형 토큰 + 이미지 계층 + i18n (D-R5-METHOD 이미지 변형)
+1. **틀(이미지 계층)** — LiveMapPage 골격: 상단 KPI 스트립(`LiveMapHeader`: 제목 + 동적 상태 badge[정상가동/점검 필요] + TOTAL/RUN/IDLE/ERROR/DOWN 타일) + 필터바(`LiveMapToolbar`) + "공정 Live Map" 보드(`LiveMapBoard`: 헤더[Start Demo/Edit layout/sync + Legend] + **좌 세로 아이콘 rail**[zoom reset/locate/in/out] + 공정 그룹 카드 캔버스) + 우 "설비 상세"(`LiveMapTooltipCard`: 상태 badge / 공정·라인·웨이퍼모드 / PORT 상태 / 메시지 / 통신로그). 이미지의 KPI·공정보드·좌 rail·우 상세 계층을 그대로 채택.
+2. **콘텐츠 재배치(R6 불변)** — draggable cluster/equipment 엔진(`LiveMapBoard` 의 DragState/pointer effect/zoom/locate), `useLiveMapUiStore`(zoom/drafts/filter/selection), `useLiveMap`/`useCommLog`/demo hook, `live-map-data`/`-layout`/`-selectors`/`-demo` 순수 lib, mock 10클러스터·30설비, `data-testid="live-map-demo-jobs-skeleton"` 전부 **불변**. 노드 선택/드래그/aria/disabled 동작 보존.
+3. **색(382→0)** — `live-map-status-theme.ts` 를 **className 토큰**으로 재작성: RUN→`success`, IDLE→`sky`(전역 토큰계에 blue 부재 → "대기" semantic 보존 위해 Tailwind sky 팔레트 + `dark:` 변형 유지), ERROR→`danger`, DOWN→`muted`. 9 컴포넌트 전 hex → surface 토큰(card/background/muted/border/foreground/muted-foreground) + 위 status 토큰. **status/설비상태 semantic 색은 success/sky/danger/muted 로 매핑해 의미 보존, brand coral 치환 금지**. grep `#[0-9A-Fa-f]{3,8}` → **0** (382→0).
+4. **i18n** — `livemap.*` 키 ~80개 신설(ko/en): 페이지 제목/부제/상태/에러/로딩, KPI total, 검색/live, 보드 제목/부제/데모/배치편집, zoom aria 4, 노드 선택 suffix, 상세(선택/공정/라인/웨이퍼모드/PORT/메시지 4), 통신로그(제목/갱신/empty/openAll/payloadEmpty), 데모모달(트리/대상/실행 컬럼·라벨·testType 등 ~40). 정적 텍스트 `t()` 배선.
+
+### 구조 정리 (SURGICAL)
+- `live-map.types.ts` / `live-map.mock.ts` — `LiveMapClusterItem` 의 장식용 색·metric 필드 8개(accentColor/panelColor/borderColor/badgeBg/badgeBorderColor/badgeTextColor/metricLabel/metricValue) **제거**(이미지 균일 토큰 카드로 무지개 accent 폐기 → 미사용 필드. 소비처 0 grep 확인, 테스트 미참조). 보드는 `bg-card`/`border-border` 균일 + coral accent bar. id/title/subtitle/x/y/width/height 만 유지.
+- `live-map-layout.ts` — `LIVE_MAP_MACHINE_NODE_WIDTH/HEIGHT` 28×40→**44×34**(라벨 타일). live-map-layout.test 가 상수 상대 참조라 PASS 유지. `NODE_OFFSET_X=24`/`NODE_GAP_X=52`(live-map-data.test 리터럴 단언)·`GRID_COLUMNS=4` 불변 — 44px 타일이 stride 52 + 클러스터 232폭 내 적합.
+- `LiveMapMachineNode` — tiny 머신 아이콘 → **상태 dot + Eqp ID 라벨 타일**(이미지 풍). 선택/드래그/aria/disabled/aria-pressed 불변.
+- `LiveMapCommLogPanel` — bespoke `LIGHT_THEME`/`DARK_THEME` 토큰 객체 + **로컬 light/dark 토글 + localStorage 제거**. 전역 테마가 관장하므로 중복·충돌 → 전역 semantic 토큰으로 통일(58 hex 제거). 로그 리스트/상세 모달·행 클릭·payload 뷰 동작 보존. RECV→sky / SEND→warning semantic 보존.
+
+### 변경 파일 (live-map 9 + 신규 2 + 글로벌 4 + lib/type/mock 3 + locale 2)
+- live-map components 9: LiveMapPage / LiveMapHeader / LiveMapToolbar / LiveMapLegend / LiveMapMachineNode / LiveMapBoard / LiveMapTooltipCard / LiveMapCommLogPanel / LiveMapDemoModal
+- live-map lib/type/mock 3: lib/live-map-status-theme.ts(재작성) / lib/live-map-layout.ts(노드 상수) / types/live-map.types.ts + mocks/live-map.mock.ts(색필드 제거)
+- 신규 2: src/shared/stores/theme.store.ts / src/shared/components/ThemeToggle.tsx
+- 글로벌 4: src/shared/components/AppTopBar.tsx / src/main.tsx / src/index.css(.dark) / (locale 2: ko.json/en.json — theme.* + livemap.* 키)
+- 스크린샷: `.claude/specs/screenshots/{before,after}/live-map-R5.png` + `after/live-map-dark-R5.png` + `after/live-map-demo-R5.png`
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 11.22s` (tsc 0 errors). LiveMapPage 청크 37.17KB(gzip 10.72KB).
+- `npx eslint`(live-map + theme.store + ThemeToggle + AppTopBar + main) ✅ **NEW 0** — 1건은 baseline pre-existing `LiveMapDemoModal.tsx:218` set-state-in-effect(기존 :215, `useI18n` 추가로 라인 3 이동 — effect 미변경).
+- `node --test`(live-map-data/layout/demo) ✅ **18/18 PASS** — 노드 좌표(OFFSET_X=24/GAP_X=52 리터럴)·클러스터 10개·요약 집계 단언 정합.
+- `npx playwright test`(전체) ✅ **75 passed / 0 failed** (2.0m). live-map 전용 spec 부재(닿는 e2e 0), AppTopBar(공유 chrome) bg-white→bg-card + ThemeToggle 추가에도 topbar/nav e2e 회귀 0. (`page.on('console','error')`/`pageerror` 0 — 라이트/다크 캡처 시 console.error 미발생 확인.)
+- hex 잔존: `grep -rnoE '#[0-9A-Fa-f]{3,8}' src/features/live-map/` → **0** (382→0 전량 토큰화).
+- before/after 스크린샷(playwright test 러너 + auth/live-map/comm-log mock, 1720×1180, before 는 `git stash`(추적 변경만) 로 parent 상태): **before** = 하이브리드(라이트 chrome + 다크 보드 + 무지개 accent + 작은 머신 아이콘 + 한글 하드코딩 + 테마 토글 없음) / **after(light)** = KPI 스트립 + Process Live Map 공정 그룹 보드 + 좌 세로 rail + 우 Selected 상세 + coral/neutral 토큰 + EN i18n + status semantic 보존 / **after(dark)** = 동일 레이아웃 전역 다크(이미지의 다크 모니터링 룩) + Sun 토글 아이콘. 데모 모달 캡처 포함.
+
+### Follow-up (보류 — 투명 기록)
+- **line/state 필터 select 옵션 라벨 미 i18n** — `LIVE_MAP_LINE_OPTIONS`/`LIVE_MAP_STATE_OPTIONS`(mock.ts 데이터)의 "전체 라인"/"전체 상태" 한국어가 EN locale 에서도 노출(after light 스크린샷). enum/데이터 라벨이라 mock 레이어에 위치 — 이전 phase 의 enum 라벨 보류 컨벤션 따름. Validate 시 `[~]` 표기 가능.
+- **데모 모달 동적 메시지 미 i18n** — `t()` 보간 미지원이라 카운트 임베드("체크된 설비 N", "N대 선택됨", "완료 X/Y", startMessage, 그룹 일괄선택 aria)는 한국어 동적 유지. 정적 라벨·컬럼·testType 은 i18n 충족. eqp/user/dlq/model/deploy 대형 모달 컨벤션 일관.
+- **좌 세로 rail 이 첫 클러스터(cvd x=34) 좌단과 소폭 겹침** — 원본도 floating 컨트롤이 top-left 겹침이었음(보드 스크롤/줌으로 회피 가능). 동작 영향 없음.
+- **`.dark` semantic(success/warning/danger/info/brand) 미재정의** — `:root` 상속이 양 테마 안정(중간 명도)이라 SURGICAL 보존. 정밀 다크 대비 조정은 별도 범위.
+- **임시 캡처 spec** — `tests/e2e/_live_map_capture.spec.ts` 는 스크린샷 캡처용 임시 파일. 삭제 명령이 권한 게이트로 차단되어 `test.skip` 무해화 처리(향후 playwright run 영향 0). 미추적 — commit 미포함. 수동 삭제 권장.
+
+### 전역 테마 컨벤션 (이후 재사용)
+- **테마 반응형이 곧 다크/라이트 자매품** — 라이트/다크를 따로 디자인하지 않고 surface 시맨틱 토큰(`bg-card`/`bg-background`/`bg-muted`/`text-foreground`/`border`)으로 통일하면 `.dark` cascade 로 자동 양 테마. status semantic(success/sky/danger/muted)은 양 테마 안정값 선택.
+- **`useThemeStore`** — `nori-tc-theme` localStorage 키, 모듈 로드 즉시 `.dark` 적용. 신규 페이지는 토큰만 쓰면 자동 테마 대응(별도 배선 0).
+
+### 사용자 피드백 보정 — 이미지 플로우 구조 재구축 (2026-05-31)
+> ⚠️ 1차 구현은 **기존 2×5 독립 카드 그리드에 토큰만 입힌 오구현**이었다(이미지의 공정 플로우를 재현하지 않음). 사용자 지적("이미지랑 같은 게 하나도 없다, 분석부터 제대로") 후 첨부 이미지(`new_dash_theme.png`)를 영역별 crop(playwright chromium + base64, `C:/tmp/livemap_crops`)으로 정밀 분석 → 보드/노드/우측패널/헤더/rail 을 이미지 구조대로 **전면 재구축**. 본 보정으로 1차 기록은 대체된다.
+
+**이미지 정밀 분석으로 확인한 구조 (crop 근거)**:
+- 보드 = **공정 플로우 다이어그램**: `IN(원형) → CVD → CMP → DIFF → PHOTO → METRO`(상단) `→ 감김 → METAL → ETCH → IMP → WET → ETC → OUT(원형)`, 카드 사이 **화살표 SVG 커넥터** + IN/OUT 종단.
+- 공정 카드 = 좌측 accent bar + 제목/부제 + 카운트 badge + **노드 타일 그리드**(2열). 1차의 status 카운트 2×2 그리드·빈 패널은 이미지에 없어 **제거**.
+- 노드 타일 = `[상태 dot][EQP_ID]`(윗줄) + `[포트 dot 행]`(아랫줄) 가로 타일.
+- 우측 패널 = `선택 설비`(● EQP + 상태 badge + ✕ 닫기) → **KV 리스트**(공정/라인/웨이퍼모드/실시간상태) → `포트 상태`(N/N + 번호 리스트) → `최근 알림`(시간+dot+메시지 타임라인, 더보기).
+- 헤더 = `설비 Live Map` + **`● 실시간 Ns` 라이브싱크 pill**(1차의 정상가동 badge 대체).
+- 좌측 = **세로 에디터 툴 rail**(hand/move/zoom/fit/locate).
+- 보드 헤더 = 공정 Live Map + 자동 새로고침 + 데모 시작.
+
+**재구축 변경 (위 9파일 중 board/node/tooltip/commlog/header/page + mock/layout/selectors)**:
+- `LiveMapBoard` 전면 재작성 — clusterId 그룹핑 → 카드별 CSS 그리드 노드, **SVG 커넥터 오버레이**(IN→배열순서 스네이크→OUT, 카드 rect 에서 계산해 drag/zoom 추종) + IN/OUT 원형 종단, 세로 rail(RailButton, hand=pan·move=배치편집·zoom in/out·fit·locate — undo/redo/delete 는 백킹 기능 부재로 미도입). 카드 헤더가 드래그 핸들(노드 클릭=선택과 분리).
+- `LiveMapMachineNode` — 절대좌표·드래그 prop 제거 → 카드 그리드 타일([dot+ID]+[포트 dot]). 선택 동작만 유지.
+- `LiveMapTooltipCard` — 3열 grid → 선택설비 KV 리스트 + 포트 번호 리스트(N/N) + ✕ 닫기(`onClose`→선택 해제) + 최근알림(LiveMapCommLogPanel).
+- `LiveMapCommLogPanel` — 인라인을 **최근 알림 타임라인**(시간+방향 dot+메시지)로, "더보기"→전체 로그 모달. 모달 재사용.
+- `LiveMapHeader` — `syncLabel` prop + `● 실시간 Ns` pill. `LiveMapPage` 는 syncLabel 을 헤더로, board 는 `onMoveCluster`(노드 드래그 제거)·`onClearSelection` 으로 갱신.
+- `mock` — 클러스터 10개를 스네이크 플로우 좌표로 재배치(2행5열, w224/h264, IN 가시성 위해 좌측 +60 시프트), `LIVE_MAP_BOARD_WIDTH 1500`/`HEIGHT 820`. `layout.ts` 노드 상수는 그리드 렌더로 미사용(테스트 PASS 유지). `selectors.formatLiveMapSyncLabel` → 초만 반환("Ns").
+- **R6**: store/lib(data·layout·selectors·demo 순수함수)/mock 데이터(10클러스터·status·portItems)/testId 불변. 노드별 자유 드래그(equipmentPositionDrafts)는 이미지의 정렬 그리드와 무관해 **시각 미사용**(store/lib 동결, draft 잔존만) — 카드(공정 단위) 드래그는 유지.
+
+**재구축 검증**:
+- `npm run build` ✅ `✓ built in 13.34s` (tsc 0).
+- `npx eslint src/features/live-map/` ✅ **NEW 0** — 1건 baseline pre-existing `LiveMapDemoModal.tsx:218`(rail 배열→RailButton 컴포넌트 추출로 `react-hooks/refs` NEW 에러 해소).
+- `node --test`(live-map-data/layout/demo) ✅ **18/18** (클러스터 좌표 동적 참조라 재배치에도 PASS).
+- `npx playwright test --grep-invert "capture live-map"`(전체) ✅ **75 passed / 0 failed** (2.8m) 회귀 0.
+- hex 잔존 0 / JSON 키 276/276 parity.
+- before/after 재캡처: **before**(parent 하이브리드, 기존 유지) / **after(light)** = IN→스네이크→OUT 플로우 커넥터 + accent 카드 + 노드 타일([dot+ID]+포트dot) + 좌 rail + 우 선택설비/포트/최근알림 / **after(dark)** = 동일 구조 전역 다크(이미지의 다크 모니터링 룩 정합). 데모 모달 캡처 포함.
+
+**보정 후 잔여 (투명 기록)**:
+- 좌 rail 의 undo/redo/delete 는 백킹 기능(undo 스택/삭제) 부재로 미도입 — 필요 시 별도 기능.
+- 노드 자유 드래그 시각 미사용(카드 드래그만). store/lib 동결로 잔존.
+- line/state 필터 라벨(mock enum 한국어)·데모 동적 메시지 i18n 미적용(기존 follow-up 유지).

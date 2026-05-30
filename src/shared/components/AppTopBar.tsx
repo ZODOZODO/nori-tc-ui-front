@@ -16,6 +16,7 @@ import { useMe } from '@/features/profile/hooks/useProfile'
 import { userApi } from '@/features/user/api/user.api'
 import { userQueryKeys } from '@/features/user/lib/user-query-keys'
 import { USER_PAGE_SIZE } from '@/features/user/components/UserListTable'
+import { ThemeToggle } from './ThemeToggle'
 import type { AppTopNavigationKey } from '../lib/app-navigation'
 import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
 import { clearCsrfCookie } from '../lib/session'
@@ -139,7 +140,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-white px-5">
+    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
       <div className="flex items-center">
         <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-8 w-auto" />
       </div>
@@ -179,6 +180,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        <ThemeToggle />
         <LanguageToggle />
 
         <Button

@@ -6,8 +6,8 @@ import type {
   LiveMapPoint,
 } from '../types/live-map.types'
 
-export const LIVE_MAP_MACHINE_NODE_WIDTH = 28
-export const LIVE_MAP_MACHINE_NODE_HEIGHT = 40
+export const LIVE_MAP_MACHINE_NODE_WIDTH = 44
+export const LIVE_MAP_MACHINE_NODE_HEIGHT = 34
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value))

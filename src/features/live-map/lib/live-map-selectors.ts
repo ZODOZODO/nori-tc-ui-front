@@ -138,5 +138,5 @@ export const resolveSelectedLiveMapEquipment = (
  */
 export const formatLiveMapSyncLabel = (lastSyncAt: number, now: number): string => {
   const deltaMs = Math.max(0, now - lastSyncAt)
-  return `${(deltaMs / 1000).toFixed(1)}s live sync`
+  return `${(deltaMs / 1000).toFixed(1)}s`
 }

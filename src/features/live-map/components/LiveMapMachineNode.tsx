@@ -1,80 +1,59 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
-import { LIVE_MAP_STATUS_THEME } from '../lib/live-map-status-theme'
-import type { LiveMapEqpStatus } from '../types/live-map.types'
+import { useI18n } from '@/i18n/i18n-context'
+import {
+  LIVE_MAP_PORT_STATUS_CLASS,
+  LIVE_MAP_STATUS_CLASS,
+} from '../lib/live-map-status-theme'
+import type { LiveMapEqpStatus, LiveMapEquipmentPortItem } from '../types/live-map.types'
 
 interface LiveMapMachineNodeProps {
   eqpId: string
   status: LiveMapEqpStatus
-  x: number
-  y: number
+  portItems: readonly LiveMapEquipmentPortItem[]
   selected: boolean
   dimmed: boolean
-  editable: boolean
-  dragging: boolean
   onSelect: (eqpId: string) => void
-  onDragStart: (eqpId: string, event: ReactPointerEvent<HTMLButtonElement>) => void
 }
 
 /**
- * dash_map frame의 machine node 톤을 코드 컴포넌트로 옮긴 표현입니다.
+ * 공정 카드 그리드 안의 설비 노드 타일입니다.
+ * 윗줄 = 상태 dot + Eqp ID, 아랫줄 = 포트 상태 dot 행. 선택 동작만 주입됩니다.
  */
 export function LiveMapMachineNode({
   eqpId,
   status,
-  x,
-  y,
+  portItems,
   selected,
   dimmed,
-  editable,
-  dragging,
   onSelect,
-  onDragStart,
 }: LiveMapMachineNodeProps) {
-  const theme = LIVE_MAP_STATUS_THEME[status]
+  const { t } = useI18n()
+  const variant = LIVE_MAP_STATUS_CLASS[status]
 
   return (
     <button
       type="button"
-      className={`absolute rounded-[10px] text-left transition-[transform,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E36C7C]/60 ${
-        editable
-          ? dragging
-            ? 'cursor-grabbing shadow-[0_12px_20px_rgba(9,16,24,0.3)]'
-            : 'cursor-grab hover:-translate-y-0.5'
-          : 'cursor-pointer hover:-translate-y-0.5'
-      }`}
-      style={{
-        left: x,
-        top: y,
-        opacity: dimmed ? 0.2 : 1,
-      }}
       onClick={() => onSelect(eqpId)}
-      onPointerDown={(event) => onDragStart(eqpId, event)}
-      aria-label={`${eqpId} 설비 선택`}
-      disabled={dimmed}
+      aria-label={`${eqpId} ${t('livemap.node.selectSuffix')}`}
       aria-pressed={selected}
+      disabled={dimmed}
+      className={`flex min-w-0 flex-col gap-1 rounded-[8px] border bg-card px-2 py-1.5 text-left transition-colors ${
+        selected
+          ? 'border-brand-primary ring-2 ring-brand-primary/20'
+          : 'border-border hover:border-brand-primary/40'
+      } ${dimmed ? 'opacity-30' : ''}`}
     >
-      {selected ? (
-        <span className="absolute -inset-1 rounded-[10px] border-2 border-[#E36C7C] shadow-[0_0_0_2px_rgba(227,108,124,0.15)]" />
-      ) : null}
-      <span className="relative block h-10 w-7 rounded-[6px] border border-[#B7C4D4] bg-[#F1F5FB] shadow-[0_5px_12px_rgba(9,16,24,0.2)]">
-        <span
-          className="absolute left-1 top-1 h-[7px] w-5 rounded-[3px]"
-          style={{ backgroundColor: theme.nodeTop }}
-        />
-        <span className="absolute right-0 top-[7px] h-6 w-[6px] rounded-r-[4px] bg-[#707A88]" />
-        <span
-          className="absolute left-[7px] top-4 h-3 w-[14px] rounded-[3px]"
-          style={{ backgroundColor: theme.nodeLower }}
-        />
-        <span
-          className="absolute right-1 top-[5px] h-[6px] w-[6px] rounded-full border"
-          style={{
-            backgroundColor: theme.nodeLamp,
-            borderColor: theme.nodeLampBorder,
-          }}
-        />
-        <span className="absolute bottom-0 left-[6px] h-[5px] w-4 rounded-b-[4px] bg-[#BCC7D6]" />
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span className={`size-2 shrink-0 rounded-full ${variant.dot}`} />
+        <span className="truncate text-[11px] font-bold text-foreground">{eqpId}</span>
+      </div>
+      <div className="flex items-center gap-[3px]">
+        {portItems.slice(0, 6).map((portItem) => (
+          <span
+            key={portItem.id}
+            className={`size-1.5 rounded-full ${LIVE_MAP_PORT_STATUS_CLASS[portItem.status].dot}`}
+          />
+        ))}
+      </div>
     </button>
   )
 }

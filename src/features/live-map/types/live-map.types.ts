@@ -21,18 +21,10 @@ export interface LiveMapClusterItem {
   id: string
   title: string
   subtitle: string
-  metricLabel: string
-  metricValue: string
   x: number
   y: number
   width: number
   height: number
-  accentColor: string
-  panelColor: string
-  borderColor: string
-  badgeBg: string
-  badgeBorderColor: string
-  badgeTextColor: string
 }
 
 export interface LiveMapEquipmentNode {

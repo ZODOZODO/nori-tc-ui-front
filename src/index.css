@@ -187,14 +187,15 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  /* chart 1-5 (dark) — :root 와 동일 N coral monochrome (블루/퍼플 제거, 다크 대비용 lightness 소폭 ↑) */
+  --chart-1: oklch(0.66 0.16 36);   /* coral primary (N) */
+  --chart-2: oklch(0.78 0.17 75);   /* amber */
+  --chart-3: oklch(0.56 0.20 28);   /* rust */
+  --chart-4: oklch(0.80 0.12 100);  /* peach / golden */
+  --chart-5: oklch(0.62 0.04 250);  /* neutral cool (chroma 0.04 — blue 아님) */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.66 0.16 36);   /* coral (블루 제거 — :root 와 hue 일치) */
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/i18n/i18n-context'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
@@ -24,13 +25,13 @@ import {
   formatLiveMapSyncLabel,
   resolveSelectedLiveMapEquipment,
   summarizeLiveMapEquipmentNodes,
-  summarizeLiveMapEquipmentNodesByCluster,
 } from '../lib/live-map-selectors'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
 
 export function LiveMapPage() {
+  const { t } = useI18n()
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
 
@@ -50,7 +51,6 @@ export function LiveMapPage() {
   const setSelectedEqpId = useLiveMapUiStore((state) => state.setSelectedEqpId)
   const setLayoutEditEnabled = useLiveMapUiStore((state) => state.setLayoutEditEnabled)
   const updateClusterLayout = useLiveMapUiStore((state) => state.updateClusterLayout)
-  const updateEquipmentPosition = useLiveMapUiStore((state) => state.updateEquipmentPosition)
   const zoomIn = useLiveMapUiStore((state) => state.zoomIn)
   const zoomOut = useLiveMapUiStore((state) => state.zoomOut)
   const resetZoom = useLiveMapUiStore((state) => state.resetZoom)
@@ -94,11 +94,6 @@ export function LiveMapPage() {
   const summary = useMemo(
     () => summarizeLiveMapEquipmentNodes(visibleEquipmentNodes),
     [visibleEquipmentNodes],
-  )
-
-  const clusterSummaries = useMemo(
-    () => summarizeLiveMapEquipmentNodesByCluster(equipmentNodes),
-    [equipmentNodes],
   )
 
   const selectedEquipment = useMemo(
@@ -163,7 +158,7 @@ export function LiveMapPage() {
     >
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex w-full flex-col gap-4 px-6 py-6">
-          <LiveMapHeader summary={summary} />
+          <LiveMapHeader summary={summary} syncLabel={syncLabel} />
           <LiveMapToolbar
             searchKeyword={searchKeyword}
             selectedLine={selectedLine}
@@ -175,10 +170,10 @@ export function LiveMapPage() {
             onSelectedStatusChange={setSelectedStatus}
           />
           {liveMapQuery.isError ? (
-            <div className="rounded-[18px] border border-[#F1C0C0] bg-[#FFF5F5] px-4 py-3 text-sm font-semibold text-[#A63A3A]">
+            <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
               {liveMapQuery.error instanceof Error
                 ? liveMapQuery.error.message
-                : '라이브 맵 정보를 조회하지 못했습니다.'}
+                : t('livemap.error')}
             </div>
           ) : null}
           <LiveMapBoard
@@ -186,22 +181,20 @@ export function LiveMapPage() {
             equipmentNodes={equipmentNodes}
             visibleEquipmentIds={visibleEquipmentIds}
             selectedEquipment={selectedEquipment}
-            clusterSummaries={clusterSummaries}
             zoomLevel={zoomLevel}
-            syncLabel={syncLabel}
             isLayoutEditEnabled={isLayoutEditEnabled}
             onSelectEquipment={setSelectedEqpId}
+            onClearSelection={() => setSelectedEqpId(null)}
             onOpenDemo={() => setIsDemoModalOpen(true)}
             onLayoutEditEnabledChange={setLayoutEditEnabled}
-            onMoveClusterLayout={updateClusterLayout}
-            onMoveEquipment={updateEquipmentPosition}
+            onMoveCluster={(clusterId, position) => updateClusterLayout(clusterId, position, {})}
             onZoomIn={zoomIn}
             onZoomOut={zoomOut}
             onResetZoom={resetZoom}
           />
           {liveMapQuery.isLoading && equipmentNodes.length === 0 ? (
-            <div className="rounded-[18px] border border-[#D9E3DC] bg-white px-4 py-3 text-sm font-semibold text-[#51606A]">
-              라이브 맵 설비 정보를 불러오는 중입니다.
+            <div className="rounded-[18px] border border-border bg-card px-4 py-3 text-sm font-semibold text-muted-foreground">
+              {t('livemap.loading')}
             </div>
           ) : null}
         </div>
