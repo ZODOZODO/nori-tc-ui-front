@@ -1,5 +1,5 @@
 import { memo, useDeferredValue, useMemo, useState } from 'react'
-import { Boxes, ChevronLeft, ChevronRight, Network, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -63,7 +63,7 @@ const subLinkClass = (selected: boolean) =>
 
 /**
  * design.pen의 EqpSidebarExpanded/Collapsed 구조 + nori-client 리뉴얼 LNB 시각 패턴
- * (그룹 아이콘 / 들여쓴 하위 링크 / active 좌측 액센트 / hover 전환)을 입힌 사이드바입니다.
+ * (그룹 아코디언 / 들여쓴 하위 링크 / active 좌측 액센트 / hover 전환)을 입힌 사이드바입니다.
  * 검색은 eqpId 기준 필터링, 그룹화는 eqp-group.util 의 groupEqpItems 를 사용합니다.
  * 색은 nori-client 의 slate/blue 가 아닌 ui-front coral/neutral 토큰. 구조·라우팅·선택 동작 불변(R4.1/R4.2).
  */
@@ -113,6 +113,17 @@ export const EqpSidebar = memo(function EqpSidebar({
     () => groupEqpItems(filteredEqpItems),
     [filteredEqpItems],
   )
+
+  // 그룹 펼침/접힘 (nori-client sidebar__top 아코디언). 헤더 클릭으로 토글.
+  // 초기값은 현재 선택 컨텍스트 기반 — 새로고침 복원 시 선택된 그룹은 펼쳐 보여준다.
+  const [businessOpen, setBusinessOpen] = useState(
+    () => isBusinessSelected || selectedBusinessGroupIndex !== null,
+  )
+  const [gatewayOpen, setGatewayOpen] = useState(
+    () => isGatewaySelected || selectedGroupIndex !== null || selectedEqpId !== null,
+  )
+  // 검색 중에는 결과가 접혀 안 보이는 걸 막기 위해 양 그룹을 강제로 펼친다(파생값, effect 미사용).
+  const hasSearch = deferredSearchKeyword.trim().length > 0
 
   const renderEqpNode = (eqp: EqpInfo, key: string) => {
     const isSelected = selectedEqpId === eqp.eqpId
@@ -217,59 +228,75 @@ export const EqpSidebar = memo(function EqpSidebar({
           </div>
 
           <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
-            {/* Business 그룹 (nori-client LNB top + sublinks) */}
-            <button type="button" onClick={onSelectBusinessAll} className={groupTopClass(isBusinessSelected)}>
-              <Boxes className="size-[17px] shrink-0" aria-hidden="true" />
+            {/* Business 그룹 (nori-client LNB 아코디언 — 헤더 클릭 시 펼침/접힘 + 전체선택) */}
+            <button
+              type="button"
+              onClick={() => {
+                onSelectBusinessAll()
+                setBusinessOpen((open) => !open)
+              }}
+              className={groupTopClass(isBusinessSelected)}
+            >
               <span className="flex-1 truncate">Business</span>
             </button>
-            <div className="flex flex-col gap-0.5">
-              {businessGroups.length === 0 ? (
-                <p className="py-1 pl-8 text-[11px] text-muted-foreground">
-                  {t('eqp.sidebar.noBusinessGroups')}
-                </p>
-              ) : (
-                businessGroups.map((group) => (
-                  <button
-                    key={group.appName}
-                    type="button"
-                    onClick={() => onSelectBusinessGroup(group.appIndex)}
-                    className={subLinkClass(selectedBusinessGroupIndex === group.appIndex)}
-                  >
-                    {group.appName}
-                  </button>
-                ))
-              )}
-            </div>
+            {businessOpen || hasSearch ? (
+              <div className="flex flex-col gap-0.5">
+                {businessGroups.length === 0 ? (
+                  <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                    {t('eqp.sidebar.noBusinessGroups')}
+                  </p>
+                ) : (
+                  businessGroups.map((group) => (
+                    <button
+                      key={group.appName}
+                      type="button"
+                      onClick={() => onSelectBusinessGroup(group.appIndex)}
+                      className={subLinkClass(selectedBusinessGroupIndex === group.appIndex)}
+                    >
+                      {group.appName}
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
 
             {/* Gateway 그룹 (우클릭 ContextMenu = SECS/Socket Eqp Create) */}
             <ContextMenu>
               <div className="mt-2 flex flex-col gap-0.5">
                 <ContextMenuTrigger asChild>
-                  <button type="button" onClick={onSelectGatewayAll} className={groupTopClass(isGatewaySelected)}>
-                    <Network className="size-[17px] shrink-0" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectGatewayAll()
+                      setGatewayOpen((open) => !open)
+                    }}
+                    className={groupTopClass(isGatewaySelected)}
+                  >
                     <span className="flex-1 truncate">Gateway</span>
                   </button>
                 </ContextMenuTrigger>
-                {gatewayGroups.length === 0 ? (
-                  <p className="py-1 pl-8 text-[11px] text-muted-foreground">
-                    {t('eqp.sidebar.noGatewayGroups')}
-                  </p>
-                ) : (
-                  gatewayGroups.map((group) => (
-                    <div key={group.appName} className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => onSelectGatewayGroup(group.appIndex)}
-                        className={subLinkClass(selectedGroupIndex === group.appIndex)}
-                      >
-                        {group.appName}
-                      </button>
-                      {group.items.map((eqp) =>
-                        renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                      )}
-                    </div>
-                  ))
-                )}
+                {gatewayOpen || hasSearch ? (
+                  gatewayGroups.length === 0 ? (
+                    <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                      {t('eqp.sidebar.noGatewayGroups')}
+                    </p>
+                  ) : (
+                    gatewayGroups.map((group) => (
+                      <div key={group.appName} className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => onSelectGatewayGroup(group.appIndex)}
+                          className={subLinkClass(selectedGroupIndex === group.appIndex)}
+                        >
+                          {group.appName}
+                        </button>
+                        {group.items.map((eqp) =>
+                          renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                        )}
+                      </div>
+                    ))
+                  )
+                ) : null}
               </div>
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel>Gateway</ContextMenuLabel>

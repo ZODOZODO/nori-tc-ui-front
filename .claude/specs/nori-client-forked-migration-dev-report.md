@@ -214,3 +214,9 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className
 - **(1) 콘텐츠 eqpid 검색 제거** — gateway/business 그룹 콘텐츠 테이블의 `PageFilterBar`(검색 Input) 삭제. eqpId 검색은 좌측 사이드바에서만 제공(중복 제거). GatewayGroupTable/BusinessGroupModelTable 의 searchKeyword state·필터 로직·미사용 import(Search/Input/PageFilterBar) 제거, 페이지네이션·총건수 pill 은 유지. 미사용 `eqp.filter.*` 키 2개 locale 에서 제거.
 - **(2) EqpSidebar nori-client LNB 시각 적용** (사용자 선택: "forked LNB 시각만 입히기") — forked `sidebar.jsx`/`header_sidebar.scss` 패턴 차용: Business→`Boxes`/Gateway→`Network` lucide 아이콘, flat nav(박스 카드 제거), 그룹 헤더 선택 시 solid coral(`sidebar__top` is-expanded 인상), 하위 그룹/eqp 링크 active=`brand-primary/10` + 좌측 2px 액센트(`sidebar__sublink` is-active 인상), hover 전환(transition-colors). **slate/blue 렌더값 차용 금지 → coral/neutral 토큰. 구조·라우팅·선택 동작·ContextMenu·검색·R4.2 토글/resize 불변(R4.1/R4.2). 그룹 아코디언(하위 접힘)은 R4.2 OoS 라 미도입.**
 - 검증: `npm run build` ✅ ✓ built in 7.77s / `eslint` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(사이드바 LNB + 검색바 제거 반영).
+
+### 사용자 피드백 보정 2 (2026-05-30, 39d7541 직후)
+- **(1) 그룹 아코디언 도입** — Business/Gateway 가 기본 펼쳐져 있던 것을 **헤더 클릭 시에만 펼침/접힘**으로 변경(`businessOpen`/`gatewayOpen` 로컬 state, 헤더 클릭 = 전체선택 + 토글). 초기값은 현재 선택 컨텍스트 기반 lazy init(새로고침 복원 시 선택 그룹 자동 펼침), 검색 중에는 결과 노출 위해 파생값으로 강제 펼침(effect 미사용). **R4.2 의 "그룹 아코디언 비흡수(OoS)" 결정을 사용자 명시 요청으로 도입** — SPEC owner 결정으로 R4.2 OoS 해제. R4.1 의 메뉴/라우팅/선택 state·핸들러는 불변(아코디언은 표현용 로컬 state).
+- **(2) 그룹 아이콘 제거** — Business→Boxes / Gateway→Network lucide 아이콘 삭제(사용자 요청), import 제거.
+- **e2e 보정** — 아코디언 기본 접힘으로 `selectable-table-gateway-group`(×2) / `selectable-table-check-in`(openCheckInModal) 이 gateway_app1·EQP 노드를 직접 클릭하던 흐름이 깨져, 각 테스트에 "Gateway 헤더 클릭으로 펼침" 단계를 선행 추가. 동작 검증 의미 동일.
+- 검증: `npm run build` ✅ ✓ built in 7.76s / `eslint EqpSidebar` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(기본 접힘 + 아이콘 제거 반영).

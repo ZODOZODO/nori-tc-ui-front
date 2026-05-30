@@ -254,7 +254,8 @@ const openCheckInModal = async (page: Page) => {
   await page.goto('/eqp')
   await page.waitForLoadState('networkidle')
 
-  // gateway_app1 그룹 안의 EQP 노드 (버튼 텍스트 = eqpId) 클릭 → 편집 모드 자동 복원.
+  // 사이드바 Gateway 그룹 헤더 클릭 → 아코디언 펼침 후 gateway_app1 안의 EQP 노드 클릭.
+  await page.getByRole('button', { name: 'Gateway', exact: true }).click()
   await page.getByRole('button', { name: EQP_ID, exact: true }).click()
 
   // 편집 모드 진입 후 Check In 버튼 노출/활성 대기.
