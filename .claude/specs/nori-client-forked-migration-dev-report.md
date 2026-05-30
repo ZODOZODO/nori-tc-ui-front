@@ -443,3 +443,54 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, �
 검증: build + eslint(변경파일, baseline delta NEW 0) + deploy-register-selection/selectable-table-deploy-monitor e2e PASS + before/after 스크린샷(playwright test 러너, before 는 git stash) + 단일 commit.
 이후: LiveMap 보류(D-LIVEMAP, 사용자 이미지 기반 별도). R5 전 phase 완료 후 Validate 세션.
 ```
+
+## Phase R5-deploy — DeployPage 대시보드 자매품 재구성 (2026-05-30)
+
+### 결정 (구조 / 차트 / 사이드바)
+- DeployPage 는 forked **대시보드 구조**(`_dashboard.scss` 카드 grid)를 R1 `PageCardGrid`+`PageCard` 로 재구성하는 phase. eqp/user/dlq/model 일관(보정 후 확립)대로 **page-level breadcrumb/헤더 band 미채택**(PageLayoutShell/PageLocation 미도입) — forked 헤더는 **카드/패널 헤더(accent-bar + 제목)** 로 표현. 페이지는 `AppPageShell > main > DeploySidebar + section` plain 구조 유지.
+- **PageCard accent-bar 확정 (R1 보강)** — `PageCard` 헤더에 eqp/model 패널과 동일한 `h-4 w-[3px] rounded-sm bg-brand-primary` 액센트 바를 추가(additive). forked `.card`/`.card-header` 의 ui-front 등가가 eqp/model 패널 헤더와 시각 일치. fixture(`LayoutShellFixture`)에만 부수 영향(자동 단언 없음).
+- **R4.2 도입** — DeploySidebar 가 dlq/user 와 동일 패턴으로 접기 토글 + 폭 드래그(shared-layout store + SidebarResizeHandle 4 prop)를 흡수 → eqp/model/dlq/user/deploy 6 도메인 사이드바가 동일 `shared-sidebar-layout` 키 공유(단일 사이드바 선호 일관). mode 전환 동작·라우팅 불변(R4.1).
+- **차트 도입처** — DeployMonitorPanel 상단에 **대상 상태 분포 도넛 차트(recharts)** + KPI 요약 카드를 `PageCardGrid` 로 배치. 데이터는 `resolvedHistoryItems` 의 `targetSummary` 를 **클라이언트 집계**(신규 API 호출 0, R6) — completed/running/pending/failed/canceled. `resolvedHistoryItems.length > 0` 일 때만 렌더.
+
+### D-R5-METHOD 4단 적용
+1. **틀** — DeployRegisterPanel 의 3 `cardClassName` 섹션(Target Equipment Search / Selected Equipments / Configuration & Deploy)과 DeployMonitorPanel 의 2 섹션(Deploy Search / Deploy(History))을 **`PageCard`(accent-bar 헤더)** 로 재구성. 내부 패딩(`px-6 py-5`)은 `bodyClassName="p-0"` 로 보존(레이아웃 회귀 차단). Configuration & Deploy 의 Deploy/Clear 버튼은 PageCard `action` 슬롯으로 이동. **신규 대시보드 overview**: `PageCardGrid`(Target Status 도넛 + Summary KPI 2 카드).
+2. **콘텐츠 재배치** — DeployRegisterPanel/DeployMonitorPanel/DeployHistoryPanel(=MonitorPanel historyOnly) 의 prop/state/API/TanStack hook/Zustand store(deploy-ui.store)/testId(`deploy-monitor-history`/`deploy-monitor-history-skeleton`/`deploy-register-skeleton`)/data-* **불변**(R6). SelectableTable 엔진/rangeCopy/wrapRow/ContextMenu **불변**(D-GRID-ENGINE). 페이지 레벨 표현 변경 0 — 기능 위젯은 카드 slot 으로 위치만 이동.
+3. **사이드바** — DeploySidebar 를 dlq/user 패턴으로 재작성: flat nav / 아이콘 없음 / active = `border-l-2 border-brand-primary` + `bg-brand-primary/10` + coral 텍스트 / 비active hover `transition-colors`, 헤더 `t('deploy.sidebar.title')` + R4.2(접기 rail + SidebarResizeHandle). 자식 트리 없음 → 아코디언 미도입. `data-testid`(`deploy-sidebar-{register,deploy,history}`) **추가**(additive — 기존 testId 없었음), accessible name "Deploy"/"Register" **EN locale 정확 보존**(e2e `getByRole('button',{name:'Deploy',exact})` 의존). DeployPage 에 `useSharedLayoutStore` + `handleSidebarDrag`(clampSidebarWidth, effect 미사용) 배선.
+4. **i18n** — 정적 한국어를 `deploy.*` 키 72개 신설(ko/en): 사이드바 6 / common 5(search/clear/deploy/prev/next) / overview 4 / chart 8 / monitor 21 / register 28. **동적 메시지(카운트·deployKey·deployName 임베드: 페이지네이션 요약 "총 N건 · P / T 페이지", feedback 메시지, "현재 선택 #key" 등)는 `t()` 보간 미지원이라 보류**. **대형 Dialog 2종(Deploy View 상세 / 시나리오 선택)은 색 토큰화 전량 완료, 내부 폼·테이블 라벨 i18n 은 follow-up**(eqp/user/dlq/model 대형 모달 컨벤션). e2e 는 사이드바 accessible name(EN) 의존이라 locale 무관 보정 불필요(EN 값을 "Deploy"/"Register" 로 고정).
+5. **색** — deploy **4파일 182 hex 전량 → 시맨틱 토큰**(prefix별 매핑, grep 0 잔존). brand green(`bg-[#243E33]`/`hover:bg-[#1D332B]` CTA, `accent-[#1C7F59]`, `text-[#1B7A57]`)→brand-primary, dark green text(`#243129`/`#335244`/`#405149`)→foreground, muted green(`#52635C`~`#90A097` 다수)→muted-foreground, border green(`#D8E1DB`/`#EDF1EE`/`#E7EDE8` 등)→border, light green bg(`#F6F8F6`/`#FAFCFA`/`#F8FBF9` 등)→muted, white→card, 선택 틴트(`#ECF5F0`)→brand-primary/5. **status/semantic 보존(brand coral 치환 금지)**: 성공(`#215A43`/`#2D6B56`/`#E8F3EC`)→success, 경고/active 공지(`#A66518`/`#FFF7E8`/`#F0D7A6`)→warning, 오류(`#B33A33`/`#C5534B`/`#FFF7F6`/`#F4D5D2`)→danger. **차트 도넛 색**: 배포 상태는 본질적 semantic 이라 coral 단색 미치환 — completed→`--success` / failed→`--danger` / running→`--chart-1`(coral 진행) / pending→`--chart-5`(중립) / canceled→`--muted-foreground` (SPEC R5.0 (5) status/chart semantic 보존 + `--chart-1~5` 매핑 동시 충족).
+
+### R3 — recharts 도입 (이 phase 에서만)
+- `npm view recharts peerDependencies` → `react: '^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0'` (recharts@3.8.1) — **React 19 호환 확인**.
+- `npm install recharts@^3` → `added 37 packages, and audited 385 packages in 11s` / `found 0 vulnerabilities`.
+- `DeployStatusChart.tsx` — recharts `PieChart`(donut, innerRadius 56/outerRadius 82) + 중앙 total 오버레이 + 우측 범례. shadcn 차트 패턴(선언적 SVG + 디자인 토큰)을 단일 용도로 직접 사용(과도한 ChartContainer 추상화 회피, 룰 §11). `isAnimationActive={false}`(스크린샷/테스트 안정). Tooltip `contentStyle` 토큰화.
+
+### 변경 파일 (8 tracked + 4 screenshot + package)
+- `src/features/deploy/components/`: DeployPage(R4.2 store 배선) / DeploySidebar(LNB+R4.2+i18n, 재작성) / DeployMonitorPanel(PageCard 재구성 + overview grid + 토큰 + i18n) / DeployRegisterPanel(PageCard 재구성 + 토큰 + i18n) / SelectedEquipmentRow(토큰 + i18n) / **DeployStatusChart(신규)**
+- `src/shared/layout/PageCard.tsx` — accent-bar 추가(R1 보강)
+- `src/i18n/locales/ko.json` / `en.json` — `deploy.*` 72키 신설
+- `package.json` / `package-lock.json` — recharts@^3
+- 스크린샷: `.claude/specs/screenshots/{before,after}/deploy-register-R5.png`·`deploy-monitor-R5.png`
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 10.63s` (tsc 0 errors). DeployPage 청크 398KB(recharts 포함, gzip 117KB).
+- `npx eslint src/features/deploy/components/ src/shared/layout/PageCard.tsx` ✅ **EXIT 0** — NEW 에러 0(deploy 파일은 baseline pre-existing lint 대상 아님; 신규 page-clamp 없음, effect 미사용).
+- `npx playwright test`(전체) ✅ **75 passed / 0 failed** (2.0m). 대상 spec `selectable-table-deploy-monitor`(2건: 2x2 Ctrl+C TSV + ContextMenu View, 둘 다 `page.on('console','error')`/`pageerror` 0건 단언 통과 — recharts 도넛 렌더가 console.error 미유발 확인) 포함 cross-page 회귀 0. (`deploy-register-selection` spec 은 현재 레포에 부재 — Plan §1 의 명칭은 stale, 실재 deploy e2e 는 `selectable-table-deploy-monitor` 단일.)
+- hex 잔존: `grep -rnoE '#[0-9A-Fa-f]{3,8}' src/features/deploy/components/` → **0** (182→0 전량 토큰화).
+- before/after 스크린샷: 임시 playwright `test` 러너 spec(`_deploy_capture.spec.ts`) + 내부 section scroll-reset 으로 캡처 후 spec 삭제. before 는 deploy 소스 미변경 시점(recharts 설치만 — 렌더 무관) 직접 캡처. **before** = 녹색 LNB("Deploy"+ChevronDown)+plain 카드(accent 없음)+한글 하드코딩+차트 없음. **after** = coral LNB(좌측 액센트, "Deployment"+접기 `<` rail)+accent-bar 카드 헤더+Target Status 도넛 차트(success/danger/chart-1/chart-5 semantic)+Summary KPI+i18n(EN).
+
+### Follow-up (보류 — 투명 기록)
+- **동적 메시지·대형 Dialog i18n 미완** — 페이지네이션 요약("총 N건 · P / T 페이지")·feedback 메시지·"현재 선택 #key"·Deploy View 상세 Dialog·시나리오 선택 Dialog 내부 라벨/테이블 헤더는 `t()` 보간 미지원 + 분량으로 보류(색 토큰화는 전량 완료). 주요 표면(사이드바/카드 헤더/검색바/테이블 empty/overview/차트)은 i18n 충족. Validate 시 `[~] 부분` 표기 권장.
+- **차트/status semantic 색 보존** — 배포 상태 도넛(success/danger/chart-1/chart-5)·상태 Badge(info/warning/secondary/default)·active 공지(warning)는 의도적 보존, brand coral 미치환(SPEC R5.0 (5) 준수).
+- **DeployPage 청크 398KB** — recharts 도입에 따른 증가(gzip 117KB). 코드 스플릿/경량 차트는 별도 perf 범위(본 phase 범위 밖).
+
+### 사용자 피드백 보정 (레이아웃 회귀 — PageCard shrink, 2026-05-30 commit 직후)
+- **버그** — "대상 설비 조회"에서 결과가 많을 때 `Add to Selected` 버튼이 사라지고 `Selected Equipments` 레이아웃이 깨짐. **40행 mock + Search 제출 재현 확인**(스크린샷): Target Equipment Search 카드가 5행 직후 잘리고 Add 버튼·feedback 이 보이지 않음, Selected 카드 squish.
+- **근본 원인** — 섹션을 `PageCard` 로 재구성하며 PageCard 의 `flex min-h-0 flex-col overflow-hidden` + body `flex-1` 이 들어옴. DeployPage 의 콘텐츠 패널은 `flex-1 min-h-full` (뷰포트 높이 확보) 인 **flex-col** 컨테이너라, 자식 PageCard 들이 `min-h-0`(=`min-height:0`) 때문에 **콘텐츠보다 작게 flex-shrink** 되고 `overflow-hidden` 이 하단(Add 버튼·테이블 일부)을 **클리핑**. 기존 plain `<section>` 은 `min-height:auto` 라 shrink 되지 않아 부모 `overflow-y-auto` 가 스크롤했음 — 이 차이를 색·구조만 보고 **다행수 케이스로 검증하지 않은 회귀**.
+- **수정** — 세로로 쌓인 콘텐츠 카드(register 3 + monitor search/table 2 + monitor overview grid 1)에 `className="shrink-0"` 추가 → flex-shrink 0 → 자연 높이 유지 → 부모 section 이 스크롤(원래 동작 복원). PageCard 기본값(`min-h-0`/`overflow-hidden`)은 grid-cell·내부 스크롤 용도라 보존, 스택 용도에서만 shrink-0 opt-out.
+- **검증** — 40행 재현 mock 재실행: Add 버튼 visible + 테이블 `max-h-[400px]` 내부 스크롤 + 카드 정상 높이 확인(스크린샷). `npm run build` ✓ built in 10.71s / `eslint src/features/deploy/components/` EXIT 0 / `npx playwright test` 전체 75 passed / 0 failed 회귀 0. (재현 mock 은 임시 spec 으로 검증 후 삭제.)
+
+## eqp/user/dlq/model/deploy 세션 공통 컨벤션 보강 (R5 전 phase 완료)
+- **PageCard 세로 스택 시 shrink-0** — flex-col 콘텐츠 패널(`flex-1` + `min-h-full`)에 PageCard 를 세로로 쌓으면, PageCard 의 `min-h-0`+`overflow-hidden` 이 콘텐츠를 클리핑한다. 스택 카드에는 `className="shrink-0"` 을 줘 자연 높이+부모 스크롤로 복원. PageCard 의 grid-cell 내부 스크롤 기본 동작은 보존.
+- **대시보드 도메인(deploy)** — forked `_dashboard.scss` 카드 grid 는 `PageCardGrid`+`PageCard`(accent-bar 헤더)로 실현. 차트는 recharts(단일 용도 직접 사용), status/배포상태는 semantic 토큰(success/danger/info)·중립은 chart-1~5 로 매핑(coral 단색 치환 금지). 신규 API 호출 없이 기존 in-memory 데이터(targetSummary) 클라이언트 집계로 시각화(R6).
+- **R4.2 6 도메인 일관 완료** — eqp/model/dlq/user/deploy 5 도메인(+login 사이드바 없음) 사이드바가 `shared-sidebar-layout` 단일 키로 접기·폭 공유. 신규 도메인 사이드바는 4 prop(sidebarOpen/width/onToggle/onResize) + 페이지 `useSharedLayoutStore` 배선만으로 동작 확보.
+- **PageCard 가 forked 카드의 canonical** — accent-bar(`h-4 w-[3px] bg-brand-primary`) + 제목 + `bg-muted/40` 헤더 + `rounded-xl border bg-card shadow-soft-sm`. R1 fixture 와 deploy 실페이지가 공유. 패널 내부 패딩 보존이 필요하면 `bodyClassName="p-0"`.

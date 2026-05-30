@@ -39,6 +39,8 @@ import {
   resolveFailureDetail,
   toUniqueModelOptions,
 } from '../lib/deploy-register-utils'
+import { useI18n } from '@/i18n/i18n-context'
+import { PageCard } from '@/shared/layout/PageCard'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
 import { SelectedEquipmentRow } from './SelectedEquipmentRow'
 import { useCreateDeploy } from '../hooks/useCreateDeploy'
@@ -61,9 +63,6 @@ const EMPTY_MODEL_OPTIONS: EqpModelOption[] = []
 const EMPTY_JAR_OPTIONS: EqpJarOption[] = []
 const DEPLOY_EVENT_TYPE = 'EQP_REGISTER_DEPLOY'
 
-const cardClassName =
-  'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
-
 type DeployDialogState = {
   isSuccess: boolean
   title: string
@@ -80,6 +79,7 @@ type ScenarioDialogState = {
 }
 
 export function DeployRegisterPanel() {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const registerFilters = useDeployUiStore((state) => state.registerFilters)
   const selectedEqpIds = useDeployUiStore((state) => state.selectedEqpIds)
@@ -822,14 +822,14 @@ export function DeployRegisterPanel() {
               <DialogTitle>{deployDialogState.title}</DialogTitle>
               <DialogDescription
                 className={
-                  deployDialogState.isSuccess ? 'text-[#2D6B56]' : 'text-[#B33A33]'
+                  deployDialogState.isSuccess ? 'text-success' : 'text-danger'
                 }
               >
                 {deployDialogState.message}
               </DialogDescription>
             </DialogHeader>
             {deployDialogState.detail ? (
-              <div className="rounded-xl bg-[#F6F9F7] px-4 py-3 text-sm whitespace-pre-line text-[#4D5D55]">
+              <div className="rounded-xl bg-muted px-4 py-3 text-sm whitespace-pre-line text-muted-foreground">
                 {deployDialogState.detail}
               </div>
             ) : null}
@@ -838,7 +838,7 @@ export function DeployRegisterPanel() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 rounded-full border-[#D8E1DB] bg-white px-4 text-[#54635D]"
+                  className="h-9 rounded-full border-border bg-card px-4 text-muted-foreground"
                   onClick={closeDeployDialog}
                 >
                   닫기
@@ -846,7 +846,7 @@ export function DeployRegisterPanel() {
               ) : null}
               <Button
                 type="button"
-                className="h-9 rounded-full bg-[#243E33] px-4 text-white hover:bg-[#1D332B]"
+                className="h-9 rounded-full bg-brand-primary px-4 text-white hover:bg-brand-primary/90"
                 onClick={() =>
                   deployDialogState.nextMode
                     ? moveToNextMode(
@@ -872,10 +872,10 @@ export function DeployRegisterPanel() {
         }}
       >
         <DialogContent className="max-w-[920px] rounded-2xl p-0">
-          <div className="border-b border-[#EDF1EE] px-6 py-5">
+          <div className="border-b border-border px-6 py-5">
             <DialogHeader className="p-0">
               <DialogTitle>시나리오 선택</DialogTitle>
-              <DialogDescription className="text-[#56635C]">
+              <DialogDescription className="text-muted-foreground">
                 권장 시나리오를 확인한 뒤 원하는 시나리오를 선택하면 Deploy 가 생성됩니다.
               </DialogDescription>
             </DialogHeader>
@@ -884,9 +884,9 @@ export function DeployRegisterPanel() {
           <div className="space-y-4 px-6 py-5">
             {scenarioDialogState.preview ? (
               <>
-                <div className="grid gap-3 rounded-xl bg-[#F6F9F7] p-4 text-sm text-[#47605C] md:grid-cols-2">
+                <div className="grid gap-3 rounded-xl bg-muted p-4 text-sm text-muted-foreground md:grid-cols-2">
                   <div>
-                    <p className="font-semibold text-[#243129]">배포 대상</p>
+                    <p className="font-semibold text-foreground">배포 대상</p>
                     <p className="mt-1">
                       {scenarioDialogState.preview.remainingEqpIds.length}대
                       {scenarioDialogState.preview.removedEqpIds.length > 0
@@ -895,31 +895,31 @@ export function DeployRegisterPanel() {
                     </p>
                   </div>
                   <div>
-                    <p className="font-semibold text-[#243129]">감지된 변경</p>
+                    <p className="font-semibold text-foreground">감지된 변경</p>
                     <p className="mt-1">
                       {formatChangeKinds(scenarioDialogState.preview.unionChangeKinds)}
                     </p>
                   </div>
                   <div className="md:col-span-2">
-                    <p className="font-semibold text-[#243129]">권장 시나리오</p>
+                    <p className="font-semibold text-foreground">권장 시나리오</p>
                     <p className="mt-1">
                       {scenarioDialogState.preview.recommendedScenarioCode ?? '권장 시나리오 없음'}
                     </p>
-                    <p className="mt-1 text-xs text-[#5B6963]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {scenarioDialogState.preview.recommendedReason}
                     </p>
                   </div>
                 </div>
 
                 {scenarioDialogState.preview.scenarios.length === 0 ? (
-                  <div className="rounded-xl border border-[#E5EDE9] bg-[#F8FAF9] p-3 text-sm text-[#67716C]">
+                  <div className="rounded-xl border border-border bg-muted p-3 text-sm text-muted-foreground">
                     선택 가능한 시나리오가 없습니다.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-[14px] border border-[#E5EDE9]">
+                  <div className="overflow-x-auto rounded-[14px] border border-border">
                     <Table>
-                      <TableHeader className="bg-[#F6F8F6]">
-                        <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+                      <TableHeader className="bg-muted">
+                        <TableRow className="bg-muted hover:bg-muted">
                           <TableHead className="w-16 text-center">선택</TableHead>
                           <TableHead className="w-20 text-center">권장</TableHead>
                           <TableHead>시나리오명</TableHead>
@@ -935,7 +935,7 @@ export function DeployRegisterPanel() {
                             key={scenario.code}
                             className={
                               scenario.code === scenarioDialogState.selectedScenarioCode
-                                ? 'bg-[#ECF5F0]'
+                                ? 'bg-brand-primary/5'
                                 : undefined
                             }
                           >
@@ -950,30 +950,30 @@ export function DeployRegisterPanel() {
                                     selectedScenarioCode: scenario.code,
                                   }))
                                 }
-                                className="size-4 accent-[#1C7F59]"
+                                className="size-4 accent-brand-primary"
                                 aria-label={`${scenario.code} 선택`}
                               />
                             </TableCell>
                             <TableCell className="text-center">
                               {scenario.recommended ? (
-                                <span className="rounded-full bg-[#E8F3EC] px-2 py-1 text-xs font-medium text-[#1B7A57]">
+                                <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-brand-primary">
                                   권장
                                 </span>
                               ) : (
                                 '-'
                               )}
                             </TableCell>
-                            <TableCell className="font-medium text-[#243129]">{scenario.name}</TableCell>
-                            <TableCell className="text-xs text-[#68726C]">{scenario.code}</TableCell>
-                            <TableCell className="text-xs text-[#52635C]">
+                            <TableCell className="font-medium text-foreground">{scenario.name}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{scenario.code}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
                               {formatChangeKinds(scenario.coversChangeKinds)}
                             </TableCell>
-                            <TableCell className="text-center text-sm text-[#52635C]">
+                            <TableCell className="text-center text-sm text-muted-foreground">
                               {scenario.stepCount}
                             </TableCell>
-                            <TableCell className="text-xs text-[#5D6A63]">
+                            <TableCell className="text-xs text-muted-foreground">
                               <p>{scenario.summary}</p>
-                              <p className="mt-1 text-[#7B8781]">{scenario.reason}</p>
+                              <p className="mt-1 text-muted-foreground">{scenario.reason}</p>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -983,19 +983,19 @@ export function DeployRegisterPanel() {
                 )}
               </>
             ) : (
-              <div className="flex items-center justify-center rounded-xl border border-[#E5EDE9] bg-[#FAFCFB] py-10 text-sm text-[#62716A]">
+              <div className="flex items-center justify-center rounded-xl border border-border bg-muted py-10 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
                 시나리오 preview 결과를 준비하고 있습니다.
               </div>
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-[#EDF1EE] px-6 py-4">
+          <DialogFooter className="gap-2 border-t border-border px-6 py-4">
             <Button
               type="button"
               variant="outline"
               onClick={closeScenarioDialog}
-              className="h-10 rounded-xl border-[#D8E1DB] bg-white text-[#54635D]"
+              className="h-10 rounded-xl border-border bg-card text-muted-foreground"
             >
               닫기
             </Button>
@@ -1003,7 +1003,7 @@ export function DeployRegisterPanel() {
               type="button"
               onClick={() => void handleDeployWithScenario()}
               disabled={createDeployMutation.isPending || !scenarioDialogState.selectedScenarioCode}
-              className="h-10 rounded-xl bg-[#243E33] px-5 text-white hover:bg-[#1D332B]"
+              className="h-10 rounded-xl bg-brand-primary px-5 text-white hover:bg-brand-primary/90"
             >
               {createDeployMutation.isPending ? 'Deploy 중...' : '선택한 시나리오로 Deploy'}
             </Button>
@@ -1011,19 +1011,15 @@ export function DeployRegisterPanel() {
         </DialogContent>
       </Dialog>
 
-      <section className={cardClassName}>
-        <div className="border-b border-[#EDF1EE] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#243129]">Target Equipment Search</h2>
-        </div>
-
+      <PageCard title={t('deploy.register.searchTitle')} className="shrink-0" bodyClassName="p-0">
         <div className="space-y-5 px-6 py-5">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_92px_92px]">
             <Select value={draftModelName || EMPTY_SELECT_VALUE} onValueChange={setDraftModelName}>
               <SelectTrigger>
-                <SelectValue placeholder="Model 선택" />
+                <SelectValue placeholder={t('deploy.register.modelPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={EMPTY_SELECT_VALUE}>전체 Model</SelectItem>
+                <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.register.allModels')}</SelectItem>
                 {searchModelOptions.map((option) => (
                   <SelectItem key={option.modelName} value={option.modelName}>
                     {option.modelName}
@@ -1034,10 +1030,10 @@ export function DeployRegisterPanel() {
 
             <Select value={draftModelVersionKey} onValueChange={setDraftModelVersionKey}>
               <SelectTrigger>
-                <SelectValue placeholder="Model Version 선택" />
+                <SelectValue placeholder={t('deploy.register.versionPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={EMPTY_SELECT_VALUE}>전체 Version</SelectItem>
+                <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.register.allVersions')}</SelectItem>
                 {mergedModelVersionOptions
                   .filter(
                     (option) =>
@@ -1069,15 +1065,15 @@ export function DeployRegisterPanel() {
                     setEqpDropdownOpen(false)
                   }
                 }}
-                placeholder="Eqp ID 검색..."
+                placeholder={t('deploy.register.eqpPlaceholder')}
               />
               {eqpDropdownOpen && filteredEqpSuggestions.length > 0 && (
-                <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-[#D8E1DB] bg-white shadow-md">
+                <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-card shadow-md">
                   {filteredEqpSuggestions.map((item) => (
                     <button
                       key={item.eqpId}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm text-[#243129] hover:bg-[#F6F8F6]"
+                      className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
                       onMouseDown={(e) => {
                         e.preventDefault()
                         setDraftEqpId(item.eqpId)
@@ -1094,25 +1090,25 @@ export function DeployRegisterPanel() {
             <Button
               type="button"
               onClick={handleSearch}
-              className="h-11 rounded-xl bg-[#243E33] text-white hover:bg-[#1D332B]"
+              className="h-11 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90"
             >
-              Search
+              {t('deploy.common.search')}
             </Button>
 
             <Button
               type="button"
               variant="outline"
               onClick={handleClearSearch}
-              className="h-11 rounded-xl border-[#D8E1DB] bg-[#F8FBF9] text-[#526058]"
+              className="h-11 rounded-xl border-border bg-muted text-muted-foreground"
             >
-              Clear
+              {t('deploy.common.clear')}
             </Button>
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
+          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
             <Table>
-              <TableHeader className="bg-[#F6F8F6]">
-                <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+              <TableHeader className="bg-muted">
+                <TableRow className="bg-muted hover:bg-muted">
                   <TableHead className="w-14 text-center">
                     <input
                       ref={searchSelectAllRef}
@@ -1120,11 +1116,11 @@ export function DeployRegisterPanel() {
                       checked={isAllSearchSelected}
                       onChange={handleToggleAllSearchSelections}
                       disabled={selectableSearchItemIds.length === 0}
-                      className="size-4 accent-[#1C7F59]"
+                      className="size-4 accent-brand-primary"
                       aria-label={
                         isAllSearchSelected
-                          ? '검색 결과 전체 선택 해제'
-                          : '검색 결과 전체 선택'
+                          ? t('deploy.register.deselectAll')
+                          : t('deploy.register.selectAll')
                       }
                     />
                   </TableHead>
@@ -1138,8 +1134,8 @@ export function DeployRegisterPanel() {
               <TableBody>
                 {!hasSubmittedRegisterSearch ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-[#7B8781]">
-                      검색 조건을 설정한 뒤 Search 버튼을 눌러 주세요.
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      {t('deploy.register.searchPrompt')}
                     </TableCell>
                   </TableRow>
                 ) : registerTargetsQuery.isLoading ? (
@@ -1154,7 +1150,7 @@ export function DeployRegisterPanel() {
                   ))
                 ) : registerTargetsQuery.isError ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-[#C5534B]">
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-danger">
                       {getErrorMessage(
                         registerTargetsQuery.error,
                         '대상 설비 목록을 조회하지 못했습니다.',
@@ -1163,15 +1159,15 @@ export function DeployRegisterPanel() {
                   </TableRow>
                 ) : registerTargetItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-[#7B8781]">
-                      검색 결과가 없습니다.
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      {t('deploy.register.searchEmpty')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   registerTargetItems.map((item) => (
                     <TableRow
                       key={item.eqpId}
-                      className={item.blockedByActiveDeploy ? 'bg-[#FFF8EA]' : undefined}
+                      className={item.blockedByActiveDeploy ? 'bg-warning/10' : undefined}
                     >
                       <TableCell className="text-center">
                         <input
@@ -1181,7 +1177,7 @@ export function DeployRegisterPanel() {
                           }
                           onChange={() => handleToggleSearchSelection(item.eqpId)}
                           disabled={item.blockedByActiveDeploy}
-                          className="size-4 accent-[#1C7F59]"
+                          className="size-4 accent-brand-primary"
                           aria-label={`${item.eqpId} 선택`}
                         />
                       </TableCell>
@@ -1197,8 +1193,8 @@ export function DeployRegisterPanel() {
                           ) : null}
                         </div>
                         {item.blockedByActiveDeploy ? (
-                          <p className="mt-1 text-xs text-[#A66518]">
-                            {formatActiveDeployHint(item) ?? '이미 active Deploy에 포함된 설비입니다.'}
+                          <p className="mt-1 text-xs text-warning">
+                            {formatActiveDeployHint(item) ?? t('deploy.register.activeFallback')}
                           </p>
                         ) : null}
                       </TableCell>
@@ -1210,7 +1206,7 @@ export function DeployRegisterPanel() {
                       </TableCell>
                       <TableCell>{item.businessJarFileName ?? '-'}</TableCell>
                       <TableCell>
-                        <span className="rounded-full bg-[#EEF4F0] px-2 py-1 text-xs font-medium text-[#335244]">
+                        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
                           {item.commInterface}
                         </span>
                       </TableCell>
@@ -1227,28 +1223,22 @@ export function DeployRegisterPanel() {
               variant="outline"
               onClick={handleAddSelected}
               disabled={addableSearchItems.length === 0}
-              className="rounded-full border-[#D8E1DB] bg-white px-5 text-[#405149]"
+              className="rounded-full border-border bg-card px-5 text-foreground"
             >
-              Add to Selected
+              {t('deploy.register.addToSelected')}
             </Button>
           </div>
 
-          {feedbackMessage ? <p className="text-sm text-[#567062]">{feedbackMessage}</p> : null}
+          {feedbackMessage ? <p className="text-sm text-muted-foreground">{feedbackMessage}</p> : null}
         </div>
-      </section>
+      </PageCard>
 
-      <section className={cardClassName}>
-        <div className="border-b border-[#EDF1EE] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#243129]">Selected Equipments</h2>
-        </div>
-
+      <PageCard title={t('deploy.register.selectedTitle')} className="shrink-0" bodyClassName="p-0">
         {blockedSelectedEqpItems.length > 0 ? (
           <div className="px-6 pt-5">
-            <div className="rounded-xl border border-[#F0D7A6] bg-[#FFF7E8] px-4 py-3 text-sm text-[#8A5A18]">
-              이미 active Deploy에 포함된 설비가 Selected Equipments에 남아 있습니다.
-              {' '}
-              서버에서 최종 차단되므로 제거 후 다시 시도해 주세요.
-              <ul className="mt-2 space-y-1 text-xs text-[#9A6520]">
+            <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+              {t('deploy.register.blockedNotice')}
+              <ul className="mt-2 space-y-1 text-xs text-warning">
                 {blockedSelectedEqpItems.map((item) => (
                   <li key={`blocked-selected-${item.eqpId}`}>
                     {item.eqpId}
@@ -1261,10 +1251,10 @@ export function DeployRegisterPanel() {
         ) : null}
 
         <div className="px-6 py-5">
-          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-[#ECF0ED]">
+          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
             <Table>
-              <TableHeader className="bg-[#F6F8F6]">
-                <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+              <TableHeader className="bg-muted">
+                <TableRow className="bg-muted hover:bg-muted">
                   <TableHead>Eqp ID</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Selected Version</TableHead>
@@ -1277,8 +1267,8 @@ export function DeployRegisterPanel() {
               <TableBody>
                 {selectedEqpItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-sm text-[#7B8781]">
-                      아직 선택된 설비가 없습니다.
+                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                      {t('deploy.register.selectedEmpty')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1296,12 +1286,14 @@ export function DeployRegisterPanel() {
             </Table>
           </div>
         </div>
-      </section>
+      </PageCard>
 
-      <section className={cardClassName}>
-        <div className="flex flex-col gap-4 border-b border-[#EDF1EE] px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <h2 className="text-sm font-semibold text-[#243129]">Configuration &amp; Deploy</h2>
-          <div className="flex gap-2">
+      <PageCard
+        title={t('deploy.register.configTitle')}
+        className="shrink-0"
+        bodyClassName="p-0"
+        action={
+          <>
             <Button
               type="button"
               onClick={() => void handleDeploy()}
@@ -1311,35 +1303,35 @@ export function DeployRegisterPanel() {
                 selectedEqpItems.length === 0 ||
                 selectedInterfaceType === null
               }
-              className="h-10 rounded-xl bg-[#243E33] px-5 text-white hover:bg-[#1D332B]"
+              className="h-10 rounded-xl bg-brand-primary px-5 text-white hover:bg-brand-primary/90"
             >
               {previewScenarioMutation.isPending
-                ? '시나리오 확인 중...'
+                ? t('deploy.register.checkingScenario')
                 : createDeployMutation.isPending
-                  ? 'Deploy 중...'
-                  : 'Deploy'}
+                  ? t('deploy.register.deploying')
+                  : t('deploy.common.deploy')}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleClearRegister}
-              className="h-10 rounded-xl border-[#D8E1DB] bg-[#F8FBF9] text-[#526058]"
+              className="h-10 rounded-xl border-border bg-muted text-muted-foreground"
             >
-              Clear
+              {t('deploy.common.clear')}
             </Button>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         <div className="grid gap-3 px-6 py-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_96px]">
           <Select
             value={selectedModelName ?? EMPTY_SELECT_VALUE}
             onValueChange={handleChangeSelectedModelName}
           >
             <SelectTrigger>
-              <SelectValue placeholder="New Model 선택" />
+              <SelectValue placeholder={t('deploy.register.newModelPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>New Model 선택</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.register.newModelPlaceholder')}</SelectItem>
               {availableModelOptions.map((option) => (
                 <SelectItem key={`${option.modelName}-${option.commInterface}`} value={option.modelName}>
                   {option.modelName}
@@ -1353,10 +1345,16 @@ export function DeployRegisterPanel() {
             onValueChange={handleChangeModelVersionKey}
           >
             <SelectTrigger disabled={!selectedModelName}>
-              <SelectValue placeholder={selectedModelName ? 'New Model Version 선택' : 'Model 먼저 선택'} />
+              <SelectValue
+                placeholder={
+                  selectedModelName
+                    ? t('deploy.register.newVersionPlaceholder')
+                    : t('deploy.register.selectModelFirst')
+                }
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>New Model Version 선택</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.register.newVersionPlaceholder')}</SelectItem>
               {availableModelVersionOptions.map((option) => (
                 <SelectItem key={option.modelVersionKey} value={String(option.modelVersionKey)}>
                   {option.modelVersion} / {option.status}
@@ -1372,10 +1370,10 @@ export function DeployRegisterPanel() {
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="Business Jar File 선택" />
+              <SelectValue placeholder={t('deploy.register.jarPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>Business Jar File 선택</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.register.jarPlaceholder')}</SelectItem>
               {businessJarOptions.map((option) => (
                 <SelectItem key={option.jarRef} value={String(option.jarRef)}>
                   {option.jarFileName}
@@ -1388,15 +1386,15 @@ export function DeployRegisterPanel() {
             type="button"
             variant="outline"
             disabled
-            className="h-11 rounded-xl border-[#D8E1DB] bg-[#F6F8F7] text-[#90A097]"
-            title="추후 연동 예정"
+            className="h-11 rounded-xl border-border bg-muted text-muted-foreground"
+            title={t('deploy.register.uploadComingSoon')}
           >
-            Upload
+            {t('deploy.register.upload')}
           </Button>
         </div>
 
         {registerOptionsQuery.isError || meQuery.isError ? (
-          <div className="px-6 pb-3 text-sm text-[#C5534B]">
+          <div className="px-6 pb-3 text-sm text-danger">
             {registerOptionsQuery.isError
               ? getErrorMessage(registerOptionsQuery.error, '설정 옵션을 조회하지 못했습니다.')
               : null}
@@ -1408,15 +1406,16 @@ export function DeployRegisterPanel() {
         ) : null}
 
         {selectedInterfaceType ? (
-          <div className="px-6 pb-5 text-sm text-[#567062]">
-            현재 선택 가능한 Interface Type: <span className="font-semibold">{selectedInterfaceType}</span>
+          <div className="px-6 pb-5 text-sm text-muted-foreground">
+            {t('deploy.register.interfaceHint')}{' '}
+            <span className="font-semibold">{selectedInterfaceType}</span>
           </div>
         ) : selectedEqpItems.length > 1 ? (
-          <div className="px-6 pb-5 text-sm text-[#567062]">
-            여러 Interface Type 설비가 함께 선택되어 있습니다.
+          <div className="px-6 pb-5 text-sm text-muted-foreground">
+            {t('deploy.register.multiInterface')}
           </div>
         ) : null}
-      </section>
+      </PageCard>
     </div>
   )
 }

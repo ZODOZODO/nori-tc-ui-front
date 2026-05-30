@@ -39,6 +39,7 @@ export function PageCard({
       {title ? (
         <header className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-3">
           <div className="flex items-center gap-2">
+            <span className="h-4 w-[3px] shrink-0 rounded-sm bg-brand-primary" aria-hidden="true" />
             {icon ? <span className="text-brand-primary [&_svg]:size-4">{icon}</span> : null}
             <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
           </div>
