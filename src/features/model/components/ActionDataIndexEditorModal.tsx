@@ -206,7 +206,7 @@ function ActionDataIndexEditorModalBody({
       onOpenAutoFocus={(event) => event.preventDefault()}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
           <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
           <DialogDescription>
             action_data_index를 mdfTemplateName과 field 매핑 기준으로 편집합니다.
@@ -216,14 +216,14 @@ function ActionDataIndexEditorModalBody({
           <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
             <div className="flex h-full min-h-0 flex-col gap-3">
               {errorMessage ? (
-                <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+                <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                   {errorMessage}
                 </p>
               ) : null}
 
               {draft.mode === 'raw' ? (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <p className="text-sm text-[#C5534B]">
+                  <p className="text-sm text-danger">
                     현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
                   </p>
                   <textarea
@@ -234,15 +234,15 @@ function ActionDataIndexEditorModalBody({
                         rawValue: event.target.value,
                       }))
                     }
-                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-border bg-muted p-3 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                     readOnly={readOnly}
                   />
                 </div>
               ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-4">
-                  <div className="grid gap-4 rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+                  <div className="grid gap-4 rounded-2xl border border-border bg-muted px-4 py-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
                     <div className="space-y-2.5">
-                      <label className="text-xs font-semibold text-[#1E3D33]">MDF Message</label>
+                      <label className="text-xs font-semibold text-foreground">MDF Message</label>
                       <Select
                         value={draft.mdfTemplateName || EMPTY_MDF_TEMPLATE_VALUE}
                         disabled={readOnly}
@@ -269,29 +269,29 @@ function ActionDataIndexEditorModalBody({
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[11px] text-[#738078]">
+                      <p className="text-[11px] text-muted-foreground">
                         현재 model의 MDF XML 내부 메시지 이름을 선택하면 `mdfTemplateName`으로 저장됩니다.
                       </p>
                     </div>
 
                     <div className="space-y-2.5">
-                      <label className="text-xs font-semibold text-[#1E3D33]">선택된 XML Preview</label>
-                      <div className="min-h-[124px] max-h-[180px] overflow-auto rounded-xl border border-[#DCE5E0] bg-white px-3 py-2.5">
+                      <label className="text-xs font-semibold text-foreground">선택된 XML Preview</label>
+                      <div className="min-h-[124px] max-h-[180px] overflow-auto rounded-xl border border-border bg-card px-3 py-2.5">
                         {selectedMdfMessage?.xmlSnippet ? (
-                          <pre className="whitespace-pre-wrap break-all font-mono text-xs text-[#22322B]">
+                          <pre className="whitespace-pre-wrap break-all font-mono text-xs text-foreground">
                             {selectedMdfMessage.xmlSnippet}
                           </pre>
                         ) : draft.mdfTemplateName.trim() ? (
-                          <p className="text-sm text-[#65726B]">
+                          <p className="text-sm text-muted-foreground">
                             현재 `mdfTemplateName`과 일치하는 MDF 메시지를 찾지 못했습니다.
                           </p>
                         ) : (
-                          <p className="text-sm text-[#65726B]">
+                          <p className="text-sm text-muted-foreground">
                             MDF 메시지를 선택하면 전체 XML 조각을 여기에서 바로 확인할 수 있습니다.
                           </p>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#738078]">
+                      <p className="text-[11px] text-muted-foreground">
                         {selectedMdfMessage?.sourceName
                           ? `Source MDF: ${selectedMdfMessage.sourceName}`
                           : '업로드된 MDF XML에 정의된 메시지 본문을 그대로 보여 줍니다.'}
@@ -301,7 +301,7 @@ function ActionDataIndexEditorModalBody({
 
                   {/* Fields 테이블 레이블 및 '+field 추가' 버튼 영역 */}
                   <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-semibold text-[#1E3D33]">Fields</span>
+                    <span className="text-xs font-semibold text-foreground">Fields</span>
                     <Button
                       type="button"
                       variant="outline"
@@ -320,10 +320,10 @@ function ActionDataIndexEditorModalBody({
                     </Button>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[#E4EAE6]">
+                  <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-[#F6F9F7]">
-                        <TableRow className="bg-[#F6F9F7]">
+                      <TableHeader className="sticky top-0 z-10 bg-muted">
+                        <TableRow className="bg-muted">
                           <TableHead className="w-[112px]">순서</TableHead>
                           <TableHead>Field</TableHead>
                           <TableHead>from</TableHead>
@@ -338,7 +338,7 @@ function ActionDataIndexEditorModalBody({
                             key={field.id}
                             className={cn(
                               'align-top',
-                              draggingFieldId === field.id && 'bg-[#EEF7F1] opacity-70',
+                              draggingFieldId === field.id && 'bg-muted opacity-70',
                             )}
                             onDragOver={(event) => handleFieldDragOver(event, field.id)}
                             onDrop={(event) => handleFieldDrop(event, field.id)}
@@ -349,7 +349,7 @@ function ActionDataIndexEditorModalBody({
                                   type="button"
                                   variant="ghost"
                                   size="icon-sm"
-                                  className="size-8 cursor-grab rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] active:cursor-grabbing"
+                                  className="size-8 cursor-grab rounded-lg text-muted-foreground hover:bg-muted active:cursor-grabbing"
                                   draggable={!readOnly}
                                   onDragStart={(event) => handleFieldDragStart(event, field.id)}
                                   onDragEnd={handleFieldDragEnd}
@@ -363,7 +363,7 @@ function ActionDataIndexEditorModalBody({
                                   type="button"
                                   variant="ghost"
                                   size="icon-sm"
-                                  className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
+                                  className="size-8 rounded-lg text-muted-foreground hover:bg-muted"
                                   onClick={() => handleMoveField(field.id, fieldIndex - 1)}
                                   disabled={readOnly || fieldIndex === 0}
                                   aria-label={`${field.fieldName || 'field'} 위로 이동`}
@@ -375,7 +375,7 @@ function ActionDataIndexEditorModalBody({
                                   type="button"
                                   variant="ghost"
                                   size="icon-sm"
-                                  className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5]"
+                                  className="size-8 rounded-lg text-muted-foreground hover:bg-muted"
                                   onClick={() => handleMoveField(field.id, fieldIndex + 1)}
                                   disabled={readOnly || fieldIndex === draft.fields.length - 1}
                                   aria-label={`${field.fieldName || 'field'} 아래로 이동`}
@@ -419,7 +419,7 @@ function ActionDataIndexEditorModalBody({
                                     ),
                                   }))
                                 }
-                                className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                                className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                                 disabled={readOnly}
                               >
                                 {LOOKUP_SOURCE_OPTIONS.map((source) => (
@@ -451,7 +451,7 @@ function ActionDataIndexEditorModalBody({
                             <TableCell>
                               <div className="space-y-2">
                                 {field.transforms.length === 0 ? (
-                                  <p className="text-[11px] text-[#97A39C]">transform 없음</p>
+                                  <p className="text-[11px] text-muted-foreground">transform 없음</p>
                                 ) : (
                                   field.transforms.map((transform) => (
                                     <div key={transform.id} className="flex items-center gap-2">
@@ -480,7 +480,7 @@ function ActionDataIndexEditorModalBody({
                                         type="button"
                                         variant="ghost"
                                         size="icon-sm"
-                                        className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                                        className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
                                         onClick={() =>
                                           setDraft((previousDraft) => ({
                                             ...previousDraft,
@@ -531,7 +531,7 @@ function ActionDataIndexEditorModalBody({
                                 type="button"
                                 variant="ghost"
                                 size="icon-sm"
-                                className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                                className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
                                 onClick={() =>
                                   setDraft((previousDraft) => ({
                                     ...previousDraft,
@@ -557,7 +557,7 @@ function ActionDataIndexEditorModalBody({
             </div>
           </div>
 
-        <DialogFooter className="shrink-0 border-t border-[#EEF3F0] px-6 py-4">
+        <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>

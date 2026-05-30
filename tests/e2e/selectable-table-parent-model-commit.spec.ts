@@ -144,6 +144,26 @@ const setupMocks = async (page: Page) => {
         return
       }
 
+      // 사이드바 root 좌클릭 → useModelDetail(rootKey) GET. 리스트형 fallback 이
+      // modelItems 를 오염시키지 않도록 정상 ModelInfo 로 응답.
+      if (pathname === `/api/model/${ROOT_MODEL.modelVersionKey}` && method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createApiResponse(ROOT_MODEL)),
+        })
+        return
+      }
+
+      if (pathname === `/api/model/${BRANCH_MODEL.modelVersionKey}` && method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createApiResponse(BRANCH_MODEL)),
+        })
+        return
+      }
+
       if (pathname === `/api/model/${BRANCH_MODEL.modelKey}/commit-parent` && method === 'POST') {
         await route.fulfill({
           status: 200,
@@ -205,7 +225,10 @@ const openParentCommitModal = async (page: Page) => {
   await page.goto('/model')
   await page.waitForLoadState('networkidle')
 
-  // 사이드바 branch 모델 버튼 우클릭 → ContextMenu 노출
+  // 사이드바 LNB 3단 아코디언(기본 접힘): SECS → PARENT_COMMIT_MODEL(root) 좌클릭으로 펼친 뒤
+  // branch 모델 버튼 우클릭 → ContextMenu 노출.
+  await page.getByRole('button', { name: 'SECS', exact: true }).click()
+  await page.getByRole('button', { name: 'PARENT_COMMIT_MODEL', exact: true }).click()
   await page.getByRole('button', { name: BRANCH_MODEL.modelName, exact: true }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Parent Model Commit' }).click()
 
@@ -261,30 +284,30 @@ test('AC-R3.2-2: ParentModelCommitModal 3 mode 색상 + strikethrough 보존', a
   await setupMocks(page)
   await openParentCommitModal(page)
 
-  // added Table — 1 행 (idx 0)
+  // added Table — 1 행 (idx 0). R5-model 토큰화 — diff semantic success/warning/danger 보존.
   const addedRow = page.getByTestId('parent-commit-diff-row-added-0')
-  await expect(addedRow).toHaveClass(/bg-\[#F0FFF7\]/)
+  await expect(addedRow).toHaveClass(/bg-success\/10/)
 
   // changed Table — 2 행 (idx 0, 1)
   const changedRow0 = page.getByTestId('parent-commit-diff-row-changed-0')
   const changedRow1 = page.getByTestId('parent-commit-diff-row-changed-1')
-  await expect(changedRow0).toHaveClass(/bg-\[#FFFDF0\]/)
-  await expect(changedRow1).toHaveClass(/bg-\[#FFFDF0\]/)
+  await expect(changedRow0).toHaveClass(/bg-warning\/10/)
+  await expect(changedRow1).toHaveClass(/bg-warning\/10/)
 
-  // changed row 0 의 parent column (col 2 = Parent Parameter Value) 셀은 line-through + #97A39C
+  // changed row 0 의 parent column (col 2 = Parent Parameter Value) 셀은 line-through + muted-foreground
   const changedRow0ParentCell = changedRow0.locator('[data-col-idx="2"] span')
   await expect(changedRow0ParentCell).toHaveClass(/line-through/)
-  await expect(changedRow0ParentCell).toHaveClass(/text-\[#97A39C\]/)
+  await expect(changedRow0ParentCell).toHaveClass(/text-muted-foreground/)
   await expect(changedRow0ParentCell).toHaveCSS('text-decoration-line', 'line-through')
 
-  // changed row 0 의 branch column (col 3 = Branch Parameter Name) 셀은 font-medium + #1C7F59
+  // changed row 0 의 branch column (col 3 = Branch Parameter Name) 셀은 font-medium + success
   const changedRow0BranchCell = changedRow0.locator('[data-col-idx="3"] span')
   await expect(changedRow0BranchCell).toHaveClass(/font-medium/)
-  await expect(changedRow0BranchCell).toHaveClass(/text-\[#1C7F59\]/)
+  await expect(changedRow0BranchCell).toHaveClass(/text-success/)
 
   // deleted Table — 1 행 (idx 0)
   const deletedRow = page.getByTestId('parent-commit-diff-row-deleted-0')
-  await expect(deletedRow).toHaveClass(/bg-\[#FFF7F7\]/)
+  await expect(deletedRow).toHaveClass(/bg-danger\/5/)
 
   // deleted row 의 value 셀 (col 1 = Parameter Name) 은 line-through
   const deletedValueCell = deletedRow.locator('[data-col-idx="1"] span')

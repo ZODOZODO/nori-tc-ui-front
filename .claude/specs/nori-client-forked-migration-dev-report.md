@@ -378,3 +378,68 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, �
 검증: build + eslint(변경파일, baseline delta NEW 0) + model-flow/selectable-table-model-* e2e PASS + before/after 스크린샷(playwright test 러너 + scroll-reset, before 는 git stash) + 단일 commit.
 이후 순서: deploy (recharts 도입, 동일 4단). LiveMap 보류.
 ```
+
+## Phase R5-model — ModelPage 자매품 재구성 (2026-05-30)
+
+### 결정 (구조 / 사이드바)
+- forked **상세 페이지 구조**(`detail_pages.scss` `.ppmd-*`: location + 헤더 + 섹션 카드 + 내부 스크롤)를 R1 `PageLayoutShell` 의 `split-tab` variant 로 채워 적용. eqp/user/dlq 의 리스트 틀과 달리 ModelPage 우측 detail 영역에 forked location(breadcrumb) + 헤더(Model Management)를 **항상 노출**. 좌 = ModelSidebar(LNB 모델 트리 = list), 우 = PageLayoutShell(location + header + body) = detail 의 "좌 list / 우 detail" 분할. AC R1.1 "PageLayoutShell import 페이지 ≥1" 을 실페이지로 충족(이전엔 fixture 만).
+- **PageLayoutShell split-tab variant 확정** — R1 dev-report 의 "상세 페이지 레이아웃은 R5-model phase 에서 채움" 이행. `split-tab` = `flex min-h-0 min-w-0 flex-col`(.ppmd-body 인상 — 헤더 아래 내부 스크롤로 height 전파). 다른 5 variant 불변(SURGICAL).
+- **ModelSidebar 아코디언 미도입 결정** — 모델 트리(SECS/Socket → root → branch)는 *항상 펼침*이 기존 설계이고, `model-flow` e2e 가 사이드바 모델명 버튼을 직접 클릭(openEditModelTab). eqp gateway 식 클릭 아코디언을 도입하면 R4.1(선택/라우팅/testId 불변) 위반 + e2e 클릭 흐름 파손. SPEC R5.0 (3) "단순 nav 면 아코디언 불필요" + 프롬프트 "시각 토큰·i18n 만, 추가 배선 금지" 에 따라 **forked LNB 시각만** 적용(flat / 좌측 2px coral 액센트 + brand-primary/10 틴트 + coral 텍스트 / hover transition-colors / dot·box 제거).
+
+### D-R5-METHOD 4단 적용
+1. **틀** — ModelPage 우측 `<section><div>` 래퍼를 `PageLayoutShell variant="split-tab"` 로 교체(bread: Home › Model Info › {선택 모델명 | 전체}, heading: `model.title`). 콘텐츠 모드(interfaceGroup / 단일 선택 / version frame split)는 children 으로 유지. 중복 패딩 제거(콘텐츠 `p-3 md:p-4` → shell `p-6` 단일화), version frame 의 divider gap 은 `pb-3`/`pt-3` 로 유지 — `centerContainerRef` height 계산·`ResizableDivider` 동작 불변.
+2. **콘텐츠 재배치** — ModelInfoTable / ModelDetailPanel(lazy, 2007 LOC) / SelectableTable / 8 모달의 prop/state/API/TanStack hook/Zustand store/testId/data-* **불변**(R6). SelectableTable 엔진/rangeCopy/wrapRow 불변(D-GRID-ENGINE). ModelDetailPanel 내부 로직·heading(Identity/Trigger/Filter/Action/Collect/Message Flows 등) **동결** — PageLayoutShell body 로 위치만 이동.
+3. **사이드바** — ModelSidebar forked LNB 시각(상기). TreeNode: dot 제거 + flat 행 + active `border-l-2 border-brand-primary bg-brand-primary/10 text-brand-primary` / 비active `border-transparent hover:bg-muted hover:text-foreground transition-colors`. InterfaceSection: box 래퍼(`rounded-lg border bg-muted`) 제거 → flat + 헤더 좌측 액센트. R4.2(접기/리사이즈)는 이미 shared-layout store + onToggleSidebar/onResizeSidebar 배선 완비 → **추가 배선 0, 시각·i18n 만**. ContextMenu/검색/선택/라우팅/testId 불변(R4.1).
+4. **i18n** — 정적 한국어를 `model.*` 키 12개 신설(ko/en): 페이지 title/breadcrumb/breadcrumb.all, 사이드바 title/searchPlaceholder/empty/loading/expand/collapse, info table title/empty/syncing. 동적 메시지(버전·model id·카운트 임베드)·ContextMenu 영문 도메인 용어(Model Info Update 등)·대형 모달 내부 폼 라벨은 `t()` 보간 미지원 / ModelDetailPanel 동결로 보류(follow-up). 모델 트리 노드명은 데이터(불변). **e2e locale 무관 보정 불필요** — 6 spec 의 단언 텍스트(영문 패널 heading)는 i18n 대상 아님(검증).
+5. **색** — model **16파일 hex 전량 → 시맨틱 토큰**(prefix별 매핑 sed, grep 0 잔존). green brand(`#1c7f59` bg/`#166749`/`#1a7a55`/`#176748`/`#2aae67`)→brand-primary(coral), dark green(`#1e3d33`/`#22322b`/`#1f2d26` 등)→foreground, muted green(`#738078`/`#97a39c`/`#8a8a8a` 등)→muted-foreground, border green(`#e4eae6`/`#dce5e0` 등)→border/input, light green bg→muted, active(`#eaf5ee`)→brand-primary/10, white→card, focus ring(`#1c7f59`)→ring-brand-primary. **diff/status semantic 보존(prefix 구분 핵심)**: `text-[#1c7f59]`(diff added)→**success**(brand 아님), `#d1f5e7`/`#f0fff7`→success, `#fff0c0`/`#fffdf0`/`#7a5800`(changed)→warning, `#fad9d7`/`#fff7f7`/`#b4483f`/`#c5534b`(deleted/error)→danger, DEPRECATED 뱃지(`#efc7b4`/`#fff5ef`/`#a05a39`)→warning. brand coral 치환 금지 준수.
+
+### 변경 파일 (21 tracked + 4 screenshot)
+- `src/features/model/components/` 16: ModelPage(PageLayoutShell split-tab + i18n) / ModelSidebar(LNB 시각 + i18n) / ModelInfoTable(패널 accent bar + soft-shadow + i18n) / ModelDetailPanel · FlowCard · FlowFilterEditorModal · ActionDataIndexEditorModal · DcopItemPickerModal · ModelCheckInDiffModal · ModelCheckInModal · ModelCreateOrUpdateModal · ModelDeleteConfirmDialog · BranchModelCreateModal · ParentModelCommitModal · ModelFlowSidebar · modelDetailColumnDefs(색 토큰화)
+- `src/shared/layout/PageLayoutShell.tsx` — split-tab variant 확정(`.ppmd-body` 인상)
+- `src/i18n/locales/ko.json` / `en.json` — `model.*` 12키 신설
+- `tests/e2e/selectable-table-model-check-in-diff.spec.ts` · `selectable-table-parent-model-commit.spec.ts` — diff 색 단언 hex→토큰(`bg-success/10`·`bg-warning/10`·`bg-danger/5`·`text-success`·`text-muted-foreground`; 검증 동작 동일, 클래스 계약만 토큰화 — eqp AC-R5-CI-2 선례)
+- 스크린샷: `.claude/specs/screenshots/{before,after}/model-list-R5.png`·`model-detail-R5.png`
+
+### 검증
+- `npm run build` ✅ PASS — `✓ built in 8.02s` (tsc 0 errors)
+- `npx eslint src/features/model/components/ src/shared/layout/PageLayoutShell.tsx` ✅ **NEW 0** — 4건 전부 baseline pre-existing ModelPage `react-hooks/set-state-in-effect`(import/hook 추가로 라인만 466/510/569/586 이동).
+- `npx playwright test` (전체) ✅ **75 passed / 0 failed** (2.0m). model 6 spec(model-flow + selectable-table-model-{check-in-diff,info,parameter,workflow} + selectable-table-parent-model-commit) 포함 cross-page 회귀 0. diff 색 spec 2건은 `page.on('console','error')`/`pageerror` 0 단언 통과(글로벌 CLAUDE.md §14).
+- hex 잔존: `grep -rnoE '#[0-9A-Fa-f]{3,8}' src/features/model/components/` → **0**.
+- before/after 스크린샷: playwright test 러너 + 내부 section scroll-reset, before 는 `git stash`(추적 변경만) 로 parent 상태. **before** = boxed 사이드바(SECS/Socket 박스 + green dot) + "Model 정보" Korean + 헤더/breadcrumb 없음 + green 팔레트. **after** = flat LNB(좌측 coral 액센트) + breadcrumb(Home › Model Info › FLOW_DEMO_MODEL_admin) + "Model Management" 헤더 + coral accent bar "Model Info" 패널 + i18n.
+
+### Follow-up (보류 — 투명 기록)
+- **대형 모달 내부 i18n 미완** — 8 모달/패널(ModelDetailPanel · FlowCard · FlowFilterEditorModal · ActionDataIndexEditorModal · DcopItemPickerModal · ParentModelCommitModal · BranchModelCreateModal · ModelCheckInModal)은 색 토큰화 전량 완료, 내부 폼 라벨·동적 메시지(버전·id·카운트 임베드)·ContextMenu 영문 도메인 용어는 미적용. 사유: `t()` 보간 미지원 + ModelDetailPanel 내부 로직 동결(R6) + eqp/user/dlq 대형 모달 컨벤션. 주요 표면(페이지/사이드바/info table)은 충족. Validate 시 `[~] 부분` 표기 권장.
+- **status/diff semantic 색 보존** — diff add/change/delete(success/warning/danger), 모델 상태 Badge(default/info/warning), DEPRECATED(warning)는 의도적 보존, brand coral 미치환(SPEC R5.0 (5)·instruction 준수).
+
+### 사용자 피드백 보정 (R5-model — eqp 동일 3단 아코디언 + breadcrumb 제거, 2bdc44e 직후)
+사용자 지적 2건. eqp 와의 일관성 우선으로 위 (1)틀·(3)사이드바 결정을 **수정**:
+
+- **(1) ModelSidebar → eqp 동일 3단 클릭 아코디언 도입** — 위 "ModelSidebar 아코디언 미도입 결정"을 **사용자 명시 요청으로 철회**. 사용자: "secs 하위에 operator 모델, 그 하위 branch, 클릭했을 때만 하위로 나와야 eqp 와 동일". EqpSidebar 의 3단 패턴(그룹 헤더 토글 → 하위 링크 클릭=선택+토글 → 리프)을 그대로 매핑: **SECS/Socket 섹션**(클릭=인터페이스 그룹 선택+펼침) → **operator/root 모델**(클릭=onSelectModel+branch 토글) → **branch 모델**(리프, root 펼쳤을 때만). lazy-init(선택 모델의 root/섹션 펼침) + 검색 중 강제 펼침(파생값, effect 미사용)까지 eqp 와 동일. `secsOpen`/`socketOpen`/`expandedRoots:Set<string>` 로컬 state — **R4.1(선택/라우팅/ContextMenu/testId 불변)·R4.2 인프라 불변**, 표현용 아코디언 state 만 추가.
+- **공통 시각 헬퍼 추출** — 사용자: "왜 공통 컴포넌트처럼 안 쓰나". 컴포넌트는 데이터/선택 모델이 달라(eqp flat-group vs model root→branch tree) R4 설계상 분리 유지하되, LNB 시각 클래스(`lnbGroupClass`/`lnbSubLinkClass`/`lnbLeafClass`/`lnbLeafDotClass`/`LNB_FOCUS_RING`)를 **신규 `src/shared/layout/lnb-sidebar.ts` 로 추출**해 eqp/model 공유(eqp+model 2곳 + 시각 계약 명확 → 추출 정당, 룰 §11). EqpSidebar 는 로컬 helper → 공유 import 로 리팩터(동작·렌더 불변).
+- **(2) breadcrumb(PageLayoutShell) 제거** — 사용자: "왜 model 에서만 'Home › Model Info › X' breadcrumb 이 있나. 없을 거면 전체적으로 없게". 워크스페이스 grep 결과 **eqp/user/dlq 는 PageLocation·PageHeading·PageLayoutShell 미사용**(패널 내부 헤더만) — page-level breadcrumb/헤더 band 는 실현된 3 phase 어디에도 없고 model 만 추가됐던 것. 일관성(없는 쪽)으로 **ModelPage 의 PageLayoutShell 제거 → eqp 식 `AppPageShell > main > Sidebar + section` plain 구조 복원**. forked 헤더는 ModelInfoTable 패널 accent-bar 헤더(eqp 패널 헤더와 동일 레벨)로 표현. PageLayoutShell `split-tab` variant 변경·미사용 locale 키(`model.title`/`model.breadcrumb`/`model.breadcrumb.all`) 되돌림/제거. (AC R1.1 "PageLayoutShell import ≥1 페이지"는 fixture 가 충족 — 실현 phase 가 page-level chrome 을 채택 안 한 결과, 본 결정으로 명문화.)
+- **e2e 보정 (7 spec)** — 아코디언 기본 접힘이라, 사이드바 모델 버튼을 직접 클릭하던 6 spec(model-flow openEditModelTab + reload + AC-5.1 / model-info / model-parameter / model-workflow / check-in-diff / parent-commit / socket-message-layout)에 **섹션 → root → branch 펼침 클릭**을 선행 추가(eqp 보정3 선례, 단언 의미 동일). 추가로 root 좌클릭이 `useModelDetail(rootKey)` GET 을 유발 → 일부 spec 의 `/api/model/{rootKey}` mock 누락 시 리스트형 fallback 이 modelItems 를 오염(`commInterface` undefined → `toUpperCase` crash)하므로 parent-commit·socket 에 **root detail mock 추가**. model-flow AC-5.1(SOCKET) 은 list 오버라이드 glob `**/api/model` 이 `?offset=&limit=` 쿼리로 매칭 실패하던 **latent 버그**(always-expanded 시절 가려짐) 를 pathname 함수 매처로 고쳐 list 도 SOCKET 일관화 → 'Socket' 섹션 클릭.
+- **검증** — `npm run build` ✅ `✓ built in 7.92s` (tsc 0) / `eslint`(lnb-sidebar/EqpSidebar/ModelSidebar/ModelPage/PageLayoutShell) ✅ NEW 0(4건 baseline ModelPage set-state-in-effect) / `npx playwright test` 전체 ✅ **75 passed / 0 failed** (2.0m). after 스크린샷 재캡처(SECS→FLOW_DEMO_MODEL(root)→branch coral 좌측 액센트 아코디언 + breadcrumb 제거 반영). before(parent green)는 기존 유지.
+
+## eqp/user/dlq/model 세션 공통 컨벤션 보강 (이후 phase 재사용)
+- **상세 페이지 도메인(model)** — page-level breadcrumb/헤더 band 는 실현 phase(eqp/user/dlq) 가 채택 안 함 → model 도 미채택(일관성). forked 헤더는 **패널 카드 헤더(accent-bar + 제목, 내부 스크롤)** 로 표현하고, 페이지는 `AppPageShell > main > 도메인 Sidebar + section` plain 구조 일관 유지.
+- **도메인 사이드바 LNB 공유** — 컴포넌트는 도메인별 분리(데이터/선택 모델 상이)하되, 3단 아코디언 *시각*은 `@/shared/layout/lnb-sidebar` 공용 헬퍼로 통일(eqp/model). 트리형(자식 노드 보유) 사이드바는 **클릭 시에만 펼치는 아코디언**(섹션→그룹/root→리프), 기본 접힘 + 선택 컨텍스트 lazy-init + 검색 강제 펼침. e2e 는 섹션→상위→리프 펼침 클릭 선행(단언 의미 동일).
+- **prefix별 색 매핑** — 같은 hex 가 prefix(text-/bg-/ring-)에 따라 의미가 다를 수 있음(model `#1c7f59`: `bg-`=brand CTA→brand-primary, `text-`=diff added→success). 단일 hex 일괄 치환 금지 — `prefix-[#hex]` 단위로 semantic 매핑.
+
+## 다음 세션 진입 프롬프트 (R5-deploy — phase별 fresh 세션)
+
+> ⚠️ R5-deploy 는 색치환 작업이 아니다. eqp/user/dlq/model 처럼 **D-R5-METHOD 4단(SPEC R5.0)** 으로. DeployPage 는 forked **대시보드 구조**(`_dashboard.scss` 카드 grid)를 `PageCardGrid`+`PageCard` 로 재구성하는 phase. **차트는 이 phase 에서만 recharts 도입**(R3 D-CHART) — `npm view recharts peerDependencies` + install 마지막 5~10줄 commit 인용.
+
+```
+@.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-deploy 구현.
+이미 완료: Phase0/R1/R2/R5-login/R5-eqp/R5-user/R5-dlq/R5-model + dlq/user 사이드바 R4.2 + 글로벌 chrome(AppTopBar nori-tc-logo). baseline delta 게이트(pre-existing lint: UserPasswordResetModal.tsx:45 + ModelPage set-state-in-effect 4건 / e2e 0 failed) 유지.
+방식: SPEC R5.0 = D-R5-METHOD 4단 엄수. dev-report 의 "공통 컨벤션" 그대로 따를 것(특히 prefix별 색 매핑 / i18n e2e locale 무관화 / status semantic 보존). 색치환만 하고 끝내지 말 것.
+  (1) 틀 — forked 대시보드 구조(_dashboard.scss 카드 grid)를 R1 PageCardGrid+PageCard 로 DeployPage 골격 재구성.
+  (2) 콘텐츠 재배치 — DeployRegisterPanel/DeployMonitorPanel/DeployHistoryPanel 을 카드 slot 에 (prop/state/API/testId/data-* 불변, R6).
+  (3) 사이드바 — DeploySidebar 에 forked LNB 시각(active 좌측 액센트+hover transition+flat, 아이콘 없음). mode 전환 동작/testId 불변(R4.1). R4.2 필요 시 dlq/user 패턴 답습.
+  (4) i18n — deploy.* 정적 키 신설 후 t() 배선. 동적 메시지는 보류.
+  (5) 색 — deploy 182 hex(4파일) → coral/neutral 토큰. status/차트 semantic 색은 보존.
+  (R3) 차트 — recharts@^3 도입(이 phase 에서만). npm view recharts peerDependencies + npm install 마지막 5~10줄 commit 인용. --chart-1~5 토큰 매핑.
+D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, 시각 className·토큰만).
+검증: build + eslint(변경파일, baseline delta NEW 0) + deploy-register-selection/selectable-table-deploy-monitor e2e PASS + before/after 스크린샷(playwright test 러너, before 는 git stash) + 단일 commit.
+이후: LiveMap 보류(D-LIVEMAP, 사용자 이미지 기반 별도). R5 전 phase 완료 후 Validate 세션.
+```

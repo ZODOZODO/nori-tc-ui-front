@@ -136,20 +136,20 @@ export function BranchModelCreateModal({
         </DialogHeader>
 
         <div className="grid gap-4">
-          <section className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4">
+          <section className="rounded-2xl border border-border bg-muted p-4">
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#1E3D33]">Parent Model</label>
-                  <div className="flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                  <label className="text-xs font-semibold text-foreground">Parent Model</label>
+                  <div className="flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                     {parentModel?.modelName ?? '-'}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#1E3D33]">
+                  <label className="text-xs font-semibold text-foreground">
                     Source Version
-                    <span className="ml-1 text-[#C5534B]">*</span>
+                    <span className="ml-1 text-danger">*</span>
                   </label>
                   <Select
                     value={selectedSourceModelVersionKey || undefined}
@@ -171,33 +171,33 @@ export function BranchModelCreateModal({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">Source Description</label>
-                <div className="min-h-11 rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 py-3 text-sm text-[#51605A]">
+                <label className="text-xs font-semibold text-foreground">Source Description</label>
+                <div className="min-h-11 rounded-xl border border-border bg-muted px-3 py-3 text-sm text-muted-foreground">
                   {selectedSourceModel?.description?.trim() || '설명 없음'}
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">
+                <label className="text-xs font-semibold text-foreground">
                   suffix
-                  <span className="ml-1 text-[#C5534B]">*</span>
+                  <span className="ml-1 text-danger">*</span>
                 </label>
                 <Input
                   value={suffix}
                   onChange={(event) => setSuffix(event.target.value)}
                   placeholder="예: hotfix"
                 />
-                <p className="text-[11px] text-[#738078]">
+                <p className="text-[11px] text-muted-foreground">
                   최종 모델명은 `parent + suffix + userId` 규칙으로 생성되며 최대 1000자까지 허용됩니다.
                 </p>
               </div>
 
-              <div className="rounded-xl border border-[#DCE5E0] bg-white px-3 py-3">
-                <p className="text-[11px] font-semibold text-[#738078]">최종 Model Name Preview</p>
-                <p className="mt-1 break-all text-sm font-semibold text-[#22322B]">{previewModelName}</p>
+              <div className="rounded-xl border border-border bg-card px-3 py-3">
+                <p className="text-[11px] font-semibold text-muted-foreground">최종 Model Name Preview</p>
+                <p className="mt-1 break-all text-sm font-semibold text-foreground">{previewModelName}</p>
                 <p
                   className={`mt-2 text-[11px] ${
-                    isModelNameTooLong ? 'text-[#C5534B]' : 'text-[#738078]'
+                    isModelNameTooLong ? 'text-danger' : 'text-muted-foreground'
                   }`}
                 >
                   {remainingModelNameLength === null
@@ -211,13 +211,13 @@ export function BranchModelCreateModal({
           </section>
 
           {formErrorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {formErrorMessage}
             </p>
           ) : null}
 
           {errorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}

@@ -112,5 +112,14 @@
   "dlq.table.searchPlaceholder": "Search keyword",
   "dlq.table.loadError": "Failed to load the list.",
   "dlq.table.loadingAria": "Loading the list...",
-  "dlq.page.loading": "Checking your account..."
+  "dlq.page.loading": "Checking your account...",
+  "model.sidebar.title": "Model Info",
+  "model.sidebar.searchPlaceholder": "Search model name",
+  "model.sidebar.empty": "No models to display.",
+  "model.sidebar.loading": "Loading model list...",
+  "model.sidebar.expand": "Expand sidebar",
+  "model.sidebar.collapse": "Collapse sidebar",
+  "model.infoTable.title": "Model Info",
+  "model.infoTable.empty": "No models to display.",
+  "model.infoTable.syncing": "Syncing model data..."
 }

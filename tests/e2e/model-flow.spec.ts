@@ -470,7 +470,7 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
  *   - 모델명 단일 클릭은 좌측 ModelSidebar 의 모델명 아이템에서 행이 펼쳐지는 동작.
  *   - 따라서 사이드바의 모델명 클릭 → row 펼침 → row 더블클릭 흐름이 필요합니다.
  */
-const openEditModelTab = async (page: Page) => {
+const openEditModelTab = async (page: Page, sectionTitle: 'SECS' | 'Socket' = 'SECS') => {
   page.on('pageerror', (error) => {
     console.log(`[pageerror] ${error.message}`)
   })
@@ -483,6 +483,10 @@ const openEditModelTab = async (page: Page) => {
   // 모델 목록이 도착하기 전 사이드바 모델명 버튼은 보이지 않습니다 — networkidle 대기.
   await page.waitForLoadState('networkidle')
   // 좌측 사이드바에서 모델명을 클릭해 행을 펼친 다음 EDIT 행을 더블 클릭합니다.
+  // 사이드바는 nori-client LNB 3단 아코디언(기본 접힘) — {sectionTitle} 섹션 → FLOW_DEMO_MODEL(root)
+  // → FLOW_DEMO_MODEL_admin(branch) 순으로 펼친 뒤 branch 행을 더블 클릭합니다.
+  await page.getByRole('button', { name: sectionTitle, exact: true }).click()
+  await page.getByRole('button', { name: 'FLOW_DEMO_MODEL', exact: true }).click()
   await page.getByRole('button', { name: 'FLOW_DEMO_MODEL_admin' }).click()
   const editRow = page.getByRole('row', { name: /FLOW_DEMO_MODEL_admin EDIT/i })
   await editRow.dblclick()
@@ -643,6 +647,8 @@ test('Model-Flow-AC-4: Identity Message Name dropdown 변경 → save → reload
   // 항목은 더 이상 사이드바에 존재하지 않아야 합니다.
   await page.reload()
   await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'SECS', exact: true }).click()
+  await page.getByRole('button', { name: 'FLOW_DEMO_MODEL', exact: true }).click()
   await page.getByRole('button', { name: 'FLOW_DEMO_MODEL_admin' }).click()
   const reloadedEditRow = page.getByRole('row', { name: /FLOW_DEMO_MODEL_admin EDIT/i })
   await reloadedEditRow.dblclick()
@@ -743,24 +749,30 @@ test('Model-Flow-AC-5.1: SOCKET model 의 자유 messageName Flow 도 Filter 섹
   // setupMocks 전에 먼저 등록해야 합니다 (Playwright route 매칭은 *나중에 등록된* 라우트 우선).
   // 따라서 setupMocks 이후에 특수 라우트로 /api/model* 의 commInterface 만 SOCKET 으로 응답.
   await setupMocks(page, state)
-  await page.route('**/api/model', async (route, request) => {
-    if (request.method() !== 'GET') {
-      await route.fallback()
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(
-        createApiResponse({
-          items: [SOCKET_ROOT, SOCKET_EDIT],
-          offset: 0,
-          limit: 500,
-          count: 2,
-        }),
-      ),
-    })
-  })
+  // /api/model 리스트 GET 은 `?offset=&limit=` 쿼리가 붙어 glob '**/api/model' 가 매칭하지
+  // 못한다(과거 always-expanded 사이드바라 드러나지 않던 latent 버그). pathname 함수 매처로
+  // 매칭해 리스트도 SOCKET 으로 일관 응답 → 사이드바 트리가 Socket 섹션 아래에 놓인다.
+  await page.route(
+    (url) => (typeof url === 'string' ? new URL(url).pathname : url.pathname) === '/api/model',
+    async (route, request) => {
+      if (request.method() !== 'GET') {
+        await route.fallback()
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          createApiResponse({
+            items: [SOCKET_ROOT, SOCKET_EDIT],
+            offset: 0,
+            limit: 500,
+            count: 2,
+          }),
+        ),
+      })
+    },
+  )
   await page.route(`**/api/model/${EDIT_MODEL.modelVersionKey}`, async (route, request) => {
     if (request.method() !== 'GET') {
       await route.fallback()
@@ -784,7 +796,7 @@ test('Model-Flow-AC-5.1: SOCKET model 의 자유 messageName Flow 도 Filter 섹
     })
   })
 
-  await openEditModelTab(page)
+  await openEditModelTab(page, 'Socket')
 
   // workflowName 그룹 펼친 후 자유 messageName 행 클릭.
   await page.getByRole('button', { name: /EQP_CONDITION_CHECK/ }).click()

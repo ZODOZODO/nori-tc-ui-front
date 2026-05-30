@@ -90,31 +90,31 @@ export function ModelCreateOrUpdateModal({
         </DialogHeader>
 
         <div className="grid gap-4">
-          <section className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4">
+          <section className="rounded-2xl border border-border bg-muted p-4">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-[#1F2D26]">기본 정보</h3>
-              <p className="mt-1 text-xs text-[#65726B]">
+              <h3 className="text-sm font-semibold text-foreground">기본 정보</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
                 root model은 기준 정보만 수정할 수 있으며, 상세 편집은 branch checkout 이후에만 가능합니다.
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">
+                <label className="text-xs font-semibold text-foreground">
                   Model Name
-                  {mode === 'create' ? <span className="ml-1 text-[#C5534B]">*</span> : null}
+                  {mode === 'create' ? <span className="ml-1 text-danger">*</span> : null}
                 </label>
                 <Input
                   value={modelName}
                   onChange={(event) => setModelName(event.target.value)}
                   readOnly={mode === 'update'}
-                  className={mode === 'update' ? 'bg-[#F4F7F5]' : undefined}
+                  className={mode === 'update' ? 'bg-muted' : undefined}
                   placeholder="예: MODEL_A"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">Maker</label>
+                <label className="text-xs font-semibold text-foreground">Maker</label>
                 <Input
                   value={maker}
                   onChange={(event) => setMaker(event.target.value)}
@@ -125,13 +125,13 @@ export function ModelCreateOrUpdateModal({
           </section>
 
           {formErrorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {formErrorMessage}
             </p>
           ) : null}
 
           {errorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}

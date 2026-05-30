@@ -179,13 +179,13 @@ export function DcopItemPickerModal({
 
         <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.2fr)_88px_minmax(0,1.45fr)]">
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-[#DCE7E0] bg-white p-4"
+            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-left"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-[#22332A]">Reference DCOP</h3>
-                <p className="mt-1 text-[11px] text-[#6D7A73]">
+                <h3 className="text-sm font-semibold text-foreground">Reference DCOP</h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   model 의 dcop_item pool 전체. 이미 매핑된 항목은 비활성화됩니다.
                 </p>
               </div>
@@ -206,7 +206,7 @@ export function DcopItemPickerModal({
             </div>
 
             <div className="relative mt-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#93A19A]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 value={searchKeyword}
@@ -217,9 +217,9 @@ export function DcopItemPickerModal({
               />
             </div>
 
-            <div className="mt-3 flex-1 overflow-y-auto rounded-[12px] bg-[#F8FBF9] p-2">
+            <div className="mt-3 flex-1 overflow-y-auto rounded-[12px] bg-muted p-2">
               {filteredReferenceItems.length === 0 ? (
-                <p className="px-2 py-4 text-center text-xs text-[#7B8A82]">
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                   표시할 DCOP item 이 없습니다.
                 </p>
               ) : (
@@ -232,7 +232,7 @@ export function DcopItemPickerModal({
                       <li key={key}>
                         <label
                           className={
-                            'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[#EEF4F0]' +
+                            'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted' +
                             (isAlreadyBound ? ' cursor-not-allowed opacity-50 hover:bg-transparent' : '')
                           }
                         >
@@ -243,7 +243,7 @@ export function DcopItemPickerModal({
                             onChange={() => toggleLeftSelection(key)}
                             aria-label={`${item.dcopItemName} 선택`}
                           />
-                          <span className="min-w-0 flex-1 truncate font-medium text-[#22322B]">
+                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                             {item.dcopItemName}
                           </span>
                           {isAlreadyBound ? (
@@ -265,7 +265,7 @@ export function DcopItemPickerModal({
               type="button"
               onClick={handleClickMove}
               disabled={!hasLeftSelection}
-              className="h-12 w-12 rounded-full bg-[#1A7A55] text-white hover:bg-[#176748]"
+              className="h-12 w-12 rounded-full bg-brand-primary text-white hover:bg-brand-primary/90"
               aria-label="선택한 DCOP item 추가"
               data-testid="dcop-picker-move-button"
             >
@@ -274,13 +274,13 @@ export function DcopItemPickerModal({
           </div>
 
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-[#DCE7E0] bg-white p-4"
+            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-right"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-[#22332A]">현재 Flow 의 DCOP</h3>
-                <p className="mt-1 text-[11px] text-[#6D7A73]">
+                <h3 className="text-sm font-semibold text-foreground">현재 Flow 의 DCOP</h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   좌측에서 추가한 항목이 누적됩니다. Trash 로 1 행씩 제거할 수 있습니다.
                 </p>
               </div>
@@ -300,11 +300,11 @@ export function DcopItemPickerModal({
               </div>
             </div>
 
-            <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-[#E5ECE7]">
+            <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-border">
               <div className="h-full overflow-auto">
                 <Table className="min-w-[360px]">
                   <TableHeader>
-                    <TableRow className="bg-[#F6F9F7] hover:bg-[#F6F9F7]">
+                    <TableRow className="bg-muted hover:bg-muted">
                       <TableHead>DCOP Item Name</TableHead>
                       <TableHead>Variable Id</TableHead>
                       <TableHead className="w-[70px] text-center">삭제</TableHead>
@@ -313,14 +313,14 @@ export function DcopItemPickerModal({
                   <TableBody>
                     {rightDisplayItems.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="py-12 text-center text-xs text-[#708078]">
+                        <TableCell colSpan={3} className="py-12 text-center text-xs text-muted-foreground">
                           좌측에서 항목을 체크한 뒤 화살표로 추가해 주세요.
                         </TableCell>
                       </TableRow>
                     ) : (
                       rightDisplayItems.map((item) => (
                         <TableRow key={item.dcopItemKey}>
-                          <TableCell className="font-semibold text-[#21332A]">
+                          <TableCell className="font-semibold text-foreground">
                             {item.dcopItemName}
                           </TableCell>
                           <TableCell>{item.variableId}</TableCell>
@@ -328,7 +328,7 @@ export function DcopItemPickerModal({
                             <button
                               type="button"
                               onClick={() => removeFromRight(item.dcopItemKey)}
-                              className="inline-flex size-8 items-center justify-center rounded-full border border-[#E0E8E3] text-[#6E7B74] transition hover:border-[#D65454] hover:bg-[#FFF4F4] hover:text-[#C64040]"
+                              className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/5 hover:text-danger"
                               aria-label={`${item.dcopItemName} 매핑 해제`}
                             >
                               <Trash2 className="size-4" />

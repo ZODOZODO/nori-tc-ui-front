@@ -263,6 +263,9 @@ const openCheckInDiffModal = async (page: Page) => {
   await page.goto('/model')
   await page.waitForLoadState('networkidle')
 
+  // 사이드바 LNB 3단 아코디언(기본 접힘): SECS → CHECKIN_DIFF_MODEL(root) → branch 펼침.
+  await page.getByRole('button', { name: 'SECS', exact: true }).click()
+  await page.getByRole('button', { name: 'CHECKIN_DIFF_MODEL', exact: true }).click()
   await page.getByRole('button', { name: BRANCH_EDIT.modelName }).click()
   const editRow = page.getByRole('row', { name: new RegExp(`${BRANCH_EDIT.modelName} EDIT`, 'i') })
   await editRow.dblclick()
@@ -315,9 +318,9 @@ test('AC-R3.2-1: ModelCheckInDiffModal 2x2 range copy → TSV (added / changed �
 
 /**
  * AC-R3.2-1: diff 색상 / strikethrough 보존.
- * - added 행: bg-[#F0FFF7]
- * - changed 행: bg-[#FFFDF0] + 셀 내 previous 값 line-through
- * - deleted 행: bg-[#FFF7F7] + identity line-through
+ * - added 행: bg-success/10 (R5-model coral/neutral 토큰화 — diff semantic success 보존)
+ * - changed 행: bg-warning/10 + 셀 내 previous 값 line-through
+ * - deleted 행: bg-danger/5 + identity line-through
  */
 test('AC-R3.2-1: ModelCheckInDiffModal diff 색상 + strikethrough 보존', async ({ page }) => {
   const consoleBucket = attachConsoleErrorListeners(page)
@@ -329,9 +332,9 @@ test('AC-R3.2-1: ModelCheckInDiffModal diff 색상 + strikethrough 보존', asyn
   const changedRow = page.getByTestId('check-in-diff-row-changed-ITEM_CHG')
   const deletedRow = page.getByTestId('check-in-diff-row-deleted-ITEM_DEL')
 
-  await expect(addedRow).toHaveClass(/bg-\[#F0FFF7\]/)
-  await expect(changedRow).toHaveClass(/bg-\[#FFFDF0\]/)
-  await expect(deletedRow).toHaveClass(/bg-\[#FFF7F7\]/)
+  await expect(addedRow).toHaveClass(/bg-success\/10/)
+  await expect(changedRow).toHaveClass(/bg-warning\/10/)
+  await expect(deletedRow).toHaveClass(/bg-danger\/5/)
 
   // changed 행의 previous 값 (val_parent) 은 line-through div 안에 위치
   const previousLine = changedRow.locator('.line-through', { hasText: 'val_parent' })

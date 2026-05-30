@@ -11,6 +11,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import { useI18n } from '@/i18n/i18n-context'
+import {
+  LNB_FOCUS_RING,
+  lnbGroupClass,
+  lnbLeafClass,
+  lnbLeafDotClass,
+  lnbSubLinkClass,
+} from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import type { EqpInfo, ProtocolType } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
@@ -38,28 +45,6 @@ interface EqpSidebarProps {
   onToggleSidebar: () => void
   onResizeSidebar: (deltaX: number) => void
 }
-
-const NODE_FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
-/** nori-client `sidebar__top` — 그룹 헤더(아이콘+라벨). 선택(is-expanded)=solid coral. */
-const groupTopClass = (selected: boolean) =>
-  cn(
-    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-bold transition-colors',
-    NODE_FOCUS_RING,
-    selected
-      ? 'bg-brand-primary text-white'
-      : 'text-foreground hover:bg-brand-primary/10 hover:text-brand-primary',
-  )
-
-/** nori-client `sidebar__sublink` — 하위 그룹 링크(들여쓰기 + active 좌측 보더). */
-const subLinkClass = (selected: boolean) =>
-  cn(
-    'block w-full rounded-md py-1.5 pr-3 text-left text-xs font-medium transition-colors',
-    NODE_FOCUS_RING,
-    selected
-      ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[30px] font-semibold text-brand-primary'
-      : 'pl-8 text-muted-foreground hover:bg-muted hover:text-foreground',
-  )
 
 /**
  * design.pen의 EqpSidebarExpanded/Collapsed 구조 + nori-client 리뉴얼 LNB 시각 패턴
@@ -164,20 +149,9 @@ export const EqpSidebar = memo(function EqpSidebar({
           <button
             type="button"
             onClick={() => onSelectEqp(eqp.eqpId)}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left text-xs transition-colors',
-              NODE_FOCUS_RING,
-              isSelected
-                ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[42px] font-semibold text-brand-primary'
-                : 'pl-11 text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
+            className={lnbLeafClass(isSelected)}
           >
-            <span
-              className={cn(
-                'inline-block size-1.5 rounded-full',
-                isSelected ? 'bg-brand-primary' : 'bg-muted-foreground/50',
-              )}
-            />
+            <span className={lnbLeafDotClass(isSelected)} />
             <span className="truncate">{eqp.eqpId}</span>
           </button>
         </ContextMenuTrigger>
@@ -210,7 +184,7 @@ export const EqpSidebar = memo(function EqpSidebar({
             onClick={onToggleSidebar}
             className={cn(
               'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
-              NODE_FOCUS_RING,
+              LNB_FOCUS_RING,
             )}
             aria-label={t('eqp.sidebar.expand')}
           >
@@ -237,7 +211,7 @@ export const EqpSidebar = memo(function EqpSidebar({
               onClick={onToggleSidebar}
               className={cn(
                 'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
-                NODE_FOCUS_RING,
+                LNB_FOCUS_RING,
               )}
               aria-label={t('eqp.sidebar.collapse')}
             >
@@ -265,7 +239,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                 onSelectBusinessAll()
                 setBusinessOpen((open) => !open)
               }}
-              className={groupTopClass(isBusinessSelected)}
+              className={lnbGroupClass(isBusinessSelected)}
             >
               <span className="flex-1 truncate">Business</span>
             </button>
@@ -281,7 +255,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                       key={group.appName}
                       type="button"
                       onClick={() => onSelectBusinessGroup(group.appIndex)}
-                      className={subLinkClass(selectedBusinessGroupIndex === group.appIndex)}
+                      className={lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex)}
                     >
                       {group.appName}
                     </button>
@@ -300,7 +274,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                       onSelectGatewayAll()
                       setGatewayOpen((open) => !open)
                     }}
-                    className={groupTopClass(isGatewaySelected)}
+                    className={lnbGroupClass(isGatewaySelected)}
                   >
                     <span className="flex-1 truncate">Gateway</span>
                   </button>
@@ -316,7 +290,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                         <button
                           type="button"
                           onClick={() => toggleGatewayGroup(group.appIndex)}
-                          className={subLinkClass(selectedGroupIndex === group.appIndex)}
+                          className={lnbSubLinkClass(selectedGroupIndex === group.appIndex)}
                         >
                           {group.appName}
                         </button>

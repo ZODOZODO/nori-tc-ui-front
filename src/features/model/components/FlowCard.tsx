@@ -224,18 +224,18 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-[#E4EAE6] bg-white p-5 shadow-[0_1px_2px_rgba(20,46,36,0.04)]">
+    <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(20,46,36,0.04)]">
       <header className="flex items-baseline justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-[#213028]">
+          <h2 className="text-base font-semibold text-foreground">
             {draft.workflowName || '(flow 미지정)'} / {draft.messageName || '(message 미지정)'}
           </h2>
-          <p className="text-xs text-[#738078]">
+          <p className="text-xs text-muted-foreground">
             {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? 'Flow ID #신규' : `Flow ID #${flow.flowId}`}
           </p>
         </div>
         {errorMessage ? (
-          <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-1.5 text-xs text-[#B4483F]">
+          <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs text-danger">
             {errorMessage}
           </p>
         ) : null}
@@ -244,7 +244,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
       <FlowCardSection title="Identity" description="Flow 의 고유 식별값입니다.">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">Flow Name</label>
+            <label className="text-xs font-semibold text-foreground">Flow Name</label>
             <Input
               value={draft.workflowName}
               onChange={(event) =>
@@ -258,13 +258,13 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               placeholder={isDraftCard ? '신규 Flow 이름을 입력하세요' : undefined}
             />
             {!isDraftCard ? (
-              <p className="text-[11px] text-[#97A39C]">
+              <p className="text-[11px] text-muted-foreground">
                 저장된 Flow 의 Flow Name 은 변경 불가입니다. 변경이 필요하면 새 Flow 를 추가하고 기존 Flow 를 삭제하세요.
               </p>
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">Message Name</label>
+            <label className="text-xs font-semibold text-foreground">Message Name</label>
             <Select
               value={messageDropdownValue}
               onValueChange={handleSelectMessageName}
@@ -293,7 +293,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[#1E3D33]">Event Id</label>
+              <label className="text-xs font-semibold text-foreground">Event Id</label>
               <Select
                 value={draft.eventId ?? MESSAGE_NAME_PLACEHOLDER}
                 onValueChange={handleSelectEventId}
@@ -313,14 +313,14 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[#1E3D33]">Transaction Id</label>
+              <label className="text-xs font-semibold text-foreground">Transaction Id</label>
               <Input
                 value={draft.transactionId ?? ''}
                 onChange={(event) => handleChangeTransactionId(event.target.value)}
                 placeholder="(빈 값 = wildcard)"
                 readOnly={readOnly}
               />
-              <p className="text-[11px] text-[#97A39C]">
+              <p className="text-[11px] text-muted-foreground">
                 값을 비우면 모든 transactionId 에 매칭됩니다.
               </p>
             </div>
@@ -332,11 +332,11 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
         title="Filter"
         description="workflow_filter — data / event / context 조건 트리. 모든 protocol 에서 편집 가능."
       >
-        <div className="space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
+        <div className="space-y-2 rounded-xl border border-border bg-muted p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-[#1E3D33]">Flow Filter</p>
-              <p className="text-[11px] text-[#738078]">
+              <p className="text-xs font-semibold text-foreground">Flow Filter</p>
+              <p className="text-[11px] text-muted-foreground">
                 data / event / context 의 조건 트리를 편집합니다.
               </p>
             </div>
@@ -352,7 +352,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             </Button>
           </div>
           <p
-            className="rounded-lg border border-[#DCE5E0] bg-white px-3 py-2 text-xs text-[#22322B]"
+            className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground"
             data-testid="flow-card-workflow-filter-summary"
           >
             {flowFilterSummary}
@@ -362,7 +362,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
 
       <FlowCardSection title="Action" description="이 Flow 가 실행하는 동작입니다.">
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-[#1E3D33]">Action Name</label>
+          <label className="text-xs font-semibold text-foreground">Action Name</label>
           <Input
             value={draft.actionName}
             onChange={(event) => handleChangeActionName(event.target.value)}
@@ -371,11 +371,11 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
           />
         </div>
 
-        <div className="mt-4 space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
+        <div className="mt-4 space-y-2 rounded-xl border border-border bg-muted p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-[#1E3D33]">Action Data Index</p>
-              <p className="text-[11px] text-[#738078]">
+              <p className="text-xs font-semibold text-foreground">Action Data Index</p>
+              <p className="text-[11px] text-muted-foreground">
                 mdfTemplateName 과 fields 매핑을 편집합니다.
               </p>
             </div>
@@ -391,7 +391,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             </Button>
           </div>
           <p
-            className="rounded-lg border border-[#DCE5E0] bg-white px-3 py-2 text-xs text-[#22322B]"
+            className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground"
             data-testid="flow-card-action-data-index-summary"
           >
             {actionDataIndexSummary}
@@ -423,10 +423,10 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
           </Button>
         }
       >
-        <div className="rounded-xl border border-[#E4EAE6]">
+        <div className="rounded-xl border border-border">
           <Table className="min-w-[640px]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
+              <TableRow className="bg-muted">
                 <TableHead>DCOP Item Name</TableHead>
                 <TableHead>Variable Id</TableHead>
                 <TableHead>Collection Rule</TableHead>
@@ -438,7 +438,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
                 <TableRow>
                   <TableCell
                     colSpan={4}
-                    className="py-6 text-center text-xs text-[#7A8680]"
+                    className="py-6 text-center text-xs text-muted-foreground"
                   >
                     수집 항목이 없습니다.
                   </TableCell>
@@ -459,7 +459,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
       </FlowCardSection>
 
       {isDraftCard && onCancelDraft !== null ? (
-        <footer className="flex items-center justify-end gap-2 border-t border-[#EEF3F0] pt-4">
+        <footer className="flex items-center justify-end gap-2 border-t border-border pt-4">
           <Button
             type="button"
             variant="outline"
@@ -489,11 +489,11 @@ interface FlowCardSectionProps {
  */
 function FlowCardSection({ title, description, headerRight, children }: FlowCardSectionProps) {
   return (
-    <section className="space-y-3 rounded-2xl border border-[#E7EEEA] bg-[#FBFDFC] p-4">
+    <section className="space-y-3 rounded-2xl border border-border bg-muted p-4">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-[#1E3D33]">{title}</h3>
-          <p className="text-[11px] text-[#738078]">{description}</p>
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="text-[11px] text-muted-foreground">{description}</p>
         </div>
         {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
       </header>

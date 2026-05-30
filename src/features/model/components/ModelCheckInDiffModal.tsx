@@ -46,15 +46,15 @@ const KIND_BADGE_LABEL: Record<CheckInDiffRowKind, string> = {
 }
 
 const KIND_BADGE_CLASS: Record<CheckInDiffRowKind, string> = {
-  added: 'bg-[#D1F5E7] text-[#1C7F59]',
-  changed: 'bg-[#FFF0C0] text-[#7A5800]',
-  deleted: 'bg-[#FAD9D7] text-[#B4483F]',
+  added: 'bg-success/20 text-success',
+  changed: 'bg-warning/20 text-warning',
+  deleted: 'bg-danger/20 text-danger',
 }
 
 const KIND_ROW_CLASS: Record<CheckInDiffRowKind, string> = {
-  added: 'bg-[#F0FFF7] hover:bg-[#F0FFF7]',
-  changed: 'bg-[#FFFDF0] hover:bg-[#FFFDF0]',
-  deleted: 'bg-[#FFF7F7] hover:bg-[#FFF7F7]',
+  added: 'bg-success/10 hover:bg-success/10',
+  changed: 'bg-warning/10 hover:bg-warning/10',
+  deleted: 'bg-danger/5 hover:bg-danger/5',
 }
 
 const normalizeSectionRows = (section: ModelDiffSection): NormalizedCheckInDiffRow[] => [
@@ -110,8 +110,8 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
         <span
           className={
             row.kind === 'deleted'
-              ? 'text-xs text-[#97A39C] line-through'
-              : 'text-xs text-[#22322B]'
+              ? 'text-xs text-muted-foreground line-through'
+              : 'text-xs text-foreground'
           }
         >
           {row.identity}
@@ -134,7 +134,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           if (row.kind === 'added') {
             const value = row.branchValues[columnIndex] ?? ''
             return (
-              <span className="text-xs text-[#22322B]">
+              <span className="text-xs text-foreground">
                 <DiffCellValue value={value} />
               </span>
             )
@@ -142,7 +142,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           if (row.kind === 'deleted') {
             const value = row.parentValues[columnIndex] ?? ''
             return (
-              <span className="text-xs text-[#97A39C] line-through">
+              <span className="text-xs text-muted-foreground line-through">
                 <DiffCellValue value={value} />
               </span>
             )
@@ -152,17 +152,17 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           const isChanged = current !== previous
           if (!isChanged) {
             return (
-              <span className="text-xs text-[#22322B]">
+              <span className="text-xs text-foreground">
                 <DiffCellValue value={current} />
               </span>
             )
           }
           return (
             <div className="space-y-1 text-xs">
-              <div className="text-[#97A39C] line-through">
+              <div className="text-muted-foreground line-through">
                 <DiffCellValue value={previous} />
               </div>
-              <div className="text-[#1C7F59] font-medium">
+              <div className="text-success font-medium">
                 <DiffCellValue value={current} />
               </div>
             </div>
@@ -240,12 +240,12 @@ export function ModelCheckInDiffModal({
 
         <div className="max-h-[60vh] overflow-y-auto space-y-4">
           {isPending ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-[#647169]">
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               이전 버전 데이터를 불러오는 중입니다.
             </div>
           ) : !hasDiff ? (
-            <p className="py-10 text-center text-sm text-[#647169]">
+            <p className="py-10 text-center text-sm text-muted-foreground">
               이전 버전과 비교하여 변경된 내용이 없습니다.
             </p>
           ) : (
@@ -262,10 +262,10 @@ export function ModelCheckInDiffModal({
                 section.detailNode
 
               return (
-                <div key={section.detailNode} className="rounded-2xl border border-[#E4EAE6] overflow-hidden">
-                  <div className="bg-[#F6F9F7] px-4 py-2.5">
-                    <span className="text-sm font-semibold text-[#1E3D33]">{nodeLabel}</span>
-                    <span className="ml-2 text-xs text-[#647169]">
+                <div key={section.detailNode} className="rounded-2xl border border-border overflow-hidden">
+                  <div className="bg-muted px-4 py-2.5">
+                    <span className="text-sm font-semibold text-foreground">{nodeLabel}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
                       추가 {section.added.length} / 변경 {section.changed.length} / 삭제 {section.deleted.length}
                     </span>
                   </div>
@@ -283,7 +283,7 @@ export function ModelCheckInDiffModal({
           <Button
             type="button"
             variant="outline"
-            className="h-9 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+            className="h-9 rounded-full border-border px-4 text-xs font-semibold"
             onClick={onCancel}
             disabled={isPending}
           >
@@ -291,7 +291,7 @@ export function ModelCheckInDiffModal({
           </Button>
           <Button
             type="button"
-            className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+            className="h-9 rounded-full bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary/90"
             onClick={onOk}
             disabled={isPending}
           >
@@ -309,7 +309,7 @@ export function ModelCheckInDiffModal({
  */
 function DiffCellValue({ value }: { value: string }) {
   if (!value) {
-    return <span className="text-[#97A39C]">—</span>
+    return <span className="text-muted-foreground">—</span>
   }
   const MAX_LENGTH = 100
   if (value.length <= MAX_LENGTH) {
@@ -318,7 +318,7 @@ function DiffCellValue({ value }: { value: string }) {
   return (
     <span title={value}>
       {value.slice(0, MAX_LENGTH)}
-      <span className="text-[#97A39C]">…</span>
+      <span className="text-muted-foreground">…</span>
     </span>
   )
 }

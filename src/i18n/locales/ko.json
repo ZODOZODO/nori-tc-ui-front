@@ -112,5 +112,14 @@
   "dlq.table.searchPlaceholder": "키워드 검색",
   "dlq.table.loadError": "목록을 조회하지 못했습니다.",
   "dlq.table.loadingAria": "목록을 불러오는 중입니다.",
-  "dlq.page.loading": "사용자 정보를 확인하는 중입니다."
+  "dlq.page.loading": "사용자 정보를 확인하는 중입니다.",
+  "model.sidebar.title": "Model Info",
+  "model.sidebar.searchPlaceholder": "Model Name 검색",
+  "model.sidebar.empty": "표시할 모델이 없습니다.",
+  "model.sidebar.loading": "모델 목록을 불러오는 중입니다.",
+  "model.sidebar.expand": "사이드바 펼치기",
+  "model.sidebar.collapse": "사이드바 축소",
+  "model.infoTable.title": "Model 정보",
+  "model.infoTable.empty": "표시할 모델이 없습니다.",
+  "model.infoTable.syncing": "모델 데이터를 동기화 중입니다."
 }

@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { useI18n } from '@/i18n/i18n-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -76,6 +77,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
   onSelectRow,
   onOpenDetail,
 }: ModelInfoTableProps) {
+  const { t } = useI18n()
   const sortedModels = useMemo(
     () => [...models].sort((firstItem, secondItem) => secondItem.updatedAt.localeCompare(firstItem.updatedAt)),
     [models],
@@ -121,16 +123,19 @@ export const ModelInfoTable = memo(function ModelInfoTable({
   )
 
   return (
-    <section className="flex h-full flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4">
+    <section className="flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-soft-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#213028]">Model 정보</h2>
+        <div className="flex items-center gap-2">
+          <span className="h-4 w-[3px] shrink-0 rounded-sm bg-brand-primary" aria-hidden="true" />
+          <h2 className="text-base font-semibold text-foreground">{t('model.infoTable.title')}</h2>
+        </div>
       </div>
 
       {isLoading ? (
         <div className={cn('overflow-auto', compactHeight ? 'max-h-[300px]' : 'flex-1')}>
           <Table className="min-w-[980px]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
+              <TableRow className="bg-muted">
                 <TableHead>Model Name</TableHead>
                 <TableHead>Model Version</TableHead>
                 <TableHead>status</TableHead>
@@ -161,7 +166,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
           testId="selectable-table-model-info"
           containerClassName={cn(compactHeight ? 'max-h-[300px]' : 'flex-1')}
           tableClassName="min-w-[980px]"
-          emptyState="표시할 모델이 없습니다."
+          emptyState={t('model.infoTable.empty')}
           wrapRow={(model, _rowIdx, children) => (
             <TableRow
               data-state={
@@ -178,7 +183,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
       )}
 
       {isFetching && !isLoading ? (
-        <p className="mt-2 text-xs text-[#7A8680]">모델 데이터를 동기화 중입니다.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t('model.infoTable.syncing')}</p>
       ) : null}
     </section>
   )
