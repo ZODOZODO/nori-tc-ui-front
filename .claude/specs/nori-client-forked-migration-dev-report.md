@@ -226,3 +226,32 @@ D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop 불변, 시각 className
 - **(2) 상단 브랜드 로고 교체** — `AppTopBar` 의 "N 박스 + Nori-TC 텍스트" → login 과 동일한 `public/nori-tc-logo.png` 이미지(`<img h-8 w-auto>`). 브랜드 자산 스왑이며 `navigationItems`/`resolveVisibleAppNavigationItems`/라우팅/prefetch 는 **미변경**(AC R4 git diff 0 유지).
 - **e2e 보정** — gateway_app 아코디언으로 `selectable-table-check-in` 의 EQP 노드가 gateway_app1 펼침 전엔 숨음 → openCheckInModal 에 `Gateway → gateway_app1 → EQP` 순 클릭으로 보정. gateway-group e2e 는 그룹 테이블 콘텐츠 검증이라 영향 없음.
 - 검증: `npm run build` ✅ ✓ built in 7.83s / `eslint EqpSidebar+AppTopBar` ✅ EXIT 0 / `playwright test` 전체 ✅ 75 passed / 0 failed. after 스크린샷 재캡처(2단계 아코디언 + 로고 반영).
+
+## eqp 세션에서 확립한 공통 컨벤션 (이후 phase 재사용)
+- **콘텐츠 검색바** — 도메인 사이드바에 이미 검색이 있으면 콘텐츠 테이블엔 중복 검색바 두지 않음(eqp). 사이드바에 검색이 없는 도메인은 콘텐츠 리스트에 검색/필터가 적절할 수 있음 → phase 진입 시 사용자 확인.
+- **사이드바 forked LNB 시각** — flat nav / 그룹 아이콘 없음(사용자 선호) / active=`bg-brand-primary/10`+좌측 2px 액센트 / 선택 그룹 헤더=solid coral / hover `transition-colors`. **자식이 있는 트리형 사이드바는 클릭 시에만 펼치는 아코디언**(eqp gateway 2단계). 자식 없는 단순 nav 는 아코디언 불필요.
+- **색** — bespoke hex → coral/neutral 토큰 전량. **status/diff semantic 색(emerald/sky/amber 런타임 상태, add/change/delete)은 success/warning/danger 로 매핑하되 brand coral 로 치환 금지.**
+- **i18n** — 정적 한국어만 `<domain>.*` 키 신설. **동적 메시지(id·카운트 임베드)는 `t()` 보간 미지원이라 보류**(정적만, follow-up 기록).
+- **대형 모달** — 색 토큰화 우선 완수, 내부 폼 라벨 i18n 은 분량/보간 한계로 follow-up 가능(투명 기록).
+- **e2e 스크린샷 캡처** — standalone `node` chromium 은 vite dev cold-start 에서 동적 import 레이스로 blank → **playwright `test` 러너**(webServer/warmup 관리, reuseExistingServer)로 임시 spec 작성해 캡처 후 spec 삭제. before 는 `git stash`(추적 변경만)로 parent 상태 캡처 → `stash pop`.
+- **회귀 게이트** — baseline pre-existing lint(`react-hooks/set-state-in-effect`) 대비 **NEW 0**. 새 page-clamp 는 effect 금지(slice 시점 `safePage` clamp). 사이드바 상호작용 바뀌면 닿는 e2e 의 클릭 흐름 보정(단언 의미 동일 유지).
+- **단일 commit** — phase 별 1 commit, PR/MR 금지.
+
+## 다음 세션 진입 프롬프트 (R5-user — phase별 fresh 세션)
+
+> ⚠️ R5-user 는 색치환 작업이 아니다. eqp(`a32c738` 외)처럼 **D-R5-METHOD 4단(SPEC R5.0)** 으로. UserManagementSidebar 는 User/Group **2-모드 전환**(트리/아코디언 아님)이라 사이드바 검색·아코디언이 없으니, User/Group **콘텐츠 리스트엔 forked 리스트 틀의 검색/필터가 적절할 수 있음 → 진입 시 사용자에게 확인**.
+
+```
+@.claude/specs/nori-client-forked-migration.md @.claude/specs/nori-client-forked-migration-plan.md @.claude/specs/nori-client-forked-migration-dev-report.md 셋 다 읽고 R5-user 구현.
+이미 완료: Phase0/R1/R2/R5-login/R5-eqp + 글로벌 chrome(AppTopBar nori-tc-logo). baseline delta 게이트(pre-existing lint: UserPasswordResetModal.tsx:45 set-state-in-effect / e2e 0 failed) 유지.
+방식: SPEC R5.0 = D-R5-METHOD 4단 엄수. dev-report 의 "eqp 세션에서 확립한 공통 컨벤션" 그대로 따를 것. 색치환만 하고 끝내지 말 것.
+  (1) 틀 — forked 폼/리스트 구조를 R1 shell(PageHeading[pill] / PageFilterBar / PagePagination / SelectableTable / PageModal / PageActionBar)로 UserManagementPage 골격 재구성.
+      User/Group 리스트는 플랫 목록이라 콘텐츠 검색/필터·페이지네이션이 적절 — 단 도입 전 사용자에게 1회 확인(eqp 는 사이드바 검색 중복이라 콘텐츠 검색 제거했던 점 환기).
+  (2) 콘텐츠 재배치 — UserListTable/GroupListTable + UserAdminPanel/GroupAdminPanel + UserUpsertModal/UserPasswordResetModal/UserDeleteConfirmDialog/GroupUpsertModal/GroupAddMembersModal/GroupDeleteConfirmDialog 를 골격 slot 에 배치 (prop/state/API/testId/data-* 불변, R6).
+  (3) 사이드바 — UserManagementSidebar(User/Group 2-모드 전환) 에 forked LNB 시각만(active 좌측 액센트 + hover transition + flat, 아이콘 없음). 자식 없으니 아코디언 불필요. mode 전환 동작/testId(user-management-sidebar-user|group) 불변(R4.1).
+  (4) i18n — user.*/group.* 정적 키 신설 후 t() 배선. 동적 메시지(userId·카운트 임베드)는 t() 보간 미지원이라 보류(dev-report 기록).
+  (5) 색 — user/user-management/group ~46 hex → coral/neutral 토큰. status/뱃지 semantic 색은 보존.
+D-GRID-ENGINE 엄수(SelectableTable 엔진/동작/prop/testId/data-* 불변, 시각 className·토큰만).
+검증: build + eslint(변경파일, baseline delta NEW 0) + user-page/group-page/selectable-table-user-list/selectable-table-group-list e2e PASS + before/after 스크린샷(playwright test 러너로 캡처, before 는 git stash) + 단일 commit.
+이후 순서: dlq → model → deploy (각 phase 동일 4단). LiveMap 보류.
+```
