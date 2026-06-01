@@ -78,7 +78,7 @@ function RecoveryModal({ type, onClose }: RecoveryModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-[10px] bg-brand-primary px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-[10px] bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {t('login.confirm')}
               </button>
@@ -261,7 +261,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] bg-brand-primary text-[15px] font-semibold text-white transition-colors hover:bg-brand-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
+            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isPending ? (
               <Loader2 className="size-[18px] animate-spin" aria-hidden="true" />

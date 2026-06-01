@@ -1382,7 +1382,6 @@ export function ModelPage() {
               <section className="flex flex-1 flex-col p-3 md:p-4">
                 <ModelInfoTable
                   models={interfaceGroupRows}
-                  selectedModelVersionKey={null}
                   isLoading={modelListQuery.isLoading}
                   isFetching={modelListQuery.isFetching}
                   onSelectRow={(modelVersionKey) => {
@@ -1401,7 +1400,6 @@ export function ModelPage() {
               <section className="flex flex-1 flex-col p-3 md:p-4">
                 <ModelInfoTable
                   models={selectedModelRows}
-                  selectedModelVersionKey={selectedModelVersionKey}
                   isLoading={modelListQuery.isLoading}
                   isFetching={modelListQuery.isFetching || selectedModelDetailQuery.isFetching}
                   onSelectRow={setSelectedModelVersionKey}
@@ -1416,7 +1414,6 @@ export function ModelPage() {
                 >
                   <ModelInfoTable
                     models={selectedModelRows}
-                    selectedModelVersionKey={selectedModelVersionKey}
                     isLoading={modelListQuery.isLoading}
                     isFetching={modelListQuery.isFetching || selectedModelDetailQuery.isFetching}
                     compactHeight

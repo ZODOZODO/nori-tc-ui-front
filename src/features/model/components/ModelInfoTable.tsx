@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import type { ModelInfo } from '../types/model.types'
 
 const MODEL_INFO_COLUMN_COUNT = 6
@@ -12,7 +13,6 @@ const MODEL_INFO_SKELETON_ROW_COUNT = 8
 
 interface ModelInfoTableProps {
   models: ModelInfo[]
-  selectedModelVersionKey: number | null
   isLoading: boolean
   isFetching: boolean
   compactHeight?: boolean
@@ -64,13 +64,12 @@ const resolveStatusBadgeVariant = (status: string): 'default' | 'info' | 'warnin
 /**
  * design.pen의 Model 정보 테이블을 렌더링합니다.
  * - updatedAt 내림차순 정렬
- * - 단일 클릭: cell anchor + row select (wrapRow onClick → onSelectRow)
+ * - 단일 클릭: 모델 선택 (wrapRow onClick → onSelectRow) — 선택 행 하이라이트는 표시하지 않음
  * - 더블 클릭: Version 화면(탭) 오픈 (wrapRow onDoubleClick → onOpenDetail)
  * - 셀 영역 Ctrl+C → 클립보드 TSV (SelectableTable rangeCopy)
  */
 export const ModelInfoTable = memo(function ModelInfoTable({
   models,
-  selectedModelVersionKey,
   isLoading,
   isFetching,
   compactHeight = false,
@@ -124,12 +123,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
 
   return (
     <section className="flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-soft-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="h-4 w-[3px] shrink-0 rounded-sm bg-brand-primary" aria-hidden="true" />
-          <h2 className="text-base font-semibold text-foreground">{t('model.infoTable.title')}</h2>
-        </div>
-      </div>
+      <TableSectionHeader title={t('model.infoTable.title')} className="mb-3" />
 
       {isLoading ? (
         <div className={cn('overflow-auto', compactHeight ? 'max-h-[300px]' : 'flex-1')}>
@@ -169,9 +163,6 @@ export const ModelInfoTable = memo(function ModelInfoTable({
           emptyState={t('model.infoTable.empty')}
           wrapRow={(model, _rowIdx, children) => (
             <TableRow
-              data-state={
-                selectedModelVersionKey === model.modelVersionKey ? 'selected' : undefined
-              }
               onClick={() => onSelectRow(model.modelVersionKey)}
               onDoubleClick={() => onOpenDetail(model)}
               className="cursor-pointer"

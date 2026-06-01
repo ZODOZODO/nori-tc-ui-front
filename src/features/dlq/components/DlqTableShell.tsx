@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
 import { Search } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/i18n/i18n-context'
 import { PagePagination } from '@/shared/layout/PagePagination'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 
 interface DlqTableShellProps {
   title: string
@@ -74,43 +74,42 @@ export function DlqTableShell({
   return (
     <div data-testid={testId} className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6">
       <section className="rounded-xl border border-border bg-card shadow-soft-sm">
-        <div className="flex flex-col gap-3 border-b border-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-              <Badge variant="secondary" className="tabular-nums">
-                {totalCount.toLocaleString()}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
+        <TableSectionHeader
+          title={title}
+          count={totalCount}
+          className="border-b border-border px-6 py-4"
+          subtitle={
+            <>
               {t('dlq.table.lastUpdated')}: {formatLastUpdated(lastUpdatedAt)}
               {isFetching ? ` · ${t('dlq.table.syncing')}` : ''}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={searchKeyword}
-                onChange={(event) => onSearchChange(event.target.value)}
-                placeholder={t('dlq.table.searchPlaceholder')}
-                className="h-9 w-56 pl-8"
-                data-testid={`${testId}-search`}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isFetching}
-              data-testid={`${testId}-refresh`}
-            >
-              {t('dlq.table.refresh')}
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+          actions={
+            <>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchKeyword}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder={t('dlq.table.searchPlaceholder')}
+                  className="h-9 w-56 pl-8"
+                  data-testid={`${testId}-search`}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isFetching}
+                data-testid={`${testId}-refresh`}
+              >
+                {t('dlq.table.refresh')}
+              </Button>
+            </>
+          }
+        />
 
         <div className="overflow-x-auto px-6 py-5">
           {isLoading ? (

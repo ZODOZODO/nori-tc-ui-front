@@ -49,11 +49,11 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   if (status === 'offline') {
     return (
       <span
-        className="relative inline-flex size-4 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-300/80"
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-muted ring-2 ring-border"
         title="오프라인"
         aria-label="오프라인"
       >
-        <span className="inline-flex size-2 rounded-full bg-slate-500" />
+        <span className="inline-flex size-2 rounded-full bg-muted-foreground" />
       </span>
     )
   }
@@ -222,7 +222,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
             wrapRow={(_row, _rowIdx, children) => (
               <ContextMenu>
                 <ContextMenuTrigger asChild>
-                  <TableRow data-state="selected">{children}</TableRow>
+                  <TableRow>{children}</TableRow>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-44">
                   <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>

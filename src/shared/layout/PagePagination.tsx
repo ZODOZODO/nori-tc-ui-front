@@ -108,7 +108,7 @@ export function PagePagination({
               className={cn(
                 PAGE_BTN_BASE,
                 p === safePage &&
-                  'border-brand-primary bg-brand-primary font-semibold text-white hover:bg-brand-primary',
+                  'border-primary bg-primary font-semibold text-primary-foreground hover:bg-primary',
               )}
               aria-current={p === safePage ? 'page' : undefined}
               onClick={() => onPageChange(p)}

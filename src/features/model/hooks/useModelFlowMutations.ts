@@ -51,8 +51,23 @@ export function useModelFlowMutations(modelVersionKey: number | null) {
     },
   })
 
+  const deleteFlowMutation = useMutation({
+    mutationFn: (flowId: number) => {
+      if (modelVersionKey === null) {
+        throw new Error('modelVersionKey 가 지정되지 않았습니다.')
+      }
+      return modelFlowApi.remove(modelVersionKey, flowId)
+    },
+    onSuccess: async () => {
+      if (modelVersionKey !== null) {
+        await invalidateModelFlowQueries(queryClient, modelVersionKey)
+      }
+    },
+  })
+
   return {
     createFlowMutation,
     updateFlowMutation,
+    deleteFlowMutation,
   }
 }

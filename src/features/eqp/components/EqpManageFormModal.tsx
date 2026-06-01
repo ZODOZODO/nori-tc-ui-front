@@ -1260,7 +1260,7 @@ export function EqpManageFormModal({
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-full bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary/90"
+              className="h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleSave()}
               disabled={saveDisabled}
             >

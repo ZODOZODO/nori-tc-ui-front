@@ -97,6 +97,7 @@ interface FlowMockState {
   details: Map<number, FlowDetailFixture>
   updateFlowCalls: Array<{ flowId: number; body: unknown }>
   createFlowCalls: Array<{ body: unknown }>
+  deleteFlowCalls: Array<{ flowId: number }>
   nextFlowId: number
 }
 
@@ -175,6 +176,7 @@ const createDefaultMockState = (): FlowMockState => {
     details: new Map<number, FlowDetailFixture>([[initial.flowId, initial]]),
     updateFlowCalls: [],
     createFlowCalls: [],
+    deleteFlowCalls: [],
     nextFlowId: 202,
   }
 }
@@ -346,6 +348,17 @@ const setupMocks = async (page: Page, state: FlowMockState) => {
           })
           return
         }
+      }
+      if (method === 'DELETE') {
+        state.deleteFlowCalls.push({ flowId })
+        state.details.delete(flowId)
+        state.summaries = state.summaries.filter((summary) => summary.flowId !== flowId)
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createApiResponse(null)),
+        })
+        return
       }
     }
 
@@ -596,6 +609,78 @@ test('Model-Flow-AC-3c: draft 카드의 DCOP 추가 버튼이 disabled + tooltip
   await expect(dcopAddButton).toBeDisabled()
   await expect(dcopAddButton).toHaveAttribute('aria-disabled', 'true')
   await expect(dcopAddButton).toHaveAttribute('title', 'Flow 저장 후 DCOP 추가 가능')
+})
+
+// 시나리오 3d (신규 Flow 입력 영속 회귀) ----------------------------------------
+// draft 카드에 actionName 을 입력하고 저장하면, POST(identity) 후 같은 flowId 로 PUT 이
+// 이어져 사용자가 입력한 actionName 이 영속된다 — 과거엔 POST 만 하여 backend placeholder
+// "TODO" 가 고정으로 남던 버그의 회귀 가드. dcop 는 draft 에서 편집 불가하므로 PUT 의
+// dcopItemKeys 는 null(Collect 미갱신).
+test('Model-Flow-AC-3d: draft actionName 입력 후 저장 시 POST→PUT 으로 actionName 이 영속된다', async ({
+  page,
+}) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /Add Flow/i }).click()
+
+  await page.getByPlaceholder('신규 Flow 이름을 입력하세요').fill('NEW_FLOW_NAME')
+  await page.getByPlaceholder('예: TOOL_CONDITION_REPLY').fill('ACK_NEW_FLOW')
+
+  await page.getByRole('button', { name: 'Flow 저장' }).click()
+
+  // POST(identity) 후 PUT(actionName) 이 같은 flowId 로 이어진다.
+  await expect.poll(() => state.createFlowCalls.length).toBeGreaterThan(0)
+  await expect.poll(() => state.updateFlowCalls.length).toBeGreaterThan(0)
+
+  const putCall = state.updateFlowCalls[0]
+  expect((putCall.body as Record<string, unknown>).actionName).toBe('ACK_NEW_FLOW')
+  // dcop 는 draft 미편집 → Collect 미갱신(null) 로 송신.
+  expect((putCall.body as Record<string, unknown>).dcopItemKeys).toBeNull()
+  // 영속 상태에 사용자가 입력한 actionName 이 반영(placeholder 아님).
+  expect(state.details.get(putCall.flowId)?.actionName).toBe('ACK_NEW_FLOW')
+})
+
+// 시나리오 D (Flow 삭제) -------------------------------------------------------
+// 저장된 Flow 카드 헤더 우상단의 삭제 버튼 → ConfirmDialog 확인 → DELETE /flows/{id} 호출 +
+// 좌측 트리/상세에서 제거.
+test('Model-Flow-AC-D1: 저장된 Flow 카드 삭제 버튼 → 확인 시 DELETE 호출 + 제거', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click()
+  await expect(page.getByRole('heading', { name: 'Action' })).toBeVisible()
+
+  // FlowCard 헤더 우상단 삭제 버튼 → ConfirmDialog.
+  await page.getByRole('button', { name: '삭제' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: '삭제' }).click()
+
+  await expect.poll(() => state.deleteFlowCalls.length).toBeGreaterThan(0)
+  expect(state.deleteFlowCalls[0].flowId).toBe(201)
+  await expect.poll(() => state.details.has(201)).toBe(false)
+})
+
+// Message Flows 트리에서 우클릭 → ContextMenu Delete → ConfirmDialog 확인 → DELETE 호출.
+test('Model-Flow-AC-D2: Message Flows 우클릭 Delete → 확인 시 DELETE 호출', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+  await openEditModelTab(page)
+
+  await page.getByRole('button', { name: /handleLotStart/ }).click()
+  await page.getByRole('button', { name: 'S6F11' }).click({ button: 'right' })
+
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: '삭제' }).click()
+
+  await expect.poll(() => state.deleteFlowCalls.length).toBeGreaterThan(0)
+  expect(state.deleteFlowCalls[0].flowId).toBe(201)
 })
 
 // 시나리오 4 ----------------------------------------------------------------

@@ -173,7 +173,7 @@ export function CheckInModal({
           </Button>
           <Button
             type="button"
-            className="h-9 rounded-full bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary/90"
+            className="h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
             onClick={handleSave}
             disabled={isPending || isDiffLoading}
           >

@@ -1,7 +1,15 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { Beaker, Hand, LocateFixed, Maximize2, Minus, Move, Plus, RefreshCw } from 'lucide-react'
+import { Beaker, Maximize2, Minus, Move, Plus, Radar, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
 import { LiveMapMachineNode } from './LiveMapMachineNode'
 import { LiveMapTooltipCard } from './LiveMapTooltipCard'
@@ -11,10 +19,17 @@ import type {
   LiveMapClusterItem,
   LiveMapEquipmentNode,
   LiveMapPoint,
+  LiveMapStatusFilter,
 } from '../types/live-map.types'
 
 interface LiveMapBoardProps {
   clusters: readonly LiveMapClusterItem[]
+  syncLabel: string
+  searchKeyword: string
+  selectedStatus: LiveMapStatusFilter
+  stateOptions: readonly { value: LiveMapStatusFilter; label: string }[]
+  onSearchKeywordChange: (searchKeyword: string) => void
+  onSelectedStatusChange: (selectedStatus: LiveMapStatusFilter) => void
   equipmentNodes: readonly LiveMapEquipmentNode[]
   visibleEquipmentIds: ReadonlySet<string>
   selectedEquipment: LiveMapEquipmentNode | null
@@ -30,27 +45,54 @@ interface LiveMapBoardProps {
   onResetZoom: () => void
 }
 
-interface ClusterDragState {
-  clusterId: string
+interface TerminalPoint {
+  cx: number
+  cy: number
+}
+
+type DragState =
+  | {
+      kind: 'cluster'
+      clusterId: string
+      pointerId: number
+      originX: number
+      originY: number
+      baseX: number
+      baseY: number
+      width: number
+      height: number
+    }
+  | {
+      kind: 'terminal'
+      terminal: 'in' | 'out'
+      pointerId: number
+      originX: number
+      originY: number
+      baseCx: number
+      baseCy: number
+    }
+
+interface PanState {
   pointerId: number
-  originX: number
-  originY: number
-  baseX: number
-  baseY: number
-  width: number
-  height: number
+  startX: number
+  startY: number
+  scrollLeft: number
+  scrollTop: number
 }
 
 const TERMINAL_RADIUS = 26
 
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value))
+
 interface RailButtonProps {
-  icon: typeof Hand
+  icon: typeof Plus
   label: string
-  active: boolean
   onClick: () => void
+  active?: boolean
 }
 
-function RailButton({ icon: Icon, label, active, onClick }: RailButtonProps) {
+function RailButton({ icon: Icon, label, onClick, active = false }: RailButtonProps) {
   return (
     <Button
       type="button"
@@ -70,8 +112,22 @@ function RailButton({ icon: Icon, label, active, onClick }: RailButtonProps) {
   )
 }
 
+// 클러스터별 상태 분포 세그먼트 바(모니터링 큐) — RUN/IDLE/ERROR/DOWN 비율을 한 줄로.
+const STATUS_SEGMENTS: readonly { key: LiveMapEquipmentNode['status']; cls: string }[] = [
+  { key: 'RUN', cls: 'bg-success' },
+  { key: 'IDLE', cls: 'bg-sky-500' },
+  { key: 'ERROR', cls: 'bg-danger' },
+  { key: 'DOWN', cls: 'bg-muted-foreground' },
+]
+
 export function LiveMapBoard({
   clusters,
+  syncLabel,
+  searchKeyword,
+  selectedStatus,
+  stateOptions,
+  onSearchKeywordChange,
+  onSelectedStatusChange,
   equipmentNodes,
   visibleEquipmentIds,
   selectedEquipment,
@@ -88,7 +144,25 @@ export function LiveMapBoard({
 }: LiveMapBoardProps) {
   const { t } = useI18n()
   const boardScrollerRef = useRef<HTMLDivElement>(null)
-  const [dragState, setDragState] = useState<ClusterDragState | null>(null)
+  const panRef = useRef<PanState | null>(null)
+  const [dragState, setDragState] = useState<DragState | null>(null)
+  const [isPanning, setIsPanning] = useState(false)
+  // IN/OUT 종단 위치 override — 사용자가 편집모드에서 끌면 설정, null 이면 첫/마지막 카드 기준 자동.
+  const [inOverride, setInOverride] = useState<TerminalPoint | null>(null)
+  const [outOverride, setOutOverride] = useState<TerminalPoint | null>(null)
+  // 보드(고정 px)를 스크롤러 폭에 맞춰 자동 축소 — 전체 공정 흐름을 가로 스크롤 없이 한눈에.
+  // 사용자 zoom(store)은 이 위에 곱해지는 배율로 유지된다(effectiveScale).
+  const [fitScale, setFitScale] = useState(1)
+  const effectiveScale = fitScale * zoomLevel
+
+  // 선택설비 패널 슬라이드 — 열림은 selectedEquipment 존재 여부로 결정.
+  // 닫힐 때(우측 슬라이드아웃) 마지막 설비 내용을 유지해야 빈 카드가 비치지 않으므로,
+  // 새 설비가 선택될 때만 렌더 단계에서 갱신하고, 닫힘 동안에는 직전 설비를 그대로 보여준다.
+  const [renderedEquipment, setRenderedEquipment] = useState(selectedEquipment)
+  if (selectedEquipment !== null && selectedEquipment !== renderedEquipment) {
+    setRenderedEquipment(selectedEquipment)
+  }
+  const isPanelOpen = selectedEquipment !== null
 
   const nodesByCluster = useMemo(() => {
     const map = new Map<string, LiveMapEquipmentNode[]>()
@@ -103,16 +177,14 @@ export function LiveMapBoard({
     return map
   }, [equipmentNodes])
 
-  // 플로우 커넥터(IN → 배열 순서 → OUT) — 카드 rect 에서 직접 계산해 drag/zoom 에 따라 갱신.
+  // 클러스터 간 커넥터 + IN/OUT 기본 위치(카드 rect 기준). 종단 override 는 별도 적용.
   const flow = useMemo(() => {
     if (clusters.length === 0) {
       return null
     }
     const first = clusters[0]
     const last = clusters[clusters.length - 1]
-    const inTerminal = { cx: first.x - 56, cy: first.y + first.height / 2 }
-    const outTerminal = { cx: last.x + last.width + 56, cy: last.y + last.height / 2 }
-    const edges: string[] = [`M ${inTerminal.cx} ${inTerminal.cy} H ${first.x}`]
+    const interEdges: string[] = []
     for (let i = 0; i < clusters.length - 1; i += 1) {
       const a = clusters[i]
       const b = clusters[i + 1]
@@ -122,17 +194,45 @@ export function LiveMapBoard({
       const bCy = b.y + b.height / 2
       if (Math.abs(a.y - b.y) < 12) {
         const midX = (aRight + bLeft) / 2
-        edges.push(`M ${aRight} ${aCy} H ${midX} V ${bCy} H ${bLeft}`)
+        interEdges.push(`M ${aRight} ${aCy} H ${midX} V ${bCy} H ${bLeft}`)
       } else {
         const gapY = (a.y + a.height + b.y) / 2
         const leftX = bLeft - 44
-        edges.push(`M ${a.x + a.width / 2} ${a.y + a.height} V ${gapY} H ${leftX} V ${bCy} H ${bLeft}`)
+        interEdges.push(`M ${a.x + a.width / 2} ${a.y + a.height} V ${gapY} H ${leftX} V ${bCy} H ${bLeft}`)
       }
     }
-    edges.push(`M ${last.x + last.width} ${outTerminal.cy} H ${outTerminal.cx}`)
-    return { inTerminal, outTerminal, edges }
+    return {
+      interEdges,
+      firstX: first.x,
+      firstCy: first.y + first.height / 2,
+      lastRight: last.x + last.width,
+      lastCy: last.y + last.height / 2,
+      defaultIn: { cx: first.x - 56, cy: first.y + first.height / 2 },
+      defaultOut: { cx: last.x + last.width + 56, cy: last.y + last.height / 2 },
+    }
   }, [clusters])
 
+  const inTerminal = inOverride ?? flow?.defaultIn ?? null
+  const outTerminal = outOverride ?? flow?.defaultOut ?? null
+
+  useEffect(() => {
+    const scroller = boardScrollerRef.current
+    if (!scroller) {
+      return
+    }
+    const measure = () => {
+      const available = scroller.clientWidth - 2
+      // 가용 폭에 맞춰 보드를 채운다. 1 로 상한을 두면 와이드 화면에서 보드(1350px)
+      // 오른쪽에 드래그로 닿을 수 없는 빈 공간이 남아 카드가 우측 끝까지 못 간다.
+      setFitScale(Math.max(0.5, available / LIVE_MAP_BOARD_WIDTH))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [])
+
+  // 카드 / IN-OUT 종단 드래그(편집 모드).
   useEffect(() => {
     if (!dragState) {
       return
@@ -142,19 +242,39 @@ export function LiveMapBoard({
       if (event.pointerId !== dragState.pointerId) {
         return
       }
-      const nextPosition = clampLiveMapRectPosition(
-        {
-          x: dragState.baseX + (event.clientX - dragState.originX) / zoomLevel,
-          y: dragState.baseY + (event.clientY - dragState.originY) / zoomLevel,
-        },
-        dragState.width,
-        dragState.height,
-        LIVE_MAP_BOARD_WIDTH,
-        LIVE_MAP_BOARD_HEIGHT,
-      )
-      startTransition(() => {
-        onMoveCluster(dragState.clusterId, nextPosition)
-      })
+      if (dragState.kind === 'cluster') {
+        const nextPosition = clampLiveMapRectPosition(
+          {
+            x: dragState.baseX + (event.clientX - dragState.originX) / effectiveScale,
+            y: dragState.baseY + (event.clientY - dragState.originY) / effectiveScale,
+          },
+          dragState.width,
+          dragState.height,
+          LIVE_MAP_BOARD_WIDTH,
+          LIVE_MAP_BOARD_HEIGHT,
+        )
+        startTransition(() => {
+          onMoveCluster(dragState.clusterId, nextPosition)
+        })
+        return
+      }
+      const nextPoint: TerminalPoint = {
+        cx: clamp(
+          dragState.baseCx + (event.clientX - dragState.originX) / effectiveScale,
+          TERMINAL_RADIUS,
+          LIVE_MAP_BOARD_WIDTH - TERMINAL_RADIUS,
+        ),
+        cy: clamp(
+          dragState.baseCy + (event.clientY - dragState.originY) / effectiveScale,
+          TERMINAL_RADIUS,
+          LIVE_MAP_BOARD_HEIGHT - TERMINAL_RADIUS,
+        ),
+      }
+      if (dragState.terminal === 'in') {
+        setInOverride(nextPoint)
+      } else {
+        setOutOverride(nextPoint)
+      }
     }
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -171,25 +291,37 @@ export function LiveMapBoard({
       window.removeEventListener('pointerup', handlePointerEnd)
       window.removeEventListener('pointercancel', handlePointerEnd)
     }
-  }, [dragState, onMoveCluster, zoomLevel])
+  }, [dragState, onMoveCluster, effectiveScale])
 
-  const handleLocateSelectedEquipment = () => {
-    if (!selectedEquipment || !boardScrollerRef.current) {
+  // 빈 캔버스 드래그로 팬(스크롤) — 확대 상태에서 마우스로 끌어서 이동(비편집 모드).
+  useEffect(() => {
+    if (!isPanning) {
       return
     }
-    const cluster = clusters.find((item) => item.id === selectedEquipment.clusterId)
-    if (!cluster) {
-      return
+    const handlePointerMove = (event: PointerEvent) => {
+      const pan = panRef.current
+      const scroller = boardScrollerRef.current
+      if (!pan || !scroller || event.pointerId !== pan.pointerId) {
+        return
+      }
+      scroller.scrollLeft = pan.scrollLeft - (event.clientX - pan.startX)
+      scroller.scrollTop = pan.scrollTop - (event.clientY - pan.startY)
     }
-    const scroller = boardScrollerRef.current
-    const targetCenterX = (cluster.x + cluster.width / 2) * zoomLevel
-    const targetCenterY = (cluster.y + cluster.height / 2) * zoomLevel
-    scroller.scrollTo({
-      left: Math.max(0, targetCenterX - scroller.clientWidth / 2),
-      top: Math.max(0, targetCenterY - scroller.clientHeight / 2),
-      behavior: 'smooth',
-    })
-  }
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (panRef.current && event.pointerId === panRef.current.pointerId) {
+        panRef.current = null
+        setIsPanning(false)
+      }
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerEnd)
+    window.addEventListener('pointercancel', handlePointerEnd)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerEnd)
+      window.removeEventListener('pointercancel', handlePointerEnd)
+    }
+  }, [isPanning])
 
   const handleClusterHandlePointerDown = (
     cluster: LiveMapClusterItem,
@@ -200,6 +332,7 @@ export function LiveMapBoard({
     }
     event.preventDefault()
     setDragState({
+      kind: 'cluster',
       clusterId: cluster.id,
       pointerId: event.pointerId,
       originX: event.clientX,
@@ -211,59 +344,139 @@ export function LiveMapBoard({
     })
   }
 
+  const handleTerminalPointerDown = (
+    terminal: 'in' | 'out',
+    point: TerminalPoint,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (!isLayoutEditEnabled) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    setDragState({
+      kind: 'terminal',
+      terminal,
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      baseCx: point.cx,
+      baseCy: point.cy,
+    })
+  }
+
+  const handleBoardPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // 비편집 모드에서 빈 배경을 끌면 팬. 카드/종단/노드 위가 아닐 때만.
+    if (isLayoutEditEnabled || event.target !== event.currentTarget) {
+      return
+    }
+    const scroller = boardScrollerRef.current
+    if (!scroller) {
+      return
+    }
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: scroller.scrollLeft,
+      scrollTop: scroller.scrollTop,
+    }
+    setIsPanning(true)
+  }
+
+  const edges =
+    flow && inTerminal && outTerminal
+      ? [
+          `M ${inTerminal.cx} ${inTerminal.cy} L ${flow.firstX} ${flow.firstCy}`,
+          ...flow.interEdges,
+          `M ${flow.lastRight} ${flow.lastCy} L ${outTerminal.cx} ${outTerminal.cy}`,
+        ]
+      : []
+
   return (
     <section className="relative overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-[620px]">
-          <h2 className="text-[17px] font-extrabold text-foreground">
-            {t('livemap.board.title')}
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-[17px] font-extrabold text-foreground">
+              {t('livemap.board.title')}
+            </h2>
+            <span className="inline-flex h-6 items-center gap-1.5 rounded-pill border border-success/30 bg-success/10 px-2.5 text-[11px] font-bold text-success">
+              <Radar className="size-3" />
+              {t('livemap.realtime')} {syncLabel}
+            </span>
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">{t('livemap.board.subtitle')}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex h-8 items-center gap-2 rounded-pill border border-success/30 bg-success/10 px-3 text-[11px] font-bold text-success">
-            <RefreshCw className="size-3.5" />
-            {t('livemap.board.autoRefresh')}
-          </span>
           <Button
             type="button"
             size="sm"
             onClick={onOpenDemo}
-            className="h-8 rounded-pill bg-brand-primary px-4 text-[12px] font-bold text-white hover:bg-brand-primary/90"
+            className="h-8 rounded-pill bg-primary px-4 text-[12px] font-bold text-primary-foreground hover:bg-primary/90"
           >
             <Beaker className="size-3.5" />
             {t('livemap.board.demo')}
           </Button>
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchKeyword}
+              onChange={(event) => onSearchKeywordChange(event.target.value)}
+              placeholder={t('livemap.search.placeholder')}
+              className="h-8 w-[220px] rounded-[12px] pl-9 text-sm"
+            />
+          </div>
+
+          <Select
+            value={selectedStatus}
+            onValueChange={(value) => onSelectedStatusChange(value as LiveMapStatusFilter)}
+          >
+            <SelectTrigger className="h-8 w-[140px] rounded-[12px] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {stateOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="relative">
+      <div className="mt-5 flex items-stretch">
+        <div className="relative min-w-0 flex-1">
           <div
             ref={boardScrollerRef}
-            className="overflow-auto rounded-[18px] border border-border bg-muted/40"
+            className="thin-scroll overflow-auto rounded-[18px] border border-border bg-muted/20"
             style={{ maxHeight: 760 }}
           >
             <div
               className="relative"
               style={{
-                width: LIVE_MAP_BOARD_WIDTH * zoomLevel,
-                height: LIVE_MAP_BOARD_HEIGHT * zoomLevel,
+                width: LIVE_MAP_BOARD_WIDTH * effectiveScale,
+                height: LIVE_MAP_BOARD_HEIGHT * effectiveScale,
               }}
             >
               <div
-                className="relative"
+                onPointerDown={handleBoardPointerDown}
+                className={`live-map-canvas relative ${
+                  isLayoutEditEnabled ? '' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
                 style={{
                   width: LIVE_MAP_BOARD_WIDTH,
                   height: LIVE_MAP_BOARD_HEIGHT,
-                  transform: `scale(${zoomLevel})`,
+                  transform: `scale(${effectiveScale})`,
                   transformOrigin: 'top left',
                 }}
               >
-                {flow ? (
+                {edges.length > 0 ? (
                   <svg
-                    className="pointer-events-none absolute inset-0 text-muted-foreground/45"
+                    className="pointer-events-none absolute inset-0 text-brand-primary/45"
                     width={LIVE_MAP_BOARD_WIDTH}
                     height={LIVE_MAP_BOARD_HEIGHT}
                     fill="none"
@@ -281,60 +494,82 @@ export function LiveMapBoard({
                         <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
                       </marker>
                     </defs>
-                    {flow.edges.map((edge, index) => (
-                      <path
-                        key={index}
-                        d={edge}
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        markerEnd="url(#live-map-arrow)"
-                      />
+                    {edges.map((edge, index) => (
+                      <g key={index}>
+                        <path
+                          d={edge}
+                          stroke="currentColor"
+                          strokeOpacity={0.22}
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          markerEnd="url(#live-map-arrow)"
+                        />
+                        <path
+                          className="live-map-flow-edge"
+                          d={edge}
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </g>
                     ))}
                   </svg>
                 ) : null}
 
-                {flow ? (
-                  <>
-                    <div
-                      className="absolute flex items-center justify-center rounded-full border border-border bg-card text-[12px] font-extrabold tracking-wide text-muted-foreground shadow-soft-sm"
-                      style={{
-                        left: flow.inTerminal.cx - TERMINAL_RADIUS,
-                        top: flow.inTerminal.cy - TERMINAL_RADIUS,
-                        width: TERMINAL_RADIUS * 2,
-                        height: TERMINAL_RADIUS * 2,
-                      }}
-                    >
-                      IN
-                    </div>
-                    <div
-                      className="absolute flex items-center justify-center rounded-full border border-brand-primary/40 bg-brand-primary/10 text-[12px] font-extrabold tracking-wide text-brand-primary shadow-soft-sm"
-                      style={{
-                        left: flow.outTerminal.cx - TERMINAL_RADIUS,
-                        top: flow.outTerminal.cy - TERMINAL_RADIUS,
-                        width: TERMINAL_RADIUS * 2,
-                        height: TERMINAL_RADIUS * 2,
-                      }}
-                    >
-                      OUT
-                    </div>
-                  </>
+                {inTerminal ? (
+                  <div
+                    onPointerDown={(event) => handleTerminalPointerDown('in', inTerminal, event)}
+                    className={`absolute flex items-center justify-center rounded-full border border-border bg-card text-[12px] font-extrabold tracking-wide text-muted-foreground shadow-soft-sm ${
+                      isLayoutEditEnabled
+                        ? 'cursor-grab hover:border-brand-primary/50'
+                        : ''
+                    }`}
+                    style={{
+                      left: inTerminal.cx - TERMINAL_RADIUS,
+                      top: inTerminal.cy - TERMINAL_RADIUS,
+                      width: TERMINAL_RADIUS * 2,
+                      height: TERMINAL_RADIUS * 2,
+                    }}
+                  >
+                    IN
+                  </div>
+                ) : null}
+                {outTerminal ? (
+                  <div
+                    onPointerDown={(event) => handleTerminalPointerDown('out', outTerminal, event)}
+                    className={`absolute flex items-center justify-center rounded-full border border-brand-primary/40 bg-brand-primary/10 text-[12px] font-extrabold tracking-wide text-brand-primary shadow-soft-sm ${
+                      isLayoutEditEnabled ? 'cursor-grab hover:border-brand-primary' : ''
+                    }`}
+                    style={{
+                      left: outTerminal.cx - TERMINAL_RADIUS,
+                      top: outTerminal.cy - TERMINAL_RADIUS,
+                      width: TERMINAL_RADIUS * 2,
+                      height: TERMINAL_RADIUS * 2,
+                    }}
+                  >
+                    OUT
+                  </div>
                 ) : null}
 
                 {clusters.map((cluster) => {
                   const clusterNodes = nodesByCluster.get(cluster.id) ?? []
                   const containsSelected = selectedEquipment?.clusterId === cluster.id
-                  const isDragging = dragState?.clusterId === cluster.id
+                  const isDragging = dragState?.kind === 'cluster' && dragState.clusterId === cluster.id
+                  const hasError = clusterNodes.some((node) => node.status === 'ERROR')
+                  const total = clusterNodes.length || 1
 
                   return (
                     <div
                       key={cluster.id}
-                      className={`absolute flex flex-col overflow-hidden rounded-[18px] border bg-card shadow-soft-sm ${
+                      className={`absolute flex flex-col overflow-hidden rounded-[18px] border bg-card/95 shadow-soft-sm backdrop-blur-sm ${
                         containsSelected
                           ? 'border-brand-primary/50 ring-1 ring-brand-primary/30'
-                          : 'border-border'
-                      } ${isDragging ? 'ring-2 ring-brand-primary/40' : ''}`}
+                          : hasError
+                            ? 'border-danger/50 ring-1 ring-danger/25'
+                            : 'border-border'
+                      } ${isDragging ? 'z-10 ring-2 ring-brand-primary/40' : ''}`}
                       style={{
                         left: cluster.x,
                         top: cluster.y,
@@ -343,7 +578,7 @@ export function LiveMapBoard({
                       }}
                     >
                       <div
-                        className={`flex items-start justify-between gap-2 border-b border-border px-4 pb-2.5 pt-3 ${
+                        className={`flex items-start justify-between gap-2 px-4 pt-3 ${
                           isLayoutEditEnabled
                             ? isDragging
                               ? 'cursor-grabbing'
@@ -363,13 +598,34 @@ export function LiveMapBoard({
                             {cluster.subtitle}
                           </div>
                         </div>
-                        <span className="shrink-0 rounded-pill bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                          {clusterNodes.length}
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {hasError ? (
+                            <span className="size-1.5 animate-pulse rounded-full bg-danger [box-shadow:0_0_8px_var(--danger)]" />
+                          ) : null}
+                          <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                            {clusterNodes.length}
+                          </span>
                         </span>
                       </div>
 
-                      <div className="min-h-0 flex-1 overflow-auto p-2.5">
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="mx-3 mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
+                        {STATUS_SEGMENTS.map((segment) => {
+                          const count = clusterNodes.filter((node) => node.status === segment.key).length
+                          if (count === 0) {
+                            return null
+                          }
+                          return (
+                            <span
+                              key={segment.key}
+                              className={segment.cls}
+                              style={{ width: `${(count / total) * 100}%` }}
+                            />
+                          )
+                        })}
+                      </div>
+
+                      <div className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto px-3 pb-3">
+                        <div className="flex flex-col gap-1">
                           {clusterNodes.map((node) => (
                             <LiveMapMachineNode
                               key={node.eqpId}
@@ -390,34 +646,32 @@ export function LiveMapBoard({
             </div>
           </div>
 
-          <div className="absolute left-4 top-4 inline-flex flex-col items-center gap-1.5 rounded-[16px] border border-border bg-card px-1.5 py-2 shadow-soft-md">
-            <RailButton
-              icon={Hand}
-              label={t('livemap.tool.pan')}
-              active={!isLayoutEditEnabled}
-              onClick={() => onLayoutEditEnabledChange(false)}
-            />
+          <div className="absolute left-4 top-4 inline-flex flex-col items-center gap-1.5 rounded-[16px] border border-border bg-card/80 px-1.5 py-2 shadow-soft-md backdrop-blur-sm">
+            <RailButton icon={Plus} label={t('livemap.zoom.in')} onClick={onZoomIn} />
+            <RailButton icon={Minus} label={t('livemap.zoom.out')} onClick={onZoomOut} />
+            <RailButton icon={Maximize2} label={t('livemap.zoom.reset')} onClick={onResetZoom} />
+            <span className="my-0.5 h-px w-5 bg-border" />
             <RailButton
               icon={Move}
               label={t('livemap.tool.move')}
               active={isLayoutEditEnabled}
               onClick={() => onLayoutEditEnabledChange(!isLayoutEditEnabled)}
             />
-            <span className="my-0.5 h-px w-5 bg-border" />
-            <RailButton icon={Plus} label={t('livemap.zoom.in')} active={false} onClick={onZoomIn} />
-            <RailButton icon={Minus} label={t('livemap.zoom.out')} active={false} onClick={onZoomOut} />
-            <RailButton icon={Maximize2} label={t('livemap.zoom.reset')} active={false} onClick={onResetZoom} />
-            <RailButton
-              icon={LocateFixed}
-              label={t('livemap.zoom.locate')}
-              active={false}
-              onClick={handleLocateSelectedEquipment}
-            />
           </div>
         </div>
 
-        <div className="min-h-0">
-          <LiveMapTooltipCard equipment={selectedEquipment} onClose={onClearSelection} />
+        <div
+          className={`shrink-0 overflow-hidden transition-[width,margin] duration-300 ease-out ${
+            isPanelOpen ? 'ml-4 w-[340px] 2xl:w-[360px]' : 'ml-0 w-0'
+          }`}
+        >
+          <div
+            className={`h-full w-[340px] 2xl:w-[360px] transition-transform duration-300 ease-out ${
+              isPanelOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            <LiveMapTooltipCard equipment={renderedEquipment} onClose={onClearSelection} />
+          </div>
         </div>
       </div>
     </section>

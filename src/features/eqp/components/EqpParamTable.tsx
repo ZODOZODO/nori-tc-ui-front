@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,9 +49,6 @@ export const EqpParamTable = memo(function EqpParamTable({
   onDeleteRow,
 }: EqpParamTableProps) {
   const { t } = useI18n()
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
-  const effectiveSelectedRowId =
-    selectedRowId ?? (rows[0] ? (rows[0].rowId ?? rows[0].paramName) : null)
 
   const columns = useMemo<ReadonlyArray<ColumnDef<EqpParamTableRow>>>(
     () => [
@@ -189,18 +186,6 @@ export const EqpParamTable = memo(function EqpParamTable({
             rowKey={(row) => row.rowId ?? row.paramName}
             actionColumn={actionColumn}
             tableClassName="min-w-[960px]"
-            wrapRow={(row, _rowIdx, children) => {
-              const rowId = row.rowId ?? row.paramName
-              return (
-                <TableRow
-                  data-state={effectiveSelectedRowId === rowId ? 'selected' : undefined}
-                  onClick={() => setSelectedRowId(rowId)}
-                  onContextMenu={() => setSelectedRowId(rowId)}
-                >
-                  {children}
-                </TableRow>
-              )
-            }}
           />
         )}
       </div>

@@ -233,9 +233,12 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const historyListOffset = useDeployUiStore((state) => state.historyListOffset)
   const serverBackedDeployKeys = useDeployUiStore((state) => state.serverBackedDeployKeys)
   const localTargetsByDeployKey = useDeployUiStore((state) => state.localTargetsByDeployKey)
-  const monitorFilters = useDeployUiStore((state) => state.monitorFilters)
+  const deployFilters = useDeployUiStore((state) => state.deployFilters)
+  const historyFilters = useDeployUiStore((state) => state.historyFilters)
   const setMonitorFilters = useDeployUiStore((state) => state.setMonitorFilters)
   const resetMonitorFilters = useDeployUiStore((state) => state.resetMonitorFilters)
+  // 배포 / 배포이력은 각각 독립된 조회 필터를 갖는다 (모드 전환 시 패널 remount → draft 재초기화).
+  const monitorFilters = historyOnly ? historyFilters : deployFilters
   const setMonitorListOffset = useDeployUiStore((state) => state.setMonitorListOffset)
   const resetMonitorListOffsets = useDeployUiStore((state) => state.resetMonitorListOffsets)
   const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
@@ -689,7 +692,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const canGoNext = currentOffset + MONITOR_PAGE_SIZE < serverTotalCount
 
   const handleSearch = () => {
-    setMonitorFilters({
+    setMonitorFilters(historyOnly, {
       modelName: draftModelName === EMPTY_SELECT_VALUE ? '' : draftModelName.trim(),
       requestedBy: draftRequestedBy === EMPTY_SELECT_VALUE ? '' : draftRequestedBy.trim(),
       fromDate: draftFromDate,
@@ -706,7 +709,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setDraftRequestedBy('')
     setDraftFromDate(defaultMonitorFilters.fromDate)
     setDraftToDate(defaultMonitorFilters.toDate)
-    resetMonitorFilters()
+    resetMonitorFilters(historyOnly)
     resetMonitorListOffsets()
     setFeedbackMessage(null)
     setFeedbackTone('info')
@@ -1105,7 +1108,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         ) : null}
       </Dialog>
 
-      {resolvedHistoryItems.length > 0 ? (
+      {!historyOnly && resolvedHistoryItems.length > 0 ? (
         <PageCardGrid className="shrink-0 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
           <PageCard title={t('deploy.overview.statusTitle')}>
             <DeployStatusChart aggregate={statusAggregate} />
@@ -1192,7 +1195,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           <Button
             type="button"
             onClick={handleSearch}
-            className="h-11 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90"
+            className="h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {t('deploy.common.search')}
           </Button>
@@ -1239,6 +1242,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
       <PageCard
         title={historyOnly ? t('deploy.monitor.historyTitle') : t('deploy.monitor.deployTitle')}
+        count={resolvedHistoryItems.length}
         className="shrink-0"
         bodyClassName="p-0"
       >
@@ -1339,6 +1343,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           ) : (
             <SelectableTable<DeployHistoryItem>
               testId="deploy-monitor-history"
+              containerClassName="max-h-[60vh]"
               columns={deployHistoryColumns}
               rows={resolvedHistoryItems}
               rowKey={(row) => row.deployKey}
@@ -1346,7 +1351,6 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
                     <TableRow
-                      data-state={activeDeployKey === item.deployKey ? 'selected' : undefined}
                       className="cursor-pointer"
                       onClick={() => setActiveDeployKey(item.deployKey)}
                       onContextMenu={() => setActiveDeployKey(item.deployKey)}

@@ -1,4 +1,4 @@
-import { Radar, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -70,11 +70,6 @@ export function LiveMapToolbar({
           ))}
         </SelectContent>
       </Select>
-
-      <div className="inline-flex h-[38px] items-center justify-center gap-2 self-start rounded-[14px] bg-brand-primary px-4 text-[11px] font-bold tracking-[0.08em] text-white lg:self-auto">
-        <Radar className="size-3.5" />
-        {t('livemap.live')}
-      </div>
     </section>
   )
 }

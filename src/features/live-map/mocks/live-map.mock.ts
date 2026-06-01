@@ -9,8 +9,8 @@ import type {
   LiveMapStatusFilter,
 } from '../types/live-map.types'
 
-export const LIVE_MAP_BOARD_WIDTH = 1500
-export const LIVE_MAP_BOARD_HEIGHT = 820
+export const LIVE_MAP_BOARD_WIDTH = 1350
+export const LIVE_MAP_BOARD_HEIGHT = 710
 
 export const LIVE_MAP_LINE_OPTIONS: readonly LiveMapLineOption[] = [
   { value: 'ALL', label: '전체 라인' },
@@ -51,17 +51,18 @@ export const LIVE_MAP_DEMO_SCENARIO_OPTIONS: readonly LiveMapDemoScenarioOption[
 
 // 공정 플로우 스네이크 배치 — 상단 5(좌→우) → 감김 → 하단 5(좌→우). x/y 는 보드 좌표(px),
 // 카드 사이는 SVG 커넥터로 연결되고 IN/OUT 종단이 양끝에 붙는다. (LiveMapBoard 가 배열 순서를 흐름 순서로 사용)
+// 카드 폭은 설비 1열 행 리스트에 맞춰 좁히고(168), 보드는 fit-to-width 로 뷰포트에 맞춰 스케일된다.
 export const LIVE_MAP_CLUSTER_ITEMS: readonly LiveMapClusterItem[] = [
-  { id: 'cvd', title: 'CVD', subtitle: 'Deposition', x: 152, y: 70, width: 224, height: 264 },
-  { id: 'cmp', title: 'CMP', subtitle: 'Polish', x: 406, y: 70, width: 224, height: 264 },
-  { id: 'diff', title: 'DIFF', subtitle: 'Diffusion', x: 660, y: 70, width: 224, height: 264 },
-  { id: 'photo', title: 'PHOTO', subtitle: 'Lithography', x: 914, y: 70, width: 224, height: 264 },
-  { id: 'metro', title: 'METRO', subtitle: 'Metrology', x: 1168, y: 70, width: 224, height: 264 },
-  { id: 'metal', title: 'METAL', subtitle: 'Metal Line', x: 152, y: 474, width: 224, height: 264 },
-  { id: 'etch', title: 'ETCH', subtitle: 'Dry Etch', x: 406, y: 474, width: 224, height: 264 },
-  { id: 'imp', title: 'IMP', subtitle: 'Implant', x: 660, y: 474, width: 224, height: 264 },
-  { id: 'wet', title: 'WET', subtitle: 'Wet Clean', x: 914, y: 474, width: 224, height: 264 },
-  { id: 'etc', title: 'ETC', subtitle: 'Auxiliary', x: 1168, y: 474, width: 224, height: 264 },
+  { id: 'cvd', title: 'CVD', subtitle: 'Deposition', x: 168, y: 56, width: 168, height: 224 },
+  { id: 'cmp', title: 'CMP', subtitle: 'Polish', x: 392, y: 56, width: 168, height: 224 },
+  { id: 'diff', title: 'DIFF', subtitle: 'Diffusion', x: 616, y: 56, width: 168, height: 224 },
+  { id: 'photo', title: 'PHOTO', subtitle: 'Lithography', x: 840, y: 56, width: 168, height: 224 },
+  { id: 'metro', title: 'METRO', subtitle: 'Metrology', x: 1064, y: 56, width: 168, height: 224 },
+  { id: 'metal', title: 'METAL', subtitle: 'Metal Line', x: 168, y: 430, width: 168, height: 224 },
+  { id: 'etch', title: 'ETCH', subtitle: 'Dry Etch', x: 392, y: 430, width: 168, height: 224 },
+  { id: 'imp', title: 'IMP', subtitle: 'Implant', x: 616, y: 430, width: 168, height: 224 },
+  { id: 'wet', title: 'WET', subtitle: 'Wet Clean', x: 840, y: 430, width: 168, height: 224 },
+  { id: 'etc', title: 'ETC', subtitle: 'Auxiliary', x: 1064, y: 430, width: 168, height: 224 },
 ] as const
 
 const LIVE_MAP_PROCESS_NODE_OFFSETS: readonly [number, number][] = [

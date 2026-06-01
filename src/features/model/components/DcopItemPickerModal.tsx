@@ -265,7 +265,7 @@ export function DcopItemPickerModal({
               type="button"
               onClick={handleClickMove}
               disabled={!hasLeftSelection}
-              className="h-12 w-12 rounded-full bg-brand-primary text-white hover:bg-brand-primary/90"
+              className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
               aria-label="선택한 DCOP item 추가"
               data-testid="dcop-picker-move-button"
             >

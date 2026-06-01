@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { TableSectionHeader } from './TableSectionHeader'
 
 interface PageCardProps {
   /** card-header 의 제목. 생략 시 헤더 미표시 (body only). */
@@ -8,6 +9,8 @@ interface PageCardProps {
   icon?: ReactNode
   /** card-header 우측 액션 (newwindow / 더보기 등). */
   action?: ReactNode
+  /** 우측 카운트 pill (총건수 표시). */
+  count?: number
   /** 카드 본문. */
   children: ReactNode
   className?: string
@@ -15,16 +18,14 @@ interface PageCardProps {
 }
 
 /**
- * nori-client `_dashboard.scss` 의 `.card` (border + radius) + `.card-header`
- * (flex justify-between + 상단 bg + border-bottom) 시각 패턴.
- *
- * 2026 재해석 (D10): grayscale-50 헤더 → `bg-muted/40`, 단일 그림자 → `shadow-soft-sm`,
- * radius `.5rem` → `rounded-xl`. 현황/대시보드 화면 카드 섹션에 사용 (DeployPage 등).
+ * nori-client `_dashboard.scss` 의 `.card` (border + radius) 시각 패턴.
+ * 헤더는 사용자 결정으로 무채색 plain (`TableSectionHeader`) — 코랄 바 / 밴드 채움 없음.
  */
 export function PageCard({
   title,
   icon,
   action,
+  count,
   children,
   className,
   bodyClassName,
@@ -37,14 +38,13 @@ export function PageCard({
       )}
     >
       {title ? (
-        <header className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-4 w-[3px] shrink-0 rounded-sm bg-brand-primary" aria-hidden="true" />
-            {icon ? <span className="text-brand-primary [&_svg]:size-4">{icon}</span> : null}
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
-          </div>
-          {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
-        </header>
+        <TableSectionHeader
+          title={title}
+          icon={icon}
+          count={count}
+          actions={action}
+          className="px-4 pt-4"
+        />
       ) : null}
       <div className={cn('min-h-0 flex-1 p-4', bodyClassName)}>{children}</div>
     </section>

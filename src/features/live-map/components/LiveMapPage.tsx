@@ -5,7 +5,6 @@ import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.st
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
-import { LiveMapToolbar } from './LiveMapToolbar'
 
 // 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
 const LiveMapDemoModal = lazy(() =>
@@ -17,7 +16,6 @@ import {
 } from '../lib/live-map-layout'
 import {
   LIVE_MAP_CLUSTER_ITEMS,
-  LIVE_MAP_LINE_OPTIONS,
   LIVE_MAP_STATE_OPTIONS,
 } from '../mocks/live-map.mock'
 import {
@@ -34,9 +32,11 @@ export function LiveMapPage() {
   const { t } = useI18n()
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
+  // 상세 패널 닫기(X) — resolver 가 selectedEqpId=null 일 때 ERROR 설비로 자동 폴백하므로,
+  // "사용자가 명시적으로 닫음" 을 별도 플래그로 구분해 폴백 복귀를 막는다.
+  const [isDetailDismissed, setIsDetailDismissed] = useState(false)
 
   const searchKeyword = useLiveMapUiStore((state) => state.searchKeyword)
-  const selectedLine = useLiveMapUiStore((state) => state.selectedLine)
   const selectedStatus = useLiveMapUiStore((state) => state.selectedStatus)
   const selectedEqpId = useLiveMapUiStore((state) => state.selectedEqpId)
   const isLayoutEditEnabled = useLiveMapUiStore((state) => state.isLayoutEditEnabled)
@@ -46,7 +46,6 @@ export function LiveMapPage() {
   const lastSyncAt = useLiveMapUiStore((state) => state.lastSyncAt)
   const [now, setNow] = useState(lastSyncAt)
   const setSearchKeyword = useLiveMapUiStore((state) => state.setSearchKeyword)
-  const setSelectedLine = useLiveMapUiStore((state) => state.setSelectedLine)
   const setSelectedStatus = useLiveMapUiStore((state) => state.setSelectedStatus)
   const setSelectedEqpId = useLiveMapUiStore((state) => state.setSelectedEqpId)
   const setLayoutEditEnabled = useLiveMapUiStore((state) => state.setLayoutEditEnabled)
@@ -84,11 +83,10 @@ export function LiveMapPage() {
   const visibleEquipmentNodes = useMemo(
     () =>
       filterLiveMapEquipmentNodes(equipmentNodes, {
-        lineValue: selectedLine,
         statusFilter: selectedStatus,
         searchKeyword: deferredSearchKeyword,
       }),
-    [deferredSearchKeyword, equipmentNodes, selectedLine, selectedStatus],
+    [deferredSearchKeyword, equipmentNodes, selectedStatus],
   )
 
   const summary = useMemo(
@@ -105,6 +103,18 @@ export function LiveMapPage() {
       ),
     [equipmentNodes, selectedEqpId, visibleEquipmentNodes],
   )
+
+  // 사용자가 X 로 닫았으면 폴백 설비를 표시하지 않는다.
+  const displayedEquipment = isDetailDismissed ? null : selectedEquipment
+
+  const handleSelectEquipment = (eqpId: string) => {
+    setIsDetailDismissed(false)
+    setSelectedEqpId(eqpId)
+  }
+
+  const handleClearSelection = () => {
+    setIsDetailDismissed(true)
+  }
 
   const visibleEquipmentIds = useMemo(
     () => new Set(visibleEquipmentNodes.map((item) => item.eqpId)),
@@ -156,19 +166,9 @@ export function LiveMapPage() {
       onOpenProfile={() => setIsProfileModalOpen(true)}
       onAfterLogout={handleAfterLogout}
     >
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="thin-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="flex w-full flex-col gap-4 px-6 py-6">
-          <LiveMapHeader summary={summary} syncLabel={syncLabel} />
-          <LiveMapToolbar
-            searchKeyword={searchKeyword}
-            selectedLine={selectedLine}
-            selectedStatus={selectedStatus}
-            lineOptions={LIVE_MAP_LINE_OPTIONS}
-            stateOptions={LIVE_MAP_STATE_OPTIONS}
-            onSearchKeywordChange={setSearchKeyword}
-            onSelectedLineChange={setSelectedLine}
-            onSelectedStatusChange={setSelectedStatus}
-          />
+          <LiveMapHeader summary={summary} />
           {liveMapQuery.isError ? (
             <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
               {liveMapQuery.error instanceof Error
@@ -178,13 +178,19 @@ export function LiveMapPage() {
           ) : null}
           <LiveMapBoard
             clusters={clusterItems}
+            syncLabel={syncLabel}
+            searchKeyword={searchKeyword}
+            selectedStatus={selectedStatus}
+            stateOptions={LIVE_MAP_STATE_OPTIONS}
+            onSearchKeywordChange={setSearchKeyword}
+            onSelectedStatusChange={setSelectedStatus}
             equipmentNodes={equipmentNodes}
             visibleEquipmentIds={visibleEquipmentIds}
-            selectedEquipment={selectedEquipment}
+            selectedEquipment={displayedEquipment}
             zoomLevel={zoomLevel}
             isLayoutEditEnabled={isLayoutEditEnabled}
-            onSelectEquipment={setSelectedEqpId}
-            onClearSelection={() => setSelectedEqpId(null)}
+            onSelectEquipment={handleSelectEquipment}
+            onClearSelection={handleClearSelection}
             onOpenDemo={() => setIsDemoModalOpen(true)}
             onLayoutEditEnabledChange={setLayoutEditEnabled}
             onMoveCluster={(clusterId, position) => updateClusterLayout(clusterId, position, {})}

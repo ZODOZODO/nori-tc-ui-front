@@ -109,7 +109,7 @@ function CommLogListModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="thin-scroll min-h-0 flex-1 overflow-auto">
           {logs.length === 0 ? (
             <div className="flex h-full items-center justify-center py-16 text-[12px] text-muted-foreground">
               {t('livemap.commlog.empty')}
@@ -177,7 +177,7 @@ function CommLogDetailModal({
               </span>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
+            <div className="thin-scroll min-h-0 flex-1 overflow-auto px-5 py-4">
               <pre className="whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-foreground">
                 {formatPayload(entry.payload) || (
                   <span className="text-muted-foreground/70">{t('livemap.commlog.payloadEmpty')}</span>
@@ -219,7 +219,7 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
         </button>
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 overflow-auto rounded-[12px] border border-border bg-muted/40 p-1.5">
+      <div className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto rounded-[12px] border border-border bg-muted/40 p-1.5">
         {recentLogs.length === 0 ? (
           <div className="flex h-full min-h-[80px] items-center justify-center text-[10px] text-muted-foreground">
             {t('livemap.commlog.empty')}

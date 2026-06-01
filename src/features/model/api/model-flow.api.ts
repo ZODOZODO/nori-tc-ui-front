@@ -4,6 +4,7 @@ import {
   createModelFailResponse,
   DEFAULT_MODEL_ERROR_MESSAGE,
   ModelApiError,
+  type ApiResponse,
   type ModelFlow,
   type ModelFlowCreateRequest,
   type ModelFlowCreatedData,
@@ -21,6 +22,7 @@ const FLOW_LIST_FALLBACK_MESSAGE = 'Message Flow 목록을 조회하지 못했�
 const FLOW_DETAIL_FALLBACK_MESSAGE = 'Message Flow 상세를 조회하지 못했습니다.'
 const FLOW_CREATE_FALLBACK_MESSAGE = 'Message Flow 생성에 실패했습니다.'
 const FLOW_UPDATE_FALLBACK_MESSAGE = 'Message Flow 수정에 실패했습니다.'
+const FLOW_DELETE_FALLBACK_MESSAGE = 'Message Flow 삭제에 실패했습니다.'
 
 /**
  * document.cookie 에서 특정 쿠키 값을 추출합니다.
@@ -223,6 +225,33 @@ export const modelFlowApi = {
       )
     } catch (error) {
       throw normalizeModelError(error, FLOW_UPDATE_FALLBACK_MESSAGE)
+    }
+  },
+
+  /**
+   * 단일 Message Flow 를 삭제합니다 (Collect 바인딩 포함, 응답 본문 없음).
+   */
+  remove: async (modelVersionKey: number, flowId: number): Promise<void> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.delete<ApiResponse<null>>(
+          `/model/${modelVersionKey}/flows/${flowId}`,
+          {
+            withCredentials: true,
+            headers: { [CSRF_HEADER_NAME]: csrfToken },
+            validateStatus: (status) => status >= 200 && status < 600,
+          },
+        ),
+      )
+
+      if (!isApiResponse(response.data) || response.data.success !== true) {
+        throw new ModelApiError(
+          createModelFailResponse(response.data, FLOW_DELETE_FALLBACK_MESSAGE),
+          response.status,
+        )
+      }
+    } catch (error) {
+      throw normalizeModelError(error, FLOW_DELETE_FALLBACK_MESSAGE)
     }
   },
 }

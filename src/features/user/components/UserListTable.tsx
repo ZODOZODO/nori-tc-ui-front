@@ -16,6 +16,7 @@ import {
   type ColumnDef,
   type SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
@@ -143,6 +144,11 @@ export function UserListTable() {
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card">
+      <TableSectionHeader
+        title={t('user.table.title')}
+        count={totalCount}
+        className="px-4 pt-4"
+      />
       <div className="overflow-x-auto" data-testid="user-list-table">
         {isInitialLoading ? (
           <Table>

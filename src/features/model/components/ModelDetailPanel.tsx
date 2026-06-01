@@ -34,6 +34,7 @@ import {
 } from '../types/model.types'
 import { FlowFilterEditorModal } from './FlowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard, type FlowCardHandle } from './FlowCard'
 import { DcopItemPickerModal } from './DcopItemPickerModal'
@@ -193,7 +194,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const activeModelVersionKey = activeModel?.modelVersionKey ?? null
   const modelFlowListQuery = useModelFlowList(activeModelVersionKey)
   const modelFlowDetailQuery = useModelFlowDetail(activeModelVersionKey, selectedFlowId)
-  const { createFlowMutation, updateFlowMutation } = useModelFlowMutations(activeModelVersionKey)
+  const { createFlowMutation, updateFlowMutation, deleteFlowMutation } =
+    useModelFlowMutations(activeModelVersionKey)
+  const [flowIdToDelete, setFlowIdToDelete] = useState<number | null>(null)
 
   // activeTab 이 바뀌면 Flow 선택 / draft 초기화 — 다른 모델로 전환 시 stale 회피.
   useEffect(() => {
@@ -564,14 +567,34 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
   const handleSaveFlow = (payload: ModelFlowUpdateRequest) => {
     if (isDraftMode) {
-      // 첫 저장은 Identity 만 — Trigger / Action 은 사용자가 별도 PUT 저장합니다
-      // (F5 결정 #1: POST 만 → 후속 PUT 으로 4 섹션 갱신).
+      // 신규 Flow: POST 로 생성(identity)한 뒤, 사용자가 draft 카드에 입력한 나머지 섹션
+      // (Trigger / Filter / actionName / actionDataIndex)을 같은 flowId 로 이어서 PUT 한다 —
+      // 한 번의 Save 로 사용자가 기입한 값을 전부 영속한다.
+      //
+      // dcopItems 는 draft 모드에서 편집 불가(FlowCard 의 isDraftCard 가드)이므로
+      // dcopItemKeys=null(Collect 미갱신) 로 보낸다 — Collect 바인딩은 저장 후 별도로 추가한다.
+      //
+      // actionName 이 비어 있으면 backend updateFlow 가 non-blank 를 요구해 400 이 되므로
+      // PUT 을 건너뛰고 POST-only 로 둔다(action_name 은 placeholder "TODO" 로 생성됨 —
+      // "빈 Flow 를 만들고 나중에 채우는" 경로를 보존).
       createFlowMutation.mutate(
         { workflowName: payload.workflowName, messageName: payload.messageName },
         {
           onSuccess: (data) => {
-            clearDraftFlow()
-            setSelectedFlowId(data.flowId)
+            if (payload.actionName.trim().length === 0) {
+              clearDraftFlow()
+              setSelectedFlowId(data.flowId)
+              return
+            }
+            updateFlowMutation.mutate(
+              { flowId: data.flowId, request: { ...payload, dcopItemKeys: null } },
+              {
+                onSuccess: () => {
+                  clearDraftFlow()
+                  setSelectedFlowId(data.flowId)
+                },
+              },
+            )
           },
         },
       )
@@ -581,6 +604,21 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       return
     }
     updateFlowMutation.mutate({ flowId: selectedFlowId, request: payload })
+  }
+
+  // ConfirmDialog 확인 시 실제 삭제 — 성공하면 해당 Flow 가 선택돼 있었으면 선택 해제.
+  const handleConfirmDeleteFlow = () => {
+    if (flowIdToDelete === null) {
+      return
+    }
+    deleteFlowMutation.mutate(flowIdToDelete, {
+      onSuccess: () => {
+        if (selectedFlowId === flowIdToDelete) {
+          setSelectedFlowId(null)
+        }
+        setFlowIdToDelete(null)
+      },
+    })
   }
 
   // 우상단 통합 Save 버튼 클릭 핸들러 — 현재 우측 영역에 FlowCard 가 보이면 그 카드의
@@ -770,6 +808,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               selectedFlowId={selectedFlowId}
               onSelectFlow={handleSelectFlow}
               onAddFlow={handleAddFlow}
+              onDeleteFlow={(flowId) => setFlowIdToDelete(flowId)}
               isEditable={canEditTableRows}
             />
 
@@ -790,7 +829,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     className={cn(
                       'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
                       selectedFlowId === null && !isDraftMode && normalizedDetailNode === node
-                        ? 'bg-brand-primary/10 font-semibold text-foreground'
+                        ? 'bg-muted font-semibold text-foreground'
                         : 'text-muted-foreground hover:bg-muted',
                     )}
                   >
@@ -818,6 +857,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 onEditFlowFilter={handleEditFlowFilter}
                 onEditActionDataIndex={handleFlowEditActionDataIndex}
                 onAddDcopItem={handleFlowAddDcopItem}
+                onDelete={null}
                 onCancelDraft={clearDraftFlow}
               />
             ) : selectedFlowId !== null ? (
@@ -840,6 +880,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   onEditFlowFilter={handleEditFlowFilter}
                   onEditActionDataIndex={handleFlowEditActionDataIndex}
                   onAddDcopItem={handleFlowAddDcopItem}
+                  onDelete={() => setFlowIdToDelete(flowDetail.flowId)}
                   onCancelDraft={null}
                 />
               ) : (
@@ -1017,6 +1058,22 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={flowIdToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFlowIdToDelete(null)
+          }
+        }}
+        title="Flow 를 삭제하시겠습니까?"
+        description="선택한 Message Flow 와 그 Collect(DCOP) 바인딩이 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
+        confirmVariant="destructive"
+        isConfirming={deleteFlowMutation.isPending}
+        onConfirm={handleConfirmDeleteFlow}
+      />
 
       <FlowFilterEditorModal
         open={isFilterEditorOpen}

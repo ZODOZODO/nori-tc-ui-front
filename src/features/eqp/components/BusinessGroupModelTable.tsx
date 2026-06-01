@@ -12,6 +12,7 @@ import {
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { PagePagination } from '@/shared/layout/PagePagination'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import type { ModelInfo } from '@/features/model/types/model.types'
 
@@ -95,7 +96,6 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   isFetching,
 }: BusinessGroupModelTableProps) {
   const { t } = useI18n()
-  const [selectedModelVersionKey, setSelectedModelVersionKey] = useState<number | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(BUSINESS_GROUP_MODEL_DEFAULT_PAGE_SIZE)
 
@@ -112,19 +112,9 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
     return sortedModels.slice(start, start + pageSize)
   }, [sortedModels, page, pageCount, pageSize])
 
-  const effectiveSelectedModelVersionKey =
-    selectedModelVersionKey ?? pagedModels[0]?.modelVersionKey ?? null
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">{groupName}</h2>
-          <Badge variant="secondary" className="tabular-nums">
-            {sortedModels.length.toLocaleString()}
-          </Badge>
-        </div>
-      </div>
+      <TableSectionHeader title={groupName} count={sortedModels.length} />
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
         <div className="min-h-0 flex-1 overflow-auto">
@@ -163,17 +153,6 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
               rows={pagedModels}
               rowKey={(row) => row.modelVersionKey}
               tableClassName="min-w-[980px]"
-              wrapRow={(row, _rowIdx, children) => (
-                <TableRow
-                  data-state={
-                    effectiveSelectedModelVersionKey === row.modelVersionKey ? 'selected' : undefined
-                  }
-                  onClick={() => setSelectedModelVersionKey(row.modelVersionKey)}
-                  onContextMenu={() => setSelectedModelVersionKey(row.modelVersionKey)}
-                >
-                  {children}
-                </TableRow>
-              )}
             />
           )}
         </div>

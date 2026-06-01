@@ -35,7 +35,8 @@ interface DeployUiState {
   registerFilters: DeployRegisterFilters
   hasSubmittedRegisterSearch: boolean
   registerSearchRevision: number
-  monitorFilters: DeployMonitorFilters
+  deployFilters: DeployMonitorFilters
+  historyFilters: DeployMonitorFilters
   selectedModelName: string | null
   selectedModelVersionKey: number | null
   selectedBusinessJarRef: number | null
@@ -43,8 +44,8 @@ interface DeployUiState {
   setMode: (mode: DeployMode) => void
   submitRegisterSearch: (filters: DeployRegisterFilters) => void
   resetRegisterFilters: () => void
-  setMonitorFilters: (filters: Partial<DeployMonitorFilters>) => void
-  resetMonitorFilters: () => void
+  setMonitorFilters: (historyOnly: boolean, filters: Partial<DeployMonitorFilters>) => void
+  resetMonitorFilters: (historyOnly: boolean) => void
   setMonitorListOffset: (historyOnly: boolean, offset: number) => void
   resetMonitorListOffsets: () => void
   addSelectedEqps: (targets: DeployRegisterTargetItem[]) => void
@@ -128,7 +129,8 @@ const createInitialDeployUiDataState = () => ({
   registerFilters: EMPTY_REGISTER_FILTERS,
   hasSubmittedRegisterSearch: false,
   registerSearchRevision: 0,
-  monitorFilters: createDefaultMonitorFilters(),
+  deployFilters: createDefaultMonitorFilters(),
+  historyFilters: createDefaultMonitorFilters(),
   selectedModelName: null as string | null,
   selectedModelVersionKey: null as number | null,
   selectedBusinessJarRef: null as number | null,
@@ -304,14 +306,18 @@ export const useDeployUiStore = create<DeployUiState>()(
           registerFilters: EMPTY_REGISTER_FILTERS,
           hasSubmittedRegisterSearch: false,
         }),
-      setMonitorFilters: (filters) =>
-        set((state) => ({
-          monitorFilters: {
-            ...state.monitorFilters,
-            ...filters,
-          },
-        })),
-      resetMonitorFilters: () => set({ monitorFilters: createDefaultMonitorFilters() }),
+      setMonitorFilters: (historyOnly, filters) =>
+        set((state) =>
+          historyOnly
+            ? { historyFilters: { ...state.historyFilters, ...filters } }
+            : { deployFilters: { ...state.deployFilters, ...filters } },
+        ),
+      resetMonitorFilters: (historyOnly) =>
+        set(
+          historyOnly
+            ? { historyFilters: createDefaultMonitorFilters() }
+            : { deployFilters: createDefaultMonitorFilters() },
+        ),
       setMonitorListOffset: (historyOnly, offset) =>
         set(historyOnly ? { historyListOffset: Math.max(0, offset) } : { deployListOffset: Math.max(0, offset) }),
       resetMonitorListOffsets: () => set({ deployListOffset: 0, historyListOffset: 0 }),
@@ -737,7 +743,12 @@ export const useDeployUiStore = create<DeployUiState>()(
       merge: (persistedState, currentState) => {
         const typedPersistedState = (persistedState ?? {}) as Partial<DeployUiState>
         const defaultMonitorFilters = createDefaultMonitorFilters()
-        const persistedMonitorFilters = typedPersistedState.monitorFilters
+        const mergeMonitorFilters = (persisted?: Partial<DeployMonitorFilters>) => ({
+          ...defaultMonitorFilters,
+          ...persisted,
+          fromDate: persisted?.fromDate || defaultMonitorFilters.fromDate,
+          toDate: persisted?.toDate || defaultMonitorFilters.toDate,
+        })
         const persistedServerBackedDeployKeys = Array.isArray(typedPersistedState.serverBackedDeployKeys)
           ? typedPersistedState.serverBackedDeployKeys.filter((deployKey): deployKey is number => typeof deployKey === 'number')
           : []
@@ -786,12 +797,8 @@ export const useDeployUiStore = create<DeployUiState>()(
             persistedSelectedEqpIds,
             hasPersistedSelectedTargets ? persistedSelectedEqpTargetsById : {},
           ),
-          monitorFilters: {
-            ...defaultMonitorFilters,
-            ...persistedMonitorFilters,
-            fromDate: persistedMonitorFilters?.fromDate || defaultMonitorFilters.fromDate,
-            toDate: persistedMonitorFilters?.toDate || defaultMonitorFilters.toDate,
-          },
+          deployFilters: mergeMonitorFilters(typedPersistedState.deployFilters),
+          historyFilters: mergeMonitorFilters(typedPersistedState.historyFilters),
         }
       },
     },

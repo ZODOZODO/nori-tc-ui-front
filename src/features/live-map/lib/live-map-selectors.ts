@@ -6,13 +6,12 @@ import type {
 } from '../types/live-map.types'
 
 interface FilterLiveMapEquipmentNodesParams {
-  lineValue: string
   statusFilter: LiveMapStatusFilter
   searchKeyword: string
 }
 
 /**
- * line / status / 검색어 기준으로 설비 노드를 필터링합니다.
+ * status / 검색어 기준으로 설비 노드를 필터링합니다.
  */
 export const filterLiveMapEquipmentNodes = (
   equipmentNodes: readonly LiveMapEquipmentNode[],
@@ -21,7 +20,6 @@ export const filterLiveMapEquipmentNodes = (
   const normalizedKeyword = params.searchKeyword.trim().toLowerCase()
 
   return equipmentNodes.filter((item) => {
-    const matchesLine = params.lineValue === 'ALL' || item.lineValue === params.lineValue
     const matchesStatus = params.statusFilter === 'ALL' || item.status === params.statusFilter
     const matchesKeyword =
       normalizedKeyword.length === 0 ||
@@ -33,7 +31,7 @@ export const filterLiveMapEquipmentNodes = (
         item.clusterName,
       ].some((field) => field.toLowerCase().includes(normalizedKeyword))
 
-    return matchesLine && matchesStatus && matchesKeyword
+    return matchesStatus && matchesKeyword
   })
 }
 

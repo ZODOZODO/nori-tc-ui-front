@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import { useI18n } from '@/i18n/i18n-context'
+import { lnbFlatNavClass } from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import type { DlqMode } from '../types/dlq.types'
 
@@ -99,12 +100,7 @@ export function DlqSidebar({
                   variant="ghost"
                   data-testid={item.testId}
                   onClick={() => onChangeMode(item.mode)}
-                  className={cn(
-                    'h-9 justify-start rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[14px] font-semibold text-brand-primary hover:bg-brand-primary/10 hover:text-brand-primary'
-                      : 'pl-4 text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
+                  className={lnbFlatNavClass(isActive)}
                 >
                   {t(item.labelKey)}
                 </Button>

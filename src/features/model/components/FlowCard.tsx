@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useMemo, useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -107,6 +107,11 @@ interface FlowCardProps {
    * 저장된 Flow 의 카드 (sentinel 아님) 에는 Cancel 버튼이 미렌더 — `null` 가능.
    */
   onCancelDraft: (() => void) | null
+  /**
+   * 저장된 Flow 카드 헤더 우상단의 삭제 버튼 핸들러. 호출 시 부모가 ConfirmDialog 로 확인 후
+   * DELETE /flows/{id} 를 수행합니다. draft(미저장) 카드와 읽기 전용일 때는 미렌더 — `null` 가능.
+   */
+  onDelete: (() => void) | null
 }
 
 /**
@@ -140,6 +145,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
     onEditActionDataIndex,
     onAddDcopItem,
     onCancelDraft,
+    onDelete,
   },
   ref,
 ) {
@@ -234,11 +240,25 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? 'Flow ID #신규' : `Flow ID #${flow.flowId}`}
           </p>
         </div>
-        {errorMessage ? (
-          <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs text-danger">
-            {errorMessage}
-          </p>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {errorMessage ? (
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs text-danger">
+              {errorMessage}
+            </p>
+          ) : null}
+          {onDelete && !readOnly && !isDraftCard ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-danger/40 text-danger hover:bg-danger/10 hover:text-danger"
+              onClick={onDelete}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              삭제
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       <FlowCardSection title="Identity" description="Flow 의 고유 식별값입니다.">

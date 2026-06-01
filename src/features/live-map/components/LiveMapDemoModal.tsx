@@ -490,7 +490,7 @@ export function LiveMapDemoModal({
                 type="button"
                 onClick={handleAddTargetEquipments}
                 disabled={candidateEquipments.length === 0}
-                className="h-12 w-12 rounded-full bg-brand-primary text-white hover:bg-brand-primary/90"
+                className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
                 aria-label={t('livemap.demo.addAria')}
               >
                 <ArrowRight className="size-5" />
@@ -514,7 +514,7 @@ export function LiveMapDemoModal({
                 <div className="h-full overflow-auto">
                   <Table className="min-w-[520px]">
                     <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableRow className="bg-muted hover:bg-muted">
                         <TableHead>{t('livemap.demo.colEqp')}</TableHead>
                         <TableHead>{t('livemap.demo.colProcess')}</TableHead>
                         <TableHead>{t('livemap.demo.colWaferMode')}</TableHead>
@@ -632,7 +632,7 @@ export function LiveMapDemoModal({
                         void handleStartRun()
                       }}
                       disabled={targetEquipments.length === 0 || !selectedScenario || createDemoJobsMutation.isPending}
-                      className="h-10 rounded-[14px] bg-brand-primary px-4 text-sm font-semibold text-white hover:bg-brand-primary/90"
+                      className="h-10 rounded-[14px] bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                     >
                       <Play className="size-4" />
                       {createDemoJobsMutation.isPending
@@ -656,7 +656,7 @@ export function LiveMapDemoModal({
                 <div className="max-h-[360px] overflow-auto">
                   <Table className="min-w-[1180px]">
                     <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableRow className="bg-muted hover:bg-muted">
                         <TableHead>{t('livemap.demo.colEqp')}</TableHead>
                         <TableHead>{t('livemap.demo.colProcess')}</TableHead>
                         <TableHead>{t('livemap.demo.colScenario')}</TableHead>

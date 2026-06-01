@@ -316,7 +316,7 @@ export function DeployRegisterPanel() {
   }
 
   const moveToNextMode = (nextMode: 'deploy' | 'history', deployKey: number | null) => {
-    resetMonitorFilters()
+    resetMonitorFilters(nextMode === 'history')
     resetMonitorListOffsets()
     setActiveDeployKey(deployKey)
     setMode(nextMode)
@@ -846,7 +846,7 @@ export function DeployRegisterPanel() {
               ) : null}
               <Button
                 type="button"
-                className="h-9 rounded-full bg-brand-primary px-4 text-white hover:bg-brand-primary/90"
+                className="h-9 rounded-full bg-primary px-4 text-primary-foreground hover:bg-primary/90"
                 onClick={() =>
                   deployDialogState.nextMode
                     ? moveToNextMode(
@@ -1003,7 +1003,7 @@ export function DeployRegisterPanel() {
               type="button"
               onClick={() => void handleDeployWithScenario()}
               disabled={createDeployMutation.isPending || !scenarioDialogState.selectedScenarioCode}
-              className="h-10 rounded-xl bg-brand-primary px-5 text-white hover:bg-brand-primary/90"
+              className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
               {createDeployMutation.isPending ? 'Deploy 중...' : '선택한 시나리오로 Deploy'}
             </Button>
@@ -1090,7 +1090,7 @@ export function DeployRegisterPanel() {
             <Button
               type="button"
               onClick={handleSearch}
-              className="h-11 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90"
+              className="h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {t('deploy.common.search')}
             </Button>
@@ -1105,6 +1105,19 @@ export function DeployRegisterPanel() {
             </Button>
           </div>
 
+          {!hasSubmittedRegisterSearch ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {t('deploy.register.searchPrompt')}
+            </p>
+          ) : registerTargetsQuery.isError ? (
+            <p className="py-8 text-center text-sm text-danger">
+              {getErrorMessage(registerTargetsQuery.error, '대상 설비 목록을 조회하지 못했습니다.')}
+            </p>
+          ) : !registerTargetsQuery.isLoading && registerTargetItems.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {t('deploy.register.searchEmpty')}
+            </p>
+          ) : (
           <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
             <Table>
               <TableHeader className="bg-muted">
@@ -1132,13 +1145,7 @@ export function DeployRegisterPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!hasSubmittedRegisterSearch ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                      {t('deploy.register.searchPrompt')}
-                    </TableCell>
-                  </TableRow>
-                ) : registerTargetsQuery.isLoading ? (
+                {registerTargetsQuery.isLoading ? (
                   Array.from({ length: 6 }).map((_, rowIndex) => (
                     <TableRow key={`deploy-register-skeleton-${rowIndex}`} data-testid="deploy-register-skeleton">
                       {Array.from({ length: 6 }).map((_, cellIndex) => (
@@ -1148,21 +1155,6 @@ export function DeployRegisterPanel() {
                       ))}
                     </TableRow>
                   ))
-                ) : registerTargetsQuery.isError ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-danger">
-                      {getErrorMessage(
-                        registerTargetsQuery.error,
-                        '대상 설비 목록을 조회하지 못했습니다.',
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ) : registerTargetItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                      {t('deploy.register.searchEmpty')}
-                    </TableCell>
-                  </TableRow>
                 ) : (
                   registerTargetItems.map((item) => (
                     <TableRow
@@ -1216,6 +1208,7 @@ export function DeployRegisterPanel() {
               </TableBody>
             </Table>
           </div>
+          )}
 
           <div className="flex justify-center">
             <Button
@@ -1303,7 +1296,7 @@ export function DeployRegisterPanel() {
                 selectedEqpItems.length === 0 ||
                 selectedInterfaceType === null
               }
-              className="h-10 rounded-xl bg-brand-primary px-5 text-white hover:bg-brand-primary/90"
+              className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
               {previewScenarioMutation.isPending
                 ? t('deploy.register.checkingScenario')

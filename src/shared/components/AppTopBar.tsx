@@ -142,7 +142,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   return (
     <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
       <div className="flex items-center">
-        <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-8 w-auto" />
+        <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-10 w-auto" />
       </div>
 
       <div className="flex min-w-0 items-center justify-center overflow-hidden">
@@ -161,7 +161,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
                 onFocus={
                   isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
                 }
-                className={`group relative inline-flex h-[38px] items-center px-2 text-[14px] font-medium tracking-[0.01em] transition-colors ${
+                className={`group relative inline-flex h-[38px] items-center px-2 text-[15px] font-medium tracking-[0.01em] transition-colors ${
                   isCurrentMenu ? 'text-foreground' : 'text-muted-foreground hover:text-accent-foreground'
                 }`}
               >

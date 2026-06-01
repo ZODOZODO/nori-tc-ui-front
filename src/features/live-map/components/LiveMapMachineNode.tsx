@@ -15,8 +15,8 @@ interface LiveMapMachineNodeProps {
 }
 
 /**
- * 공정 카드 그리드 안의 설비 노드 타일입니다.
- * 윗줄 = 상태 dot + Eqp ID, 아랫줄 = 포트 상태 dot 행. 선택 동작만 주입됩니다.
+ * 공정 카드 안의 설비 행입니다. 1행: 상태 dot + Eqp ID(전체 표시), 2행: 포트 dot 요약.
+ * 1열 리스트로 쌓여 설비 수가 많아도(카드 내부 스크롤) 가독성을 유지합니다. 선택 동작만 주입됩니다.
  */
 export function LiveMapMachineNode({
   eqpId,
@@ -36,24 +36,33 @@ export function LiveMapMachineNode({
       aria-label={`${eqpId} ${t('livemap.node.selectSuffix')}`}
       aria-pressed={selected}
       disabled={dimmed}
-      className={`flex min-w-0 flex-col gap-1 rounded-[8px] border bg-card px-2 py-1.5 text-left transition-colors ${
+      title={eqpId}
+      className={`flex w-full min-w-0 flex-col gap-1 rounded-[7px] border px-2 py-1.5 text-left transition-colors ${
         selected
-          ? 'border-brand-primary ring-2 ring-brand-primary/20'
-          : 'border-border hover:border-brand-primary/40'
+          ? 'border-brand-primary bg-brand-primary/5 ring-1 ring-brand-primary/30'
+          : 'border-border bg-card hover:bg-muted/60'
       } ${dimmed ? 'opacity-30' : ''}`}
     >
-      <div className="flex items-center gap-1.5">
-        <span className={`size-2 shrink-0 rounded-full ${variant.dot}`} />
-        <span className="truncate text-[11px] font-bold text-foreground">{eqpId}</span>
-      </div>
-      <div className="flex items-center gap-[3px]">
-        {portItems.slice(0, 6).map((portItem) => (
-          <span
-            key={portItem.id}
-            className={`size-1.5 rounded-full ${LIVE_MAP_PORT_STATUS_CLASS[portItem.status].dot}`}
-          />
-        ))}
-      </div>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span
+          className={`size-2 shrink-0 rounded-full ${variant.dot} ${
+            status === 'ERROR' ? 'animate-pulse [box-shadow:0_0_8px_var(--danger)]' : ''
+          }`}
+        />
+        <span className="min-w-0 flex-1 break-all text-[11px] font-bold leading-tight text-foreground">
+          {eqpId}
+        </span>
+      </span>
+      {portItems.length > 0 ? (
+        <span className="flex flex-wrap items-center gap-[3px] pl-3.5">
+          {portItems.map((portItem) => (
+            <span
+              key={portItem.id}
+              className={`size-1.5 rounded-full ${LIVE_MAP_PORT_STATUS_CLASS[portItem.status].dot}`}
+            />
+          ))}
+        </span>
+      ) : null}
     </button>
   )
 }

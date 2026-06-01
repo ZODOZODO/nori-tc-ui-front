@@ -89,17 +89,18 @@ export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardPro
             {t('livemap.detail.portStatus')}
           </div>
           <div className="text-[10px] font-semibold text-muted-foreground">
-            {equipment.portItems.length} / {equipment.portItems.length}
+            <span className="text-success">
+              {equipment.portItems.filter((portItem) => portItem.status === 'RUN').length}
+            </span>
+            {' / '}
+            {equipment.portItems.length}
           </div>
         </div>
         <ul className="mt-2 space-y-1.5">
-          {equipment.portItems.map((portItem, index) => {
+          {equipment.portItems.map((portItem) => {
             const portVariant = LIVE_MAP_PORT_STATUS_CLASS[portItem.status]
             return (
               <li key={portItem.id} className="flex items-center gap-2 text-[12px]">
-                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-card text-[10px] font-bold text-muted-foreground">
-                  {index + 1}
-                </span>
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                   {portItem.label}
                 </span>

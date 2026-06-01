@@ -23,6 +23,7 @@ import {
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { PagePagination } from '@/shared/layout/PagePagination'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
@@ -57,11 +58,11 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   if (status === 'offline') {
     return (
       <span
-        className="relative inline-flex size-4 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-300/80"
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-muted ring-2 ring-border"
         title="오프라인"
         aria-label="오프라인"
       >
-        <span className="inline-flex size-2 rounded-full bg-slate-500" />
+        <span className="inline-flex size-2 rounded-full bg-muted-foreground" />
       </span>
     )
   }
@@ -194,7 +195,6 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
   onLifecycleAction,
 }: GatewayGroupTableProps) {
   const { t } = useI18n()
-  const [selectedEqpId, setSelectedEqpId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(GATEWAY_GROUP_DEFAULT_PAGE_SIZE)
 
@@ -212,8 +212,6 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
     const start = (safePage - 1) * pageSize
     return sortedEqpItems.slice(start, start + pageSize)
   }, [sortedEqpItems, page, pageCount, pageSize])
-
-  const effectiveSelectedEqpId = selectedEqpId ?? pagedEqpItems[0]?.eqpId ?? null
 
   // 그룹 화면은 N대의 설비 상세를 한 번에 보여줘야 합니다.
   // 과거에는 useQueries로 N개 HTTP 호출을 fan-out 했고, 일부가 일시 실패하면 그 행만 '—'로 박혔습니다.
@@ -270,22 +268,18 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">{groupName}</h2>
-          <Badge variant="secondary" className="tabular-nums">
-            {sortedEqpItems.length.toLocaleString()}
-          </Badge>
-        </div>
-      </div>
+      <TableSectionHeader title={groupName} count={sortedEqpItems.length} />
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
-        <div className="flex-1 min-h-0 overflow-auto">
+        {/* SelectableTable 이 단일 스크롤러가 되도록 redundant overflow 래퍼를 두지 않는다.
+            (이중 overflow 는 sticky thead 가 바깥 스크롤에 밀려 고정되지 않게 만든다.) */}
+        <div className="flex min-h-0 flex-1 flex-col">
           {sortedEqpItems.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {t('eqp.gateway.empty')}
             </p>
           ) : isInitialLoading ? (
+            <div className="min-h-0 flex-1 overflow-auto">
             <Table className="min-w-[1280px]">
               <TableHeader>
                 <TableRow className="bg-muted">
@@ -319,6 +313,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <SelectableTable<GatewayGroupRow>
               testId="selectable-table-gateway-group"
@@ -338,10 +333,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
                   <ContextMenu>
                     <ContextMenuTrigger asChild>
                       <TableRow
-                        data-state={effectiveSelectedEqpId === eqp.eqpId ? 'selected' : undefined}
                         className={row.isMissingFromBatch ? 'bg-danger/5' : undefined}
-                        onClick={() => setSelectedEqpId(eqp.eqpId)}
-                        onContextMenu={() => setSelectedEqpId(eqp.eqpId)}
                       >
                         {children}
                       </TableRow>

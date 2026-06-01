@@ -50,7 +50,7 @@ const LayoutShellFixture = lazy(async () => {
 
 function RouteLoadingFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F6FBF8] px-6 text-sm text-[#4B5A52]">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground">
       화면을 불러오는 중입니다.
     </div>
   )
