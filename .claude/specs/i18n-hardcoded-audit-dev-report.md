@@ -754,3 +754,40 @@ e2e 영향 없음 확인: 날짜 포맷 문자열을 단언하는 spec 0건(`gre
 
 ## 6. 최종 — i18n 하드코딩 감사 전체 완료
 카탈로그 ≈795 문자열(P1~P6) + 날짜 로컬라이제이션(P7) 모두 처리. surface B(하드코딩 한글) i18n 마이그레이션 종결.
+
+---
+
+# Validate 정정 (P8) — 단위 테스트 회귀 발견 & 수정
+
+> 2026-06-02 독립 Validate 재실행에서 **위 P0~P7 의 "단위 테스트 전부 PASS" 기록이 커밋 상태와 불일치**함을 발견하고 수정. 위 각 phase 의 e2e/tsc/build 결과는 재검증 시 정합(키 888/888, 잔여 한글 8건=전부 D2 제외, api/types 17파일 i18n.t).
+
+## 1. 발견된 불일치
+커밋 상태에서 `npm run test:unit` 실제 결과 = **61개 중 3 fail**(보고서 기록 "89 pass / 0 fail" 과 불일치):
+```
+not ok 3  - tests/flow-card-render.test.ts
+not ok 10 - tests/model-detail-editor.test.ts
+not ok 11 - tests/model-flow-editor.test.ts
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@/i18n'
+  imported from .../src/features/model/lib/model-flow-editor.ts
+```
+
+## 2. 근본 원인
+P4(`c7425584`)가 `model-flow-editor.ts:1`·`model-detail-editor.ts:1`·`model.types.ts:1` 에 `import i18n from '@/i18n'` 추가. **`node --test` 는 `@/` Vite/tsconfig 별칭을 해석하지 못함** → 모듈 로드 실패(3 파일 + transitive). **Vite 는 별칭을 해석**하므로 build/e2e 는 green → P4 시점 검증이 이 회귀를 못 잡고 "PASS" 로 기록. (61 vs 89 차이 = 크래시한 3 파일의 subtest 28개 미집계분.)
+
+## 3. 수정 (Plan 결정 (a) — 테스트 러너에 별칭 해석 추가)
+- `tests/i18n-test-instance.ts` (신규) — node-safe i18n. prod `index.ts`(LanguageDetector window/localStorage + resourcesToBackend) 는 node 에서 크래시하므로, `config.ts` 의 `i18nBaseOptions` 공유 + 실제 ko/en locale inline + `lng:'ko'` 로 `createInstance().init()`. flow-card-render 가 `summarizeFlowFilter()==='필터 없음'`(=`i18n.t('model.flow.noFilter')`) 을 assert 하므로 키 아닌 실제 ko 값 반환 필요 → 실제 resource 로드.
+- `tests/alias-hooks.mjs` (신규) — `module.registerHooks({resolve})`. `@/i18n` → 위 테스트 인스턴스, 그 외 `@/X` → `src/X`(확장자 probe). `--import` 로 등록.
+- `package.json` `test:unit` — `node --import ./tests/alias-hooks.mjs --test --experimental-strip-types tests/*.test.ts`.
+
+## 4. 재검증 (PASS)
+```
+# tests 89
+# pass 89
+# fail 0
+UNIT_EXIT:0
+```
+- `tsc -b`: `TSC_EXIT:0`. 신규 파일 eslint: 0. (tests/ 는 tsc·vite·playwright 스코프 밖 → build/e2e 무영향.)
+
+## 5. 회귀 아닌 기존 사항(참고)
+- `eslint` 14 error(`react-hooks/set-state-in-effect`): blame 결과 **전원 i18n 이전 커밋** 도입 = i18n 신규 0. lint 게이트는 기존 부채로 red 유지(이번 작업 범위 밖).
+- e2e `group-page.spec.ts:395` 1건 간헐 실패: 단독 재실행 PASS = 병렬 타이밍 flaky(P1 §5 기록과 동일), i18n 무관.
