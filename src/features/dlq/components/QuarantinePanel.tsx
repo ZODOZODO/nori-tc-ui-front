@@ -8,18 +8,21 @@ import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
 import type { QuarantineEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const QUARANTINE_COLUMNS: ReadonlyArray<ColumnDef<QuarantineEntry>> = [
-  { key: 'equipmentId', header: '설비', accessor: (row) => row.equipmentId },
-  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+// 컬럼 헤더 팩토리(C4). 순수 jargon 헤더(TTL)는 리터럴 유지.
+const buildQuarantineColumns = (
+  t: (key: string) => string,
+): ReadonlyArray<ColumnDef<QuarantineEntry>> => [
+  { key: 'equipmentId', header: t('dlq.col.equipment'), accessor: (row) => row.equipmentId },
+  { key: 'reasonCode', header: t('dlq.col.reasonCode'), accessor: (row) => row.reasonCode ?? '-' },
   {
     key: 'reasonMessage',
-    header: '사유',
+    header: t('dlq.col.reason'),
     accessor: (row) => row.reasonMessage ?? '-',
     maxWidth: '24em',
   },
   {
     key: 'quarantinedAt',
-    header: '격리 시각',
+    header: t('dlq.col.quarantinedAt'),
     accessor: (row) => formatDlqTime(row.quarantinedAt),
   },
   { key: 'ttlSeconds', header: 'TTL', accessor: (row) => row.ttlSeconds?.toString() ?? '-' },
@@ -32,6 +35,8 @@ export function QuarantinePanel() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
 
+  const columns = useMemo(() => buildQuarantineColumns(t), [t])
+
   const sortedEntries = useMemo<QuarantineEntry[]>(() => {
     const items = query.data ?? []
     return [...items].sort((left, right) => {
@@ -42,8 +47,8 @@ export function QuarantinePanel() {
   }, [query.data])
 
   const filteredEntries = useMemo(
-    () => filterDlqRows(sortedEntries, QUARANTINE_COLUMNS, searchKeyword),
-    [sortedEntries, searchKeyword],
+    () => filterDlqRows(sortedEntries, columns, searchKeyword),
+    [sortedEntries, columns, searchKeyword],
   )
 
   const totalCount = filteredEntries.length
@@ -86,7 +91,7 @@ export function QuarantinePanel() {
     >
       <SelectableTable<QuarantineEntry>
         testId="selectable-table-quarantine"
-        columns={QUARANTINE_COLUMNS}
+        columns={columns}
         rows={pageItems}
         rowKey={(row) => row.equipmentId}
         wrapRow={(row, _rowIdx, children) => (

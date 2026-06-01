@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
 import type { LiveMapDemoTestType } from '../types/live-map.types'
@@ -74,7 +75,8 @@ export interface LiveMapDemoJobCreateRequest {
   requestedBy?: string
 }
 
-const DEFAULT_ERROR_MESSAGE = 'Demo 테스트 정보를 처리하지 못했습니다.'
+// 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
+const defaultErrorMessage = () => i18n.t('error.livemap.demoDefault')
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -100,7 +102,7 @@ const issueCsrfToken = async (): Promise<string> => {
 
   const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
   if (!csrfToken) {
-    throw new Error('CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.')
+    throw new Error(i18n.t('error.livemap.csrf'))
   }
 
   return csrfToken
@@ -149,10 +151,10 @@ export const liveMapDemoApi = {
       )
       return resolveSuccessPayload<LiveMapDemoScenarioCatalogItem[]>(
         response.data,
-        'Demo 시나리오 목록을 조회하지 못했습니다.',
+        i18n.t('error.livemap.demoScenarios'),
       )
     } catch (error) {
-      throw normalizeError(error, 'Demo 시나리오 목록을 조회하지 못했습니다.')
+      throw normalizeError(error, i18n.t('error.livemap.demoScenarios'))
     }
   },
 
@@ -168,10 +170,10 @@ export const liveMapDemoApi = {
       )
       return resolveSuccessPayload<LiveMapDemoJobCreateResult>(
         response.data,
-        'Demo 테스트 시작에 실패했습니다.',
+        i18n.t('error.livemap.demoStart'),
       )
     } catch (error) {
-      throw normalizeError(error, 'Demo 테스트 시작에 실패했습니다.')
+      throw normalizeError(error, i18n.t('error.livemap.demoStart'))
     }
   },
 
@@ -189,10 +191,10 @@ export const liveMapDemoApi = {
       )
       return resolveSuccessPayload<LiveMapDemoJobSummary[]>(
         response.data,
-        'Demo job 목록을 조회하지 못했습니다.',
+        i18n.t('error.livemap.demoJobs'),
       )
     } catch (error) {
-      throw normalizeError(error, 'Demo job 목록을 조회하지 못했습니다.')
+      throw normalizeError(error, i18n.t('error.livemap.demoJobs'))
     }
   },
 
@@ -202,9 +204,9 @@ export const liveMapDemoApi = {
         `/live-map/demo-jobs/${encodeURIComponent(jobId)}`,
         { withCredentials: true },
       )
-      return resolveSuccessPayload<LiveMapDemoJobDetail>(response.data, DEFAULT_ERROR_MESSAGE)
+      return resolveSuccessPayload<LiveMapDemoJobDetail>(response.data, defaultErrorMessage())
     } catch (error) {
-      throw normalizeError(error, DEFAULT_ERROR_MESSAGE)
+      throw normalizeError(error, defaultErrorMessage())
     }
   },
 
@@ -222,9 +224,9 @@ export const liveMapDemoApi = {
           },
         ),
       )
-      return resolveSuccessPayload<LiveMapDemoJobDetail>(response.data, 'Demo job 취소에 실패했습니다.')
+      return resolveSuccessPayload<LiveMapDemoJobDetail>(response.data, i18n.t('error.livemap.demoCancel'))
     } catch (error) {
-      throw normalizeError(error, 'Demo job 취소에 실패했습니다.')
+      throw normalizeError(error, i18n.t('error.livemap.demoCancel'))
     }
   },
 }

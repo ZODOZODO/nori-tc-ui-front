@@ -203,12 +203,12 @@ export function LiveMapDemoModal({
       }
 
       if (failure) {
-        setStartMessage('Demo 정보를 새로고침하지 못했습니다.')
+        setStartMessage(t('livemap.demo.refreshFailed'))
       }
     } finally {
       setIsRefreshing(false)
     }
-  }, [refetchJobs, refetchScenarios])
+  }, [refetchJobs, refetchScenarios, t])
 
   useEffect(() => {
     if (!open) {
@@ -304,10 +304,13 @@ export function LiveMapDemoModal({
         requestedBy: 'LIVE_MAP_UI',
       })
       setStartMessage(
-        `요청 완료: ${result.acceptedJobs.length}대 시작, ${result.rejectedEquipments.length}대 제외`,
+        t('livemap.demo.startResult', {
+          started: result.acceptedJobs.length,
+          excluded: result.rejectedEquipments.length,
+        }),
       )
     } catch (error) {
-      setStartMessage(error instanceof Error ? error.message : 'Demo 테스트 시작에 실패했습니다.')
+      setStartMessage(error instanceof Error ? error.message : t('error.livemap.demoStart'))
     }
   }
 
@@ -316,12 +319,12 @@ export function LiveMapDemoModal({
     setStartMessage(null)
     try {
       await cancelDemoJobMutation.mutateAsync(jobId)
-      setStartMessage(`${testTypeLabel} 테스트 종료를 요청했습니다.`)
+      setStartMessage(t('livemap.demo.cancelRequested', { testType: testTypeLabel }))
     } catch (error) {
       setStartMessage(
         error instanceof Error
           ? error.message
-          : `${testTypeLabel} 테스트 종료 요청에 실패했습니다.`,
+          : t('livemap.demo.cancelFailed', { testType: testTypeLabel }),
       )
     }
   }
@@ -392,7 +395,9 @@ export function LiveMapDemoModal({
 
       const groupCheckState = resolveGroupCheckState(node)
       const groupLabel =
-        node.type === 'LINE' ? `${node.label} 라인 일괄 선택` : `${node.label} 공정 일괄 선택`
+        node.type === 'LINE'
+          ? t('livemap.demo.selectLine', { label: node.label })
+          : t('livemap.demo.selectProcess', { label: node.label })
 
       return (
         <div key={node.id} className="space-y-2">
@@ -403,7 +408,11 @@ export function LiveMapDemoModal({
                 onClick={() => handleToggleExpanded(node.id)}
                 disabled={isSearchActive}
                 className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={`${node.label} ${isExpanded ? '접기' : '펼치기'}`}
+                aria-label={
+                  isExpanded
+                    ? t('livemap.demo.collapseAria', { label: node.label })
+                    : t('livemap.demo.expandAria', { label: node.label })
+                }
               >
                 <ChevronRight
                   className={`size-4 transition-transform ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
@@ -423,7 +432,7 @@ export function LiveMapDemoModal({
               />
               <span className="flex-1 truncate text-sm font-medium">{node.label}</span>
               {node.type === 'PROCESS' ? (
-                <span className="shrink-0 text-xs text-muted-foreground">{node.children.length}대</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{t('livemap.demo.unitCount', { count: node.children.length })}</span>
               ) : null}
             </div>
           </div>

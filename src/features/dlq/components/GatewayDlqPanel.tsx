@@ -8,23 +8,26 @@ import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
 import type { GatewayDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const GATEWAY_DLQ_COLUMNS: ReadonlyArray<ColumnDef<GatewayDlqEntry>> = [
+// 컬럼 헤더 팩토리(C4). 순수 jargon 헤더(ID/IF/TTL)는 리터럴 유지.
+const buildGatewayDlqColumns = (
+  t: (key: string) => string,
+): ReadonlyArray<ColumnDef<GatewayDlqEntry>> => [
   { key: 'dlqId', header: 'ID', accessor: (row) => row.dlqId, maxWidth: '24em' },
-  { key: 'equipmentId', header: '설비', accessor: (row) => row.equipmentId },
+  { key: 'equipmentId', header: t('dlq.col.equipment'), accessor: (row) => row.equipmentId },
   { key: 'commInterfaceType', header: 'IF', accessor: (row) => row.commInterfaceType ?? '-' },
-  { key: 'socketType', header: '소켓', accessor: (row) => row.socketType ?? '-' },
-  { key: 'stage', header: '단계', accessor: (row) => row.stage ?? '-' },
-  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+  { key: 'socketType', header: t('dlq.col.socket'), accessor: (row) => row.socketType ?? '-' },
+  { key: 'stage', header: t('dlq.col.stage'), accessor: (row) => row.stage ?? '-' },
+  { key: 'reasonCode', header: t('dlq.col.reasonCode'), accessor: (row) => row.reasonCode ?? '-' },
   {
     key: 'reasonMessage',
-    header: '사유',
+    header: t('dlq.col.reason'),
     accessor: (row) => row.reasonMessage ?? '-',
     maxWidth: '24em',
   },
-  { key: 'occurredAt', header: '발생 시각', accessor: (row) => formatDlqTime(row.occurredAt) },
+  { key: 'occurredAt', header: t('dlq.col.occurredAt'), accessor: (row) => formatDlqTime(row.occurredAt) },
   {
     key: 'payloadRefKey',
-    header: 'payload 참조',
+    header: t('dlq.col.payloadRef'),
     accessor: (row) => row.payloadRefKey ?? '-',
     maxWidth: '24em',
   },
@@ -38,14 +41,16 @@ export function GatewayDlqPanel() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
 
+  const columns = useMemo(() => buildGatewayDlqColumns(t), [t])
+
   const sortedEntries = useMemo<GatewayDlqEntry[]>(() => {
     const items = query.data ?? []
     return [...items].sort((left, right) => right.occurredAt - left.occurredAt)
   }, [query.data])
 
   const filteredEntries = useMemo(
-    () => filterDlqRows(sortedEntries, GATEWAY_DLQ_COLUMNS, searchKeyword),
-    [sortedEntries, searchKeyword],
+    () => filterDlqRows(sortedEntries, columns, searchKeyword),
+    [sortedEntries, columns, searchKeyword],
   )
 
   const totalCount = filteredEntries.length
@@ -88,7 +93,7 @@ export function GatewayDlqPanel() {
     >
       <SelectableTable<GatewayDlqEntry>
         testId="selectable-table-gateway-dlq"
-        columns={GATEWAY_DLQ_COLUMNS}
+        columns={columns}
         rows={pageItems}
         rowKey={(row) => row.dlqId}
         wrapRow={(row, _rowIdx, children) => (

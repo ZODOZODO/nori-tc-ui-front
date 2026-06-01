@@ -93,7 +93,7 @@ export function GroupListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`그룹 ${row.groupCode} 사용자 추가`}
+            aria-label={t('group.aria.addMembers', { code: row.groupCode })}
             data-testid={`group-row-members-${row.groupId}`}
             onClick={() => openAddMembersModal(row.groupId)}
           >
@@ -103,7 +103,7 @@ export function GroupListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`그룹 ${row.groupCode} 수정`}
+            aria-label={t('group.aria.edit', { code: row.groupCode })}
             data-testid={`group-row-edit-${row.groupId}`}
             onClick={() => openEditModal(row.groupId)}
           >
@@ -113,7 +113,7 @@ export function GroupListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`그룹 ${row.groupCode} 삭제`}
+            aria-label={t('group.aria.delete', { code: row.groupCode })}
             data-testid={`group-row-delete-${row.groupId}`}
             onClick={() => openDeleteDialog(row.groupId)}
           >
@@ -178,7 +178,11 @@ export function GroupListTable() {
 
       <div className="flex flex-col gap-2 border-t border-border px-6 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
         <span data-testid="group-list-pagination-summary">
-          총 {totalCount}건 · {currentPage} / {totalPages} 페이지
+          {t('deploy.monitor.pagination', {
+            count: totalCount,
+            page: currentPage,
+            total: totalPages,
+          })}
         </span>
         <div className="flex items-center gap-2">
           {groupListQuery.isFetching ? <span>{t('group.table.syncing')}</span> : null}

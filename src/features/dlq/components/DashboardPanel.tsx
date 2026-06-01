@@ -18,7 +18,8 @@ import {
 import { formatDlqTime } from '../lib/dlq-format'
 
 interface CategoryStyle {
-  label: string
+  // 카테고리 라벨은 기존 dlq.panel.* 키를 재사용한다(렌더 시점 t(labelKey)).
+  labelKey: string
   testId: `dlq-kpi-${DashboardCategory}`
   borderClass: string
   badgeClass: string
@@ -27,28 +28,28 @@ interface CategoryStyle {
 
 const CATEGORY_STYLES: Record<DashboardCategory, CategoryStyle> = {
   gateway: {
-    label: 'Gateway DLQ',
+    labelKey: 'dlq.panel.gateway',
     testId: 'dlq-kpi-gateway',
     borderClass: 'border-l-4 border-l-blue-400',
     badgeClass: 'bg-blue-50 text-blue-700',
     icon: Cpu,
   },
   business: {
-    label: 'Business DLQ',
+    labelKey: 'dlq.panel.business',
     testId: 'dlq-kpi-business',
     borderClass: 'border-l-4 border-l-amber-400',
     badgeClass: 'bg-amber-50 text-amber-700',
     icon: Beaker,
   },
   quarantine: {
-    label: '격리 설비',
+    labelKey: 'dlq.panel.quarantine',
     testId: 'dlq-kpi-quarantine',
     borderClass: 'border-l-4 border-l-red-400',
     badgeClass: 'bg-red-50 text-red-700',
     icon: Lock,
   },
   'repair-task': {
-    label: 'Repair Task',
+    labelKey: 'dlq.panel.repairTask',
     testId: 'dlq-kpi-repair-task',
     borderClass: 'border-l-4 border-l-violet-400',
     badgeClass: 'bg-violet-50 text-violet-700',
@@ -58,16 +59,19 @@ const CATEGORY_STYLES: Record<DashboardCategory, CategoryStyle> = {
 
 const CARD_BASE_CLASS = 'rounded-xl border border-border bg-card shadow-soft-sm'
 
-const FEED_COLUMNS: ReadonlyArray<ColumnDef<DashboardFeedItem>> = [
+// 컬럼 헤더/카테고리 라벨 팩토리(C4) — 모듈 상수라 t() 불가 → t 를 받아 렌더 시점 평가.
+const buildFeedColumns = (
+  t: (key: string) => string,
+): ReadonlyArray<ColumnDef<DashboardFeedItem>> => [
   {
     key: 'timestamp',
-    header: '발생 시각',
+    header: t('dlq.col.occurredAt'),
     accessor: (row) => formatDlqTime(row.timestamp),
   },
   {
     key: 'category',
-    header: '카테고리',
-    accessor: (row) => CATEGORY_STYLES[row.category].label,
+    header: t('dlq.col.category'),
+    accessor: (row) => t(CATEGORY_STYLES[row.category].labelKey),
     renderCell: (row) => {
       const style = CATEGORY_STYLES[row.category]
       const Icon = style.icon
@@ -79,24 +83,24 @@ const FEED_COLUMNS: ReadonlyArray<ColumnDef<DashboardFeedItem>> = [
           )}
         >
           <Icon className="size-3" />
-          {style.label}
+          {t(style.labelKey)}
         </span>
       )
     },
   },
   {
     key: 'equipmentId',
-    header: '설비',
+    header: t('dlq.col.equipment'),
     accessor: (row) => row.equipmentId ?? '-',
   },
   {
     key: 'reasonCode',
-    header: '사유 코드',
+    header: t('dlq.col.reasonCode'),
     accessor: (row) => row.reasonCode ?? '-',
   },
   {
     key: 'reasonMessage',
-    header: '사유',
+    header: t('dlq.col.reason'),
     accessor: (row) => row.reasonMessage ?? '-',
     maxWidth: '24em',
   },
@@ -130,7 +134,7 @@ function KpiCard({ category, count, isPending, isError }: KpiCardProps) {
         >
           <Icon className="size-4" />
         </span>
-        <span className="text-xs font-medium text-muted-foreground">{style.label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{t(style.labelKey)}</span>
       </div>
       {isError ? (
         <span className="text-sm text-danger">{t('dlq.dashboard.kpiError')}</span>
@@ -163,6 +167,8 @@ export function DashboardPanel() {
   const businessQuery = useBusinessDlq()
   const quarantineQuery = useQuarantine()
   const repairQuery = useRepairTasks()
+
+  const feedColumns = useMemo(() => buildFeedColumns(t), [t])
 
   const allSettled =
     !gatewayQuery.isPending &&
@@ -277,7 +283,7 @@ export function DashboardPanel() {
           ) : (
             <SelectableTable<DashboardFeedItem>
               testId="selectable-table-dashboard-feed"
-              columns={FEED_COLUMNS}
+              columns={feedColumns}
               rows={feed}
               rowKey={(row) => row.id}
               wrapRow={(row, _rowIdx, children) => (

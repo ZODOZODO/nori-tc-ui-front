@@ -418,7 +418,8 @@ test('Group-AC-6: 그룹 삭제 성공', async ({ page }) => {
 
   await expect(page.getByTestId('group-row-11')).toBeVisible()
   await page.getByTestId('group-row-delete-11').click()
-  await page.getByRole('button', { name: '삭제' }).click()
+  // e2e 는 EN 모드 — P6 i18n 적용으로 ConfirmDialog 확인 버튼이 common.delete('Delete') 로 전환됨.
+  await page.getByRole('button', { name: 'Delete' }).click()
 
   await expect.poll(() => state.deleteGroupCalls.length).toBeGreaterThan(0)
   expect(state.deleteGroupCalls[0]).toBe(11)
@@ -445,7 +446,8 @@ test('Group-AC-7: 그룹 멤버 추가/제거', async ({ page }) => {
 
   await expect.poll(() => state.addMemberCalls.length).toBeGreaterThan(0)
   expect(state.addMemberCalls[0]).toEqual({ userPk: 42, groupId: 10 })
-  await expect(page.getByTestId('group-add-members-result')).toContainText('추가 1건')
+  // EN 모드 — group.members.resultSummary = 'Added {{added}} / failed {{failed}}'.
+  await expect(page.getByTestId('group-add-members-result')).toContainText('Added 1')
 
   // 제거: 기존 멤버 50 의 "멤버 제거" → DELETE.
   await page.getByTestId('group-member-remove-50').click()

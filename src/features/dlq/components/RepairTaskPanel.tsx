@@ -8,19 +8,22 @@ import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
 import type { RepairTaskEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const REPAIR_TASK_COLUMNS: ReadonlyArray<ColumnDef<RepairTaskEntry>> = [
+// 컬럼 헤더 팩토리(C4). 순수 jargon 헤더(Task ID)는 리터럴 유지.
+const buildRepairTaskColumns = (
+  t: (key: string) => string,
+): ReadonlyArray<ColumnDef<RepairTaskEntry>> => [
   { key: 'taskId', header: 'Task ID', accessor: (row) => row.taskId, maxWidth: '24em' },
-  { key: 'eqpId', header: '설비', accessor: (row) => row.eqpId },
-  { key: 'commandType', header: '커맨드', accessor: (row) => row.commandType },
-  { key: 'repairAction', header: '액션', accessor: (row) => row.repairAction },
-  { key: 'errorCode', header: '에러 코드', accessor: (row) => row.errorCode ?? '-' },
+  { key: 'eqpId', header: t('dlq.col.equipment'), accessor: (row) => row.eqpId },
+  { key: 'commandType', header: t('dlq.col.command'), accessor: (row) => row.commandType },
+  { key: 'repairAction', header: t('dlq.col.action'), accessor: (row) => row.repairAction },
+  { key: 'errorCode', header: t('dlq.col.errorCode'), accessor: (row) => row.errorCode ?? '-' },
   {
     key: 'errorMessage',
-    header: '에러 메시지',
+    header: t('dlq.col.errorMessage'),
     accessor: (row) => row.errorMessage ?? '-',
     maxWidth: '24em',
   },
-  { key: 'createdAt', header: '생성 시각', accessor: (row) => formatDlqTime(row.createdAt) },
+  { key: 'createdAt', header: t('dlq.col.createdAt'), accessor: (row) => formatDlqTime(row.createdAt) },
 ]
 
 export function RepairTaskPanel() {
@@ -29,6 +32,8 @@ export function RepairTaskPanel() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
+
+  const columns = useMemo(() => buildRepairTaskColumns(t), [t])
 
   const sortedEntries = useMemo<RepairTaskEntry[]>(() => {
     const items = query.data ?? []
@@ -40,8 +45,8 @@ export function RepairTaskPanel() {
   }, [query.data])
 
   const filteredEntries = useMemo(
-    () => filterDlqRows(sortedEntries, REPAIR_TASK_COLUMNS, searchKeyword),
-    [sortedEntries, searchKeyword],
+    () => filterDlqRows(sortedEntries, columns, searchKeyword),
+    [sortedEntries, columns, searchKeyword],
   )
 
   const totalCount = filteredEntries.length
@@ -84,7 +89,7 @@ export function RepairTaskPanel() {
     >
       <SelectableTable<RepairTaskEntry>
         testId="selectable-table-repair-task"
-        columns={REPAIR_TASK_COLUMNS}
+        columns={columns}
         rows={pageItems}
         rowKey={(row) => row.taskId}
         wrapRow={(row, _rowIdx, children) => (

@@ -605,5 +605,110 @@ E2E_FULL_EXIT:0
 | `tests/e2e/user-page.spec.ts` | 삭제 확인 버튼 셀렉터 '삭제' → 'Delete' (EN 정합) |
 
 ## 7. 다음 단계
-P6 live-map + dlq(64) — 새 세션 권장. DLQ 컬럼 헤더 상수(C4 35건) 구조 변경 주의.
-**미배정 발견**: Plan §4 단계 테이블에 **group(76: GroupAddMembersModal 16 / GroupUpsertModal 15 / GroupDeleteConfirmDialog 6 / GroupListTable 4 / group.api 9 / group.types 1 등)** 이 P1~P6 어디에도 배정 안 됨(카탈로그엔 "eqp(api)+group 76"으로 존재, P3 은 eqp 만 처리). group.* upsert/pagination 키 미존재 확인 — 별도 phase(P7) 또는 P6 에 합산 필요. (P5 범위 밖이라 무변경.)
+P6 group + live-map + dlq — **결정 A 로 group 합산**(Plan §4 갱신). 아래 P6 참조.
+
+---
+
+# P6 — group + live-map + dlq (~117, grep 실측)
+
+## 0. 범위 결정 (결정 A)
+
+최초 Plan §4 는 group(≈51)을 어느 phase 에도 배정 안 한 누락이 있었다(카탈로그 §집계는 `eqp(api)+group 76` 으로 묶여 P3 가 eqp.api 24 만 처리). group 은 user 와 인접 admin/권한 도메인이라 **P6 에 합산**(Plan §4 + 결정 A 기록). 착수 시 grep 실측으로 카탈로그 불일치 정정:
+- **comm-log.api 는 16 이 아니라 1**(카탈로그 오기), **DlqTableShell 1 건은 `Intl.DateTimeFormat('ko-KR')` 날짜 로컬라이제이션**(Plan §2 P0 배정분 — **P6 범위 밖**, 무변경), live-map.mock.ts 39 건은 mock 디렉터리(범위 밖).
+
+## 1. 무엇을 했나
+
+3 feature 의 번역대상 한글을 i18n 키로 전수 치환:
+- **group(≈51)**: group.api(C5)/group.types(C5 getter) + GroupUpsertModal/GroupAddMembersModal/GroupDeleteConfirmDialog/GroupListTable(C1/C2/C3). user feature 와 동일 패턴.
+- **live-map(≈20)**: live-map-demo.api/live-map.api/comm-log.api(C5 getter+인라인) + LiveMapDemoModal(C1/C3, 대부분 기존 i18n — 잔여 10 fragment).
+- **dlq(≈41)**: 5 패널 컬럼 헤더 상수(C4 → t 팩토리) + dlq.api(C5 인라인) + DashboardPanel CATEGORY_STYLES label→labelKey.
+
+## 2. 신설 키 (ko/en 각 동수)
+
+P6 진입 전 808키 → **888키**(P6 신설 **80키 × 2**). `node` 로 차집합 0 검증:
+```
+ko 888 en 888
+in ko not en: []
+in en not ko: []
+```
+네임스페이스(재사용 우선 — `common.cancel/delete/close/save`, `group.create`, `deploy.monitor.pagination`, `livemap.error`, `dlq.panel.*` 재사용):
+- group(40): `error.group.*`(10) + `group.upsert.*`(7) + `group.form.*`(5) + `group.delete.*`(3) + `group.aria.*`(3) + `group.members.*`(12)
+- live-map(16): `error.livemap.*`(6) + `livemap.commlog.error`(1) + `livemap.demo.*`(9)
+- dlq(24): `error.dlq.*`(4) + `dlq.col.*`(20)
+
+## 3. Plan 결정 준수 (D1 / D2 / C4)
+
+- **D1 (api/types fallback → standalone `i18n.t` / getter)** — P2~P5 동일 패턴:
+  - group.types `DEFAULT_GROUP_ERROR_MESSAGE` → `defaultGroupErrorMessage()` getter, `createGroupFailResponse` default 파라미터식. group.api 모듈 상수 2종(`GROUP_LIST`/`GROUP_MEMBER_LIST_FALLBACK`) → getter, CSRF + 메서드 인라인 6종 `i18n.t` 직접, `normalizeGroupError` default → getter.
+  - live-map.api `LIVE_MAP_ERROR_MESSAGE` → getter(`livemap.error` 재사용). comm-log.api `ERROR_MESSAGE` → getter(`livemap.commlog.error`). live-map-demo.api `DEFAULT_ERROR_MESSAGE` → getter + CSRF/시나리오/시작/jobs/취소 인라인 `i18n.t`.
+  - dlq.api 4 인라인 fallback 은 arrow 본문(호출마다 평가)이라 `i18n.t('error.dlq.*')` 직접.
+- **C4 (모듈 상수 컬럼 헤더 → t 팩토리)**:
+  - 5 DLQ 패널의 `*_COLUMNS` 모듈 상수 → `build*Columns(t)` 팩토리 + 컴포넌트 `useMemo(() => build*Columns(t), [t])`. `filterDlqRows`/`SelectableTable columns` 참조를 useMemo 산출 `columns` 로 교체(SelectableTable `header: string` 계약 보존). 순수 jargon 헤더(`ID`/`TTL`/`IF`/`Task ID`)는 리터럴 유지.
+  - DashboardPanel `CATEGORY_STYLES.label`(표시+accessor 겸용) → `labelKey`(기존 `dlq.panel.*` 재사용) + KpiCard `t(style.labelKey)` + `buildFeedColumns(t)` 팩토리 accessor/renderCell `t(labelKey)`.
+- **D2 (borderline 제외)**:
+  - live-map-data.ts:42 `LIVE_MAP_CLUSTER_ITEMS 위치 정보를 찾을 수 없습니다` — 개발자용 invariant, **무변경**.
+  - live-map-demo.ts:188-189 `완료`/`대기`/`진행 중` — `buildLiveMapDemoRunRows` dead/mock(production 미사용, lib+test 만 참조 grep 확인), **무변경**.
+- **순수 jargon 무변경**: Gateway DLQ/Business DLQ/Repair Task(영어 라벨)/IF/소켓 외 컬럼 jargon(groupCode/updatedAt 등 영어 헤더), `Demo`/`MES`/`E2E`/scenario 등.
+
+## 4. 구현 결정 기록
+
+- **group 키 재사용**: DialogTitle create→`group.create`(기존), delete confirm→`common.delete`/`common.cancel`, pagination→`deploy.monitor.pagination`(P2 키, 텍스트 동일). near-dup 회피.
+- **dlq.col 공유 키**: `dlq.col.equipment`/`reasonCode`/`reason`/`occurredAt`/`payloadRef` 등은 여러 패널이 동일 헤더라 단일 키 공유(20 고유 키로 5 패널 + Dashboard 커버).
+- **LiveMapDemoModal `refreshDemoData` useCallback deps 에 `t` 추가**(react-compiler 정합). 언어 전환 시 effect 재실행(재fetch)은 무해.
+- **comm-log.api/live-map-demo.api 의 throw 는 plain `Error`**(ApiError 아님) — i18n.t 결과를 메시지로. 동작 동일.
+
+## 5. 검증 결과 (전부 PASS)
+
+ko/en 차집합 0 (888/888, §2 인용). 잔여 번역대상 한글 0(live-map-data invariant·live-map-demo dead·DlqTableShell `ko-KR` 날짜·mock 디렉터리 제외).
+
+### tsc -b
+```
+TSC_EXIT:0
+```
+### eslint (변경 16 소스 파일)
+P6 신규 에러 0. LiveMapDemoModal 의 `react-hooks/set-state-in-effect` 1건은 **pre-existing**(내가 수정하지 않은 `refreshDemoData` 호출 effect L213-219; refreshDemoData 의 setState 는 P6 이전부터 존재). stash 후 baseline 비교:
+```
+baseline(HEAD) set-state-in-effect count: 1
+current(P6) set-state-in-effect count: 1
+```
+(동일 → P6 신규 0. `git diff` 로 effect 블록이 변경 hunk 밖임을 확인.)
+### vite build
+```
+dist/assets/index-CBY6qHk5.js                     243.92 kB │ gzip:  77.75 kB
+dist/assets/DeployPage-jpriB9Z2.js                397.04 kB │ gzip: 115.84 kB
+✓ built in 10.83s
+BUILD_EXIT:0
+```
+### e2e (전체 79, flat-key console.error 0 가드 포함)
+```
+79 passed (2.2m)
+E2E_EXIT:0
+```
+**e2e EN 정합**: group-page.spec.ts:421 ConfirmDialog 확인 버튼 `name: '삭제'` → `'Delete'`(`common.delete` 전환), L448 `'추가 1건'` → `'Added 1'`(`group.members.resultSummary` EN). dlq/live-map spec 은 testid 기반·LiveMapDemoModal e2e 부재라 셀렉터 영향 없음.
+
+## 6. 변경 파일 (20 소스 + 1 e2e + Plan)
+
+| 파일 | 변경 |
+|---|---|
+| `src/i18n/locales/ko.json` / `en.json` | +80 키 |
+| `src/features/group/types/group.types.ts` | DEFAULT_GROUP_ERROR_MESSAGE → getter |
+| `src/features/group/api/group.api.ts` | fallback getter 2 + 인라인 6 i18n.t + CSRF |
+| `src/features/group/components/GroupUpsertModal.tsx` | useI18n + title/desc 삼항/label/placeholder/submit |
+| `src/features/group/components/GroupAddMembersModal.tsx` | useI18n + title/desc/검증/결과 보간/멤버제거/버튼 |
+| `src/features/group/components/GroupDeleteConfirmDialog.tsx` | useI18n + title/confirm(with·no code)/common.delete·cancel |
+| `src/features/group/components/GroupListTable.tsx` | aria 3 보간 + pagination 재사용 |
+| `src/features/live-map/api/live-map.api.ts` | LIVE_MAP_ERROR_MESSAGE → getter(livemap.error) |
+| `src/features/live-map/api/comm-log.api.ts` | ERROR_MESSAGE → getter |
+| `src/features/live-map/api/live-map-demo.api.ts` | DEFAULT getter + CSRF/인라인 5 i18n.t |
+| `src/features/live-map/components/LiveMapDemoModal.tsx` | 10 fragment(보간/aria 삼항/refresh deps t) |
+| `src/features/dlq/api/dlq.api.ts` | 인라인 4 i18n.t |
+| `src/features/dlq/components/BusinessDlqPanel.tsx` | 컬럼 t 팩토리(buildBusinessDlqColumns) |
+| `src/features/dlq/components/GatewayDlqPanel.tsx` | 컬럼 t 팩토리 |
+| `src/features/dlq/components/QuarantinePanel.tsx` | 컬럼 t 팩토리 |
+| `src/features/dlq/components/RepairTaskPanel.tsx` | 컬럼 t 팩토리 |
+| `src/features/dlq/components/DashboardPanel.tsx` | CATEGORY_STYLES label→labelKey + buildFeedColumns 팩토리 |
+| `tests/e2e/group-page.spec.ts` | '삭제'→'Delete', '추가 1건'→'Added 1' (EN 정합) |
+| `.claude/specs/i18n-hardcoded-audit-plan.md` | §4 P6 = group+live-map+dlq, 결정 A 기록 |
+
+## 7. 다음 단계 — ≈795 전수 완료
+P1~P6 으로 카탈로그 전 영역 i18n 키 추출 완료. **날짜 로컬라이제이션(`Intl.DateTimeFormat('ko-KR')`, Plan §2 P0 배정 미구현)** 만 잔여 — DlqTableShell/DeployMonitorPanel/ModelInfoTable/BusinessGroupModelTable/model-version.ts 등. EN 모드에서도 한국식 날짜 표시되는 기존 동작 유지 중, 별도 처리 필요.

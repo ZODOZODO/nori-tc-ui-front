@@ -92,7 +92,13 @@ react-i18next 는 standalone `i18n` 인스턴스를 export 하므로 `import i18
 | P3 | eqp | 125+24 | C1/C2/C3 + C5(eqp.api) + C4(lifecycle 상수) | ManageFormModal 동적 조사 에러(템플릿) |
 | P4 | model | 112+153 | 전 카테고리 + C5(model.api 33, model-detail-editor 28) | 최난도. hintText 삼항, JSON 에디터 검증 |
 | P5 | user/profile/auth | 84 | C1/C2/C3 + C5(api) + zod(useLogin) | Upsert/Profile 모달, zod 메시지 |
-| P6 | live-map + dlq | 64 | C4(DLQ 헤더 상수 35) + C5(api) | DLQ 컬럼 헤더 상수 구조 변경 |
+| P6 | **group + live-map + dlq** | ~117(grep 실측) | C4(DLQ 헤더 상수) + C5(api) + C1/C2/C3 | DLQ 컬럼 헤더 상수 구조 변경. group 합산(아래 결정 A) |
+
+> **결정 A (2026-06-01, Implement 중 확정)**: 최초 Plan §4 는 group(≈51)을 어느 phase 에도 배정하지 않은 누락이 있었다(카탈로그 §집계는 `eqp(api)+group 76` 으로 묶여 P3 가 eqp.api 24 만 처리). group 은 user 와 인접한 admin/권한 도메인(`group.*` 네임스페이스 독립, 키 컨벤션·재사용이 P5 와 동일)이므로 **P6 에 합산**한다. grep 실측 P6 범위:
+> - group(≈51): group.api(C5) / group.types(C5) / GroupUpsertModal / GroupAddMembersModal / GroupDeleteConfirmDialog / GroupListTable
+> - live-map(≈20): live-map-demo.api(C5 10) / live-map.api(C5 1) / comm-log.api(C5 1) / LiveMapDemoModal(C1/C3 8). **D2 제외**: live-map-data.ts invariant(1, 개발자용), live-map-demo.ts dead/mock(2, buildLiveMapDemoRunRows), live-map.mock.ts(39, mock 디렉터리 범위 밖)
+> - dlq(≈41): BusinessDlqPanel(12)/GatewayDlqPanel(7)/DashboardPanel(7)/RepairTaskPanel(6)/QuarantinePanel(4) C4 컬럼 헤더 상수 + dlq.api(C5 4) + DlqTableShell(1, 카탈로그 누락분 — grep 발견)
+> - 카탈로그 불일치 정정: comm-log.api 는 16 이 아니라 **1**(grep), DlqTableShell 1 건은 카탈로그 미기재.
 
 ### 키 네임스페이스 컨벤션 (기존 확장)
 - 기존: `eqp.* / model.* / deploy.* / dlq.* / user.* / group.* / livemap.*`

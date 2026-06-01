@@ -8,27 +8,31 @@ import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
 import type { BusinessDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
-const BUSINESS_DLQ_COLUMNS: ReadonlyArray<ColumnDef<BusinessDlqEntry>> = [
+// 컬럼 헤더는 모듈 상수라 t() 직접 호출이 불가능하므로, t 를 받는 팩토리로 두고
+// 컴포넌트에서 useMemo([t]) 로 빌드한다(C4). 순수 jargon 헤더(ID/TTL)는 리터럴 유지.
+const buildBusinessDlqColumns = (
+  t: (key: string) => string,
+): ReadonlyArray<ColumnDef<BusinessDlqEntry>> => [
   { key: 'dlqId', header: 'ID', accessor: (row) => row.dlqId, maxWidth: '24em' },
-  { key: 'source', header: '출처', accessor: (row) => row.source ?? '-' },
-  { key: 'stage', header: '단계', accessor: (row) => row.stage ?? '-' },
-  { key: 'topic', header: '토픽', accessor: (row) => row.topic ?? '-', maxWidth: '24em' },
-  { key: 'partition', header: '파티션', accessor: (row) => row.partition?.toString() ?? '-' },
-  { key: 'offset', header: '오프셋', accessor: (row) => row.offset?.toString() ?? '-' },
-  { key: 'eqpId', header: '설비', accessor: (row) => row.eqpId ?? '-' },
-  { key: 'messageType', header: '타입', accessor: (row) => row.messageType ?? '-' },
-  { key: 'messageName', header: '이름', accessor: (row) => row.messageName ?? '-' },
-  { key: 'reasonCode', header: '사유 코드', accessor: (row) => row.reasonCode ?? '-' },
+  { key: 'source', header: t('dlq.col.source'), accessor: (row) => row.source ?? '-' },
+  { key: 'stage', header: t('dlq.col.stage'), accessor: (row) => row.stage ?? '-' },
+  { key: 'topic', header: t('dlq.col.topic'), accessor: (row) => row.topic ?? '-', maxWidth: '24em' },
+  { key: 'partition', header: t('dlq.col.partition'), accessor: (row) => row.partition?.toString() ?? '-' },
+  { key: 'offset', header: t('dlq.col.offset'), accessor: (row) => row.offset?.toString() ?? '-' },
+  { key: 'eqpId', header: t('dlq.col.equipment'), accessor: (row) => row.eqpId ?? '-' },
+  { key: 'messageType', header: t('dlq.col.messageType'), accessor: (row) => row.messageType ?? '-' },
+  { key: 'messageName', header: t('dlq.col.messageName'), accessor: (row) => row.messageName ?? '-' },
+  { key: 'reasonCode', header: t('dlq.col.reasonCode'), accessor: (row) => row.reasonCode ?? '-' },
   {
     key: 'reasonMessage',
-    header: '사유',
+    header: t('dlq.col.reason'),
     accessor: (row) => row.reasonMessage ?? '-',
     maxWidth: '24em',
   },
-  { key: 'occurredAt', header: '발생 시각', accessor: (row) => formatDlqTime(row.occurredAt) },
+  { key: 'occurredAt', header: t('dlq.col.occurredAt'), accessor: (row) => formatDlqTime(row.occurredAt) },
   {
     key: 'payloadRef',
-    header: 'payload 참조',
+    header: t('dlq.col.payloadRef'),
     accessor: (row) => row.payloadRef ?? '-',
     maxWidth: '24em',
   },
@@ -42,14 +46,16 @@ export function BusinessDlqPanel() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
 
+  const columns = useMemo(() => buildBusinessDlqColumns(t), [t])
+
   const sortedEntries = useMemo<BusinessDlqEntry[]>(() => {
     const items = query.data ?? []
     return [...items].sort((left, right) => right.occurredAt - left.occurredAt)
   }, [query.data])
 
   const filteredEntries = useMemo(
-    () => filterDlqRows(sortedEntries, BUSINESS_DLQ_COLUMNS, searchKeyword),
-    [sortedEntries, searchKeyword],
+    () => filterDlqRows(sortedEntries, columns, searchKeyword),
+    [sortedEntries, columns, searchKeyword],
   )
 
   const totalCount = filteredEntries.length
@@ -92,7 +98,7 @@ export function BusinessDlqPanel() {
     >
       <SelectableTable<BusinessDlqEntry>
         testId="selectable-table-business-dlq"
-        columns={BUSINESS_DLQ_COLUMNS}
+        columns={columns}
         rows={pageItems}
         rowKey={(row) => row.dlqId}
         wrapRow={(row, _rowIdx, children) => (
