@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 
 function ConfirmDialogRoot({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="confirm-dialog" {...props} />
@@ -137,8 +138,8 @@ function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmText = '확인',
-  cancelText = '취소',
+  confirmText,
+  cancelText,
   confirmVariant = 'default',
   isConfirming = false,
   confirmDisabled = false,
@@ -146,6 +147,9 @@ function ConfirmDialog({
   children,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { t } = useI18n()
+  const resolvedConfirmText = confirmText ?? t('common.confirm')
+  const resolvedCancelText = cancelText ?? t('common.cancel')
   return (
     <ConfirmDialogRoot open={open} onOpenChange={onOpenChange}>
       <ConfirmDialogContent>
@@ -156,7 +160,7 @@ function ConfirmDialog({
         {children}
         <ConfirmDialogFooter>
           <ConfirmDialogCancel asChild disabled={cancelDisabled || isConfirming}>
-            <Button variant="outline">{cancelText}</Button>
+            <Button variant="outline">{resolvedCancelText}</Button>
           </ConfirmDialogCancel>
           <ConfirmDialogAction asChild>
             <Button
@@ -165,7 +169,7 @@ function ConfirmDialog({
               onClick={onConfirm}
             >
               {isConfirming ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-              {confirmText}
+              {resolvedConfirmText}
             </Button>
           </ConfirmDialogAction>
         </ConfirmDialogFooter>

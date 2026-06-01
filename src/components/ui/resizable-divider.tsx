@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { GripHorizontal } from 'lucide-react'
+import { useI18n } from '@/i18n/i18n-context'
 
 interface ResizableDividerProps {
   /**
@@ -17,6 +18,7 @@ interface ResizableDividerProps {
  * 컴포넌트 언마운트 또는 드래그 종료 시 document 이벤트 리스너를 반드시 정리합니다.
  */
 export function ResizableDivider({ onDrag }: ResizableDividerProps) {
+  const { t } = useI18n()
   // 드래그 시작 Y 좌표를 ref로 추적 (리렌더링 없이 유지)
   const dragStartYRef = useRef<number | null>(null)
 
@@ -92,7 +94,7 @@ export function ResizableDivider({ onDrag }: ResizableDividerProps) {
     <div
       role="separator"
       aria-orientation="horizontal"
-      aria-label="패널 크기 조절 핸들"
+      aria-label={t('common.resizeHandle.panel')}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
       className="flex h-3 w-full cursor-row-resize items-center justify-center border-y border-border bg-muted hover:bg-accent active:bg-accent"

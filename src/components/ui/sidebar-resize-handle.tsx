@@ -5,6 +5,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { GripVertical } from 'lucide-react'
+import { useI18n } from '@/i18n/i18n-context'
 
 interface SidebarResizeHandleProps {
   onDrag: (deltaX: number) => void
@@ -14,6 +15,7 @@ interface SidebarResizeHandleProps {
  * 좌우 사이드바 폭 조절에 사용하는 공통 드래그 핸들입니다.
  */
 export function SidebarResizeHandle({ onDrag }: SidebarResizeHandleProps) {
+  const { t } = useI18n()
   const dragStartXRef = useRef<number | null>(null)
 
   const handleMouseMove = useCallback(
@@ -89,7 +91,7 @@ export function SidebarResizeHandle({ onDrag }: SidebarResizeHandleProps) {
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="사이드바 크기 조절 핸들"
+      aria-label={t('common.resizeHandle.sidebar')}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
       className="flex h-full w-3 cursor-col-resize items-center justify-center border-r border-border bg-background hover:bg-muted active:bg-accent"

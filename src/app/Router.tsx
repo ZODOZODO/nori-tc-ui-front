@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useI18n } from '@/i18n/i18n-context'
 
 const LoginPage = lazy(async () => {
   const module = await import('@/features/auth/components/LoginPage')
@@ -49,9 +50,10 @@ const LayoutShellFixture = lazy(async () => {
 })
 
 function RouteLoadingFallback() {
+  const { t } = useI18n()
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground">
-      화면을 불러오는 중입니다.
+      {t('common.routeLoading')}
     </div>
   )
 }

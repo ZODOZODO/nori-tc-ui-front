@@ -2,6 +2,7 @@ import * as React from 'react'
 import { X } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -42,6 +43,7 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const { t } = useI18n()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -65,7 +67,7 @@ function DialogContent({
         {showCloseButton ? (
           <DialogPrimitive.Close
             className="absolute right-4 top-4 rounded-sm text-muted-foreground opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="닫기"
+            aria-label={t('common.close')}
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

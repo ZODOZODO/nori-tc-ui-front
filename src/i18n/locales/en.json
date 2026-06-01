@@ -275,5 +275,13 @@
   "livemap.demo.end": "End",
   "livemap.demo.testType.socket": "Equipment only",
   "livemap.demo.testType.mes": "MES only",
-  "livemap.demo.testType.e2e": "Connect all"
+  "livemap.demo.testType.e2e": "Connect all",
+  "common.confirm": "OK",
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "common.table.action": "Action",
+  "common.table.empty": "No data to display.",
+  "common.routeLoading": "Loading…",
+  "common.resizeHandle.panel": "Resize panel",
+  "common.resizeHandle.sidebar": "Resize sidebar"
 }

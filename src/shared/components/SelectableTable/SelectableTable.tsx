@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import { useGridRangeSelection } from '@/shared/hooks/useGridRangeSelection'
 import { useGridResize } from '@/shared/hooks/useGridResize'
 import { useGridSort } from '@/shared/hooks/useGridSort'
@@ -149,6 +150,8 @@ export const SelectableTable = <TRow,>({
       containerRef.current?.focus()
     }
   }, [editing])
+
+  const { t } = useI18n()
 
   const rangeCopyEnabled = features?.rangeCopy ?? true
   const rangePasteEnabled =
@@ -516,7 +519,7 @@ export const SelectableTable = <TRow,>({
                 className="whitespace-nowrap"
                 style={{ width: actionColumn?.width, minWidth: actionColumn?.width }}
               >
-                {actionColumn?.header ?? '작업'}
+                {actionColumn?.header ?? t('common.table.action')}
               </TableHead>
             ) : null}
           </TableRow>
@@ -528,7 +531,7 @@ export const SelectableTable = <TRow,>({
                 colSpan={totalColSpan}
                 className="py-10 text-center text-sm text-muted-foreground"
               >
-                {emptyState ?? '표시할 데이터가 없습니다.'}
+                {emptyState ?? t('common.table.empty')}
               </TableCell>
             </TableRow>
           ) : virtual.enabled ? (

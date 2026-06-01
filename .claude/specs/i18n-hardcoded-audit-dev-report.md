@@ -94,3 +94,67 @@ ESLINT_EXIT:0
 
 Plan §4 순서대로: P1 shared/ui(공용 default) → P2 deploy → P3 eqp → P4 model → P5 user/profile/auth → P6 live-map/dlq.
 각 단계 = 실패 e2e/스냅샷 → ko/en 키 동수 신설 → `t()`/`i18n.t()` 치환 → build+tsc+e2e PASS(console.error 0).
+
+---
+
+# P1 — shared/components/ui + app (공용 default 8건)
+
+## 1. 무엇을 했나
+
+가장 광범위 노출되는 공용 default 한국어 8건을 `common.*` i18n 키로 치환. 모두 C4(컴포넌트 default/fallback) 유형.
+**핵심**: 이 default 들은 기존에 하드코딩 한국어라 **EN 모드에서도 한국어로 표시되던 버그** — P1 으로 EN 시 영어로 정상 전환.
+
+## 2. 신설 키 (ko/en 각 8, common 네임스페이스)
+
+| key | ko | en |
+|---|---|---|
+| common.confirm | 확인 | OK |
+| common.cancel | 취소 | Cancel |
+| common.close | 닫기 | Close |
+| common.table.action | 작업 | Action |
+| common.table.empty | 표시할 데이터가 없습니다. | No data to display. |
+| common.routeLoading | 화면을 불러오는 중입니다. | Loading… |
+| common.resizeHandle.panel | 패널 크기 조절 핸들 | Resize panel |
+| common.resizeHandle.sidebar | 사이드바 크기 조절 핸들 | Resize sidebar |
+
+## 3. 변경 파일 (6)
+
+| 파일 | 변경 |
+|---|---|
+| `src/components/ui/confirm-dialog.tsx` | `confirmText='확인'`/`cancelText='취소'` default 제거 → 본문 `?? t('common.confirm'\|cancel)` |
+| `src/components/ui/dialog.tsx` | close 버튼 `aria-label="닫기"` → `t('common.close')` (DialogContent 에 useI18n) |
+| `src/shared/components/SelectableTable/SelectableTable.tsx` | `?? '작업'` → `t('common.table.action')`, `?? '표시할 데이터가 없습니다.'` → `t('common.table.empty')` |
+| `src/app/Router.tsx` | Suspense fallback "화면을 불러오는 중입니다." → `t('common.routeLoading')` |
+| `src/components/ui/sidebar-resize-handle.tsx` | `aria-label` → `t('common.resizeHandle.sidebar')` |
+| `src/components/ui/resizable-divider.tsx` | `aria-label` → `t('common.resizeHandle.panel')` |
+
+`LanguageToggle.tsx`/기타 P1 무관 파일 무수정.
+
+## 4. 회귀 전략 (전용 mock e2e 미작성 근거)
+
+P1 6컴포넌트는 전부 인증+mock 페이지 전용 — default 8건만을 위한 전용 무거운 mock e2e 는 과도(글로벌 룰 3/11). 대신:
+- 기존 e2e 가 P1 한국어 default 를 assert 하는 곳 **0건** 확인(`grep` 결과 전부 주석) → EN 모드 값 변경으로 깨질 테스트 없음.
+- 전체 e2e 79건이 EN 모드에서 이 컴포넌트들을 광범위 렌더·동작(dialog open/close, table, resize) → useI18n 추가로 인한 crash/구조 파손은 반드시 검출.
+
+## 5. 검증 결과
+
+```
+=== 잔여 P1 하드코딩 (should be 0) ===
+none — 전부 t() 치환됨
+=== tsc -b ===
+TSC_EXIT:0
+=== eslint (변경 6파일) ===
+ESLINT_EXIT:0
+```
+build:
+```
+✓ built in 11.93s
+```
+e2e (전체 79):
+```
+1 failed (group-page.spec.ts:395 Group-AC-5) / 78 passed (2.5m)
+```
+실패 1건 진단 — 단독 재실행 `1 passed (4.0s)`, group-page 스펙 전체 재실행 `8 passed (16.4s)`. 해당 테스트는 testId 셀렉터 + 데이터 값('관리자-수정')만 assert, P1 문자열·close 버튼 미참조 → **P1 무관 병렬 타이밍 flaky (workers=undefined)**. 실질 79/79 PASS.
+
+## 6. 다음 단계
+P2 deploy(173건) — 새 세션 권장(컨텍스트 분리, 글로벌 룰 10).
