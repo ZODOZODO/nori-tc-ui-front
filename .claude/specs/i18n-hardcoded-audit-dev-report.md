@@ -711,4 +711,46 @@ E2E_EXIT:0
 | `.claude/specs/i18n-hardcoded-audit-plan.md` | §4 P6 = group+live-map+dlq, 결정 A 기록 |
 
 ## 7. 다음 단계 — ≈795 전수 완료
-P1~P6 으로 카탈로그 전 영역 i18n 키 추출 완료. **날짜 로컬라이제이션(`Intl.DateTimeFormat('ko-KR')`, Plan §2 P0 배정 미구현)** 만 잔여 — DlqTableShell/DeployMonitorPanel/ModelInfoTable/BusinessGroupModelTable/model-version.ts 등. EN 모드에서도 한국식 날짜 표시되는 기존 동작 유지 중, 별도 처리 필요.
+P1~P6 으로 카탈로그 전 영역 i18n 키 추출 완료. **날짜 로컬라이제이션**만 잔여 → P7 처리.
+
+---
+
+# P7 — 날짜 로컬라이제이션 (Plan §2 P0 배정 미구현분)
+
+## 1. 무엇을 했나
+
+표시용 날짜 포맷의 하드코딩 locale(`Intl.DateTimeFormat('ko-KR')`)을 현재 UI 언어에 연동. EN 모드에서도 한국식 날짜로 표시되던 기존 동작을 수정.
+
+## 2. 범위 결정 (grep 실측 5건 → 표시용 4건만)
+
+`grep DateTimeFormat\('ko-KR'|'en-US'\)` 5건 중:
+- **표시용 4건 (대상)**: DeployMonitorPanel `formatDateTime` / DlqTableShell `formatLastUpdated` / BusinessGroupModelTable `formatDateTime` / ModelInfoTable `formatDateTime` — 전부 `'ko-KR'` 고정.
+- **model-version.ts `formatModelVersionDate` (제외)**: `'en-US'` + `formatToParts` 로 YY/MM/DD 숫자만 추출해 `${year}.${month}.${day}` **버전키 식별자**(예 `25.03.12.0001`)를 만든다. 표시용 날짜가 아니라 **언어 독립 결정적 키 생성기** — locale 변경 시 버전키 결정성 훼손 위험 + 출력 무관(명시적 2-digit). Plan §2 의 과잉 포함으로 판단해 **무변경**.
+
+## 3. 구현
+
+- `src/shared/lib/date-locale.ts` 신규 — `resolveDateLocale()`: `i18n.language` → `{ ko:'ko-KR', en:'en-US' }` 매핑(detector 가 ko/en 으로만 수렴, 그 외 en-US 폴백). 모듈 로드가 아닌 **호출 시점 평가**로 언어 전환 반응.
+- 4 포맷 함수의 `'ko-KR'` 리터럴 → `resolveDateLocale()`. 4 컴포넌트 모두 `useI18n`(useTranslation) 구독 중이라 언어 전환 시 re-render → 포맷 재평가(ModelInfoTable 은 `memo` 지만 useTranslation 구독이 memo 를 우회해 갱신). 날짜 옵션(year/month/.../hour12)·timeZone 등 표시 스펙은 보존, locale 만 변경.
+
+## 4. 검증 결과 (전부 PASS)
+
+```
+TSC_EXIT:0
+ESLINT_EXIT:0   (변경 5파일 신규 0)
+✓ built in 10.97s   BUILD_EXIT:0
+79 passed (2.3m)    E2E_EXIT:0
+```
+e2e 영향 없음 확인: 날짜 포맷 문자열을 단언하는 spec 0건(`grep` 결과 testid/숫자 기반만) → EN 포맷 전환으로 깨질 셀렉터 없음. console.error 0 가드 충족.
+
+## 5. 변경 파일 (5)
+
+| 파일 | 변경 |
+|---|---|
+| `src/shared/lib/date-locale.ts` | 신규 resolveDateLocale() |
+| `src/features/deploy/components/DeployMonitorPanel.tsx` | formatDateTime locale → resolveDateLocale() |
+| `src/features/dlq/components/DlqTableShell.tsx` | formatLastUpdated locale → resolveDateLocale() |
+| `src/features/eqp/components/BusinessGroupModelTable.tsx` | formatDateTime locale → resolveDateLocale() |
+| `src/features/model/components/ModelInfoTable.tsx` | formatDateTime locale → resolveDateLocale() |
+
+## 6. 최종 — i18n 하드코딩 감사 전체 완료
+카탈로그 ≈795 문자열(P1~P6) + 날짜 로컬라이제이션(P7) 모두 처리. surface B(하드코딩 한글) i18n 마이그레이션 종결.

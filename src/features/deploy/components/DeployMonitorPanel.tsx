@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
 import { PageCard, PageCardGrid } from '@/shared/layout/PageCard'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -134,7 +135,7 @@ const formatDateTime = (value: string | null): string => {
     return '-'
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

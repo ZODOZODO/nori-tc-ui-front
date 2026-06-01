@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
 import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import type { ModelInfo } from '../types/model.types'
 
@@ -29,7 +30,7 @@ const formatDateTime = (isoDateTime: string): string => {
     return isoDateTime
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

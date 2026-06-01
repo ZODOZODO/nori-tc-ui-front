@@ -14,6 +14,7 @@ import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { PagePagination } from '@/shared/layout/PagePagination'
 import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
 import type { ModelInfo } from '@/features/model/types/model.types'
 
 const BUSINESS_GROUP_MODEL_COLUMN_COUNT = 6
@@ -57,7 +58,7 @@ const formatDateTime = (isoDateTime: string): string => {
     return isoDateTime
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

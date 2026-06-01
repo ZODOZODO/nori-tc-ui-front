@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
 import { PagePagination } from '@/shared/layout/PagePagination'
 import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 
@@ -35,7 +36,7 @@ const formatLastUpdated = (epochMs: number | null): string => {
     return '-'
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
