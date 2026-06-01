@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useI18n } from '@/i18n/i18n-context'
 import { useCreateUser, useUpdateUser } from '../hooks/useUserMutations'
 import { useUserDetail } from '../hooks/useUsers'
 import type { UiUserStatusLiteral, UserCreateRequest, UserUpdateRequest } from '../types/user.types'
@@ -60,6 +61,7 @@ const isUiUserStatus = (value: string): value is UiUserStatusLiteral =>
  * (UserProfileModal 의 resolvedFormState 패턴과 동일 — useEffect 동기화 회피)
  */
 export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpsertModalProps) {
+  const { t } = useI18n()
   const [draftFormState, setDraftFormState] = useState<DraftFormState>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -132,14 +134,14 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
       !trimmed.userId ||
       !trimmed.email
     ) {
-      setErrorMessage('필수 입력값(회사, 부서, 이름, 아이디, 이메일)을 모두 채워주세요.')
+      setErrorMessage(t('user.upsert.requiredFields'))
       return
     }
 
     try {
       if (mode === 'create') {
         if (trimmed.password.length === 0) {
-          setErrorMessage('등록 시 비밀번호는 필수입니다.')
+          setErrorMessage(t('user.upsert.passwordRequired'))
           return
         }
         const request: UserCreateRequest = {
@@ -154,7 +156,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
         await createUserMutation.mutateAsync(request)
       } else {
         if (targetUserPk === null) {
-          setErrorMessage('수정 대상 사용자를 확인할 수 없습니다.')
+          setErrorMessage(t('user.upsert.targetNotFound'))
           return
         }
         const request: UserUpdateRequest = {
@@ -175,7 +177,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
         setErrorMessage(error.payload.errorMsg)
         return
       }
-      setErrorMessage('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+      setErrorMessage(t('user.upsert.saveError'))
     }
   }
 
@@ -183,18 +185,16 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : null)}>
       <DialogContent className="max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? '사용자 등록' : '사용자 수정'}</DialogTitle>
+          <DialogTitle>{mode === 'create' ? t('user.create') : t('user.upsert.titleEdit')}</DialogTitle>
           <DialogDescription>
-            {mode === 'create'
-              ? '새 사용자 계정을 등록합니다. 비밀번호는 필수입니다.'
-              : '사용자 정보를 수정합니다. 비밀번호 입력값을 비워두면 기존 비밀번호가 유지됩니다.'}
+            {mode === 'create' ? t('user.upsert.descCreate') : t('user.upsert.descEdit')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-company" className="text-xs font-semibold text-muted-foreground">
-              회사
+              {t('user.form.company')}
             </label>
             <Input
               id="user-upsert-company"
@@ -205,7 +205,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-department" className="text-xs font-semibold text-muted-foreground">
-              부서
+              {t('user.form.department')}
             </label>
             <Input
               id="user-upsert-department"
@@ -216,7 +216,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-user-name" className="text-xs font-semibold text-muted-foreground">
-              이름
+              {t('user.form.name')}
             </label>
             <Input
               id="user-upsert-user-name"
@@ -227,7 +227,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-user-id" className="text-xs font-semibold text-muted-foreground">
-              아이디
+              {t('user.form.userId')}
             </label>
             <Input
               id="user-upsert-user-id"
@@ -238,7 +238,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-email" className="text-xs font-semibold text-muted-foreground">
-              이메일
+              {t('user.form.email')}
             </label>
             <Input
               id="user-upsert-email"
@@ -250,7 +250,10 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="user-upsert-password" className="text-xs font-semibold text-muted-foreground">
-              비밀번호 {mode === 'create' ? '(필수)' : '(미입력 시 유지)'}
+              {t('user.form.password')}{' '}
+              {mode === 'create'
+                ? t('user.form.passwordRequiredSuffix')
+                : t('user.form.passwordOptionalSuffix')}
             </label>
             <Input
               id="user-upsert-password"
@@ -258,12 +261,16 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
               value={resolvedFormState.password}
               onChange={(event) => handleChange('password', event.target.value)}
               disabled={isBusy}
-              placeholder={mode === 'create' ? '새 비밀번호 입력' : '변경 시에만 입력'}
+              placeholder={
+                mode === 'create'
+                  ? t('user.upsert.pwPlaceholderCreate')
+                  : t('user.upsert.pwPlaceholderEdit')
+              }
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
             <label htmlFor="user-upsert-status" className="text-xs font-semibold text-muted-foreground">
-              상태
+              {t('user.form.status')}
             </label>
             <Select
               value={resolvedFormState.status}
@@ -296,7 +303,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose} disabled={isBusy}>
-            취소
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -305,7 +312,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
             data-testid="user-upsert-submit"
           >
             {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {mode === 'create' ? '등록' : '저장'}
+            {mode === 'create' ? t('user.upsert.submitCreate') : t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

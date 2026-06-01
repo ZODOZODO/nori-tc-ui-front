@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n/i18n-context'
 import { useResetPassword } from '../hooks/useUserMutations'
 import { generateTemporaryPassword } from '../lib/password-generator'
 import { UserApiError } from '../types/user.types'
@@ -34,6 +35,7 @@ export function UserPasswordResetModal({
   targetUserId,
   onClose,
 }: UserPasswordResetModalProps) {
+  const { t } = useI18n()
   const resetPasswordMutation = useResetPassword()
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [resetStatus, setResetStatus] = useState<'pending' | 'success' | 'error'>('pending')
@@ -73,7 +75,7 @@ export function UserPasswordResetModal({
         if (error instanceof UserApiError) {
           setErrorMessage(error.payload.errorMsg)
         } else {
-          setErrorMessage('비밀번호 초기화에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+          setErrorMessage(t('user.passwordReset.error'))
         }
       }
     }
@@ -103,12 +105,13 @@ export function UserPasswordResetModal({
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
       <DialogContent className="max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>비밀번호 초기화</DialogTitle>
+          <DialogTitle>{t('user.passwordReset.title')}</DialogTitle>
           <DialogDescription>
             {targetUserId
-              ? `사용자 ${targetUserId} 의 비밀번호를 임시 비밀번호로 초기화했습니다.`
-              : '사용자 비밀번호를 임시 비밀번호로 초기화했습니다.'}
-            <br />이 화면을 닫으면 비밀번호는 다시 볼 수 없습니다. 안전한 채널로 즉시 전달해 주세요.
+              ? t('user.passwordReset.doneWithId', { userId: targetUserId })
+              : t('user.passwordReset.done')}
+            <br />
+            {t('user.passwordReset.warning')}
           </DialogDescription>
         </DialogHeader>
 
@@ -125,17 +128,17 @@ export function UserPasswordResetModal({
             onClick={() => void handleCopy()}
             disabled={!generatedPassword}
             data-testid="user-password-reset-copy"
-            aria-label="비밀번호 복사"
+            aria-label={t('user.passwordReset.copyAria')}
           >
             <Copy className="size-4" aria-hidden="true" />
-            복사
+            {t('user.passwordReset.copy')}
           </Button>
         </div>
 
         {resetStatus === 'pending' ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            서버에 비밀번호 변경을 적용하는 중...
+            {t('user.passwordReset.applying')}
           </p>
         ) : null}
 
@@ -146,15 +149,15 @@ export function UserPasswordResetModal({
         ) : null}
 
         {copyState === 'success' ? (
-          <p className="text-xs text-success">클립보드에 복사되었습니다.</p>
+          <p className="text-xs text-success">{t('user.passwordReset.copied')}</p>
         ) : null}
         {copyState === 'error' ? (
-          <p className="text-xs text-danger">클립보드 복사에 실패했습니다. 직접 선택해 복사해 주세요.</p>
+          <p className="text-xs text-danger">{t('user.passwordReset.copyFailed')}</p>
         ) : null}
 
         <DialogFooter>
           <Button type="button" onClick={onClose} disabled={resetStatus === 'pending'}>
-            닫기
+            {t('common.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

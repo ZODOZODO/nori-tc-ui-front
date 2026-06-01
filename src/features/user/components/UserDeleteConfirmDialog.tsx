@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useI18n } from '@/i18n/i18n-context'
 import { useDeleteUser } from '../hooks/useUserMutations'
 import { UserApiError } from '../types/user.types'
 
@@ -21,6 +22,7 @@ export function UserDeleteConfirmDialog({
   onClose,
   onDeleted,
 }: UserDeleteConfirmDialogProps) {
+  const { t } = useI18n()
   const deleteUserMutation = useDeleteUser()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -38,22 +40,22 @@ export function UserDeleteConfirmDialog({
         setErrorMessage(error.payload.errorMsg)
         return
       }
-      setErrorMessage('사용자 삭제에 실패했습니다.')
+      setErrorMessage(t('error.user.delete'))
     }
   }
 
   const description = targetUserId
-    ? `사용자 ${targetUserId} 을(를) 삭제합니다. 되돌릴 수 없습니다.`
-    : '선택한 사용자를 삭제합니다. 되돌릴 수 없습니다.'
+    ? t('user.delete.confirmWithId', { userId: targetUserId })
+    : t('user.delete.confirm')
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}
-      title="사용자 삭제"
+      title={t('user.delete.title')}
       description={description}
-      confirmText="삭제"
-      cancelText="취소"
+      confirmText={t('common.delete')}
+      cancelText={t('common.cancel')}
       confirmVariant="destructive"
       isConfirming={deleteUserMutation.isPending}
       onConfirm={() => void handleConfirm()}

@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 
 /**
@@ -125,9 +126,9 @@ export type UserFailResponse = ApiResponse<null> & {
 
 /**
  * User API 기본 오류 메시지입니다.
+ * 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
  */
-export const DEFAULT_USER_ERROR_MESSAGE =
-  '사용자 정보를 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+export const defaultUserErrorMessage = () => i18n.t('error.user.default')
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -153,7 +154,7 @@ export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResp
  */
 export const createUserFailResponse = (
   payload: unknown,
-  fallbackMessage = DEFAULT_USER_ERROR_MESSAGE,
+  fallbackMessage = defaultUserErrorMessage(),
 ): UserFailResponse => {
   if (isApiResponse(payload) && payload.success === false) {
     return {

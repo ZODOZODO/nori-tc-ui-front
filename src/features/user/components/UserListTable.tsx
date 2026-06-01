@@ -108,7 +108,7 @@ export function UserListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`사용자 ${row.userId} 수정`}
+            aria-label={t('user.aria.edit', { userId: row.userId })}
             data-testid={`user-row-edit-${row.userPk}`}
             onClick={() => openEditModal(row.userPk)}
           >
@@ -118,7 +118,7 @@ export function UserListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`사용자 ${row.userId} 비밀번호 초기화`}
+            aria-label={t('user.aria.resetPassword', { userId: row.userId })}
             data-testid={`user-row-reset-${row.userPk}`}
             onClick={() => openPasswordResetModal(row.userPk)}
           >
@@ -128,7 +128,7 @@ export function UserListTable() {
             type="button"
             variant="ghost"
             size="sm"
-            aria-label={`사용자 ${row.userId} 삭제`}
+            aria-label={t('user.aria.delete', { userId: row.userId })}
             data-testid={`user-row-delete-${row.userPk}`}
             onClick={() => openDeleteDialog(row.userPk)}
           >
@@ -198,7 +198,11 @@ export function UserListTable() {
 
       <div className="flex flex-col gap-2 border-t border-border px-6 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
         <span data-testid="user-list-pagination-summary">
-          총 {totalCount}건 · {currentPage} / {totalPages} 페이지
+          {t('deploy.monitor.pagination', {
+            count: totalCount,
+            page: currentPage,
+            total: totalPages,
+          })}
         </span>
         <div className="flex items-center gap-2">
           {userListQuery.isFetching ? <span>{t('user.table.syncing')}</span> : null}

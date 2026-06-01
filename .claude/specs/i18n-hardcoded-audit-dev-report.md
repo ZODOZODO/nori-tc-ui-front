@@ -492,3 +492,118 @@ model-flow + check-in-diff 단독 재실행 `22 passed (56.1s)`. check-in-diff �
 
 ## 7. 다음 단계
 P5 user/profile/auth(84) — 새 세션 권장. zod(useLogin) 메시지 포함.
+
+---
+
+# P5 — user / profile / auth (84)
+
+## 1. 무엇을 했나
+
+카탈로그의 user/profile/auth 영역 84건을 i18n 키로 전수 치환.
+착수 시 grep 실측으로 카탈로그 재확인(auth 6+1+zod4 / profile 16+2 / user upsert21·passwordReset11·delete6·listTable4 + api12+types1).
+C1/C2/C3(컴포넌트 인라인·삼항·템플릿) → `t()`, C5(api/types fallback) → standalone `i18n.t` / getter(D1), zod(useLogin) → t 의존 useMemo 스키마 팩토리.
+
+## 2. 신설 키 (ko/en 각 동수)
+
+P5 진입 전 739키 → **808키**(P5 신설 **69키 × 2**). `node` 로 ko/en 차집합 0 검증:
+```
+ko 808 en 808
+in ko not en: []
+in en not ko: []
+```
+
+네임스페이스(재사용 우선 — `common.cancel/delete/close/save`, `user.create`, `deploy.monitor.pagination` 재사용):
+- `login.validation.*` (4) — useLogin zod 검증(id/pw required·min)
+- `error.auth.*` (7) — auth.api fallback 5 + CSRF(`error.auth.csrf`, 뒤) + auth.types `error.auth.login`
+- `error.profile.me` (1) — profile.api getMe fallback
+- `profile.feedback.*` (6) + `profile.{title,subtitle,loading,userIdReadonly,pwPlaceholder,pwChange,save,pwHint}` (8) — UserProfileModal
+- `error.user.*` (8) — user.api fallback 7(csrf/list/detail/create/save/delete/password) + user.types `error.user.default`
+- `user.delete.*` (3) — title + confirm(with/no id)
+- `user.aria.*` (3) — edit/resetPassword/delete (`{{userId}}` 보간)
+- `user.passwordReset.*` (10) — title/done(with·no id)/warning/copy·aria/applying/copied/copyFailed/error
+- `user.upsert.*` (10) — titleEdit/descCreate·Edit/requiredFields/passwordRequired/targetNotFound/saveError/submitCreate/pwPlaceholderCreate·Edit
+- `user.form.*` (9) — company/department/name/userId/email/password + passwordRequired·OptionalSuffix/status
+
+## 3. Plan 결정 준수 (D1 / C5 / zod / C2 / C3)
+
+- **D1 (api/types fallback → standalone `i18n.t`)** — P2~P4 와 동일 패턴:
+  - `auth.api.ts` — 모듈 로드 시점 고정 상수 5종(`DEFAULT_LOGOUT`·`LOGIN_CSRF_FORBIDDEN`·`LOGIN_FORBIDDEN`·`LOGOUT_CSRF_FORBIDDEN`·`LOGOUT_FORBIDDEN`) → getter 함수(`defaultLogoutErrorMessage = () => i18n.t(...)` 등)로 전환, `buildForbiddenAuthResponse`/`issueCsrfToken`/`normalizeAuthError`/login·logout 의 사용처가 전부 호출 시점 평가라 `()` 로 치환. CSRF invariant(L126) `i18n.t('error.auth.csrf')` 직접.
+  - `auth.types.ts` — `DEFAULT_AUTH_ERROR_MESSAGE` → `defaultAuthErrorMessage()` getter. `createLoginFailResponse` 의 `fallbackMessage = defaultAuthErrorMessage()` default 파라미터식(호출마다 평가).
+  - `user.api.ts` — 인라인 fallback 5종(detail/create/save/delete/password 각 2회)·CSRF `i18n.t` 직접. 모듈 상수 `USER_LIST_FALLBACK_MESSAGE` → getter `userListFallbackMessage()`. `normalizeUserError` default 파라미터 → `defaultUserErrorMessage()`.
+  - `user.types.ts` — `DEFAULT_USER_ERROR_MESSAGE` → `defaultUserErrorMessage()` getter. `createUserFailResponse` default 파라미터 평가식.
+  - `profile.types.ts` — `DEFAULT_PROFILE_ERROR_MESSAGE = DEFAULT_USER_ERROR_MESSAGE`(상수 재노출) → `defaultProfileErrorMessage = defaultUserErrorMessage`(getter 재노출). `createProfileFailResponse` default 파라미터 → `defaultProfileErrorMessage()`.
+  - `profile.api.ts` — getMe 인라인 fallback(L73/76, 동일 문자열) `i18n.t('error.profile.me')` 직접. `normalizeProfileError` default → `defaultProfileErrorMessage()`.
+  - import 경로 전부 `import i18n from '@/i18n'`.
+- **zod(useLogin, 최난도)** — **결정: 컴포넌트/훅 내부에서 t 의존 useMemo 로 스키마 빌드**.
+  - 근거: zod 의 message 는 스키마 정의 시점에 고정되므로 모듈 top-level 에 `i18n.t` 를 박으면 (1) i18n lazy-load 초기화 전 평가 위험(raw key 고정) (2) 언어 전환 비반응. 따라서 `buildLoginSchema(t)` 팩토리 + 훅 안 `useMemo(() => buildLoginSchema(t), [t])` 로 **호출 시점 평가(컴포넌트는 main.tsx 의 i18nReady await 후 렌더) + 언어 전환 시 t identity 변경 → 스키마 재빌드** 를 보장. 호환 shim 의 `t` 는 react-i18next `t` 위 useCallback(deps `[t]`)이라 언어 변경에 identity 가 바뀐다.
+  - `loginSchema`/`LoginFormValues` 는 useLogin.ts 내부 전용(grep 전수 확인 — 외부 import 0). type 은 `z.infer<ReturnType<typeof buildLoginSchema>>` 로 유지(message 무관, shape 만 추론).
+- **C2 삼항/동적** — UserUpsertModal DialogTitle 등록/수정(create→`user.create` 재사용, edit→`user.upsert.titleEdit`)·desc 삼항·placeholder 삼항·submit(create→`user.upsert.submitCreate`, edit→`common.save`)·password label 한글혼합(`user.form.password` + create/edit suffix 2키). UserProfileModal placeholder 삼항(true→`profile.pwPlaceholder`, false→`••••••••` mask 보존)·버튼 삼항(`profile.save`/`profile.pwChange`). UserDeleteConfirmDialog·UserPasswordResetModal with/no id 분기 → 분기별 키(`{{userId}}` 보간).
+- **C3 템플릿 보간** — UserListTable aria 3(`{{userId}}`). 페이지네이션은 deploy/group 의 기존 `deploy.monitor.pagination`("총 {{count}}건 · {{page}} / {{total}} 페이지")과 **텍스트 정확 일치 → 재사용**(`{count,page,total}` 매핑).
+- **순수 jargon 무변경** — UserProfileModal 의 영문 컬럼 라벨(`company`/`user_name`/`user_id`/`password`/`email`), UserListTable 컬럼 헤더(`userId`/`userName`/`group`/`company`/`department`), UserUpsertModal STATUS_OPTIONS(`ACTIVE`/`LOCKED`/`DISABLED`/`DELETED`), `Prev`/`Next`. `user_id는 수정할 수 없습니다.`(L226)는 한글 부분만 키화하되 `user_id` 토큰을 ko/en 값에 그대로 유지.
+- **borderline 무변경(D2)** — auth/user/profile 영역엔 dead path / 매칭 prefix(L382 류) 없음. CSRF invariant 는 사용자 노출 에러라 대상(`error.auth.csrf`/`error.user.csrf`)으로 포함.
+
+## 4. 구현 결정 기록
+
+- **near-dup vs 재사용**: `error.auth.csrf` 는 "새로고침한 **뒤**" 여서 deploy/eqp/model 의 `error.*.csrf`("**후**")와 텍스트가 달라 별 키 유지(값 보존). `error.user.csrf` 는 "후" 로 동일 텍스트지만 `error.<feature>.csrf` 컨벤션 따라 user 네임스페이스 신설.
+- **profile.save 재사용**: '저장하기'(L260 true branch 비밀번호 토글 + L309 메인 저장) 동일 텍스트 → `profile.save` 단일 키. '변경하기'(L260 false)는 `profile.pwChange`.
+- **UserPasswordResetModal useEffect deps 무변경**: 비밀번호 생성·submit 효과(L45-88)는 `[open, targetUserPk]` deps + 기존 `eslint-disable react-hooks/exhaustive-deps`. catch 의 `setErrorMessage(t(...))` 만 추가했고 **`t` 를 deps 에 넣지 않음** — 넣으면 언어 전환 시 효과 재실행 → 비밀번호 재생성·재제출 부작용. 캡처된 t 로 충분(메시지는 노출 시점 1회).
+- **profile.types 재노출**: 상수 alias(`= DEFAULT_USER_ERROR_MESSAGE`)에서 getter alias(`= defaultUserErrorMessage`)로 바뀌었지만 `defaultProfileErrorMessage()` 호출 형태 유지로 의미 동일.
+
+## 5. 검증 결과 (전부 PASS)
+
+ko/en 키 차집합 0 (808/808, §2 인용). 잔여 번역대상 한글 0(LoginPage `·` 구분자[P0 범위]·`••••••••` mask 제외).
+
+### tsc -b
+```
+TSC_EXIT:0
+```
+
+### eslint (변경 12 소스 파일)
+P5 신규 에러 0. UserPasswordResetModal 의 `react-hooks/set-state-in-effect` 1건은 **pre-existing**(내가 수정하지 않은 비밀번호 생성 useEffect L45-50). 해당 파일 stash 후 baseline 비교로 확정:
+```
+=== baseline(HEAD) eslint UserPasswordResetModal error count ===
+1
+=== current(P5) eslint error count ===
+1
+```
+(동일 → P5 신규 0.) my diff 가 useEffect 블록을 건드리지 않음을 `git diff` 로 확인.
+
+### vite build
+```
+dist/assets/index-DC2S2UT_.js                     243.92 kB │ gzip:  77.76 kB
+dist/assets/DeployPage-mOycNN9X.js                397.04 kB │ gzip: 115.84 kB
+✓ built in 12.58s
+BUILD_EXIT:0
+```
+
+### e2e (전체 79, flat-key console.error 0 가드 포함)
+직접 영향 spec(user-page / selectable-table-user-list / login-page.smoke / i18n-flat-key-render) 15건 단독 `15 passed (24.2s)` → 전체:
+```
+79 passed (2.4m)
+E2E_FULL_EXIT:0
+```
+**e2e EN 정합(P4 교훈)**: user-page.spec.ts:415 의 ConfirmDialog 확인 버튼 셀렉터 `name: '삭제'` → `name: 'Delete'`(P5 로 `common.delete` 전환되어 EN 모드 영어화). 그 외 user-page 의 테스트명/mock 데이터(홍길동/노리시스템)·페이지네이션 assert(`'45'`/`'1 / 3'` 숫자)는 셀렉터 무관·값 보존으로 무영향. login zod 메시지는 셀렉터 미참조. console.error 0 가드 충족.
+
+## 6. 변경 파일 (15)
+
+| 파일 | 변경 |
+|---|---|
+| `src/i18n/locales/ko.json` | +69 키 |
+| `src/i18n/locales/en.json` | +69 키 |
+| `src/features/auth/types/auth.types.ts` | DEFAULT_AUTH_ERROR_MESSAGE → defaultAuthErrorMessage() getter |
+| `src/features/auth/api/auth.api.ts` | 고정 상수 5종 getter + CSRF i18n.t + 사용처 호출식 |
+| `src/features/auth/hooks/useLogin.ts` | zod 스키마 buildLoginSchema(t) 팩토리 + useMemo 재빌드 |
+| `src/features/profile/types/profile.types.ts` | defaultProfileErrorMessage getter 재노출 + default 파라미터식 |
+| `src/features/profile/api/profile.api.ts` | getMe fallback i18n.t + normalizeProfileError default |
+| `src/features/profile/components/UserProfileModal.tsx` | useI18n + feedback 6/JSX/userIdReadonly/placeholder·버튼 삼항 |
+| `src/features/user/types/user.types.ts` | DEFAULT_USER_ERROR_MESSAGE → defaultUserErrorMessage() getter |
+| `src/features/user/api/user.api.ts` | fallback getter + 인라인 5종 i18n.t + CSRF |
+| `src/features/user/components/UserDeleteConfirmDialog.tsx` | useI18n + title/confirm(with·no id)/common.delete·cancel |
+| `src/features/user/components/UserListTable.tsx` | aria 3 보간 + pagination(deploy.monitor.pagination 재사용) |
+| `src/features/user/components/UserPasswordResetModal.tsx` | useI18n + title/done(with·no id)/warning/copy/상태 + common.close |
+| `src/features/user/components/UserUpsertModal.tsx` | useI18n + title·desc·submit 삼항/label 다수/placeholder/password 한글혼합 |
+| `tests/e2e/user-page.spec.ts` | 삭제 확인 버튼 셀렉터 '삭제' → 'Delete' (EN 정합) |
+
+## 7. 다음 단계
+P6 live-map + dlq(64) — 새 세션 권장. DLQ 컬럼 헤더 상수(C4 35건) 구조 변경 주의.
+**미배정 발견**: Plan §4 단계 테이블에 **group(76: GroupAddMembersModal 16 / GroupUpsertModal 15 / GroupDeleteConfirmDialog 6 / GroupListTable 4 / group.api 9 / group.types 1 등)** 이 P1~P6 어디에도 배정 안 됨(카탈로그엔 "eqp(api)+group 76"으로 존재, P3 은 eqp 만 처리). group.* upsert/pagination 키 미존재 확인 — 별도 phase(P7) 또는 P6 에 합산 필요. (P5 범위 밖이라 무변경.)

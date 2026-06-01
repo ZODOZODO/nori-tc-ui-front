@@ -1,30 +1,36 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
+import { useI18n } from '@/i18n/i18n-context'
 import { apiClient } from '@/shared/lib/api-client'
 import { authApi } from '../api/auth.api'
 import { AuthApiError, type LoginRequest, type LoginSuccessResponse } from '../types/auth.types'
 
 /**
- * 로그인 폼 유효성 스키마입니다.
- * - userId: 필수, 최소 2자
- * - password: 필수, 최소 8자
+ * 로그인 폼 유효성 스키마를 만든다.
+ * - userId: 필수, 최소 2자 / password: 필수, 최소 8자
+ *
+ * zod 의 message 는 스키마 정의 시점에 고정되므로, 모듈 top-level 에 t 를 박으면
+ * (1) i18n 초기화 전 평가 위험 (2) 언어 전환 비반응 문제가 생긴다. 따라서 t 를 받는
+ * 팩토리로 두고 훅 안에서 t 변화에 맞춰 useMemo 로 재빌드해 호출 시점 평가 + 언어 반응을 보장한다.
  */
-export const loginSchema = z.object({
-  userId: z
-    .string()
-    .trim()
-    .min(1, '아이디를 입력해 주세요.')
-    .min(2, '아이디는 최소 2자 이상이어야 합니다.'),
-  password: z
-    .string()
-    .min(1, '비밀번호를 입력해 주세요.')
-    .min(8, '비밀번호는 최소 8자 이상이어야 합니다.'),
-})
+const buildLoginSchema = (t: (key: string) => string) =>
+  z.object({
+    userId: z
+      .string()
+      .trim()
+      .min(1, t('login.validation.idRequired'))
+      .min(2, t('login.validation.idMin')),
+    password: z
+      .string()
+      .min(1, t('login.validation.pwRequired'))
+      .min(8, t('login.validation.pwMin')),
+  })
 
-export type LoginFormValues = z.infer<typeof loginSchema>
+export type LoginFormValues = z.infer<ReturnType<typeof buildLoginSchema>>
 
 /**
  * 로그인 성공 후 이동할 EqpInfo 기본 진입 경로입니다.
@@ -43,6 +49,9 @@ const verifyEqpAccess = async () => {
 
 export function useLogin() {
   const navigate = useNavigate()
+  const { t } = useI18n()
+
+  const loginSchema = useMemo(() => buildLoginSchema(t), [t])
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

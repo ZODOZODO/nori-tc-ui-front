@@ -412,7 +412,8 @@ test('사용자 삭제 성공', async ({ page }) => {
 
   await expect(page.getByTestId('user-row-2')).toBeVisible()
   await page.getByTestId('user-row-delete-2').click()
-  await page.getByRole('button', { name: '삭제' }).click()
+  // e2e 는 EN 모드 — P5 i18n 적용으로 ConfirmDialog 확인 버튼이 common.delete('Delete') 로 전환됨.
+  await page.getByRole('button', { name: 'Delete' }).click()
 
   await expect.poll(() => state.deleteUserCalls.length).toBeGreaterThan(0)
   expect(state.deleteUserCalls[0]).toBe(2)

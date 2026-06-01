@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   createUserFailResponse,
-  DEFAULT_USER_ERROR_MESSAGE,
+  defaultUserErrorMessage,
   isApiResponse,
   isRecord,
   UserApiError,
@@ -23,7 +24,8 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const USER_LIST_FALLBACK_MESSAGE = '사용자 목록을 조회하지 못했습니다.'
+// 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
+const userListFallbackMessage = () => i18n.t('error.user.list')
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -52,7 +54,7 @@ const issueCsrfToken = async (): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.user.csrf'),
       }),
     )
   }
@@ -62,7 +64,7 @@ const issueCsrfToken = async (): Promise<string> => {
 
 const normalizeUserError = (
   error: unknown,
-  fallbackMessage = DEFAULT_USER_ERROR_MESSAGE,
+  fallbackMessage = defaultUserErrorMessage(),
 ): UserApiError => {
   if (error instanceof UserApiError) {
     return error
@@ -152,9 +154,9 @@ const normalizeUserPagePayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: USER_LIST_FALLBACK_MESSAGE,
+          errorMsg: userListFallbackMessage(),
         },
-        USER_LIST_FALLBACK_MESSAGE,
+        userListFallbackMessage(),
       ),
     )
   }
@@ -188,10 +190,10 @@ export const userApi = {
       return resolveSuccessPayload<UserInfo>(
         response.data,
         response.status,
-        '사용자 상세 정보를 조회하지 못했습니다.',
+        i18n.t('error.user.detail'),
       )
     } catch (error) {
-      throw normalizeUserError(error, '사용자 상세 정보를 조회하지 못했습니다.')
+      throw normalizeUserError(error, i18n.t('error.user.detail'))
     }
   },
 
@@ -209,13 +211,13 @@ export const userApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          USER_LIST_FALLBACK_MESSAGE,
+          userListFallbackMessage(),
         ),
         offset,
         limit,
       )
     } catch (error) {
-      throw normalizeUserError(error, USER_LIST_FALLBACK_MESSAGE)
+      throw normalizeUserError(error, userListFallbackMessage())
     }
   },
 
@@ -263,10 +265,10 @@ export const userApi = {
       return resolveSuccessPayload<UserInfo>(
         response.data,
         response.status,
-        '사용자 생성에 실패했습니다.',
+        i18n.t('error.user.create'),
       )
     } catch (error) {
-      throw normalizeUserError(error, '사용자 생성에 실패했습니다.')
+      throw normalizeUserError(error, i18n.t('error.user.create'))
     }
   },
 
@@ -286,10 +288,10 @@ export const userApi = {
       return resolveSuccessPayload<UserInfo>(
         response.data,
         response.status,
-        '사용자 정보 저장에 실패했습니다.',
+        i18n.t('error.user.save'),
       )
     } catch (error) {
-      throw normalizeUserError(error, '사용자 정보 저장에 실패했습니다.')
+      throw normalizeUserError(error, i18n.t('error.user.save'))
     }
   },
 
@@ -309,11 +311,11 @@ export const userApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '사용자 삭제에 실패했습니다.',
+        i18n.t('error.user.delete'),
         true,
       )
     } catch (error) {
-      throw normalizeUserError(error, '사용자 삭제에 실패했습니다.')
+      throw normalizeUserError(error, i18n.t('error.user.delete'))
     }
   },
 
@@ -337,11 +339,11 @@ export const userApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '비밀번호 변경에 실패했습니다.',
+        i18n.t('error.user.password'),
         true,
       )
     } catch (error) {
-      throw normalizeUserError(error, '비밀번호 변경에 실패했습니다.')
+      throw normalizeUserError(error, i18n.t('error.user.password'))
     }
   },
 

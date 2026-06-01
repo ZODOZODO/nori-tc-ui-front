@@ -1,7 +1,7 @@
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import {
   createUserFailResponse,
-  DEFAULT_USER_ERROR_MESSAGE,
+  defaultUserErrorMessage,
   isApiResponse,
   isRecord,
   UserApiError,
@@ -28,9 +28,9 @@ export interface MeInfo {
 export type MeResponse = ApiResponse<MeInfo>
 
 /**
- * Profile API 기본 오류 메시지입니다. user 모듈의 메시지를 그대로 재사용합니다.
+ * Profile API 기본 오류 메시지입니다. user 모듈의 메시지 getter 를 그대로 재사용합니다.
  */
-export const DEFAULT_PROFILE_ERROR_MESSAGE = DEFAULT_USER_ERROR_MESSAGE
+export const defaultProfileErrorMessage = defaultUserErrorMessage
 
 /**
  * 기존 호출처(UserProfileModal 등) 호환을 위해 user 모듈의 헬퍼를 그대로 re-export 합니다.
@@ -47,7 +47,7 @@ export type ProfileFailResponse = UserFailResponse
 
 export const createProfileFailResponse = (
   payload: unknown,
-  fallbackMessage: string = DEFAULT_PROFILE_ERROR_MESSAGE,
+  fallbackMessage: string = defaultProfileErrorMessage(),
 ): ProfileFailResponse => createUserFailResponse(payload, fallbackMessage)
 
 export type {
