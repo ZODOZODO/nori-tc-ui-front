@@ -246,3 +246,116 @@ deploy-monitor 단독 baseline → 변경 후 모두 PASS. deploy-monitor e2e �
 
 ## 8. 다음 단계
 P3 eqp(125+24) — 새 세션 권장. ManageFormModal 동적 조사 에러(템플릿) 주의.
+
+---
+
+# P3 — eqp (125 + 24 + 1)
+
+## 1. 무엇을 했나
+
+카탈로그의 eqp 영역(components 125 / eqp.api 24 / eqp.types DEFAULT_EQP_ERROR_MESSAGE 1)을 i18n 키로 전수 치환.
+C1/C2/C3(컴포넌트 인라인·삼항·템플릿) → `t()`, C4(lifecycle/delete 상수 · CheckIn/Gateway 컬럼 헤더) → 키 반환 / 팩토리 + 호출부 번역, C5(api/types fallback) → standalone `i18n.t`(D1).
+착수 시 grep 실측으로 카탈로그 재확인(EqpInfoTable 4 / GatewayGroupTable 8 포함 components 125). BusinessGroupModelTable 은 표시 한글 없음(컬럼 jargon + `Intl.DateTimeFormat('ko-KR')` 날짜 로컬라이제이션은 Plan §2 P0 배정 — 후속) → 무변경.
+
+## 2. 신설 키 (ko/en 각 동수)
+
+P3 진입 전 418키 → **529키**(P3 신설 **111키 × 2**). `node` 로 ko/en 키 차집합 0 검증:
+```
+ko 529 en 529
+in ko not en: []
+in en not ko: []
+```
+
+네임스페이스(기존 `eqp.*` 41키 재사용 우선 — `eqp.lifecycle.*`/`eqp.delete.*`/`eqp.param.action`/`eqp.common.confirm` 등 + P1/P2 `common.*` 재사용):
+- `error.eqp.*` (25) — eqp.api fallback 24 + eqp.types `error.eqp.default` 1
+- `eqp.page.*` (12) — EqpPage 컴포넌트 fallback/메시지(불러오기 실패·타임아웃·삭제 성공 보간 등). 단, 등록/수정/삭제/EDIT저장/undo 실패는 텍스트 동일 → `error.eqp.create/update/delete/saveEditParams/undoCheckout` 재사용
+- `eqp.validation.*` (4) — ManageFormModal parse 헬퍼 동적 조사 에러(`{{label}}`/`{{min}}` interpolation). ko 만 조사 `을(를)`/`은(는)` 유지, en 단일
+- `eqp.form.*` (28) — ManageFormModal 섹션 desc/placeholder/label/hint/toggle
+- `eqp.binding.*` (6) — ModelBindingModal desc/현재 Model·Version/필터 hint
+- `eqp.checkin.*` (5) — CheckInModal desc/구분/빈상태/버전안내/placeholder
+- `eqp.status.*` (2) — `오프라인`/`주의 상태`(EqpInfoTable·GatewayGroupTable 공용)
+- `eqp.gateway.missing*` (3) — missing 뱃지/title/안내(보간)
+- `eqp.param.*` 신설 (6) — 검증 메시지·중복(`{{name}}`)·행 삭제 aria
+- `eqp.lifecycle.*` 신설 (11) — verb 3 + confirm(with/no id) 2 + result 6
+- `eqp.delete.*` 신설 (4) — confirm(with/no id) 2 + result 2
+- `eqp.mode.editingBy` / `eqp.checkout.byTitle` / `eqp.common.selectedTarget` / `eqp.lifecycle.passiveUnsupported` (4)
+- `common.example` (1) — `예: {{value}}`(placeholder 6곳: EQP-01/127.0.0.1/5000/7/\\/UTF-8)
+
+## 3. Plan 결정 준수 (D1 / C4 / C2)
+
+- **D1 (api/lib/types fallback → standalone `i18n.t`)**:
+  - `eqp.api.ts` — 인라인 fallback 22종은 호출 시점 평가라 `i18n.t('error.eqp.*')` 직접 치환(런타임 언어 반영). 모듈 로드 시점 고정 상수였던 `EQP_LIST_FALLBACK_MESSAGE` 는 **getter 함수** `eqpListFallbackMessage = () => i18n.t(...)` 로 전환.
+  - `eqp.types.ts` — `DEFAULT_EQP_ERROR_MESSAGE`(모듈 상수)를 **getter** `defaultEqpErrorMessage = () => i18n.t('error.eqp.default')` 로 전환. `createEqpFailResponse`/`normalizeEqpError` 의 `fallbackMessage = defaultEqpErrorMessage()` default 파라미터 식은 호출마다 평가되므로 fallback 이 현재 언어를 따른다(P2 deploy.api 동일 패턴).
+- **C4 모듈 상수 구조 변경**:
+  - `EqpLifecycleActionDialog` `ACTION_MESSAGES`(시작/종료/재시작) → `ACTION_VERB_KEYS`(i18n 키 맵) + 렌더 시점 `t(verb)` 보간.
+  - `EqpLifecycleResultDialog` `ACTION_RESULT_MESSAGES` → `ACTION_RESULT_MESSAGE_KEYS`(키 맵) + `t(key, { eqpId })` 보간. 기존 `eqp.lifecycle.*Success/Failure`(title) 키는 이미 존재 → 재사용, 결과 메시지는 신설.
+  - `CheckInModal` `EQP_PARAM_DIFF_COLUMNS` 상수 → `buildDiffColumns(kindHeader)` 팩토리 + `useMemo(() => buildDiffColumns(t('eqp.checkin.diffKind')), [t])`. SelectableTable 의 `header: string` 계약 보존(전역 변경 회피).
+  - `GatewayGroupTable` `GATEWAY_GROUP_COLUMNS` 상수 → `buildGatewayGroupColumns(missingTitle, missingBadge)` 팩토리 + `useMemo([t])`. 한 컬럼 renderCell 의 missing 뱃지만 번역 주입.
+  - `EqpModelBindingModal` `resolveOptionalJarRef`(React 밖 헬퍼) throw → standalone `i18n.t`. `EqpPage` `PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE` 상수 → `*_KEY` 키 상수 + 컴포넌트 내 `t(KEY)`(useCallback deps 에 `t` 추가).
+- **C2 삼항/동적 + 조사**:
+  - ManageFormModal "사용/미사용"(ToggleField, useI18n 추가) · DialogDescription create/update 삼항 → 2키.
+  - 동적 조사 에러 10건(parse 헬퍼) → `eqp.validation.required/integer/positive/min` 4키 + `{{label}}` 보간. ko 만 조사 유지, en 단일.
+  - lifecycle/delete confirm·result 의 eqpId 유무 분기는 with-id(보간)/no-id(정적) 별 키로 분리해 값 보존.
+- **순수 jargon 무변경**: `Eqp Create`/`Eqp Info Update`/`Model Info Update`/`Check In`/`EQP ID`/`Comm Mode`/`SECS Settings`/`Add/Change/Delete`(diff label)/컬럼 헤더(`EQPID`/`Model Version`/`status` 등)/`예: 25.03.12.0000`의 버전 jargon 등 정책상 범위 밖.
+- **borderline 무변경(D2)**: eqp util/hooks 의 내부 invariant·CSRF·날짜 로컬라이제이션은 P3 카탈로그(125+24+1) 밖 — 무변경.
+
+## 4. 구현 결정 기록
+
+- **near-dup 키 보존**: api 레이어 "…조회하지 못했습니다"(`error.eqp.*`)와 EqpPage 컴포넌트 fallback "…불러오지 못했습니다"(`eqp.page.*LoadError`)는 **표시 텍스트가 달라** 별도 키 유지(값 보존 우선). 텍스트가 정확히 동일한 등록/수정/삭제/EDIT저장/undo 실패는 `error.eqp.*` 재사용.
+- **`common.example` 보간 키**: `예: {{value}}` — placeholder 6곳의 `예:` 접두만 번역, 예시 값(EQP-01 등)은 보간으로 보존.
+- **useCallback/useMemo deps**: `t` 를 사용하게 된 `openLifecycleDialog`/`executeLifecycleAction`/`handleConfirmLifecycleAction`/`paramEditValidationMessage` deps 에 `t` 추가(react-compiler 정합).
+
+## 5. 검증 결과 (전부 PASS)
+
+ko/en 키 차집합 0 (529/529, §2 인용).
+
+### tsc -b
+```
+TSC_EXIT:0
+```
+
+### eslint (변경 13 소스 파일)
+P3 신규 에러 0. 변경 파일들의 `react-hooks/set-state-in-effect` 에러 8건은 **모두 pre-existing**(EqpPage·ManageFormModal·ModelBindingModal 의 *내가 수정하지 않은* `useEffect` 블록). 전체 변경 stash 후 baseline 비교로 확정:
+```
+=== 현재(P3 적용) error 수 ===
+8
+=== baseline(HEAD) error 수 ===
+8
+```
+(동일 → P3 신규 0. 해당 effect 들은 P3 범위 밖 기술부채로 무변경.)
+
+### vite build
+```
+dist/assets/EqpPage-Bty0z-Ap.js                  66.52 kB │ gzip:  16.55 kB
+✓ built in 11.90s
+BUILD_EXIT:0
+```
+
+### e2e (전체 79, flat-key console.error 0 가드 포함)
+```
+1 failed (selectable-table-model-workflow.spec.ts:337) / 78 passed (2.6m)
+```
+실패 1건은 **P3 미변경 model 영역**(dcop EventId dropdown) — 단독 재실행 `3 passed (10.5s)` → parallel 타이밍 flaky(P1 group-page 와 동일 양상). 실질 79/79 PASS. eqp 관련 spec(selectable-table-gateway-group / selectable-table-check-in / i18n-flat-key-render)은 전부 PASS, console.error 0.
+
+## 6. 변경 파일 (15)
+
+| 파일 | 변경 |
+|---|---|
+| `src/i18n/locales/ko.json` | +111 키 |
+| `src/i18n/locales/en.json` | +111 키 |
+| `src/features/eqp/components/EqpPage.tsx` | fallback/타임아웃/삭제·편집 보간 + PASSIVE 키 상수 |
+| `src/features/eqp/components/EqpManageFormModal.tsx` | parse 헬퍼 i18n.t + 섹션/placeholder/label/hint/toggle + 삼항 |
+| `src/features/eqp/components/EqpModelBindingModal.tsx` | useI18n + 헬퍼 throw i18n.t + desc/label/placeholder/필터 hint |
+| `src/features/eqp/components/CheckInModal.tsx` | useI18n + buildDiffColumns 팩토리 + desc/구분/빈상태/placeholder |
+| `src/features/eqp/components/EqpInfoTable.tsx` | StatusIndicator useI18n(오프라인/주의 상태) |
+| `src/features/eqp/components/EqpParamTable.tsx` | 행 삭제 aria 보간 + newParam |
+| `src/features/eqp/components/EqpLifecycleActionDialog.tsx` | useI18n + verb 키맵 + confirm(with/no id) |
+| `src/features/eqp/components/EqpLifecycleResultDialog.tsx` | result 메시지 키맵 + eqpId 보간 + selectedTarget |
+| `src/features/eqp/components/EqpDeleteConfirmDialog.tsx` | useI18n + confirm(with/no id) |
+| `src/features/eqp/components/EqpDeleteResultDialog.tsx` | result 메시지 키 + eqpId 보간 |
+| `src/features/eqp/components/GatewayGroupTable.tsx` | StatusIndicator useI18n + buildGatewayGroupColumns 팩토리 + missing 안내 보간 |
+| `src/features/eqp/api/eqp.api.ts` | fallback getter + 인라인 22종 i18n.t + CSRF/traceId/async |
+| `src/features/eqp/types/eqp.types.ts` | DEFAULT_EQP_ERROR_MESSAGE → defaultEqpErrorMessage() getter |
+
+## 7. 다음 단계
+P4 model(112+153) — 새 세션 권장. 최난도(hintText 삼항, model-detail-editor JSON 에디터 검증 28, model.api 33).

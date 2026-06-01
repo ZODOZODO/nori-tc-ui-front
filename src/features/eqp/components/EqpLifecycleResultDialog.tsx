@@ -28,10 +28,11 @@ const ACTION_RESULT_TITLE_KEYS: Record<EqpLifecycleAction, { success: string; fa
   restart: { success: 'eqp.lifecycle.restartSuccess', failure: 'eqp.lifecycle.restartFailure' },
 }
 
-const ACTION_RESULT_MESSAGES: Record<EqpLifecycleAction, { success: string; failure: string }> = {
-  start: { success: '시작이 완료되었습니다.', failure: '시작에 실패했습니다.' },
-  end: { success: '종료가 완료되었습니다.', failure: '종료에 실패했습니다.' },
-  restart: { success: '재시작이 완료되었습니다.', failure: '재시작에 실패했습니다.' },
+/** action × status → 결과 메시지 i18n 키. eqpId 는 보간으로 주입한다. */
+const ACTION_RESULT_MESSAGE_KEYS: Record<EqpLifecycleAction, { success: string; failure: string }> = {
+  start: { success: 'eqp.lifecycle.resultStartSuccess', failure: 'eqp.lifecycle.resultStartFailure' },
+  end: { success: 'eqp.lifecycle.resultEndSuccess', failure: 'eqp.lifecycle.resultEndFailure' },
+  restart: { success: 'eqp.lifecycle.resultRestartSuccess', failure: 'eqp.lifecycle.resultRestartFailure' },
 }
 
 export function EqpLifecycleResultDialog({
@@ -49,9 +50,12 @@ export function EqpLifecycleResultDialog({
     : t(ACTION_RESULT_TITLE_KEYS[action].failure)
   const resolvedMessage =
     message ??
-    `${eqpId ?? '선택한 설비'} ${
-      isSuccess ? ACTION_RESULT_MESSAGES[action].success : ACTION_RESULT_MESSAGES[action].failure
-    }`
+    t(
+      isSuccess
+        ? ACTION_RESULT_MESSAGE_KEYS[action].success
+        : ACTION_RESULT_MESSAGE_KEYS[action].failure,
+      { eqpId: eqpId ?? t('eqp.common.selectedTarget') },
+    )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -114,7 +114,7 @@ const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
 }
 const EQP_ASYNC_POLL_INTERVAL_MS = 1000
 const EQP_ASYNC_MAX_ATTEMPTS = 60
-const PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE = 'PASSIVE 설비는 Start/End/Restart 명령 대상이 아닙니다.'
+const PASSIVE_LIFECYCLE_UNSUPPORTED_KEY = 'eqp.lifecycle.passiveUnsupported'
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -577,7 +577,7 @@ export function EqpPage() {
         status: 'failure',
         action,
         eqpId: eqp.eqpId,
-        message: PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE,
+        message: t(PASSIVE_LIFECYCLE_UNSUPPORTED_KEY),
       })
       return
     }
@@ -586,7 +586,7 @@ export function EqpPage() {
       action,
       eqp,
     })
-  }, [])
+  }, [t])
 
   const closeLifecycleDialog = useCallback(() => {
     setLifecycleDialog(EMPTY_EQP_LIFECYCLE_DIALOG_STATE)
@@ -771,13 +771,13 @@ export function EqpPage() {
       closeManagementDialog()
       handleSelectEqp(request.eqpId)
     } catch (error) {
-      setManagementErrorMessage(resolveErrorMessage(error, '설비 등록에 실패했습니다.'))
+      setManagementErrorMessage(resolveErrorMessage(error, t('error.eqp.create')))
     }
   }
 
   const handleSaveEqpUpdate = async (request: EqpUpdateRequest) => {
     if (!managementTargetEqpId) {
-      setManagementErrorMessage('선택된 설비 정보가 없어 저장할 수 없습니다.')
+      setManagementErrorMessage(t('eqp.page.noSelectedForSave'))
       return
     }
 
@@ -789,7 +789,7 @@ export function EqpPage() {
       })
       closeManagementDialog()
     } catch (error) {
-      setManagementErrorMessage(resolveErrorMessage(error, '설비 수정에 실패했습니다.'))
+      setManagementErrorMessage(resolveErrorMessage(error, t('error.eqp.update')))
     }
   }
 
@@ -813,7 +813,7 @@ export function EqpPage() {
         open: true,
         status: 'success',
         eqpId: targetEqpId,
-        message: `${targetEqpId} 설비가 정상적으로 삭제되었습니다.`,
+        message: t('eqp.page.deleteSuccess', { eqpId: targetEqpId }),
       })
     } catch (error) {
       closeManagementDialog()
@@ -821,7 +821,7 @@ export function EqpPage() {
         open: true,
         status: 'failure',
         eqpId: targetEqpId,
-        message: resolveErrorMessage(error, '설비 삭제에 실패했습니다.'),
+        message: resolveErrorMessage(error, t('error.eqp.delete')),
       })
     }
   }
@@ -852,7 +852,7 @@ export function EqpPage() {
   const executeLifecycleAction = useCallback(
     async (eqp: EqpInfo, action: EqpLifecycleAction) => {
       if (!isActiveEquipment(eqp)) {
-        throw new Error(PASSIVE_LIFECYCLE_UNSUPPORTED_MESSAGE)
+        throw new Error(t(PASSIVE_LIFECYCLE_UNSUPPORTED_KEY))
       }
 
       const request = {
@@ -862,23 +862,23 @@ export function EqpPage() {
 
       if (action === 'start') {
         const traceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-        await waitForEqpAsyncCompletion(traceId, '설비 시작 응답 대기 시간이 초과되었습니다.')
+        await waitForEqpAsyncCompletion(traceId, t('eqp.page.startTimeout'))
         return
       }
 
       if (action === 'end') {
         const traceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-        await waitForEqpAsyncCompletion(traceId, '설비 종료 응답 대기 시간이 초과되었습니다.')
+        await waitForEqpAsyncCompletion(traceId, t('eqp.page.endTimeout'))
         return
       }
 
       const endTraceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-      await waitForEqpAsyncCompletion(endTraceId, '설비 종료 응답 대기 시간이 초과되었습니다.')
+      await waitForEqpAsyncCompletion(endTraceId, t('eqp.page.endTimeout'))
 
       const startTraceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-      await waitForEqpAsyncCompletion(startTraceId, '설비 시작 응답 대기 시간이 초과되었습니다.')
+      await waitForEqpAsyncCompletion(startTraceId, t('eqp.page.startTimeout'))
     },
-    [endEqpMutation, startEqpMutation, waitForEqpAsyncCompletion],
+    [endEqpMutation, startEqpMutation, waitForEqpAsyncCompletion, t],
   )
 
   const handleConfirmLifecycleAction = useCallback(async () => {
@@ -886,7 +886,7 @@ export function EqpPage() {
     const action = lifecycleDialog.action
 
     if (!targetEqp) {
-      setLifecycleErrorMessage('선택된 설비 정보가 없어 작업을 진행할 수 없습니다.')
+      setLifecycleErrorMessage(t('eqp.page.noSelectedForAction'))
       return
     }
 
@@ -905,7 +905,7 @@ export function EqpPage() {
       const resolvedMessage =
         error instanceof Error && error.message
           ? error.message
-          : resolveErrorMessage(error, '설비 lifecycle 작업에 실패했습니다.')
+          : resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
 
       closeLifecycleDialog()
       setLifecycleResultDialog({
@@ -916,7 +916,7 @@ export function EqpPage() {
         message: resolvedMessage,
       })
     }
-  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog])
+  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog, t])
 
   const isLifecyclePending = startEqpMutation.isPending || endEqpMutation.isPending
 
@@ -969,7 +969,7 @@ export function EqpPage() {
       setEditMode(true)
     } catch (error) {
       // 409 (이미 체크아웃 중) 포함한 오류를 사용자에게 표시
-      setCheckInErrorMessage(resolveErrorMessage(error, '체크아웃에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('eqp.page.checkoutError')))
     } finally {
       isCheckoutSubmittingRef.current = false
       setIsCheckoutSubmitting(false)
@@ -1074,19 +1074,19 @@ export function EqpPage() {
     }
 
     if (localEditRows.length === 0) {
-      return '저장할 파라미터가 없습니다. 행 추가로 행을 만들거나 Undo로 체크아웃을 취소해 주세요.'
+      return t('eqp.param.emptyValidation')
     }
 
     if (hasBlankParamName) {
-      return 'Param Name은 비어 있을 수 없습니다.'
+      return t('eqp.param.blankName')
     }
 
     if (duplicatedParamNames.length > 0) {
-      return `중복된 Param Name이 있습니다: ${duplicatedParamNames[0]}`
+      return t('eqp.param.duplicateName', { name: duplicatedParamNames[0] })
     }
 
     return null
-  }, [duplicatedParamNames, hasBlankParamName, isEditMode, isEditParamRowsLoading, localEditRows.length])
+  }, [duplicatedParamNames, hasBlankParamName, isEditMode, isEditParamRowsLoading, localEditRows.length, t])
 
   /**
    * Save 버튼 클릭: 로컬 편집 행을 DB EDIT 버전으로 저장합니다.
@@ -1097,17 +1097,17 @@ export function EqpPage() {
     }
 
     if (localEditRows.length === 0) {
-      setCheckInErrorMessage('저장할 파라미터가 없습니다. 행 추가로 행을 추가하거나 Undo를 사용해 주세요.')
+      setCheckInErrorMessage(t('eqp.param.emptySave'))
       return
     }
 
     if (hasBlankParamName) {
-      setCheckInErrorMessage('Param Name은 비어 있을 수 없습니다.')
+      setCheckInErrorMessage(t('eqp.param.blankName'))
       return
     }
 
     if (duplicatedParamNames.length > 0) {
-      setCheckInErrorMessage(`중복된 Param Name이 있습니다: ${duplicatedParamNames[0]}`)
+      setCheckInErrorMessage(t('eqp.param.duplicateName', { name: duplicatedParamNames[0] }))
       return
     }
 
@@ -1122,7 +1122,7 @@ export function EqpPage() {
         })),
       })
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, 'EDIT 파라미터 저장에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('error.eqp.saveEditParams')))
     }
   }
 
@@ -1141,7 +1141,7 @@ export function EqpPage() {
       setEditMode(false)
       setIsCheckInModalOpen(false)
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '체크아웃 되돌리기에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('error.eqp.undoCheckout')))
     }
   }
 
@@ -1150,7 +1150,7 @@ export function EqpPage() {
    */
   const handleCheckInSave = async (description: string) => {
     if (!selectedEqpId) {
-      setCheckInErrorMessage('선택된 설비 정보가 없어 저장할 수 없습니다.')
+      setCheckInErrorMessage(t('eqp.page.noSelectedForSave'))
       return
     }
 
@@ -1165,7 +1165,7 @@ export function EqpPage() {
       setEditMode(false)
       setIsCheckInModalOpen(false)
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '체크인 중 오류가 발생했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('eqp.page.checkinError')))
     }
   }
 
@@ -1206,7 +1206,7 @@ export function EqpPage() {
   const modeDescriptionText = useMemo(() => {
     if (isEditMode || checkoutStatus.isCheckedOut) {
       const checkedOutBy = checkoutStatus.checkedOutBy
-      return checkedOutBy ? `${checkedOutBy}님이 편집 중` : t('eqp.mode.editing')
+      return checkedOutBy ? t('eqp.mode.editingBy', { user: checkedOutBy }) : t('eqp.mode.editing')
     }
     // 읽기 모드: 첫 번째 파라미터의 description 표시
     const firstParam = readParamsQuery.data?.[0]
@@ -1214,16 +1214,16 @@ export function EqpPage() {
   }, [isEditMode, checkoutStatus, readParamsQuery.data, t])
 
   const listErrorMessage = eqpListQuery.error
-    ? resolveErrorMessage(eqpListQuery.error, '설비 목록을 불러오지 못했습니다.')
+    ? resolveErrorMessage(eqpListQuery.error, t('eqp.page.listLoadError'))
     : null
   const versionErrorMessage = eqpParamVersionsQuery.error
-    ? resolveErrorMessage(eqpParamVersionsQuery.error, '버전 목록을 불러오지 못했습니다.')
+    ? resolveErrorMessage(eqpParamVersionsQuery.error, t('eqp.page.versionLoadError'))
     : null
   const managementDetailErrorMessage = needsManageDetail && eqpManageDetailQuery.error
-    ? resolveErrorMessage(eqpManageDetailQuery.error, '설비 관리 상세 정보를 불러오지 못했습니다.')
+    ? resolveErrorMessage(eqpManageDetailQuery.error, t('eqp.page.manageDetailLoadError'))
     : null
   const managementOptionsErrorMessage = needsManageOptions && eqpManageOptionsQuery.error
-    ? resolveErrorMessage(eqpManageOptionsQuery.error, '설비 관리 옵션을 불러오지 못했습니다.')
+    ? resolveErrorMessage(eqpManageOptionsQuery.error, t('eqp.page.manageOptionsLoadError'))
     : null
   const managementModalErrorMessage =
     managementErrorMessage ?? managementDetailErrorMessage ?? managementOptionsErrorMessage
@@ -1420,7 +1420,7 @@ export function EqpPage() {
                             disabled={isCheckoutDisabled}
                             title={
                               checkoutStatus.isCheckedOut && checkoutStatus.checkedOutBy
-                                ? `${checkoutStatus.checkedOutBy}님이 체크아웃 중`
+                                ? t('eqp.checkout.byTitle', { user: checkoutStatus.checkedOutBy })
                                 : undefined
                             }
                           >

@@ -118,7 +118,7 @@ export const EqpParamTable = memo(function EqpParamTable({
                   size="icon-sm"
                   className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
                   onClick={() => onDeleteRow(row.rowId as string)}
-                  aria-label={`${row.paramName || '새 파라미터'} 행 삭제`}
+                  aria-label={t('eqp.param.deleteRowAria', { name: row.paramName || t('eqp.param.newParam') })}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>

@@ -55,12 +55,13 @@ interface GatewayGroupTableProps {
  * RUN/IDLE/주의/오프라인은 런타임 상태 semantic 색이므로 brand coral 로 치환하지 않습니다.
  */
 function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) {
+  const { t } = useI18n()
   if (status === 'offline') {
     return (
       <span
         className="relative inline-flex size-4 items-center justify-center rounded-full bg-muted ring-2 ring-border"
-        title="오프라인"
-        aria-label="오프라인"
+        title={t('eqp.status.offline')}
+        aria-label={t('eqp.status.offline')}
       >
         <span className="inline-flex size-2 rounded-full bg-muted-foreground" />
       </span>
@@ -95,8 +96,8 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   return (
     <span
       className="relative inline-flex size-4 items-center justify-center rounded-full bg-amber-100/90 ring-2 ring-amber-300/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-      title="주의 상태"
-      aria-label="주의 상태"
+      title={t('eqp.status.warning')}
+      aria-label={t('eqp.status.warning')}
     >
       <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
       <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
@@ -110,7 +111,11 @@ interface GatewayGroupRow {
   isMissingFromBatch: boolean
 }
 
-const GATEWAY_GROUP_COLUMNS: ReadonlyArray<ColumnDef<GatewayGroupRow>> = [
+// missing 뱃지 텍스트만 React 밖 상수라 번역 불가 → 호출부에서 번역 문자열을 주입한다.
+const buildGatewayGroupColumns = (
+  missingTitle: string,
+  missingBadge: string,
+): ReadonlyArray<ColumnDef<GatewayGroupRow>> => [
   {
     key: 'eqpId',
     header: 'EQPID',
@@ -119,8 +124,8 @@ const GATEWAY_GROUP_COLUMNS: ReadonlyArray<ColumnDef<GatewayGroupRow>> = [
       <div className="flex items-center gap-2">
         <span>{row.eqp.eqpId}</span>
         {row.isMissingFromBatch ? (
-          <Badge variant="warning" title="DB에서 설비를 찾을 수 없음 (삭제되었을 수 있음)">
-            미확인
+          <Badge variant="warning" title={missingTitle}>
+            {missingBadge}
           </Badge>
         ) : null}
       </div>
@@ -197,6 +202,10 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
   const { t } = useI18n()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(GATEWAY_GROUP_DEFAULT_PAGE_SIZE)
+  const columns = useMemo(
+    () => buildGatewayGroupColumns(t('eqp.gateway.missingTitle'), t('eqp.gateway.missingBadge')),
+    [t],
+  )
 
   // EQPID(첫 번째 열 = 이름) 기준 오름차순 정렬
   const sortedEqpItems = useMemo(
@@ -317,7 +326,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
           ) : (
             <SelectableTable<GatewayGroupRow>
               testId="selectable-table-gateway-group"
-              columns={GATEWAY_GROUP_COLUMNS}
+              columns={columns}
               rows={tableRows}
               rowKey={(row) => row.eqp.eqpId}
               tableClassName="min-w-[1280px]"
@@ -402,8 +411,10 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
         ) : null}
         {!hasDetailError && missingEqpIds.length > 0 ? (
           <p className="mt-2 text-xs text-warning">
-            DB에서 찾을 수 없는 설비 {missingEqpIds.length}대 ({missingEqpIds.join(', ')})는 빈 값으로 표시되었습니다.
-            최근 삭제되었을 수 있으니 새로고침으로 목록을 갱신해 주세요.
+            {t('eqp.gateway.missingNotice', {
+              count: missingEqpIds.length,
+              ids: missingEqpIds.join(', '),
+            })}
           </p>
         ) : null}
       </section>

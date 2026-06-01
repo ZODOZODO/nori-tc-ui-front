@@ -33,9 +33,9 @@ export function EqpDeleteResultDialog({
   const isSuccess = status === 'success'
   const resolvedMessage =
     message ??
-    (isSuccess
-      ? `${eqpId ?? '선택한 설비'} 삭제가 완료되었습니다.`
-      : `${eqpId ?? '선택한 설비'} 삭제에 실패했습니다.`)
+    t(isSuccess ? 'eqp.delete.resultSuccess' : 'eqp.delete.resultFailure', {
+      eqpId: eqpId ?? t('eqp.common.selectedTarget'),
+    })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -40,6 +40,8 @@ import type {
   EqpUpdateRequest,
   ProtocolType,
 } from '../types/eqp.types'
+import { useI18n } from '@/i18n/i18n-context'
+import i18n from '@/i18n'
 
 type EqpManageFormMode = 'create' | 'update'
 
@@ -200,20 +202,20 @@ const parseRequiredInteger = (
 ): number => {
   const normalized = value.trim()
   if (!normalized) {
-    throw new Error(`${label}을(를) 입력해 주세요.`)
+    throw new Error(i18n.t('eqp.validation.required', { label }))
   }
 
   const parsed = Number(normalized)
   if (!Number.isInteger(parsed)) {
-    throw new Error(`${label}은(는) 정수로 입력해 주세요.`)
+    throw new Error(i18n.t('eqp.validation.integer', { label }))
   }
 
   if (options.positive && parsed <= 0) {
-    throw new Error(`${label}은(는) 1 이상이어야 합니다.`)
+    throw new Error(i18n.t('eqp.validation.positive', { label }))
   }
 
   if (typeof options.min === 'number' && parsed < options.min) {
-    throw new Error(`${label}은(는) ${options.min} 이상이어야 합니다.`)
+    throw new Error(i18n.t('eqp.validation.min', { label, min: options.min }))
   }
 
   return parsed
@@ -231,11 +233,11 @@ const parseOptionalInteger = (
 
   const parsed = Number(normalized)
   if (!Number.isInteger(parsed)) {
-    throw new Error(`${label}은(는) 정수로 입력해 주세요.`)
+    throw new Error(i18n.t('eqp.validation.integer', { label }))
   }
 
   if (typeof options.min === 'number' && parsed < options.min) {
-    throw new Error(`${label}은(는) ${options.min} 이상이어야 합니다.`)
+    throw new Error(i18n.t('eqp.validation.min', { label, min: options.min }))
   }
 
   return parsed
@@ -253,11 +255,11 @@ const parseOptionalSelectInteger = (
 
   const parsed = Number(normalized)
   if (!Number.isInteger(parsed)) {
-    throw new Error(`${label}은(는) 정수로 입력해 주세요.`)
+    throw new Error(i18n.t('eqp.validation.integer', { label }))
   }
 
   if (typeof options.min === 'number' && parsed < options.min) {
-    throw new Error(`${label}은(는) ${options.min} 이상이어야 합니다.`)
+    throw new Error(i18n.t('eqp.validation.min', { label, min: options.min }))
   }
 
   return parsed
@@ -275,11 +277,11 @@ const parseOptionalLong = (
 
   const parsed = Number(normalized)
   if (!Number.isInteger(parsed)) {
-    throw new Error(`${label}은(는) 정수로 입력해 주세요.`)
+    throw new Error(i18n.t('eqp.validation.integer', { label }))
   }
 
   if (typeof options.min === 'number' && parsed < options.min) {
-    throw new Error(`${label}은(는) ${options.min} 이상이어야 합니다.`)
+    throw new Error(i18n.t('eqp.validation.min', { label, min: options.min }))
   }
 
   return parsed
@@ -400,6 +402,7 @@ function ReadOnlyField({ label, value, hint }: ReadOnlyFieldProps) {
 }
 
 function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldProps) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold text-foreground">{label}</span>
@@ -409,7 +412,7 @@ function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldPr
           disabled ? 'bg-muted opacity-70' : 'bg-card',
         )}
       >
-        <span className="text-sm text-foreground">{checked ? '사용' : '미사용'}</span>
+        <span className="text-sm text-foreground">{checked ? t('eqp.form.toggleOn') : t('eqp.form.toggleOff')}</span>
         <span
           className={cn(
             'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
@@ -453,6 +456,7 @@ export function EqpManageFormModal({
   onOpenChange,
   onSubmit,
 }: EqpManageFormModalProps) {
+  const { t } = useI18n()
   const [formState, setFormState] = useState<EqpManageFormState>(() =>
     createInitialFormState(mode, interfaceType, detail),
   )
@@ -597,7 +601,10 @@ export function EqpManageFormModal({
 
   const modelSelectionHint =
     mode === 'create'
-      ? `현재 Is Dev=${formState.isDev ? 'true' : 'false'} 이므로 ${resolveAllowedModelStatus(formState.isDev)} 모델만 노출됩니다.`
+      ? t('eqp.form.modelSelectionHint', {
+          isDev: formState.isDev ? 'true' : 'false',
+          status: resolveAllowedModelStatus(formState.isDev),
+        })
       : null
 
   const mergedErrorMessage = formErrorMessage ?? errorMessage
@@ -608,15 +615,15 @@ export function EqpManageFormModal({
 
       if (mode === 'create') {
         if (!formState.eqpId.trim()) {
-          throw new Error('EQP ID를 입력해 주세요.')
+          throw new Error(t('eqp.form.eqpIdRequired'))
         }
 
         if (!formState.commMode) {
-          throw new Error('Comm Mode를 선택해 주세요.')
+          throw new Error(t('eqp.form.commModeRequired'))
         }
 
         if (!formState.eqpIp.trim()) {
-          throw new Error('EQP IP를 입력해 주세요.')
+          throw new Error(t('eqp.form.eqpIpRequired'))
         }
 
         const selectedModelVersionKey = parseRequiredInteger(
@@ -683,15 +690,15 @@ export function EqpManageFormModal({
       }
 
       if (!detail) {
-        throw new Error('설비 관리 상세 정보를 불러오지 못했습니다.')
+        throw new Error(t('eqp.page.manageDetailLoadError'))
       }
 
       if (!formState.commMode) {
-        throw new Error('Comm Mode를 선택해 주세요.')
+        throw new Error(t('eqp.form.commModeRequired'))
       }
 
       if (!formState.eqpIp.trim()) {
-        throw new Error('EQP IP를 입력해 주세요.')
+        throw new Error(t('eqp.form.eqpIpRequired'))
       }
 
       const request = buildEqpUpdateRequest(detail, {
@@ -748,7 +755,7 @@ export function EqpManageFormModal({
 
       await onSubmit(request)
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : '입력값을 다시 확인해 주세요.')
+      setFormErrorMessage(error instanceof Error ? error.message : t('eqp.form.invalidInput'))
     }
   }
 
@@ -762,9 +769,7 @@ export function EqpManageFormModal({
           <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
             <DialogTitle>{mode === 'create' ? `${resolvedInterfaceType} Eqp Create` : 'Eqp Info Update'}</DialogTitle>
             <DialogDescription>
-              {mode === 'create'
-                ? '새 EQP를 등록하고 기본 통신/로그 설정을 함께 저장합니다.'
-                : '기본 EQP 정보와 프로토콜별 통신 설정을 수정합니다.'}
+              {mode === 'create' ? t('eqp.form.createDesc') : t('eqp.form.updateDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -772,13 +777,13 @@ export function EqpManageFormModal({
             {mode === 'update' && isLoading && !detail ? (
               <div className="flex min-h-60 items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                설비 관리 정보를 불러오는 중입니다.
+                {t('eqp.form.loading')}
               </div>
             ) : (
               <div className="space-y-4">
                 <FormSection
-                  title="공통 정보"
-                  description="EQP 기본 식별자와 연결 정책을 설정합니다."
+                  title={t('eqp.form.sectionCommon')}
+                  description={t('eqp.form.sectionCommonDesc')}
                 >
                   <div className="grid gap-4 md:grid-cols-2">
                     {mode === 'create' ? (
@@ -787,7 +792,7 @@ export function EqpManageFormModal({
                           value={formState.eqpId}
                           onChange={handleInputChange('eqpId')}
                           disabled={isPending}
-                          placeholder="예: EQP-01"
+                          placeholder={t('common.example', { value: 'EQP-01' })}
                           className="h-11"
                         />
                       </Field>
@@ -804,7 +809,7 @@ export function EqpManageFormModal({
                         disabled={isPending}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Comm Mode를 선택해 주세요." />
+                          <SelectValue placeholder={t('eqp.form.commModeRequired')} />
                         </SelectTrigger>
                         <SelectContent>
                           {EQP_COMM_MODE_OPTIONS.map((commMode) => (
@@ -820,7 +825,7 @@ export function EqpManageFormModal({
                       label="Is Dev"
                       checked={formState.isDev}
                       disabled={isPending}
-                      hint="개발 장비면 DEVELOP 모델, 운영 장비면 OPERATE 모델과 연결해야 합니다."
+                      hint={t('eqp.form.isDevHint')}
                       onChange={(checked) =>
                         setFormState((previous) => ({
                           ...previous,
@@ -846,7 +851,7 @@ export function EqpManageFormModal({
                         value={formState.eqpIp}
                         onChange={handleInputChange('eqpIp')}
                         disabled={isPending}
-                        placeholder="예: 127.0.0.1"
+                        placeholder={t('common.example', { value: '127.0.0.1' })}
                         className="h-11"
                       />
                     </Field>
@@ -858,7 +863,7 @@ export function EqpManageFormModal({
                         value={formState.eqpPort}
                         onChange={handleInputChange('eqpPort')}
                         disabled={isPending}
-                        placeholder="예: 5000"
+                        placeholder={t('common.example', { value: '5000' })}
                         className="h-11"
                       />
                     </Field>
@@ -870,10 +875,10 @@ export function EqpManageFormModal({
                         disabled={isPending || isOptionsLoading}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Gateway Jar를 선택해 주세요." />
+                          <SelectValue placeholder={t('eqp.form.gatewayJarPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
+                          <SelectItem value={EQP_SELECT_NONE_VALUE}>{t('eqp.form.noneSelected')}</SelectItem>
                           {gatewayJarOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
@@ -888,11 +893,11 @@ export function EqpManageFormModal({
                 {mode === 'create' ? (
                   <FormSection
                     title="Model / Business"
-                    description="생성 시점에 연결할 모델 버전과 Business Jar를 선택합니다."
+                    description={t('eqp.form.sectionModelDesc')}
                   >
                     <div className="grid gap-4 md:grid-cols-2">
                       <ReadOnlyField
-                        label="허용 모델 상태"
+                        label={t('eqp.form.allowedModelStatus')}
                         value={`${resolveAllowedModelStatus(formState.isDev)} / ${resolvedInterfaceType}`}
                         hint={modelSelectionHint}
                       />
@@ -904,7 +909,7 @@ export function EqpManageFormModal({
                           disabled={isPending || isOptionsLoading || modelNameOptions.length === 0}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Model Name을 선택해 주세요." />
+                            <SelectValue placeholder={t('eqp.form.modelNamePlaceholder')} />
                           </SelectTrigger>
                           <SelectContent>
                             {modelNameOptions.map((modelName) => (
@@ -923,7 +928,7 @@ export function EqpManageFormModal({
                           disabled={isPending || isOptionsLoading || modelVersionOptions.length === 0}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Model Version을 선택해 주세요." />
+                            <SelectValue placeholder={t('eqp.form.modelVersionPlaceholder')} />
                           </SelectTrigger>
                           <SelectContent>
                             {modelVersionOptions.map((option) => (
@@ -945,10 +950,10 @@ export function EqpManageFormModal({
                           disabled={isPending || isOptionsLoading}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Business Jar를 선택해 주세요." />
+                            <SelectValue placeholder={t('eqp.form.businessJarPlaceholder')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
+                            <SelectItem value={EQP_SELECT_NONE_VALUE}>{t('eqp.form.noneSelected')}</SelectItem>
                             {businessJarOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
                                 {option.label}
@@ -959,20 +964,20 @@ export function EqpManageFormModal({
                       </Field>
 
                       <ReadOnlyField
-                        label="선택 상태"
+                        label={t('eqp.form.selectionStatus')}
                         value={
                           findEqpModelOptionByVersionKey(
                             modelVersionOptions,
                             Number(formState.modelVersionKey),
                           )?.status ?? '-'
                         }
-                        hint="is_dev 값과 일치하는 모델만 선택할 수 있습니다."
+                        hint={t('eqp.form.selectionStatusHint')}
                       />
                     </div>
 
                     {modelNameOptions.length === 0 ? (
                       <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
-                        현재 조건에 맞는 model/version 옵션이 없습니다. is_dev 또는 모델 데이터를 확인해 주세요.
+                        {t('eqp.form.noModelOptions')}
                       </p>
                     ) : null}
                   </FormSection>
@@ -980,7 +985,7 @@ export function EqpManageFormModal({
 
                 <FormSection
                   title="Log Policy"
-                  description="EQP 로그 레벨과 기본 보관 정책을 관리합니다."
+                  description={t('eqp.form.sectionLogDesc')}
                 >
                   <div className="grid gap-4 md:grid-cols-3">
                     <Field label="Log Level">
@@ -990,7 +995,7 @@ export function EqpManageFormModal({
                         disabled={isPending}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Log Level을 선택해 주세요." />
+                          <SelectValue placeholder={t('eqp.form.logLevelPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {EQP_LOG_LEVEL_OPTIONS.map((logLevel) => (
@@ -1009,7 +1014,7 @@ export function EqpManageFormModal({
                         value={formState.logRetentionDays}
                         onChange={handleInputChange('logRetentionDays')}
                         disabled={isPending}
-                        placeholder="예: 7"
+                        placeholder={t('common.example', { value: '7' })}
                         className="h-11"
                       />
                     </Field>
@@ -1019,7 +1024,7 @@ export function EqpManageFormModal({
                         value={formState.logPath}
                         onChange={handleInputChange('logPath')}
                         disabled={isPending}
-                        placeholder="예: \\"
+                        placeholder={t('common.example', { value: '\\' })}
                         className="h-11"
                       />
                     </Field>
@@ -1029,7 +1034,7 @@ export function EqpManageFormModal({
                 {isSecsMode ? (
                   <FormSection
                     title="SECS Settings"
-                    description="SECS/HSMS 연결에 필요한 timeout 및 link test 옵션입니다."
+                    description={t('eqp.form.sectionSecsDesc')}
                   >
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Device ID">
@@ -1136,7 +1141,7 @@ export function EqpManageFormModal({
                 ) : (
                   <FormSection
                     title="Socket Settings"
-                    description="Socket 통신에서 사용하는 프로토콜, heartbeat, timeout 옵션입니다."
+                    description={t('eqp.form.sectionSocketDesc')}
                   >
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Socket Protocol Type">
@@ -1146,7 +1151,7 @@ export function EqpManageFormModal({
                           disabled={isPending || isOptionsLoading}
                         >
                         <SelectTrigger>
-                          <SelectValue placeholder="Socket Protocol Type을 선택해 주세요." />
+                          <SelectValue placeholder={t('eqp.form.socketProtocolPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {socketProtocolTypeOptions.map((protocolType) => (
@@ -1163,7 +1168,7 @@ export function EqpManageFormModal({
                           value={formState.charset}
                           onChange={handleInputChange('charset')}
                           disabled={isPending}
-                          placeholder="예: UTF-8"
+                          placeholder={t('common.example', { value: 'UTF-8' })}
                           className="h-11"
                         />
                       </Field>

@@ -46,12 +46,13 @@ interface EqpInfoTableProps {
  * 상태를 원형 네온 점 아이콘으로 렌더링합니다.
  */
 function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) {
+  const { t } = useI18n()
   if (status === 'offline') {
     return (
       <span
         className="relative inline-flex size-4 items-center justify-center rounded-full bg-muted ring-2 ring-border"
-        title="오프라인"
-        aria-label="오프라인"
+        title={t('eqp.status.offline')}
+        aria-label={t('eqp.status.offline')}
       >
         <span className="inline-flex size-2 rounded-full bg-muted-foreground" />
       </span>
@@ -86,8 +87,8 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   return (
     <span
       className="relative inline-flex size-4 items-center justify-center rounded-full bg-amber-100/90 ring-2 ring-amber-300/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-      title="주의 상태"
-      aria-label="주의 상태"
+      title={t('eqp.status.warning')}
+      aria-label={t('eqp.status.warning')}
     >
       <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
       <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />

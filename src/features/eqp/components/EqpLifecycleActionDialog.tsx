@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n/i18n-context'
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart'
 
@@ -27,10 +28,11 @@ const ACTION_LABELS: Record<EqpLifecycleAction, string> = {
   restart: 'Eqp Restart',
 }
 
-const ACTION_MESSAGES: Record<EqpLifecycleAction, string> = {
-  start: '시작',
-  end: '종료',
-  restart: '재시작',
+// action → 동사 i18n 키. 확인 문구는 eqpId 유무에 따라 두 키로 분기한다.
+const ACTION_VERB_KEYS: Record<EqpLifecycleAction, string> = {
+  start: 'eqp.lifecycle.verbStart',
+  end: 'eqp.lifecycle.verbEnd',
+  restart: 'eqp.lifecycle.verbRestart',
 }
 
 export function EqpLifecycleActionDialog({
@@ -42,6 +44,8 @@ export function EqpLifecycleActionDialog({
   onOpenChange,
   onConfirm,
 }: EqpLifecycleActionDialogProps) {
+  const { t } = useI18n()
+  const verb = t(ACTION_VERB_KEYS[action])
   return (
     <Dialog
       open={open}
@@ -56,8 +60,8 @@ export function EqpLifecycleActionDialog({
           <DialogTitle>{ACTION_LABELS[action]}</DialogTitle>
           <DialogDescription>
             {eqpId
-              ? `${eqpId} 설비를 ${ACTION_MESSAGES[action]}하시겠습니까?`
-              : `선택한 설비를 ${ACTION_MESSAGES[action]}하시겠습니까?`}
+              ? t('eqp.lifecycle.confirmWithId', { eqpId, verb })
+              : t('eqp.lifecycle.confirmNoId', { verb })}
           </DialogDescription>
         </DialogHeader>
 
