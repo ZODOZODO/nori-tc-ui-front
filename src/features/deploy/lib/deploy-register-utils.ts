@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import { DeployApiError } from '../api/deploy.api'
 import type { EqpModelOption } from '@/features/eqp/types/eqp.types'
 import type {
@@ -17,7 +18,9 @@ export const getDeployErrorDetail = (error: unknown): string | null => {
     return null
   }
 
-  return error.payload.errorCode ? `오류 코드: ${error.payload.errorCode}` : null
+  return error.payload.errorCode
+    ? i18n.t('deploy.detail.errorCode', { code: error.payload.errorCode })
+    : null
 }
 
 export const mergeModelOptions = (developModelOptions: EqpModelOption[], operateModelOptions: EqpModelOption[]) => {
@@ -94,14 +97,23 @@ export const resolveFailureDetail = (targets: DeployTargetItem[]) => {
   }
 
   if (failedTarget.lastErrorMessage?.trim()) {
-    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorMessage.trim()}`
+    return i18n.t('deploy.detail.eqpMessage', {
+      eqpId: failedTarget.eqpId,
+      message: failedTarget.lastErrorMessage.trim(),
+    })
   }
 
   if (failedTarget.lastErrorCode?.trim()) {
-    return `설비 ${failedTarget.eqpId}: ${failedTarget.lastErrorCode.trim()}`
+    return i18n.t('deploy.detail.eqpMessage', {
+      eqpId: failedTarget.eqpId,
+      message: failedTarget.lastErrorCode.trim(),
+    })
   }
 
-  return `설비 ${failedTarget.eqpId} 처리 상태: ${failedTarget.targetStatus}`
+  return i18n.t('deploy.detail.eqpStatus', {
+    eqpId: failedTarget.eqpId,
+    status: failedTarget.targetStatus,
+  })
 }
 
 export const formatDeployDetail = (
@@ -109,7 +121,7 @@ export const formatDeployDetail = (
   deployStatus: DeployStatus,
   extraDetail?: string | null,
 ) => {
-  const baseDetail = `Deploy #${deployKey} · 상태 ${deployStatus}`
+  const baseDetail = i18n.t('deploy.detail.deployStatus', { key: deployKey, status: deployStatus })
   return extraDetail ? `${baseDetail}\n${extraDetail}` : baseDetail
 }
 
@@ -133,7 +145,7 @@ export const formatActiveDeployHint = (item: DeployRegisterTargetItem) => {
   }
 
   if (item.activeRequestedBy) {
-    detailParts.push(`요청자 ${item.activeRequestedBy}`)
+    detailParts.push(i18n.t('deploy.detail.requestedBy', { user: item.activeRequestedBy }))
   }
 
   return detailParts.join(' · ')

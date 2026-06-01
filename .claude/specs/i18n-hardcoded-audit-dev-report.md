@@ -158,3 +158,91 @@ e2e (전체 79):
 
 ## 6. 다음 단계
 P2 deploy(173건) — 새 세션 권장(컨텍스트 분리, 글로벌 룰 10).
+
+---
+
+# P2 — deploy (173건)
+
+## 1. 무엇을 했나
+
+카탈로그의 deploy 영역 173건(SelectedEquipmentRow 2 / DeployMonitorPanel 64 / DeployRegisterPanel 69 / deploy-utils 18 / deploy-register-utils 6 / deploy.api 14)을 i18n 키로 전수 치환.
+C1/C2/C3(컴포넌트 인라인·삼항·템플릿) → `t()`, C4(deploy-utils 작업 라벨 상수) → 키 반환 + 호출부 번역, C5(api/lib fallback) → standalone `i18n.t`(D1).
+
+## 2. 신설 키 (ko/en 각 동수)
+
+P2 진입 전 285키 → **418키**(P2 신설 **133키 × 2**). `node` 로 ko/en 키 차집합 0 검증:
+```
+ko 418 en 418
+in ko not en: []
+in en not ko: []
+```
+
+네임스페이스:
+- `error.deploy.*` (15) — api fallback + SelectedEquipmentRow paramVersions
+- `deploy.task.*` (15) — 작업 유형 라벨(C4, 키 반환)
+- `deploy.detail.*` (5) — register-utils 실패 상세 보간
+- `deploy.monitor.*` (신설 ~50) — 에러 fallback / comment 다이얼로그 / 컬럼 / 요약·상세 보간 / 페이지네이션
+- `deploy.register.*` (신설 ~45) — 검증 toast / 다이얼로그 / 시나리오 테이블 / aria
+- `common.delete` (1) — ConfirmDialog "삭제"(P1 의 common.* 확장)
+
+## 3. Plan 결정 준수 (D1 / D2)
+
+- **D1 (api/lib fallback → standalone `i18n.t`)**:
+  - `deploy.api.ts` — 12개 `DEFAULT_*_ERROR_MESSAGE` 상수 + CSRF + recommendedReason fallback. 모듈 로드 시점 i18n.t 평가는 런타임 언어 전환에 비반응 → **getter 함수**(`fallback*Error = () => i18n.t(...)`)로 전환. default 파라미터 식은 호출마다 평가되므로 fallback 이 현재 언어를 따른다.
+  - `deploy-register-utils.ts` — `getDeployErrorDetail`/`resolveFailureDetail`/`formatDeployDetail`/`formatActiveDeployHint` 의 한글 보간을 `i18n.t(key, {var})` 로.
+  - `deploy-utils.ts` — `createDeployName`(백엔드 전송 deployName)은 `i18n.t(resolveDeployTaskLabel(...))` 로 생성 시점 UI 언어 번역.
+- **D2 (borderline 제외)**: deploy 영역엔 borderline(invariant/dead/L382) 없음 — 카탈로그 173건 전수 처리. 순수 jargon(`Business JAR: …`, `EQP PARAM: …`, `AS-IS`/`TO-BE`, `Register Deploy`, 영어 컬럼 헤더 `Deploy Name`/`Event Type` 등)은 정책상 범위 밖 → 무변경.
+
+## 4. C4 구조 변경 — resolveDeployTaskLabel 키 반환
+
+`resolveDeployTaskLabel` 반환값을 **표시 문자열 → i18n 키**로 변경(모듈 상수라 React 밖에서 t() 불가).
+- DeployMonitorPanel: `commentTaskTypeLabel` → `commentTaskTypeLabelKey`(useMemo, t 미사용) + 렌더 2곳 `t(commentTaskTypeLabelKey)`.
+- DeployRegisterPanel `createDeployName` / deploy-ui.store: `i18n.t(key)` 로 deployName 생성.
+- `EQP_REGISTER_DEPLOY → 'Register Deploy'`(영어 jargon)는 키 미존재 시 `t` 가 key 그대로 반환하므로 무변경 유지.
+
+## 5. 구현 결정 기록
+
+- **`commentToBeLines`/`commentAsIsLines` useMemo deps 에 `t` 추가** — 보간 호출이 들어갔고 react-compiler `preserve-manual-memoization` 정합 위해 언어 전환 시 재계산 필요.
+- **`formatDateTime` 의 `Intl.DateTimeFormat('ko-KR')` 는 P2 범위 밖** — 173 문자열 카탈로그에 미포함, Plan §2 에서 날짜 로컬라이제이션을 P0 에 배정(P0 미구현분). EN 모드 날짜가 한국식인 기존 동작 유지. 후속 별도 처리 필요.
+- **api getter 함수 명 분리**(`fallback*Error`) — 기존 `DEFAULT_*` 식별자에 `()` 를 붙이면 선언부도 깨지므로 새 이름 + 사용처 일괄 치환.
+
+## 6. 검증 결과 (전부 PASS)
+
+ko/en 키 차집합 0 (418/418, §2 인용).
+
+### tsc
+```
+TSC_EXIT:0
+```
+### eslint (변경 6 소스 파일)
+```
+ESLINT_EXIT:0
+```
+### vite build
+```
+dist/assets/DeployPage-7gaEK_gP.js              397.04 kB │ gzip: 115.84 kB
+✓ built in 11.87s
+BUILD_EXIT:0
+```
+### e2e (전체 79, flat-key console.error 0 가드 + deploy-monitor 포함)
+```
+79 passed (2.6m)
+E2E_EXIT:0
+```
+deploy-monitor 단독 baseline → 변경 후 모두 PASS. deploy-monitor e2e 는 영어 셀렉터(`Deploy`/`View`)만 assert → 값 보존으로 무영향.
+
+## 7. 변경 파일 (8)
+
+| 파일 | 변경 |
+|---|---|
+| `src/i18n/locales/ko.json` | +133 키 |
+| `src/i18n/locales/en.json` | +133 키 |
+| `src/features/deploy/components/SelectedEquipmentRow.tsx` | paramVersions fallback + 삭제 aria |
+| `src/features/deploy/components/DeployMonitorPanel.tsx` | 에러 fallback / comment 다이얼로그 / 컬럼 / 보간 / 페이지네이션 + commentTaskTypeLabelKey |
+| `src/features/deploy/components/DeployRegisterPanel.tsx` | 검증 toast / 다이얼로그 / 시나리오 테이블 / aria |
+| `src/features/deploy/lib/deploy-utils.ts` | 작업 라벨 키 반환 + createDeployName i18n.t |
+| `src/features/deploy/lib/deploy-register-utils.ts` | 실패 상세 보간 i18n.t |
+| `src/features/deploy/api/deploy.api.ts` | fallback getter 함수 전환 + CSRF/recommendedReason i18n.t |
+
+## 8. 다음 단계
+P3 eqp(125+24) — 새 세션 권장. ManageFormModal 동적 조사 에러(템플릿) 주의.

@@ -100,7 +100,7 @@ export function SelectedEquipmentRow({
           <p className="mt-1 text-xs text-danger">
             {getErrorMessage(
               paramVersionsQuery.error,
-              '설비 파라미터 버전 목록을 조회하지 못했습니다.',
+              t('error.deploy.eqpParamVersions'),
             )}
           </p>
         ) : null}
@@ -112,7 +112,7 @@ export function SelectedEquipmentRow({
           size="icon-sm"
           className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
           onClick={() => onRemove(item.eqpId)}
-          aria-label={`${item.eqpId} 삭제`}
+          aria-label={t('deploy.register.removeAria', { eqpId: item.eqpId })}
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </Button>

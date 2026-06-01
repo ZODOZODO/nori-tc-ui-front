@@ -395,7 +395,7 @@ export function DeployRegisterPanel() {
 
   const buildScenarioPreviewRequest = (): DeployRegisterScenarioPreviewRequest => {
     if (!selectedInterfaceType) {
-      throw new Error('Deploy interfaceType 이 선택되지 않았습니다.')
+      throw new Error(t('deploy.register.interfaceNotSelected'))
     }
 
     return {
@@ -409,7 +409,7 @@ export function DeployRegisterPanel() {
 
   const buildDeployRequest = (resolvedScenarioCode: string): DeployCreateRequest => {
     if (!selectedInterfaceType) {
-      throw new Error('Deploy interfaceType 이 선택되지 않았습니다.')
+      throw new Error(t('deploy.register.interfaceNotSelected'))
     }
 
     return {
@@ -430,11 +430,11 @@ export function DeployRegisterPanel() {
 
   const handleDeploy = async () => {
     if (selectedEqpItems.length === 0) {
-      setFeedbackMessage('설비를 먼저 선택해 주세요.')
+      setFeedbackMessage(t('deploy.register.selectEqpFirst'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '설비를 먼저 선택해 주세요.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.selectEqpFirst'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -443,11 +443,11 @@ export function DeployRegisterPanel() {
     }
 
     if (!selectedInterfaceType) {
-      setFeedbackMessage('서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.')
+      setFeedbackMessage(t('deploy.register.mixedInterface'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.mixedInterface'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -456,11 +456,11 @@ export function DeployRegisterPanel() {
     }
 
     if (selectedModelVersionKey !== null && !currentModelVersion) {
-      setFeedbackMessage('선택한 Model Version 정보를 확인할 수 없습니다.')
+      setFeedbackMessage(t('deploy.register.modelVersionUnknown'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '선택한 Model Version 정보를 확인할 수 없습니다.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.modelVersionUnknown'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -476,11 +476,11 @@ export function DeployRegisterPanel() {
       }
 
       if (preview.remainingEqpIds.length === 0) {
-        const emptyMessage = preview.recommendedReason || '변경 사항이 있는 설비가 없습니다.'
+        const emptyMessage = preview.recommendedReason || t('deploy.register.noChangedEqp')
         setFeedbackMessage(emptyMessage)
         openDeployDialog({
           isSuccess: false,
-          title: 'Deploy 생성 실패',
+          title: t('deploy.register.createFailTitle'),
           message: emptyMessage,
           detail: null,
           nextMode: null,
@@ -499,15 +499,15 @@ export function DeployRegisterPanel() {
       })
       setFeedbackMessage(
         preview.removedEqpIds.length > 0
-          ? `변경이 없는 설비 ${preview.removedEqpIds.length}대를 Selected Equipments에서 제외했습니다.`
+          ? t('deploy.register.removedNoChange', { count: preview.removedEqpIds.length })
           : null,
       )
     } catch (error) {
-      const errorMessage = getErrorMessage(error, '시나리오 preview를 생성하지 못했습니다.')
+      const errorMessage = getErrorMessage(error, t('deploy.register.previewFailed'))
       setFeedbackMessage(errorMessage)
       openDeployDialog({
         isSuccess: false,
-        title: '시나리오 Preview 실패',
+        title: t('deploy.register.previewFailTitle'),
         message: errorMessage,
         detail: null,
         nextMode: null,
@@ -522,11 +522,11 @@ export function DeployRegisterPanel() {
 
   const executeDeploy = async (resolvedScenarioCode: string) => {
     if (selectedEqpItems.length === 0) {
-      setFeedbackMessage('변경 사항이 있는 설비가 없습니다.')
+      setFeedbackMessage(t('deploy.register.noChangedEqp'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '변경 사항이 있는 설비가 없습니다.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.noChangedEqp'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -535,11 +535,11 @@ export function DeployRegisterPanel() {
     }
 
     if (!selectedInterfaceType) {
-      setFeedbackMessage('서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.')
+      setFeedbackMessage(t('deploy.register.mixedInterface'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '서로 다른 Interface 의 설비는 한 번에 Deploy 할 수 없습니다.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.mixedInterface'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -548,11 +548,11 @@ export function DeployRegisterPanel() {
     }
 
     if (selectedModelVersionKey !== null && !currentModelVersion) {
-      setFeedbackMessage('선택한 Model Version 정보를 확인할 수 없습니다.')
+      setFeedbackMessage(t('deploy.register.modelVersionUnknown'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: '선택한 Model Version 정보를 확인할 수 없습니다.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.modelVersionUnknown'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -561,11 +561,11 @@ export function DeployRegisterPanel() {
     }
 
     if (!resolvedScenarioCode) {
-      setFeedbackMessage('Deploy 에 사용할 시나리오를 먼저 선택해 주세요.')
+      setFeedbackMessage(t('deploy.register.selectScenarioFirst'))
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
-        message: 'Deploy 에 사용할 시나리오를 먼저 선택해 주세요.',
+        title: t('deploy.register.createFailTitle'),
+        message: t('deploy.register.selectScenarioFirst'),
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -629,12 +629,12 @@ export function DeployRegisterPanel() {
 
       if (resolvedSummary && isFailedDeployOutcome(resolvedSummary, resolvedTargets)) {
         const failureMessage =
-          resolvedSummary.resultMessage?.message?.trim() || 'Deploy 처리 중 오류가 발생했습니다.'
+          resolvedSummary.resultMessage?.message?.trim() || t('deploy.register.processError')
         const failureDetail = resolveFailureDetail(resolvedTargets)
 
         openDeployDialog({
           isSuccess: false,
-          title: 'Deploy 처리 실패',
+          title: t('deploy.register.processFailTitle'),
           message: failureMessage,
           detail: formatDeployDetail(result.deployKey, resolvedSummary.deployStatus, failureDetail),
           nextMode: 'deploy',
@@ -645,16 +645,16 @@ export function DeployRegisterPanel() {
 
       if (snapshotLookupError) {
         const acceptedMessage =
-          result.resultMessage?.message?.trim() || 'Deploy 탭에서 실행해 주세요.'
+          result.resultMessage?.message?.trim() || t('deploy.register.deployTabHint')
 
         openDeployDialog({
           isSuccess: true,
-          title: 'Deploy 생성 완료',
+          title: t('deploy.register.createSuccessTitle'),
           message: acceptedMessage,
           detail: formatDeployDetail(
             result.deployKey,
             result.deployStatus,
-            '생성 직후 상세 조회에 실패했습니다. Deploy 탭에서 상태를 확인해 주세요.',
+            t('deploy.register.snapshotFailDetail'),
           ),
           nextMode: 'deploy',
           nextDeployKey: result.deployKey,
@@ -664,8 +664,8 @@ export function DeployRegisterPanel() {
 
       openDeployDialog({
         isSuccess: true,
-        title: 'Deploy 생성 완료',
-        message: result.resultMessage?.message?.trim() || 'Deploy 탭에서 실행해 주세요.',
+        title: t('deploy.register.createSuccessTitle'),
+        message: result.resultMessage?.message?.trim() || t('deploy.register.deployTabHint'),
         detail: formatDeployDetail(
           result.deployKey,
           resolvedSummary?.deployStatus ?? result.deployStatus,
@@ -674,11 +674,11 @@ export function DeployRegisterPanel() {
         nextDeployKey: result.deployKey,
       })
     } catch (error) {
-      const errorMessage = getErrorMessage(error, 'Deploy 생성에 실패했습니다.')
+      const errorMessage = getErrorMessage(error, t('error.deploy.create'))
       setFeedbackMessage(errorMessage)
       openDeployDialog({
         isSuccess: false,
-        title: 'Deploy 생성 실패',
+        title: t('deploy.register.createFailTitle'),
         message: errorMessage,
         detail: getDeployErrorDetail(error),
         nextMode: null,
@@ -737,21 +737,19 @@ export function DeployRegisterPanel() {
 
   const handleAddSelected = () => {
     if (searchSelectionIds.length === 0) {
-      setFeedbackMessage('추가할 설비를 먼저 선택해 주세요.')
+      setFeedbackMessage(t('deploy.register.selectToAddFirst'))
       return
     }
 
     if (addableSearchItems.length === 0) {
       setSearchSelectionIds([])
-      setFeedbackMessage('active Deploy에 포함된 설비는 Selected Equipments에 추가할 수 없습니다.')
+      setFeedbackMessage(t('deploy.register.activeCannotAdd'))
       return
     }
 
     addSelectedEqps(addableSearchItems)
     setSearchSelectionIds([])
-    setFeedbackMessage(
-      '선택한 설비를 Selected Equipments에 추가했습니다. active 설비와 중복 설비는 제외됩니다.',
-    )
+    setFeedbackMessage(t('deploy.register.addedToSelected'))
   }
 
   const handleChangeSelectedModelName = (nextModelName: string) => {
@@ -841,7 +839,7 @@ export function DeployRegisterPanel() {
                   className="h-9 rounded-full border-border bg-card px-4 text-muted-foreground"
                   onClick={closeDeployDialog}
                 >
-                  닫기
+                  {t('common.close')}
                 </Button>
               ) : null}
               <Button
@@ -856,7 +854,7 @@ export function DeployRegisterPanel() {
                     : closeDeployDialog()
                 }
               >
-                {deployDialogState.nextMode ? 'Deploy 탭으로 이동' : '확인'}
+                {deployDialogState.nextMode ? t('deploy.register.goToDeployTab') : t('common.confirm')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -874,9 +872,9 @@ export function DeployRegisterPanel() {
         <DialogContent className="max-w-[920px] rounded-2xl p-0">
           <div className="border-b border-border px-6 py-5">
             <DialogHeader className="p-0">
-              <DialogTitle>시나리오 선택</DialogTitle>
+              <DialogTitle>{t('deploy.register.scenarioDialogTitle')}</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                권장 시나리오를 확인한 뒤 원하는 시나리오를 선택하면 Deploy 가 생성됩니다.
+                {t('deploy.register.scenarioDialogDesc')}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -886,24 +884,29 @@ export function DeployRegisterPanel() {
               <>
                 <div className="grid gap-3 rounded-xl bg-muted p-4 text-sm text-muted-foreground md:grid-cols-2">
                   <div>
-                    <p className="font-semibold text-foreground">배포 대상</p>
+                    <p className="font-semibold text-foreground">{t('deploy.register.deployTarget')}</p>
                     <p className="mt-1">
-                      {scenarioDialogState.preview.remainingEqpIds.length}대
+                      {t('deploy.register.targetCountSummary', {
+                        count: scenarioDialogState.preview.remainingEqpIds.length,
+                      })}
                       {scenarioDialogState.preview.removedEqpIds.length > 0
-                        ? ` · 변경 없음 ${scenarioDialogState.preview.removedEqpIds.length}대 제외`
+                        ? t('deploy.register.targetExcludedSuffix', {
+                            count: scenarioDialogState.preview.removedEqpIds.length,
+                          })
                         : ''}
                     </p>
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">감지된 변경</p>
+                    <p className="font-semibold text-foreground">{t('deploy.register.detectedChanges')}</p>
                     <p className="mt-1">
                       {formatChangeKinds(scenarioDialogState.preview.unionChangeKinds)}
                     </p>
                   </div>
                   <div className="md:col-span-2">
-                    <p className="font-semibold text-foreground">권장 시나리오</p>
+                    <p className="font-semibold text-foreground">{t('deploy.register.recommendedScenario')}</p>
                     <p className="mt-1">
-                      {scenarioDialogState.preview.recommendedScenarioCode ?? '권장 시나리오 없음'}
+                      {scenarioDialogState.preview.recommendedScenarioCode ??
+                        t('deploy.register.noRecommendedScenario')}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {scenarioDialogState.preview.recommendedReason}
@@ -913,20 +916,20 @@ export function DeployRegisterPanel() {
 
                 {scenarioDialogState.preview.scenarios.length === 0 ? (
                   <div className="rounded-xl border border-border bg-muted p-3 text-sm text-muted-foreground">
-                    선택 가능한 시나리오가 없습니다.
+                    {t('deploy.register.noSelectableScenario')}
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-[14px] border border-border">
                     <Table>
                       <TableHeader className="bg-muted">
                         <TableRow className="bg-muted hover:bg-muted">
-                          <TableHead className="w-16 text-center">선택</TableHead>
-                          <TableHead className="w-20 text-center">권장</TableHead>
-                          <TableHead>시나리오명</TableHead>
-                          <TableHead>코드</TableHead>
-                          <TableHead>포함 변경</TableHead>
-                          <TableHead className="text-center">단계 수</TableHead>
-                          <TableHead>설명</TableHead>
+                          <TableHead className="w-16 text-center">{t('deploy.register.colSelect')}</TableHead>
+                          <TableHead className="w-20 text-center">{t('deploy.register.colRecommended')}</TableHead>
+                          <TableHead>{t('deploy.register.colScenarioName')}</TableHead>
+                          <TableHead>{t('deploy.register.colCode')}</TableHead>
+                          <TableHead>{t('deploy.register.colCoversChanges')}</TableHead>
+                          <TableHead className="text-center">{t('deploy.register.colStepCount')}</TableHead>
+                          <TableHead>{t('deploy.register.colDescription')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -951,13 +954,13 @@ export function DeployRegisterPanel() {
                                   }))
                                 }
                                 className="size-4 accent-brand-primary"
-                                aria-label={`${scenario.code} 선택`}
+                                aria-label={t('deploy.register.scenarioSelectAria', { code: scenario.code })}
                               />
                             </TableCell>
                             <TableCell className="text-center">
                               {scenario.recommended ? (
                                 <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-brand-primary">
-                                  권장
+                                  {t('deploy.register.colRecommended')}
                                 </span>
                               ) : (
                                 '-'
@@ -985,7 +988,7 @@ export function DeployRegisterPanel() {
             ) : (
               <div className="flex items-center justify-center rounded-xl border border-border bg-muted py-10 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                시나리오 preview 결과를 준비하고 있습니다.
+                {t('deploy.register.preparingPreview')}
               </div>
             )}
           </div>
@@ -997,7 +1000,7 @@ export function DeployRegisterPanel() {
               onClick={closeScenarioDialog}
               className="h-10 rounded-xl border-border bg-card text-muted-foreground"
             >
-              닫기
+              {t('common.close')}
             </Button>
             <Button
               type="button"
@@ -1005,7 +1008,9 @@ export function DeployRegisterPanel() {
               disabled={createDeployMutation.isPending || !scenarioDialogState.selectedScenarioCode}
               className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
-              {createDeployMutation.isPending ? 'Deploy 중...' : '선택한 시나리오로 Deploy'}
+              {createDeployMutation.isPending
+                ? t('deploy.register.deployingScenario')
+                : t('deploy.register.deployWithScenario')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1111,7 +1116,7 @@ export function DeployRegisterPanel() {
             </p>
           ) : registerTargetsQuery.isError ? (
             <p className="py-8 text-center text-sm text-danger">
-              {getErrorMessage(registerTargetsQuery.error, '대상 설비 목록을 조회하지 못했습니다.')}
+              {getErrorMessage(registerTargetsQuery.error, t('deploy.register.targetsLoadError'))}
             </p>
           ) : !registerTargetsQuery.isLoading && registerTargetItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
@@ -1170,7 +1175,7 @@ export function DeployRegisterPanel() {
                           onChange={() => handleToggleSearchSelection(item.eqpId)}
                           disabled={item.blockedByActiveDeploy}
                           className="size-4 accent-brand-primary"
-                          aria-label={`${item.eqpId} 선택`}
+                          aria-label={t('deploy.register.eqpSelectAria', { eqpId: item.eqpId })}
                         />
                       </TableCell>
                       <TableCell>
@@ -1389,11 +1394,11 @@ export function DeployRegisterPanel() {
         {registerOptionsQuery.isError || meQuery.isError ? (
           <div className="px-6 pb-3 text-sm text-danger">
             {registerOptionsQuery.isError
-              ? getErrorMessage(registerOptionsQuery.error, '설정 옵션을 조회하지 못했습니다.')
+              ? getErrorMessage(registerOptionsQuery.error, t('deploy.register.optionsLoadError'))
               : null}
             {registerOptionsQuery.isError && meQuery.isError ? ' ' : null}
             {meQuery.isError
-              ? getErrorMessage(meQuery.error, '현재 사용자 정보를 조회하지 못했습니다.')
+              ? getErrorMessage(meQuery.error, t('deploy.register.userLoadError'))
               : null}
           </div>
         ) : null}
