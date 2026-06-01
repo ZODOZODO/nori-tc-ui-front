@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n/i18n-context'
 import type { ModelInfo, ProtocolType } from '../types/model.types'
 
 type ModelCreateOrUpdateMode = 'create' | 'update'
@@ -39,6 +40,7 @@ export function ModelCreateOrUpdateModal({
   onOpenChange,
   onSubmit,
 }: ModelCreateOrUpdateModalProps) {
+  const { t } = useI18n()
   const [modelName, setModelName] = useState(() => targetModel?.modelName ?? '')
   const [maker, setMaker] = useState(() => targetModel?.maker ?? '')
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
@@ -51,13 +53,13 @@ export function ModelCreateOrUpdateModal({
 
   const dialogDescription =
     mode === 'create'
-      ? 'root model 기본 정보를 입력합니다. root는 기준선으로 유지되며 상세 변경은 branch에서 수행합니다.'
-      : 'root model의 공통 정보를 수정합니다. Model Name은 변경할 수 없습니다.'
+      ? t('model.create.descCreate')
+      : t('model.create.descUpdate')
 
   const handleSubmit = async () => {
     const normalizedModelName = modelName.trim()
     if (mode === 'create' && !normalizedModelName) {
-      setFormErrorMessage('Model Name을 입력해 주세요.')
+      setFormErrorMessage(t('model.create.nameRequired'))
       return
     }
 
@@ -92,9 +94,9 @@ export function ModelCreateOrUpdateModal({
         <div className="grid gap-4">
           <section className="rounded-2xl border border-border bg-muted p-4">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-foreground">기본 정보</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('model.create.sectionBasic')}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                root model은 기준 정보만 수정할 수 있으며, 상세 편집은 branch checkout 이후에만 가능합니다.
+                {t('model.create.basicHint')}
               </p>
             </div>
 
@@ -109,7 +111,7 @@ export function ModelCreateOrUpdateModal({
                   onChange={(event) => setModelName(event.target.value)}
                   readOnly={mode === 'update'}
                   className={mode === 'update' ? 'bg-muted' : undefined}
-                  placeholder="예: MODEL_A"
+                  placeholder={t('common.example', { value: 'MODEL_A' })}
                 />
               </div>
 
@@ -118,7 +120,7 @@ export function ModelCreateOrUpdateModal({
                 <Input
                   value={maker}
                   onChange={(event) => setMaker(event.target.value)}
-                  placeholder="제조사명을 입력해 주세요."
+                  placeholder={t('model.create.makerPlaceholder')}
                 />
               </div>
             </div>

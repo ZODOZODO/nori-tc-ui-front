@@ -4,6 +4,7 @@
  */
 import { type ChangeEvent } from 'react'
 import { MoreHorizontal } from 'lucide-react'
+import i18n from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -236,7 +237,10 @@ export const createWorkflowColumns = ({
                 type="button"
                 onClick={() => onOpenFlowTextEditor(row, rowIdx, columnIndex)}
                 className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
-                aria-label={`${row.values[0] ?? 'flow'} ${columnName} 편집`}
+                aria-label={i18n.t('model.detail.editCellAria', {
+                  value: row.values[0] ?? 'flow',
+                  column: columnName,
+                })}
               >
                 <MoreHorizontal className="size-3.5" />
               </button>
@@ -270,7 +274,7 @@ export const createWorkflowColumns = ({
                 'h-8 w-full min-w-0',
                 isDuplicate ? 'border-danger focus-visible:ring-danger/30' : null,
               )}
-              title={isDuplicate ? '다른 행에 동일한 Flow Name이 있습니다.' : undefined}
+              title={isDuplicate ? i18n.t('model.detail.duplicateFlowName') : undefined}
             />
           )
         }

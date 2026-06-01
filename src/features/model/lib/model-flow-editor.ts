@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import type { ModelDcopItem, ModelFlow, ModelFlowUpdateRequest } from '../types/model.types.ts'
 import {
   type ActionDataIndexEditorDraft,
@@ -120,16 +121,16 @@ export const summarizeFlowFilter = (
   draft: FlowFilterEditorDraft | null,
 ): string => {
   if (draft === null) {
-    return '필터 없음'
+    return i18n.t('model.flow.noFilter')
   }
 
   const serialized = buildFlowFilterValue(draft)
   if (serialized.length === 0) {
-    return '필터 없음'
+    return i18n.t('model.flow.noFilter')
   }
 
   const summary = summarizeFlowFilterValue(serialized)
-  return summary.length > 0 ? summary : '필터 없음'
+  return summary.length > 0 ? summary : i18n.t('model.flow.noFilter')
 }
 
 /**
@@ -142,16 +143,16 @@ export const summarizeFlowActionDataIndex = (
   draft: ActionDataIndexEditorDraft | null,
 ): string => {
   if (draft === null) {
-    return '매핑 없음'
+    return i18n.t('model.flow.noMapping')
   }
 
   const serialized = buildActionDataIndexValue(draft)
   if (serialized.length === 0) {
-    return '매핑 없음'
+    return i18n.t('model.flow.noMapping')
   }
 
   const summary = summarizeActionDataIndexValue(serialized)
-  return summary.length > 0 ? summary : '매핑 없음'
+  return summary.length > 0 ? summary : i18n.t('model.flow.noMapping')
 }
 
 /**

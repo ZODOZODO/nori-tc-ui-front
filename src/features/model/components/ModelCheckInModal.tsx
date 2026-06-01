@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,7 @@ function ModelCheckInModalBody({
   onUndo,
   onSave,
 }: ModelCheckInModalBodyProps) {
+  const { t } = useI18n()
   const [description, setDescription] = useState('')
 
   const handleSave = async () => {
@@ -104,7 +106,7 @@ function ModelCheckInModalBody({
             id="model-checkin-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="변경 내용을 입력해 주세요."
+            placeholder={t('model.checkin.commentPlaceholder')}
             disabled={isPending}
             rows={3}
             className="resize-none rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 disabled:cursor-not-allowed disabled:bg-muted"

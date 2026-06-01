@@ -273,7 +273,7 @@ const openCheckInDiffModal = async (page: Page) => {
 
   await page.getByRole('button', { name: 'Check In' }).click()
 
-  await expect(page.getByRole('heading', { name: '변경사항 미리보기' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Preview Changes' })).toBeVisible()
   await expect(page.getByTestId('selectable-table-check-in-diff-model-parameter')).toBeVisible()
 }
 

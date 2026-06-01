@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   createModelFailResponse,
-  DEFAULT_MODEL_ERROR_MESSAGE,
+  defaultModelErrorMessage,
   ModelApiError,
   type ApiResponse,
   type ModelFlow,
@@ -18,11 +19,12 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const FLOW_LIST_FALLBACK_MESSAGE = 'Message Flow 목록을 조회하지 못했습니다.'
-const FLOW_DETAIL_FALLBACK_MESSAGE = 'Message Flow 상세를 조회하지 못했습니다.'
-const FLOW_CREATE_FALLBACK_MESSAGE = 'Message Flow 생성에 실패했습니다.'
-const FLOW_UPDATE_FALLBACK_MESSAGE = 'Message Flow 수정에 실패했습니다.'
-const FLOW_DELETE_FALLBACK_MESSAGE = 'Message Flow 삭제에 실패했습니다.'
+// 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
+const flowListFallbackMessage = (): string => i18n.t('error.model.flowList')
+const flowDetailFallbackMessage = (): string => i18n.t('error.model.flowDetail')
+const flowCreateFallbackMessage = (): string => i18n.t('error.model.flowCreate')
+const flowUpdateFallbackMessage = (): string => i18n.t('error.model.flowUpdate')
+const flowDeleteFallbackMessage = (): string => i18n.t('error.model.flowDelete')
 
 /**
  * document.cookie 에서 특정 쿠키 값을 추출합니다.
@@ -57,7 +59,7 @@ const issueCsrfToken = async (): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.model.csrf'),
       }),
     )
   }
@@ -69,7 +71,7 @@ const issueCsrfToken = async (): Promise<string> => {
  */
 const normalizeModelError = (
   error: unknown,
-  fallbackMessage = DEFAULT_MODEL_ERROR_MESSAGE,
+  fallbackMessage = defaultModelErrorMessage(),
 ): ModelApiError => {
   if (error instanceof ModelApiError) {
     return error
@@ -139,10 +141,10 @@ export const modelFlowApi = {
       return resolveSuccessPayload<ModelFlowListPayload>(
         response.data,
         response.status,
-        FLOW_LIST_FALLBACK_MESSAGE,
+        flowListFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, FLOW_LIST_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, flowListFallbackMessage())
     }
   },
 
@@ -159,10 +161,10 @@ export const modelFlowApi = {
       return resolveSuccessPayload<ModelFlow>(
         response.data,
         response.status,
-        FLOW_DETAIL_FALLBACK_MESSAGE,
+        flowDetailFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, FLOW_DETAIL_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, flowDetailFallbackMessage())
     }
   },
 
@@ -189,10 +191,10 @@ export const modelFlowApi = {
       return resolveSuccessPayload<ModelFlowCreatedData>(
         response.data,
         response.status,
-        FLOW_CREATE_FALLBACK_MESSAGE,
+        flowCreateFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, FLOW_CREATE_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, flowCreateFallbackMessage())
     }
   },
 
@@ -221,10 +223,10 @@ export const modelFlowApi = {
       return resolveSuccessPayload<ModelFlow>(
         response.data,
         response.status,
-        FLOW_UPDATE_FALLBACK_MESSAGE,
+        flowUpdateFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, FLOW_UPDATE_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, flowUpdateFallbackMessage())
     }
   },
 
@@ -246,12 +248,12 @@ export const modelFlowApi = {
 
       if (!isApiResponse(response.data) || response.data.success !== true) {
         throw new ModelApiError(
-          createModelFailResponse(response.data, FLOW_DELETE_FALLBACK_MESSAGE),
+          createModelFailResponse(response.data, flowDeleteFallbackMessage()),
           response.status,
         )
       }
     } catch (error) {
-      throw normalizeModelError(error, FLOW_DELETE_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, flowDeleteFallbackMessage())
     }
   },
 }

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   buildActionDataIndexValue,
   createEmptyActionDataIndexField,
@@ -110,6 +111,7 @@ function ActionDataIndexEditorModalBody({
   onClose,
   onSave,
 }: ActionDataIndexEditorModalBodyProps) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState<ActionDataIndexEditorDraft>(() =>
     parseActionDataIndexEditor(value),
   )
@@ -207,9 +209,9 @@ function ActionDataIndexEditorModalBody({
     >
       <div className="flex h-full min-h-0 flex-col">
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
-          <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
+          <DialogTitle>{titleLabel || t('model.flowEditor.title')}</DialogTitle>
           <DialogDescription>
-            action_data_index를 mdfTemplateName과 field 매핑 기준으로 편집합니다.
+            {t('model.actionEditor.desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -224,7 +226,7 @@ function ActionDataIndexEditorModalBody({
               {draft.mode === 'raw' ? (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <p className="text-sm text-danger">
-                    현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
+                    {t('model.flowEditor.rawModeNotice')}
                   </p>
                   <textarea
                     value={draft.rawValue}
@@ -255,10 +257,10 @@ function ActionDataIndexEditorModalBody({
                         }
                       >
                         <SelectTrigger disabled={readOnly}>
-                          <SelectValue placeholder="MDF message를 선택해 주세요." />
+                          <SelectValue placeholder={t('model.actionEditor.mdfPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={EMPTY_MDF_TEMPLATE_VALUE}>선택 안 함</SelectItem>
+                          <SelectItem value={EMPTY_MDF_TEMPLATE_VALUE}>{t('model.actionEditor.mdfNone')}</SelectItem>
                           {mdfMessageOptions.map((messageOption) => (
                             <SelectItem
                               key={`${messageOption.sourceName}-${messageOption.messageName}`}
@@ -270,12 +272,12 @@ function ActionDataIndexEditorModalBody({
                         </SelectContent>
                       </Select>
                       <p className="text-[11px] text-muted-foreground">
-                        현재 model의 MDF XML 내부 메시지 이름을 선택하면 `mdfTemplateName`으로 저장됩니다.
+                        {t('model.actionEditor.mdfHint')}
                       </p>
                     </div>
 
                     <div className="space-y-2.5">
-                      <label className="text-xs font-semibold text-foreground">선택된 XML Preview</label>
+                      <label className="text-xs font-semibold text-foreground">{t('model.actionEditor.xmlPreviewLabel')}</label>
                       <div className="min-h-[124px] max-h-[180px] overflow-auto rounded-xl border border-border bg-card px-3 py-2.5">
                         {selectedMdfMessage?.xmlSnippet ? (
                           <pre className="whitespace-pre-wrap break-all font-mono text-xs text-foreground">
@@ -283,18 +285,18 @@ function ActionDataIndexEditorModalBody({
                           </pre>
                         ) : draft.mdfTemplateName.trim() ? (
                           <p className="text-sm text-muted-foreground">
-                            현재 `mdfTemplateName`과 일치하는 MDF 메시지를 찾지 못했습니다.
+                            {t('model.actionEditor.mdfNotFound')}
                           </p>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            MDF 메시지를 선택하면 전체 XML 조각을 여기에서 바로 확인할 수 있습니다.
+                            {t('model.actionEditor.mdfSelectHint')}
                           </p>
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground">
                         {selectedMdfMessage?.sourceName
                           ? `Source MDF: ${selectedMdfMessage.sourceName}`
-                          : '업로드된 MDF XML에 정의된 메시지 본문을 그대로 보여 줍니다.'}
+                          : t('model.actionEditor.mdfSourceFallback')}
                       </p>
                     </div>
                   </div>
@@ -316,7 +318,7 @@ function ActionDataIndexEditorModalBody({
                       disabled={readOnly}
                     >
                       <Plus className="size-3" aria-hidden="true" />
-                      field 추가
+                      {t('model.actionEditor.addField')}
                     </Button>
                   </div>
 
@@ -324,12 +326,12 @@ function ActionDataIndexEditorModalBody({
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-muted">
                         <TableRow className="bg-muted">
-                          <TableHead className="w-[112px]">순서</TableHead>
+                          <TableHead className="w-[112px]">{t('model.actionEditor.colOrder')}</TableHead>
                           <TableHead>Field</TableHead>
                           <TableHead>from</TableHead>
                           <TableHead>path</TableHead>
                           <TableHead>transforms</TableHead>
-                          <TableHead className="w-[72px]">작업</TableHead>
+                          <TableHead className="w-[72px]">{t('common.table.action')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -354,8 +356,8 @@ function ActionDataIndexEditorModalBody({
                                   onDragStart={(event) => handleFieldDragStart(event, field.id)}
                                   onDragEnd={handleFieldDragEnd}
                                   disabled={readOnly}
-                                  aria-label={`${field.fieldName || 'field'} 순서 드래그`}
-                                  title="드래그해서 순서 변경"
+                                  aria-label={t('model.actionEditor.dragAria', { field: field.fieldName || 'field' })}
+                                  title={t('model.actionEditor.dragTitle')}
                                 >
                                   <GripVertical className="size-4" aria-hidden="true" />
                                 </Button>
@@ -366,8 +368,8 @@ function ActionDataIndexEditorModalBody({
                                   className="size-8 rounded-lg text-muted-foreground hover:bg-muted"
                                   onClick={() => handleMoveField(field.id, fieldIndex - 1)}
                                   disabled={readOnly || fieldIndex === 0}
-                                  aria-label={`${field.fieldName || 'field'} 위로 이동`}
-                                  title="위로 이동"
+                                  aria-label={t('model.actionEditor.moveUpAria', { field: field.fieldName || 'field' })}
+                                  title={t('model.actionEditor.moveUpTitle')}
                                 >
                                   <ArrowUp className="size-4" aria-hidden="true" />
                                 </Button>
@@ -378,8 +380,8 @@ function ActionDataIndexEditorModalBody({
                                   className="size-8 rounded-lg text-muted-foreground hover:bg-muted"
                                   onClick={() => handleMoveField(field.id, fieldIndex + 1)}
                                   disabled={readOnly || fieldIndex === draft.fields.length - 1}
-                                  aria-label={`${field.fieldName || 'field'} 아래로 이동`}
-                                  title="아래로 이동"
+                                  aria-label={t('model.actionEditor.moveDownAria', { field: field.fieldName || 'field' })}
+                                  title={t('model.actionEditor.moveDownTitle')}
                                 >
                                   <ArrowDown className="size-4" aria-hidden="true" />
                                 </Button>
@@ -451,7 +453,7 @@ function ActionDataIndexEditorModalBody({
                             <TableCell>
                               <div className="space-y-2">
                                 {field.transforms.length === 0 ? (
-                                  <p className="text-[11px] text-muted-foreground">transform 없음</p>
+                                  <p className="text-[11px] text-muted-foreground">{t('model.actionEditor.transformEmpty')}</p>
                                 ) : (
                                   field.transforms.map((transform) => (
                                     <div key={transform.id} className="flex items-center gap-2">
@@ -496,7 +498,7 @@ function ActionDataIndexEditorModalBody({
                                           }))
                                         }
                                         disabled={readOnly}
-                                        aria-label="transform 삭제"
+                                        aria-label={t('model.flowEditor.transformDeleteAria')}
                                       >
                                         <Trash2 className="size-4" aria-hidden="true" />
                                       </Button>
@@ -522,7 +524,7 @@ function ActionDataIndexEditorModalBody({
                                   disabled={readOnly}
                                 >
                                   <Plus className="size-3.5" aria-hidden="true" />
-                                  transform 추가
+                                  {t('model.flowEditor.addTransform')}
                                 </Button>
                               </div>
                             </TableCell>
@@ -542,7 +544,7 @@ function ActionDataIndexEditorModalBody({
                                   }))
                                 }
                                 disabled={readOnly}
-                                aria-label="field 삭제"
+                                aria-label={t('model.actionEditor.fieldDeleteAria')}
                               >
                                 <Trash2 className="size-4" aria-hidden="true" />
                               </Button>
@@ -559,9 +561,9 @@ function ActionDataIndexEditorModalBody({
 
         <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={onClose}>
-            취소
+            {t('common.cancel')}
           </Button>
-          {!readOnly ? <Button onClick={handleSave}>저장</Button> : null}
+          {!readOnly ? <Button onClick={handleSave}>{t('common.save')}</Button> : null}
         </DialogFooter>
       </div>
     </DialogContent>

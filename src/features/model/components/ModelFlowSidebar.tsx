@@ -8,6 +8,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import { groupFlowsByFlowName } from '../lib/model-flow-grouping.ts'
 import type { ModelFlowSummary } from '../types/model.types.ts'
 
@@ -132,6 +133,7 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
   onDeleteFlow,
   isEditable,
 }: ModelFlowSidebarProps) {
+  const { t } = useI18n()
   const groups = useMemo(() => groupFlowsByFlowName(summaries), [summaries])
 
   return (
@@ -155,7 +157,7 @@ export const ModelFlowSidebar = memo(function ModelFlowSidebar({
 
       <div className="space-y-1.5">
         {groups.length === 0 ? (
-          <p className="px-2 py-1 text-[11px] text-muted-foreground">표시할 Flow 가 없습니다.</p>
+          <p className="px-2 py-1 text-[11px] text-muted-foreground">{t('model.flow.sidebarEmpty')}</p>
         ) : (
           groups.map((group) => (
             <FlowGroupSection

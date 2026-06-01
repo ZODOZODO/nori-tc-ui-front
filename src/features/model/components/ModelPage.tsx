@@ -6,6 +6,7 @@ import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
+import { useI18n } from '@/i18n/i18n-context'
 import { useModelDetail } from '../hooks/useModelDetail'
 import { useModelDetailMutations } from '../hooks/useModelDetailMutations'
 import { useModelList } from '../hooks/useModelList'
@@ -186,6 +187,7 @@ const collectCascadeDeletedVersionKeys = (
  * Model Info 메인 페이지입니다.
  */
 export function ModelPage() {
+  const { t } = useI18n()
   const selectedModelVersionKey = useModelUiStore((state) => state.selectedModelVersionKey)
   const openedTabs = useModelUiStore((state) => state.openedTabs)
   const activeTab = useModelUiStore((state) => state.activeTab)
@@ -649,7 +651,7 @@ export function ModelPage() {
   const hasDetailData = detailRows.length > 0 || detailMdfContents.length > 0
   const detailLoadErrorMessage =
     detailNodeQuery.error && !hasDetailData
-      ? resolveErrorMessage(detailNodeQuery.error, '상세 데이터를 불러오지 못했습니다.')
+      ? resolveErrorMessage(detailNodeQuery.error, t('model.page.detailLoadError'))
       : null
 
   const handleDetailValueChange = (rowId: string, columnIndex: number, nextValue: string) => {
@@ -740,7 +742,7 @@ export function ModelPage() {
         [detailContextKey]: sortDetailRowsByFirstColumn(savedDetail.rows),
       }))
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '상세 데이터를 저장하지 못했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('error.model.saveRows')))
     }
   }
 
@@ -761,7 +763,7 @@ export function ModelPage() {
         [detailContextKey]: [savedMdf],
       }))
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, 'MDF 업로드에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('error.model.mdfUpload')))
     }
   }
 
@@ -894,7 +896,7 @@ export function ModelPage() {
       }))
     } catch (error) {
       setRootModalErrorMessage(
-        resolveErrorMessage(error, 'root model 관리 요청을 처리하지 못했습니다.'),
+        resolveErrorMessage(error, t('model.page.rootManageError')),
       )
     }
   }
@@ -931,7 +933,7 @@ export function ModelPage() {
       setSelectedModelVersionKey(createdBranch.modelVersionKey)
       setIsBranchCreateModalOpen(false)
     } catch (error) {
-      setBranchCreateErrorMessage(resolveErrorMessage(error, 'branch model 생성에 실패했습니다.'))
+      setBranchCreateErrorMessage(resolveErrorMessage(error, t('model.page.branchCreateError')))
     }
   }
 
@@ -951,11 +953,11 @@ export function ModelPage() {
         }
       } catch (error) {
         if (parentCommitPreviewModelKeyRef.current === modelKey) {
-          setParentCommitErrorMessage(resolveErrorMessage(error, 'parent commit diff를 불러오지 못했습니다.'))
+          setParentCommitErrorMessage(resolveErrorMessage(error, t('model.page.parentDiffError')))
         }
       }
     },
-    [previewParentCommitMutation],
+    [previewParentCommitMutation, t],
   )
 
   const handleOpenParentCommit = (model: ModelInfo) => {
@@ -996,7 +998,7 @@ export function ModelPage() {
       setExplicitCheckoutModelVersionKey(null)
       setIsParentCommitModalOpen(false)
     } catch (error) {
-      setParentCommitErrorMessage(resolveErrorMessage(error, 'parent commit에 실패했습니다.'))
+      setParentCommitErrorMessage(resolveErrorMessage(error, t('error.model.parentCommit')))
     }
   }
 
@@ -1069,7 +1071,7 @@ export function ModelPage() {
         open: false,
       }))
     } catch (error) {
-      setDeleteDialogErrorMessage(resolveErrorMessage(error, '모델 삭제에 실패했습니다.'))
+      setDeleteDialogErrorMessage(resolveErrorMessage(error, t('error.model.delete')))
     }
   }
 
@@ -1130,12 +1132,12 @@ export function ModelPage() {
     }
 
     if (!activeTabModel.parentModel?.trim()) {
-      setCheckInErrorMessage('root model은 checkout 없이 읽기 전용으로만 조회할 수 있습니다.')
+      setCheckInErrorMessage(t('model.page.rootReadOnly'))
       return
     }
 
     if (isDeprecatedStatus(activeTabModel.status)) {
-      setCheckInErrorMessage('DEPRECATED branch model은 편집할 수 없습니다.')
+      setCheckInErrorMessage(t('model.page.deprecatedNoEdit'))
       return
     }
 
@@ -1158,7 +1160,7 @@ export function ModelPage() {
       setExplicitCheckoutModelVersionKey(checkedOutModel.modelVersionKey)
       setEditMode(true)
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '체크아웃에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('model.page.checkoutError')))
     }
   }
 
@@ -1247,7 +1249,7 @@ export function ModelPage() {
 
   const handleUndoCheckIn = async () => {
     if (!activeTabModel || activeTabModel.modelVersion.trim().toUpperCase() !== 'EDIT') {
-      setCheckInErrorMessage('원복할 EDIT 모델이 없어 Undo를 수행할 수 없습니다.')
+      setCheckInErrorMessage(t('model.page.noEditForUndo'))
       return
     }
 
@@ -1261,7 +1263,7 @@ export function ModelPage() {
 
     if (!fallbackModel) {
       setCheckInErrorMessage(
-        '현재 branch에 checkout 이전 버전이 없어 Undo를 수행할 수 없습니다. branch baseline을 먼저 확인해 주세요.',
+        t('model.page.noBaselineForUndo'),
       )
       return
     }
@@ -1291,13 +1293,13 @@ export function ModelPage() {
       setExplicitCheckoutModelVersionKey(null)
       setCheckInModalOpen(false)
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '편집 상태 원복에 실패했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('model.page.undoError')))
     }
   }
 
   const handleSaveCheckIn = async (description: string) => {
     if (!activeTabModel || activeTabModel.modelVersion.trim().toUpperCase() !== 'EDIT') {
-      setCheckInErrorMessage('체크인할 EDIT 모델이 없어 저장할 수 없습니다.')
+      setCheckInErrorMessage(t('model.page.noEditForCheckin'))
       return
     }
 
@@ -1323,12 +1325,12 @@ export function ModelPage() {
       setExplicitCheckoutModelVersionKey(null)
       setCheckInModalOpen(false)
     } catch (error) {
-      setCheckInErrorMessage(resolveErrorMessage(error, '체크인 중 오류가 발생했습니다.'))
+      setCheckInErrorMessage(resolveErrorMessage(error, t('model.page.checkinError')))
     }
   }
 
   const listErrorMessage = modelListQuery.error
-    ? resolveErrorMessage(modelListQuery.error, '모델 목록을 불러오지 못했습니다.')
+    ? resolveErrorMessage(modelListQuery.error, t('model.page.listLoadError'))
     : null
 
   const isVersionFrame = activeTab !== null && openedTabs.length > 0

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   buildFlowFilterValue,
   createEmptyFlowFilterCondition,
@@ -97,6 +98,7 @@ function FlowFilterEditorModalBody({
   onClose,
   onSave,
 }: FlowFilterEditorModalBodyProps) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState<FlowFilterEditorDraft>(() =>
     parseFlowFilterEditor(value),
   )
@@ -154,9 +156,9 @@ function FlowFilterEditorModalBody({
     >
       <div className="flex h-full min-h-0 flex-col">
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
-          <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
+          <DialogTitle>{titleLabel || t('model.flowEditor.title')}</DialogTitle>
           <DialogDescription>
-            workflow_filter를 canonical group/condition 구조로 편집합니다.
+            {t('model.flowEditor.filterDesc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -171,7 +173,7 @@ function FlowFilterEditorModalBody({
               {draft.mode === 'raw' ? (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <p className="text-sm text-danger">
-                    현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
+                    {t('model.flowEditor.rawModeNotice')}
                   </p>
                   <textarea
                     value={draft.rawValue}
@@ -189,10 +191,10 @@ function FlowFilterEditorModalBody({
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <div className="rounded-2xl border border-border bg-muted px-4 py-3">
                     <p className="text-sm font-semibold text-foreground">
-                      root group와 하위 condition을 조합해 `and` / `or` 식을 구성합니다.
+                      {t('model.flowEditor.groupCompose')}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      `expected`는 JSON literal 기준으로 입력하면 숫자, boolean, array까지 lossless 하게 저장됩니다.
+                      {t('model.flowEditor.expectedHint')}
                     </p>
                   </div>
 
@@ -214,9 +216,9 @@ function FlowFilterEditorModalBody({
 
         <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={onClose}>
-            취소
+            {t('common.cancel')}
           </Button>
-          {!readOnly ? <Button onClick={handleSave}>저장</Button> : null}
+          {!readOnly ? <Button onClick={handleSave}>{t('common.save')}</Button> : null}
         </DialogFooter>
       </div>
     </DialogContent>
@@ -336,6 +338,7 @@ function FlowNodeEditor({
   onAddGroup,
   onRemoveNode,
 }: FlowNodeEditorProps) {
+  const { t } = useI18n()
   if (node.nodeType === 'condition') {
     return (
       <div
@@ -346,7 +349,7 @@ function FlowNodeEditor({
           <div>
             <p className="text-xs font-semibold text-foreground">Condition</p>
             <p className="text-[11px] text-muted-foreground">
-              `from`, `path`, `comparison`, `expected`, `transforms`를 직접 편집합니다.
+              {t('model.flowEditor.conditionFields')}
             </p>
           </div>
           <Button
@@ -356,7 +359,7 @@ function FlowNodeEditor({
             className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
             onClick={() => onRemoveNode(node.id)}
             disabled={readOnly}
-            aria-label="조건 삭제"
+            aria-label={t('model.flowEditor.conditionDeleteAria')}
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </Button>
@@ -446,7 +449,7 @@ function FlowNodeEditor({
                     : targetNode,
                 )
               }
-              placeholder='예: "PASS", 4, true, ["A", "B"]'
+              placeholder={t('common.example', { value: '"PASS", 4, true, ["A", "B"]' })}
               readOnly={readOnly}
             />
           </div>
@@ -457,7 +460,7 @@ function FlowNodeEditor({
             <div>
               <p className="text-xs font-semibold text-foreground">transforms</p>
               <p className="text-[11px] text-muted-foreground">
-                순차 적용할 transform을 한 줄씩 추가합니다.
+                {t('model.flowEditor.transformsHint')}
               </p>
             </div>
             <Button
@@ -477,12 +480,12 @@ function FlowNodeEditor({
               disabled={readOnly}
             >
               <Plus className="size-3.5" aria-hidden="true" />
-              transform 추가
+              {t('model.flowEditor.addTransform')}
             </Button>
           </div>
 
           {node.transforms.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">transform이 없으면 원본 값을 그대로 비교합니다.</p>
+            <p className="text-[11px] text-muted-foreground">{t('model.flowEditor.transformsEmpty')}</p>
           ) : (
             <div className="space-y-2">
               {node.transforms.map((transform) => (
@@ -525,7 +528,7 @@ function FlowNodeEditor({
                       )
                     }
                     disabled={readOnly}
-                    aria-label="transform 삭제"
+                    aria-label={t('model.flowEditor.transformDeleteAria')}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
@@ -547,7 +550,7 @@ function FlowNodeEditor({
         <div>
           <p className="text-xs font-semibold text-foreground">Group</p>
           <p className="text-[11px] text-muted-foreground">
-            하위 조건을 `{node.groupType}` 기준으로 묶습니다.
+            {t('model.flowEditor.groupCompose2', { groupType: node.groupType })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -577,7 +580,7 @@ function FlowNodeEditor({
             disabled={readOnly}
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            조건 추가
+            {t('model.flowEditor.addCondition')}
           </Button>
           <Button
             type="button"
@@ -587,7 +590,7 @@ function FlowNodeEditor({
             disabled={readOnly}
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            그룹 추가
+            {t('model.flowEditor.addGroup')}
           </Button>
           {depth > 0 ? (
             <Button

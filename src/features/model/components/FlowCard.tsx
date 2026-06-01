@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   DRAFT_FLOW_ID_SENTINEL,
   type FlowDraft,
@@ -149,6 +150,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
   },
   ref,
 ) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState<FlowDraft>(() => buildFlowDraft(flow))
 
   const isSaving = saveStatus === 'saving'
@@ -234,10 +236,10 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-foreground">
-            {draft.workflowName || '(flow 미지정)'} / {draft.messageName || '(message 미지정)'}
+            {draft.workflowName || t('model.flowCard.flowUnset')} / {draft.messageName || t('model.flowCard.messageUnset')}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? 'Flow ID #신규' : `Flow ID #${flow.flowId}`}
+            {flow.flowId === DRAFT_FLOW_ID_SENTINEL ? t('model.flowCard.flowIdNew') : `Flow ID #${flow.flowId}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -255,13 +257,13 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               onClick={onDelete}
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
-              삭제
+              {t('common.delete')}
             </Button>
           ) : null}
         </div>
       </header>
 
-      <FlowCardSection title="Identity" description="Flow 의 고유 식별값입니다.">
+      <FlowCardSection title="Identity" description={t('model.flowCard.identityDesc')}>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground">Flow Name</label>
@@ -275,11 +277,11 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               }
               readOnly={!isDraftCard}
               aria-readonly={isDraftCard ? 'false' : 'true'}
-              placeholder={isDraftCard ? '신규 Flow 이름을 입력하세요' : undefined}
+              placeholder={isDraftCard ? t('model.flowCard.flowNamePlaceholder') : undefined}
             />
             {!isDraftCard ? (
               <p className="text-[11px] text-muted-foreground">
-                저장된 Flow 의 Flow Name 은 변경 불가입니다. 변경이 필요하면 새 Flow 를 추가하고 기존 Flow 를 삭제하세요.
+                {t('model.flowCard.flowNameReadonlyHint')}
               </p>
             ) : null}
           </div>
@@ -291,10 +293,10 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               disabled={readOnly}
             >
               <SelectTrigger>
-                <SelectValue placeholder="메시지를 선택하세요" />
+                <SelectValue placeholder={t('model.flowCard.messagePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={MESSAGE_NAME_PLACEHOLDER}>(선택 안 함)</SelectItem>
+                <SelectItem value={MESSAGE_NAME_PLACEHOLDER}>{t('model.flowCard.noneSelected')}</SelectItem>
                 {messageOptions.map((option) => (
                   <SelectItem key={option.name} value={option.name}>
                     {option.name}
@@ -309,7 +311,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
       {renderTrigger ? (
         <FlowCardSection
           title="Trigger"
-          description="언제 이 Flow 가 실행되는지 (SECS 전용)."
+          description={t('model.flowCard.triggerDesc')}
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -320,10 +322,10 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
                 disabled={readOnly}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="EventId 를 선택하세요" />
+                  <SelectValue placeholder={t('model.flowCard.eventIdPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={MESSAGE_NAME_PLACEHOLDER}>(선택 안 함)</SelectItem>
+                  <SelectItem value={MESSAGE_NAME_PLACEHOLDER}>{t('model.flowCard.noneSelected')}</SelectItem>
                   {eventOptions.map((option) => (
                     <SelectItem key={option.id} value={option.id}>
                       {option.label}
@@ -337,11 +339,11 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               <Input
                 value={draft.transactionId ?? ''}
                 onChange={(event) => handleChangeTransactionId(event.target.value)}
-                placeholder="(빈 값 = wildcard)"
+                placeholder={t('model.flowCard.transactionIdPlaceholder')}
                 readOnly={readOnly}
               />
               <p className="text-[11px] text-muted-foreground">
-                값을 비우면 모든 transactionId 에 매칭됩니다.
+                {t('model.flowCard.transactionIdHint')}
               </p>
             </div>
           </div>
@@ -350,14 +352,14 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
 
       <FlowCardSection
         title="Filter"
-        description="workflow_filter — data / event / context 조건 트리. 모든 protocol 에서 편집 가능."
+        description={t('model.flowCard.filterDesc')}
       >
         <div className="space-y-2 rounded-xl border border-border bg-muted p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-xs font-semibold text-foreground">Flow Filter</p>
               <p className="text-[11px] text-muted-foreground">
-                data / event / context 의 조건 트리를 편집합니다.
+                {t('model.flowCard.filterEditHint')}
               </p>
             </div>
             <Button
@@ -368,7 +370,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               disabled={readOnly}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
-              편집...
+              {t('model.flowCard.editButton')}
             </Button>
           </div>
           <p
@@ -380,13 +382,13 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
         </div>
       </FlowCardSection>
 
-      <FlowCardSection title="Action" description="이 Flow 가 실행하는 동작입니다.">
+      <FlowCardSection title="Action" description={t('model.flowCard.actionDesc')}>
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground">Action Name</label>
           <Input
             value={draft.actionName}
             onChange={(event) => handleChangeActionName(event.target.value)}
-            placeholder="예: TOOL_CONDITION_REPLY"
+            placeholder={t('common.example', { value: 'TOOL_CONDITION_REPLY' })}
             readOnly={readOnly}
           />
         </div>
@@ -396,7 +398,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             <div>
               <p className="text-xs font-semibold text-foreground">Action Data Index</p>
               <p className="text-[11px] text-muted-foreground">
-                mdfTemplateName 과 fields 매핑을 편집합니다.
+                {t('model.flowCard.actionDataIndexHint')}
               </p>
             </div>
             <Button
@@ -407,7 +409,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
               disabled={readOnly}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
-              편집...
+              {t('model.flowCard.editButton')}
             </Button>
           </div>
           <p
@@ -421,7 +423,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
 
       <FlowCardSection
         title="Collect"
-        description="해당 Flow 가 수집하는 DCOP 항목입니다."
+        description={t('model.flowCard.collectDesc')}
         headerRight={
           <Button
             type="button"
@@ -432,14 +434,14 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             aria-disabled={readOnly || isDraftCard ? 'true' : undefined}
             title={
               readOnly
-                ? '편집 모드(Check Out)에서만 DCOP 추가 가능'
+                ? t('model.flowCard.dcopReadonlyTitle')
                 : isDraftCard
-                  ? 'Flow 저장 후 DCOP 추가 가능'
+                  ? t('model.flowCard.dcopDraftTitle')
                   : undefined
             }
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            DCOP 추가
+            {t('model.flowCard.addDcop')}
           </Button>
         }
       >
@@ -460,7 +462,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
                     colSpan={4}
                     className="py-6 text-center text-xs text-muted-foreground"
                   >
-                    수집 항목이 없습니다.
+                    {t('model.flowCard.collectEmpty')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -486,7 +488,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
             onClick={onCancelDraft}
             disabled={isSaving}
           >
-            취소
+            {t('common.cancel')}
           </Button>
         </footer>
       ) : null}

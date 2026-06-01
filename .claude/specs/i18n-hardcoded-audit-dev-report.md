@@ -359,3 +359,136 @@ BUILD_EXIT:0
 
 ## 7. 다음 단계
 P4 model(112+153) — 새 세션 권장. 최난도(hintText 삼항, model-detail-editor JSON 에디터 검증 28, model.api 33).
+
+---
+
+# P4 — model (112 + 153 + 1)
+
+## 1. 무엇을 했나
+
+카탈로그의 model 영역(components set1 112 / components set2 + lib/api 153 / model.types 1)을 i18n 키로 전수 치환.
+C1/C2/C3(컴포넌트 인라인·삼항·템플릿) → `t()`, C4(ModelCheckInDiffModal KIND_BADGE/컬럼 헤더 상수 · ParentModelCommitModal diff 컬럼 · modelDetailColumnDefs factory) → 키맵/팩토리 + 렌더 시점 번역, C5(api/types/lib fallback) → standalone `i18n.t` / getter(D1).
+착수 시 grep 실측 재확인(model 전체 한글 854 라인 — 주석/jargon/기존 t() 포함) 후 카탈로그 라인 대조.
+
+## 2. 신설 키 (ko/en 각 동수)
+
+P4 진입 전 529키 → **739키**(P4 신설 **210키 × 2**). `node` 로 ko/en 차집합 0 검증:
+```
+ko 739 en 739
+in ko not en: []
+in en not ko: []
+```
+
+네임스페이스(기존 model.* 9키 외 신설 + 재사용):
+- `error.model.*` (23) — model.api 16고유 + model-flow.api 5 + CSRF + default. (try/catch 양쪽 중복 33건 → 16 고유 키)
+- `model.flow.noFilter/noMapping` (2) — model-flow-editor summary
+- `model.editor.*` (24) — model-detail-editor JSON 검증 throw (jargon 유지 + 한글/`{{label}}`/`{{fieldName}}`/`{{groupType}}` 보간)
+- `model.detail.*` (23) — ModelDetailPanel hintText 5분기 + tooltip/lock/탭/Flow·MDF 로딩·빈상태/ConfirmDialog
+- `model.flowCard.*` (22) — FlowCard 5섹션 desc/placeholder/hint/버튼
+- `model.actionEditor.*` (18) — ActionDataIndexEditorModal MDF/field/드래그 aria·title
+- `model.flowEditor.*` (14) — FlowFilterEditorModal + ActionDataIndexEditorModal(title/rawMode/transform 재사용)
+- `model.dcop.*` (18) — DcopItemPickerModal
+- `model.parent.*` (13) — ParentModelCommitModal diff
+- `model.branch.*` (11) — BranchModelCreateModal
+- `model.checkin.diff*` (10) + `model.checkin.commentPlaceholder` (1) — ModelCheckInDiffModal + ModelCheckInModal
+- `model.delete.*` (6) — ModelDeleteConfirmDialog 6분기
+- `model.create.*` (6) — ModelCreateOrUpdateModal
+- `model.page.*` (13) — ModelPage fallback (등록/저장/MDF 등 정확 동일 텍스트는 `error.model.*` 재사용)
+- `error.model.checkoutConflict(By)` (2) — useModelMutations checkout 충돌(노출됨, {{owner}})
+- `common.save` (1) 신설 + `common.delete/cancel/example/table.action` 재사용
+
+## 3. Plan 결정 준수 (D1 / D2 / C4 / C2)
+
+- **D1 (api/lib/types fallback → standalone `i18n.t`)**:
+  - `model.api.ts` — 모듈 로드 시점 고정 상수 `MODEL_LIST_FALLBACK_MESSAGE`/`MODEL_DETAIL_NODE_FALLBACK_MESSAGE` → getter(`modelListFallbackMessage = () => i18n.t(...)`). 인라인 fallback 14종 + CSRF는 호출 시점 평가라 `i18n.t(...)` 직접.
+  - `model-flow.api.ts` — 5개 `FLOW_*_FALLBACK_MESSAGE` → getter. CSRF i18n.t.
+  - `model.types.ts` — `DEFAULT_MODEL_ERROR_MESSAGE` → `defaultModelErrorMessage()` getter. `createModelFailResponse`/`normalizeModelError`의 `fallbackMessage = defaultModelErrorMessage()` default 파라미터식은 호출마다 평가(P2 deploy.api / P3 eqp 동일 패턴).
+  - `model-detail-editor.ts`(28) — JSON 에디터 검증 throw. jargon(workflow_filter/action_data_index/from/path/transforms 등) 유지 + 한글만 키화. `validateAllowedKeys`의 label 인자는 호출부에서 `i18n.t()` 생성, suffix("허용되지 않은 키:")는 `model.editor.disallowedKeys`로 분리.
+  - `model-flow-editor.ts`(6) — '필터 없음'/'매핑 없음' i18n.t 직접(FlowCard summary 노출).
+  - `useModelMutations.ts` — checkout 충돌 에러(노출) `{{owner}}` interpolation. (useModelFlowMutations invariant는 D2로 제외.)
+- **D2 (borderline·L382 제외)**:
+  - **ModelDetailPanel.tsx:382 `workflow ${n}행` rowPrefix 무변경** — BE 에러 매칭용 비교 prefix(화면 미표시). grep 재확인 후 그 한 줄 건너뜀.
+  - `useModelFlowMutations.ts:29/43/57 'modelVersionKey 가 지정되지 않았습니다.'` — 내부 invariant(정상 흐름 미노출), 1차 제외. 무변경.
+- **C4 모듈 상수 구조 변경**:
+  - `ModelCheckInDiffModal` `KIND_BADGE_LABEL`(추가/변경/삭제) → `KIND_BADGE_LABEL_KEYS` 키맵 + `CheckInDiffSectionTable` 의 `columns` useMemo deps에 `t` 추가, accessor/renderCell `t(KIND_BADGE_LABEL_KEYS[kind])`. 컬럼 header '구분'/'식별자' → `t(...)`. SelectableTable `header: string` 계약 보존.
+  - `ParentModelCommitModal` `resolveDiffTableColumns`(모듈 함수) → `itemLabel` 파라미터 추가, `DiffTable` 의 useMemo가 `t('model.parent.diffItem')` 주입(deps에 `t`). Badge "{n}건" 보간.
+  - `modelDetailColumnDefs.tsx`(React 밖 factory) → `import i18n` 후 renderCell 안 `i18n.t(..., {value, column})` 직접(렌더 시점 평가).
+- **C2 삼항/동적 + 보간**:
+  - ModelDetailPanel hintText 5분기 / topSaveTooltip 삼항 / lock 삼항({{owner}}) / 탭닫기 aria({{name}} {{version}}) / row 삭제 aria({{value}}, fallback `model.detail.newRow`) / emptyState 삼항.
+  - DialogTitle: ModelCreateOrUpdate(jargon 무변경), FlowFilterEditor/ActionDataIndexEditor `titleLabel || t('model.flowEditor.title')`(영어 titleLabel은 부모 주입 유지).
+  - ModelDeleteConfirmDialog description 6분기(with/no name × root/branch/deprecated) → 분기마다 키({{name}}).
+
+## 4. 구현 결정 기록
+
+- **near-dup 키 분리 vs 재사용**: ModelPage fallback 중 텍스트가 정확히 동일한 것만 `error.model.*` 재사용(saveRows/mdfUpload/parentCommit/delete). 미묘히 다른 것("branch model 생성" vs "branch 모델 생성", "불러오지" vs "조회하지")은 `model.page.*` 별도 키로 값 보존.
+- **`common.save` 신설**: FlowFilterEditor/ActionDataIndexEditor/DcopItemPicker '저장' 공용. `common.cancel/delete/example/table.action` 은 P1~P3 키 재사용.
+- **모달 간 키 재사용**: ActionDataIndexEditorModal이 FlowFilterEditorModal의 `model.flowEditor.title/rawModeNotice/transformDeleteAria/addTransform` 재사용(동일 문자열).
+- **useCallback/useMemo deps**: `t` 를 쓰게 된 ModelPage `loadParentCommitPreview`, ModelCheckInDiffModal/ParentModelCommitModal 컬럼 useMemo deps에 `t` 추가(react-compiler 정합).
+- **순수 jargon 무변경**: Flow/Model/MDF/DCOP/Reference/transform/field/Root/branch/DEPRECATED/EventId/Variable Id/Collection Rule/Identity/Trigger/Action/Collect/Parent Model Commit/Diff Preview/Source MDF/`Added n / Changed n / Deleted n`(ParentModelCommit 영어 라벨)/컬럼 헤더 등.
+
+## 5. 검증 결과 (전부 PASS)
+
+ko/en 키 차집합 0 (739/739, §2 인용).
+
+### tsc -b
+```
+TSC_EXIT:0
+```
+
+### eslint (변경 20 소스 파일)
+P4 신규 에러 0. ModelPage 의 `react-hooks/set-state-in-effect` 4건은 **pre-existing**(내가 수정하지 않은 `useEffect` 블록 — L509/568/585 등). ModelPage 단독 stash 후 baseline 비교로 확정:
+```
+=== P4 적용 error 수 ===
+4
+=== baseline(HEAD) error 수 ===
+4
+```
+(동일 → P4 신규 0.) `loadParentCommitPreview` useCallback 의 `t` missing-dependency warning 1건은 deps에 `t` 추가로 해소 → 최종 0 warning.
+
+### vite build
+```
+dist/assets/ModelDetailPanel-yCJ4tIRh.js           63.74 kB │ gzip:  15.58 kB
+dist/assets/ModelPage-DwsQsphE.js                  65.25 kB │ gzip:  17.54 kB
+✓ built in 14.62s
+BUILD_EXIT:0
+```
+
+### e2e (전체 79, flat-key console.error 0 가드 포함)
+1차 실행 시 16 failed(model-flow 14 + check-in-diff 2) — e2e가 **한글 텍스트 셀렉터**로 요소를 찾는데 P4 i18n 적용으로 **EN 모드에서 영어로 정상 전환**되어 셀렉터 실패(P1 의 "EN 모드 한국어 표시 버그" 수정과 동일 성격; P3까지는 model 하드코딩이라 EN 모드에서도 한글 표시되어 우연히 통과). e2e는 EN 모드로 동작하므로 두 spec의 한글 셀렉터를 EN 값(en.json 일치)으로 정합 → 전체 PASS:
+```
+79 passed (2.4m)
+E2E_EXIT:0
+```
+model-flow + check-in-diff 단독 재실행 `22 passed (56.1s)`. check-in-diff 의 `attachConsoleErrorListeners` → `consoleBucket.errors ... toEqual([])` 충족 = console.error 0.
+
+## 6. 변경 파일 (24)
+
+| 파일 | 변경 |
+|---|---|
+| `src/i18n/locales/ko.json` | +210 키 |
+| `src/i18n/locales/en.json` | +210 키 |
+| `src/features/model/types/model.types.ts` | DEFAULT_MODEL_ERROR_MESSAGE → defaultModelErrorMessage() getter |
+| `src/features/model/api/model.api.ts` | fallback getter 2 + 인라인 14종 i18n.t + CSRF + normalizeModelError default |
+| `src/features/model/api/model-flow.api.ts` | fallback getter 5 + CSRF + default |
+| `src/features/model/lib/model-detail-editor.ts` | i18n + JSON 검증 throw 28 (jargon 유지 + 보간) |
+| `src/features/model/lib/model-flow-editor.ts` | 필터/매핑 없음 i18n.t |
+| `src/features/model/hooks/useModelMutations.ts` | checkout 충돌 {{owner}} i18n.t |
+| `src/features/model/components/modelDetailColumnDefs.tsx` | factory i18n.t (편집 aria / 중복 title) |
+| `src/features/model/components/ModelFlowSidebar.tsx` | useI18n + Flow 빈상태 |
+| `src/features/model/components/ModelCheckInModal.tsx` | useI18n + placeholder |
+| `src/features/model/components/ModelDeleteConfirmDialog.tsx` | useI18n + description 6분기 |
+| `src/features/model/components/ModelCreateOrUpdateModal.tsx` | useI18n + desc/검증/placeholder |
+| `src/features/model/components/ModelCheckInDiffModal.tsx` | KIND_BADGE 키맵 + 컬럼 header + diff 본문 |
+| `src/features/model/components/BranchModelCreateModal.tsx` | useI18n + 검증/desc/길이 hint 삼항 |
+| `src/features/model/components/ParentModelCommitModal.tsx` | resolveDiffTableColumns itemLabel + DiffTable useI18n + 본문 |
+| `src/features/model/components/ModelPage.tsx` | useI18n + fallback 17 (4 재사용) + useCallback deps |
+| `src/features/model/components/FlowFilterEditorModal.tsx` | Body + FlowNodeEditor useI18n + 17 |
+| `src/features/model/components/DcopItemPickerModal.tsx` | useI18n + 20 (보간 다수) |
+| `src/features/model/components/ModelDetailPanel.tsx` | useI18n + hintText 5분기/tooltip/lock/Flow·MDF/ConfirmDialog (382 제외) |
+| `src/features/model/components/FlowCard.tsx` | useI18n + 5섹션 desc/placeholder/버튼 |
+| `src/features/model/components/ActionDataIndexEditorModal.tsx` | Body useI18n + 25 (flowEditor 키 재사용) |
+| `tests/e2e/model-flow.spec.ts` | 한글 셀렉터 → EN 정합 (Save Flow / Add DCOP / Delete / Edit 등) |
+| `tests/e2e/selectable-table-model-check-in-diff.spec.ts` | 'Preview Changes' 헬퍼 셀렉터 EN 정합 |
+
+## 7. 다음 단계
+P5 user/profile/auth(84) — 새 세션 권장. zod(useLogin) 메시지 포함.

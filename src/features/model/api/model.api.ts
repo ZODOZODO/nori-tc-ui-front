@@ -1,9 +1,10 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   type ApiResponse,
   createModelFailResponse,
-  DEFAULT_MODEL_ERROR_MESSAGE,
+  defaultModelErrorMessage,
   ModelApiError,
   type ModelBranchCreateRequest,
   type ModelDeleteBatchResult,
@@ -34,8 +35,9 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const MODEL_LIST_FALLBACK_MESSAGE = '모델 목록을 조회하지 못했습니다.'
-const MODEL_DETAIL_NODE_FALLBACK_MESSAGE = '모델 상세 노드 데이터를 조회하지 못했습니다.'
+// 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
+const modelListFallbackMessage = (): string => i18n.t('error.model.list')
+const modelDetailNodeFallbackMessage = (): string => i18n.t('error.model.detailNode')
 
 
 /**
@@ -73,7 +75,7 @@ const issueCsrfToken = async (): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.model.csrf'),
       }),
     )
   }
@@ -86,7 +88,7 @@ const issueCsrfToken = async (): Promise<string> => {
  */
 const normalizeModelError = (
   error: unknown,
-  fallbackMessage = DEFAULT_MODEL_ERROR_MESSAGE,
+  fallbackMessage = defaultModelErrorMessage(),
 ): ModelApiError => {
   if (error instanceof ModelApiError) {
     return error
@@ -176,9 +178,9 @@ const normalizeModelListPayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: MODEL_LIST_FALLBACK_MESSAGE,
+          errorMsg: modelListFallbackMessage(),
         },
-        MODEL_LIST_FALLBACK_MESSAGE,
+        modelListFallbackMessage(),
       ),
     )
   }
@@ -233,9 +235,9 @@ const normalizeModelNodeDetailPayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: MODEL_DETAIL_NODE_FALLBACK_MESSAGE,
+          errorMsg: modelDetailNodeFallbackMessage(),
         },
-        MODEL_DETAIL_NODE_FALLBACK_MESSAGE,
+        modelDetailNodeFallbackMessage(),
       ),
     )
   }
@@ -291,12 +293,12 @@ export const modelApi = {
       const successPayload = resolveSuccessPayload<unknown>(
         response.data,
         response.status,
-        MODEL_LIST_FALLBACK_MESSAGE,
+        modelListFallbackMessage(),
       )
 
       return normalizeModelListPayload(successPayload, offset, limit)
     } catch (error) {
-      throw normalizeModelError(error, MODEL_LIST_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, modelListFallbackMessage())
     }
   },
 
@@ -312,10 +314,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        '모델 상세 정보를 조회하지 못했습니다.',
+        i18n.t('error.model.detail'),
       )
     } catch (error) {
-      throw normalizeModelError(error, '모델 상세 정보를 조회하지 못했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.detail'))
     }
   },
 
@@ -337,12 +339,12 @@ export const modelApi = {
       const successPayload = resolveSuccessPayload<ModelNodeDetailPayload>(
         response.data,
         response.status,
-        MODEL_DETAIL_NODE_FALLBACK_MESSAGE,
+        modelDetailNodeFallbackMessage(),
       )
 
       return normalizeModelNodeDetailPayload(successPayload, node)
     } catch (error) {
-      throw normalizeModelError(error, MODEL_DETAIL_NODE_FALLBACK_MESSAGE)
+      throw normalizeModelError(error, modelDetailNodeFallbackMessage())
     }
   },
 
@@ -364,10 +366,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        '모델 checkout에 실패했습니다.',
+        i18n.t('error.model.checkout'),
       )
     } catch (error) {
-      throw normalizeModelError(error, '모델 checkout에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.checkout'))
     }
   },
 
@@ -392,10 +394,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        '모델 checkin에 실패했습니다.',
+        i18n.t('error.model.checkin'),
       )
     } catch (error) {
-      throw normalizeModelError(error, '모델 checkin에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.checkin'))
     }
   },
 
@@ -430,12 +432,12 @@ export const modelApi = {
       const successPayload = resolveSuccessPayload<ModelNodeDetailPayload>(
         response.data,
         response.status,
-        '상세 데이터를 저장하지 못했습니다.',
+        i18n.t('error.model.saveRows'),
       )
 
       return normalizeModelNodeDetailPayload(successPayload, node)
     } catch (error) {
-      throw normalizeModelError(error, '상세 데이터를 저장하지 못했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.saveRows'))
     }
   },
 
@@ -475,7 +477,7 @@ export const modelApi = {
       const successPayload = resolveSuccessPayload<ModelMdfContentPayload>(
         response.data,
         response.status,
-        'MDF 업로드에 실패했습니다.',
+        i18n.t('error.model.mdfUpload'),
       )
 
       return {
@@ -484,7 +486,7 @@ export const modelApi = {
         xml: successPayload.xml,
       }
     } catch (error) {
-      throw normalizeModelError(error, 'MDF 업로드에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.mdfUpload'))
     }
   },
 
@@ -506,10 +508,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        'root 모델 생성에 실패했습니다.',
+        i18n.t('error.model.rootCreate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'root 모델 생성에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.rootCreate'))
     }
   },
 
@@ -534,10 +536,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        'root 모델 정보를 수정하지 못했습니다.',
+        i18n.t('error.model.rootUpdate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'root 모델 정보를 수정하지 못했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.rootUpdate'))
     }
   },
 
@@ -562,10 +564,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelInfo>(
         response.data,
         response.status,
-        'branch 모델 생성에 실패했습니다.',
+        i18n.t('error.model.branchCreate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'branch 모델 생성에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.branchCreate'))
     }
   },
 
@@ -587,10 +589,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelParentCommitResult>(
         response.data,
         response.status,
-        'parent commit diff를 조회하지 못했습니다.',
+        i18n.t('error.model.parentDiff'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'parent commit diff를 조회하지 못했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.parentDiff'))
     }
   },
 
@@ -615,10 +617,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelParentCommitResult>(
         response.data,
         response.status,
-        'parent commit에 실패했습니다.',
+        i18n.t('error.model.parentCommit'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'parent commit에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.parentCommit'))
     }
   },
 
@@ -640,10 +642,10 @@ export const modelApi = {
       return resolveSuccessPayload<ModelDeleteBatchResult>(
         response.data,
         response.status,
-        'deprecated branch 삭제에 실패했습니다.',
+        i18n.t('error.model.deprecatedDelete'),
       )
     } catch (error) {
-      throw normalizeModelError(error, 'deprecated branch 삭제에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.deprecatedDelete'))
     }
   },
 
@@ -662,9 +664,9 @@ export const modelApi = {
         }),
       )
 
-      return resolveSuccessPayload<ModelInfo>(response.data, response.status, '모델 등록에 실패했습니다.')
+      return resolveSuccessPayload<ModelInfo>(response.data, response.status, i18n.t('error.model.create'))
     } catch (error) {
-      throw normalizeModelError(error, '모델 등록에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.create'))
     }
   },
 
@@ -683,9 +685,9 @@ export const modelApi = {
         }),
       )
 
-      return resolveSuccessPayload<ModelInfo>(response.data, response.status, '모델 수정에 실패했습니다.')
+      return resolveSuccessPayload<ModelInfo>(response.data, response.status, i18n.t('error.model.update'))
     } catch (error) {
-      throw normalizeModelError(error, '모델 수정에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.update'))
     }
   },
 
@@ -704,9 +706,9 @@ export const modelApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '모델 삭제에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.model.delete'), true)
     } catch (error) {
-      throw normalizeModelError(error, '모델 삭제에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.delete'))
     }
   },
 
@@ -728,9 +730,9 @@ export const modelApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '모델 삭제에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.model.delete'), true)
     } catch (error) {
-      throw normalizeModelError(error, '모델 삭제에 실패했습니다.')
+      throw normalizeModelError(error, i18n.t('error.model.delete'))
     }
   },
 

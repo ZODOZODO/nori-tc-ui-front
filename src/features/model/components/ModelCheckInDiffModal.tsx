@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { MODEL_DETAIL_NODE_LABELS } from '../types/model.types'
 import type { ModelDiffSection } from '../types/model.types'
 
@@ -39,10 +40,11 @@ interface NormalizedCheckInDiffRow {
   parentValues: string[]
 }
 
-const KIND_BADGE_LABEL: Record<CheckInDiffRowKind, string> = {
-  added: '추가',
-  changed: '변경',
-  deleted: '삭제',
+// 모듈 상수라 컴포넌트 밖에서 t() 불가 — i18n 키만 담고 렌더 시점 t(key) 로 번역.
+const KIND_BADGE_LABEL_KEYS: Record<CheckInDiffRowKind, string> = {
+  added: 'model.checkin.diffAdded',
+  changed: 'model.checkin.diffChanged',
+  deleted: 'model.checkin.diffDeleted',
 }
 
 const KIND_BADGE_CLASS: Record<CheckInDiffRowKind, string> = {
@@ -83,27 +85,28 @@ const normalizeSectionRows = (section: ModelDiffSection): NormalizedCheckInDiffR
  * section.columns 가 동적이라 다른 모달과 공유 불가 (Plan W-FAC1 = B inline 결정).
  */
 function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
+  const { t } = useI18n()
   const normalizedRows = useMemo(() => normalizeSectionRows(section), [section])
   const sectionColumns = section.columns
 
   const columns = useMemo<ColumnDef<NormalizedCheckInDiffRow>[]>(() => {
     const kindColumn: ColumnDef<NormalizedCheckInDiffRow> = {
       key: 'kind',
-      header: '구분',
+      header: t('model.checkin.diffKind'),
       width: '6rem',
-      accessor: (row) => KIND_BADGE_LABEL[row.kind],
+      accessor: (row) => t(KIND_BADGE_LABEL_KEYS[row.kind]),
       renderCell: (row) => (
         <span
           className={`rounded px-1.5 py-0.5 text-xs font-semibold ${KIND_BADGE_CLASS[row.kind]}`}
         >
-          {KIND_BADGE_LABEL[row.kind]}
+          {t(KIND_BADGE_LABEL_KEYS[row.kind])}
         </span>
       ),
     }
 
     const identityColumn: ColumnDef<NormalizedCheckInDiffRow> = {
       key: 'identity',
-      header: '식별자',
+      header: t('model.checkin.diffIdentity'),
       width: '10rem',
       accessor: (row) => row.identity,
       renderCell: (row) => (
@@ -172,7 +175,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
     )
 
     return [kindColumn, identityColumn, ...valueColumns]
-  }, [sectionColumns])
+  }, [sectionColumns, t])
 
   const wrapRow = (
     row: NormalizedCheckInDiffRow,
@@ -216,6 +219,7 @@ export function ModelCheckInDiffModal({
   onCancel,
   onOk,
 }: ModelCheckInDiffModalProps) {
+  const { t } = useI18n()
   const hasDiff = diffSections.some(
     (section) => section.added.length > 0 || section.changed.length > 0 || section.deleted.length > 0,
   )
@@ -232,9 +236,9 @@ export function ModelCheckInDiffModal({
     >
       <DialogContent className="z-[60] max-w-4xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>변경사항 미리보기</DialogTitle>
+          <DialogTitle>{t('model.checkin.diffTitle')}</DialogTitle>
           <DialogDescription>
-            이전 버전과 현재 편집 내용의 차이입니다. 확인 후 OK를 누르면 버전 저장 단계로 이동합니다.
+            {t('model.checkin.diffDesc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -242,11 +246,11 @@ export function ModelCheckInDiffModal({
           {isPending ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              이전 버전 데이터를 불러오는 중입니다.
+              {t('model.checkin.diffLoading')}
             </div>
           ) : !hasDiff ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
-              이전 버전과 비교하여 변경된 내용이 없습니다.
+              {t('model.checkin.diffEmpty')}
             </p>
           ) : (
             diffSections.map((section) => {
@@ -266,7 +270,11 @@ export function ModelCheckInDiffModal({
                   <div className="bg-muted px-4 py-2.5">
                     <span className="text-sm font-semibold text-foreground">{nodeLabel}</span>
                     <span className="ml-2 text-xs text-muted-foreground">
-                      추가 {section.added.length} / 변경 {section.changed.length} / 삭제 {section.deleted.length}
+                      {t('model.checkin.diffCounts', {
+                        added: section.added.length,
+                        changed: section.changed.length,
+                        deleted: section.deleted.length,
+                      })}
                     </span>
                   </div>
 

@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   MODEL_DETAIL_NODE_LABELS,
   type ModelDiffItem,
@@ -72,19 +73,20 @@ const resolveDiffTableColumns = (
   columns: string[],
   mode: DiffTableMode,
   visibleColumnIndexes: number[],
+  itemLabel: string,
 ): string[] => {
   const normalizedColumns = columns.length > 0 ? columns : ['Value']
   const visibleColumns = visibleColumnIndexes.map((index) => normalizedColumns[index] ?? 'Value')
 
   if (mode === 'changed') {
     return [
-      '항목',
+      itemLabel,
       ...visibleColumns.map((columnName) => `Parent ${columnName}`),
       ...visibleColumns.map((columnName) => `Branch ${columnName}`),
     ]
   }
 
-  return ['항목', ...visibleColumns]
+  return [itemLabel, ...visibleColumns]
 }
 
 /**
@@ -144,13 +146,14 @@ const resolveDiffTableTone = (
  * diff 테이블 단일 블록입니다.
  */
 function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTableProps) {
+  const { t } = useI18n()
   const visibleColumnIndexes = useMemo(
     () => resolveVisibleColumnIndexes(columns, hiddenColumns),
     [columns, hiddenColumns],
   )
   const tableColumns = useMemo(
-    () => resolveDiffTableColumns(columns, mode, visibleColumnIndexes),
-    [columns, mode, visibleColumnIndexes],
+    () => resolveDiffTableColumns(columns, mode, visibleColumnIndexes, t('model.parent.diffItem')),
+    [columns, mode, visibleColumnIndexes, t],
   )
   const tableRows = useMemo(
     () => resolveDiffTableRows(items, mode, visibleColumnIndexes),
@@ -194,7 +197,7 @@ function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTabl
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-foreground">{title}</p>
           <Badge variant="secondary" className={tone.badgeClassName}>
-            {items.length}건
+            {t('model.parent.itemCount', { count: items.length })}
           </Badge>
         </div>
       </div>
@@ -235,6 +238,7 @@ export function ParentModelCommitModal({
   onOpenChange,
   onCommit,
 }: ParentModelCommitModalProps) {
+  const { t } = useI18n()
   const defaultNewParentVersion = useMemo(() => {
     const parentModelName = previewResult?.parentModelName ?? branchModel?.parentModel ?? ''
     return createNextDailyModelVersion(parentModelName, parentVersions)
@@ -254,7 +258,7 @@ export function ParentModelCommitModal({
   const handleCommit = async () => {
     const normalizedNewParentVersion = newParentVersion.trim()
     if (!normalizedNewParentVersion) {
-      setFormErrorMessage('새 parent version을 입력해 주세요.')
+      setFormErrorMessage(t('model.parent.versionRequired'))
       return
     }
 
@@ -276,7 +280,7 @@ export function ParentModelCommitModal({
           <DialogHeader className="border-b border-border px-6 py-5">
             <DialogTitle>Parent Model Commit</DialogTitle>
             <DialogDescription>
-              branch 최신 버전과 parent 최신 버전의 diff를 검토한 뒤 parent 새 버전을 생성합니다.
+              {t('model.parent.desc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -310,9 +314,9 @@ export function ParentModelCommitModal({
 
             <section className="rounded-2xl border border-border bg-muted p-4">
               <div className="mb-3">
-                <h3 className="text-sm font-semibold text-foreground">새 Parent Version</h3>
+                <h3 className="text-sm font-semibold text-foreground">{t('model.parent.newVersionLabel')}</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Commit 완료 시 parent 새 version이 생성되고 branch 모든 version status는 DEPRECATED로 전환됩니다.
+                  {t('model.parent.newVersionHint')}
                 </p>
               </div>
 
@@ -342,20 +346,20 @@ export function ParentModelCommitModal({
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Diff Preview</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    추가, 변경, 삭제 항목을 모두 검토한 뒤 commit 하십시오.
+                    {t('model.parent.reviewHint')}
                   </p>
                 </div>
                 {isPreviewLoading ? (
                   <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    diff를 계산하는 중입니다.
+                    {t('model.parent.diffCalculating')}
                   </span>
                 ) : null}
               </div>
 
               {!isPreviewLoading && !errorMessage && !hasDiffItems ? (
                 <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground">
-                  표시할 diff가 없습니다. 그래도 새 parent version을 생성하려면 Commit을 진행할 수 있습니다.
+                  {t('model.parent.diffEmpty')}
                 </div>
               ) : null}
 
@@ -389,21 +393,21 @@ export function ParentModelCommitModal({
 
                     <div className="space-y-3">
                       <DiffTable
-                        title="추가 항목"
+                        title={t('model.parent.diffAddedTitle')}
                         mode="added"
                         columns={section.columns}
                         items={section.added}
                         hiddenColumns={hiddenDiffColumns}
                       />
                       <DiffTable
-                        title="변경 항목"
+                        title={t('model.parent.diffChangedTitle')}
                         mode="changed"
                         columns={section.columns}
                         items={section.changed}
                         hiddenColumns={hiddenDiffColumns}
                       />
                       <DiffTable
-                        title="삭제 항목"
+                        title={t('model.parent.diffDeletedTitle')}
                         mode="deleted"
                         columns={section.columns}
                         items={section.deleted}
