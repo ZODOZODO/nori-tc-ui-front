@@ -42,6 +42,7 @@ import type {
 } from '../types/eqp.types'
 import { useI18n } from '@/i18n/i18n-context'
 import i18n from '@/i18n'
+import { useLineList } from '@/shared/hooks/useLineList'
 
 type EqpManageFormMode = 'create' | 'update'
 
@@ -61,6 +62,7 @@ interface EqpManageFormModalProps {
 
 interface EqpManageFormState {
   eqpId: string
+  lineKey: string
   commMode: string
   isDev: boolean
   routePartition: string
@@ -300,6 +302,7 @@ const createInitialFormState = (
   if (mode === 'create') {
     return {
       eqpId: '',
+      lineKey: '',
       commMode: '',
       isDev: false,
       routePartition: '0',
@@ -334,6 +337,7 @@ const createInitialFormState = (
 
   return {
     eqpId: detail?.eqpId ?? '',
+    lineKey: detail?.lineKey ? toFieldString(detail.lineKey) : '',
     commMode: detail?.commMode ?? '',
     isDev: detail?.isDev ?? false,
     routePartition: toFieldString(detail?.routePartition ?? 0),
@@ -457,6 +461,7 @@ export function EqpManageFormModal({
   onSubmit,
 }: EqpManageFormModalProps) {
   const { t } = useI18n()
+  const lineListQuery = useLineList()
   const [formState, setFormState] = useState<EqpManageFormState>(() =>
     createInitialFormState(mode, interfaceType, detail),
   )
@@ -618,6 +623,10 @@ export function EqpManageFormModal({
           throw new Error(t('eqp.form.eqpIdRequired'))
         }
 
+        if (!formState.lineKey) {
+          throw new Error(t('eqp.form.lineRequired'))
+        }
+
         if (!formState.commMode) {
           throw new Error(t('eqp.form.commModeRequired'))
         }
@@ -633,6 +642,7 @@ export function EqpManageFormModal({
         )
         const request: EqpCreateRequest = {
           eqpId: formState.eqpId.trim(),
+          lineKey: parseRequiredInteger(formState.lineKey, 'Line', { positive: true }),
           interfaceType: resolvedInterfaceType,
           commMode: formState.commMode,
           isDev: formState.isDev,
@@ -693,6 +703,10 @@ export function EqpManageFormModal({
         throw new Error(t('eqp.page.manageDetailLoadError'))
       }
 
+      if (!formState.lineKey) {
+        throw new Error(t('eqp.form.lineRequired'))
+      }
+
       if (!formState.commMode) {
         throw new Error(t('eqp.form.commModeRequired'))
       }
@@ -702,6 +716,7 @@ export function EqpManageFormModal({
       }
 
       const request = buildEqpUpdateRequest(detail, {
+        lineKey: parseRequiredInteger(formState.lineKey, 'Line', { positive: true }),
         commMode: formState.commMode,
         isDev: formState.isDev,
         routePartition: parseRequiredInteger(formState.routePartition, 'Route Partition', { min: 0 }),
@@ -799,6 +814,25 @@ export function EqpManageFormModal({
                     ) : (
                       <ReadOnlyField label="EQP ID" value={formState.eqpId} />
                     )}
+
+                    <Field label={t('eqp.form.lineLabel')} required>
+                      <Select
+                        value={toSelectValue(formState.lineKey)}
+                        onValueChange={handleSelectChange('lineKey')}
+                        disabled={isPending || lineListQuery.isLoading}
+                      >
+                        <SelectTrigger data-testid="eqp-form-line-select">
+                          <SelectValue placeholder={t('eqp.form.linePlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(lineListQuery.data ?? []).map((line) => (
+                            <SelectItem key={line.lineKey} value={String(line.lineKey)}>
+                              {line.lineName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
 
                     <ReadOnlyField label="Comm Interface" value={resolvedInterfaceType} />
 

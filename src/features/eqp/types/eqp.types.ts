@@ -233,6 +233,7 @@ export interface EqpPortStatus {
  */
 export interface EqpManageDetail {
   eqpId: string
+  lineKey: number
   commInterface: ProtocolType
   commMode: string
   isDev: boolean
@@ -307,6 +308,7 @@ export type EqpManageOptionsResponse = ApiResponse<EqpManageOptions>
  */
 export interface EqpCreateRequest {
   eqpId: string
+  lineKey: number
   interfaceType: EqpInterfaceType
   commMode: string
   isDev: boolean
@@ -326,6 +328,7 @@ export interface EqpCreateRequest {
  * EQP 수정 요청 DTO 입니다.
  */
 export interface EqpUpdateRequest {
+  lineKey: number
   commMode: string
   isDev: boolean
   routePartition: number

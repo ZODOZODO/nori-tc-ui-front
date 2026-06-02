@@ -92,6 +92,7 @@ export const buildEqpUpdateRequest = (
   override: Partial<EqpUpdateRequest> = {},
   options: { includeAppliedParamVersion?: boolean } = {},
 ): EqpUpdateRequest => ({
+  lineKey: override.lineKey ?? detail.lineKey,
   commMode: override.commMode ?? detail.commMode,
   isDev: override.isDev ?? detail.isDev,
   routePartition: override.routePartition ?? detail.routePartition ?? 0,

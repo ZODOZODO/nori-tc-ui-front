@@ -27,6 +27,7 @@ import {
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 
 export function LiveMapPage() {
   const { t } = useI18n()
@@ -56,6 +57,7 @@ export function LiveMapPage() {
   const markSynced = useLiveMapUiStore((state) => state.markSynced)
   const reset = useLiveMapUiStore((state) => state.reset)
   const liveMapQuery = useLiveMap()
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
 
   const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
@@ -85,8 +87,9 @@ export function LiveMapPage() {
       filterLiveMapEquipmentNodes(equipmentNodes, {
         statusFilter: selectedStatus,
         searchKeyword: deferredSearchKeyword,
+        lineFilter: selectedLineValue,
       }),
-    [deferredSearchKeyword, equipmentNodes, selectedStatus],
+    [deferredSearchKeyword, equipmentNodes, selectedStatus, selectedLineValue],
   )
 
   const summary = useMemo(

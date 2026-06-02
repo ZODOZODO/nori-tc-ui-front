@@ -17,6 +17,7 @@ import { userApi } from '@/features/user/api/user.api'
 import { userQueryKeys } from '@/features/user/lib/user-query-keys'
 import { USER_PAGE_SIZE } from '@/features/user/components/UserListTable'
 import { ThemeToggle } from './ThemeToggle'
+import { LineScopeSelector } from './LineScopeSelector'
 import type { AppTopNavigationKey } from '../lib/app-navigation'
 import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
 import { clearCsrfCookie } from '../lib/session'
@@ -180,6 +181,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        <LineScopeSelector />
         <ThemeToggle />
         <LanguageToggle />
 

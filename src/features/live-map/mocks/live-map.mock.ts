@@ -4,7 +4,6 @@ import type {
   LiveMapEquipmentNode,
   LiveMapEquipmentPortItem,
   LiveMapEqpProcessingType,
-  LiveMapLineOption,
   LiveMapPortStatus,
   LiveMapStatusFilter,
 } from '../types/live-map.types'
@@ -12,10 +11,7 @@ import type {
 export const LIVE_MAP_BOARD_WIDTH = 1350
 export const LIVE_MAP_BOARD_HEIGHT = 710
 
-export const LIVE_MAP_LINE_OPTIONS: readonly LiveMapLineOption[] = [
-  { value: 'ALL', label: '전체 라인' },
-  { value: 'A_LINE', label: 'A Line' },
-] as const
+// 라인 옵션은 GET /api/line 실데이터(useLineList)로 대체되어 상단바 LineScopeSelector 가 채운다.
 
 export const LIVE_MAP_STATE_OPTIONS: readonly { value: LiveMapStatusFilter; label: string }[] = [
   { value: 'ALL', label: '전체 상태' },

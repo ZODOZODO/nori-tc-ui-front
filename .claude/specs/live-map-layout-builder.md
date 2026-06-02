@@ -65,18 +65,18 @@ CREATE INDEX ix_tc_line_is_active ON public.tc_line (is_active);
 
 ### Requirements
 
-- [ ] DB(nori-tc-exec): `tc_line` 신설 — 위 DDL(tc_user_group 컨벤션). 4 벤더 패치 + `create_all_table` 반영.
-- [ ] DB(nori-tc-exec): `tc_eqp.line_key` **NOT NULL** FK(`fk_tc_eqp_line_key__tc_line`) + `ix_tc_eqp_line_key`. `create_all_table` DDL 컬럼 위치 **`eqp_id`↔`comm_interface` 사이**. 4 벤더.
-- [ ] DB(nori-tc-exec): 마이그레이션 **순서 엄수** — ①`tc_line` 생성 + 기본 라인 1행 시드 → ②`tc_eqp.line_key` nullable 추가 → ③기존 행 전부 기본 라인 backfill → ④NOT NULL + FK 적용.
-- [ ] DB(nori-tc-exec): `LIVE_MAP_LAYOUT_WRITE` 권한 카탈로그 시드 + admin 그룹 backfill ([postgres_2026_04_07_add_live_map_api_permission.sql](../../../nori-tc-exec/docs/db_table/patch/postgres_2026_04_07_add_live_map_api_permission.sql) 패턴). 4 벤더.
-- [ ] nori-tc-common: `tc_eqp` 두 ORM 에 line_key 반영 — **JPA**(`TcEqpEntity` 필드/매핑, all-args 생성자, `TcEqpEntityMapper`) + **MyBatis**(`TcEqpMapper.xml` 의 `TcEqpColumns`/INSERT/UPDATE) + `TcEqp` 도메인 record 필드 + `TcEqpStore`. **INSERT 문에 line_key 반드시 포함**(누락 시 eqp 생성 깨짐). publish 버전 발행.
-- [ ] ui-backend: `tc_line` 조회 포트/어댑터/서비스 + `GET /api/line` 컨트롤러. 헥사고날 `*ModuleConfiguration` `@Import` 등록(ComponentScan 금지).
-- [ ] ui-backend: eqp 생성/수정 시 `line_key` **필수** 입력 수용 (UiEqp + create/update DTO + 영속화). 사전 등록 라인만 허용(서버 검증, 미등록·누락 거부).
-- [ ] ui-backend: `GET /live-map` 의 lineValue/lineLabel 을 하드코딩 "A_LINE" 대신 **설비의 실제 `tc_line` 조인 결과**로 반환.
-- [ ] ui-front: 상단바 **라인 선택 드롭다운** — dark/light 버튼 왼쪽([AppTopBar.tsx:182-184](../../src/shared/components/AppTopBar.tsx)), LanguageToggle 와 동일 드롭다운 스타일. `GET /api/line` 로 채움, line_code 정렬.
-- [ ] ui-front: 선택 라인을 전역 스코프로 — 선택 라인의 설비만 live-map 등에 표시. mock `LIVE_MAP_LINE_OPTIONS` 를 실 라인으로 대체.
-- [ ] ui-front: eqp 생성/수정 폼에 **line 드롭다운**(shadcn `Select`, 'Socket Protocol Type' 동일 UX, 자유입력 금지, 필수) — `GET /api/line` 옵션.
-- [ ] ui-front: 편집 권한 게이팅 상수 `LIVE_MAP_LAYOUT_WRITE` 추가 ([permission.ts](../../src/shared/lib/permission.ts)) — Phase 2 에서 사용. Phase 1 엔 상수/`hasPermission` 배선만.
+- [x] DB(nori-tc-exec): `tc_line` 신설 — 위 DDL(tc_user_group 컨벤션). 4 벤더 패치 + `create_all_table` 반영.
+- [x] DB(nori-tc-exec): `tc_eqp.line_key` **NOT NULL** FK(`fk_tc_eqp_line_key__tc_line`) + `ix_tc_eqp_line_key`. `create_all_table` DDL 컬럼 위치 **`eqp_id`↔`comm_interface` 사이**. 4 벤더.
+- [x] DB(nori-tc-exec): 마이그레이션 **순서 엄수** — ①`tc_line` 생성 + 기본 라인 1행 시드 → ②`tc_eqp.line_key` nullable 추가 → ③기존 행 전부 기본 라인 backfill → ④NOT NULL + FK 적용.
+- [x] DB(nori-tc-exec): `LIVE_MAP_LAYOUT_WRITE` 권한 카탈로그 시드 + admin 그룹 backfill ([postgres_2026_04_07_add_live_map_api_permission.sql](../../../nori-tc-exec/docs/db_table/patch/postgres_2026_04_07_add_live_map_api_permission.sql) 패턴). 4 벤더.
+- [x] nori-tc-common: `tc_eqp` 두 ORM 에 line_key 반영 — **JPA**(`TcEqpEntity` 필드/매핑, all-args 생성자, `TcEqpEntityMapper`) + **MyBatis**(`TcEqpMapper.xml` 의 `TcEqpColumns`/INSERT/UPDATE) + `TcEqp` 도메인 record 필드 + `TcEqpStore`. **INSERT 문에 line_key 반드시 포함**(누락 시 eqp 생성 깨짐). publish 버전 발행.
+- [x] ui-backend: `tc_line` 조회 포트/어댑터/서비스 + `GET /api/line` 컨트롤러. 헥사고날 `*ModuleConfiguration` `@Import` 등록(ComponentScan 금지).
+- [x] ui-backend: eqp 생성/수정 시 `line_key` **필수** 입력 수용 (UiEqp + create/update DTO + 영속화). 사전 등록 라인만 허용(서버 검증, 미등록·누락 거부).
+- [x] ui-backend: `GET /live-map` 의 lineValue/lineLabel 을 하드코딩 "A_LINE" 대신 **설비의 실제 `tc_line` 조인 결과**로 반환.
+- [x] ui-front: 상단바 **라인 선택 드롭다운** — dark/light 버튼 왼쪽([AppTopBar.tsx:182-184](../../src/shared/components/AppTopBar.tsx)), LanguageToggle 와 동일 드롭다운 스타일. `GET /api/line` 로 채움, line_code 정렬.
+- [x] ui-front: 선택 라인을 전역 스코프로 — 선택 라인의 설비만 live-map 등에 표시. mock `LIVE_MAP_LINE_OPTIONS` 를 실 라인으로 대체.
+- [x] ui-front: eqp 생성/수정 폼에 **line 드롭다운**(shadcn `Select`, 'Socket Protocol Type' 동일 UX, 자유입력 금지, 필수) — `GET /api/line` 옵션.
+- [x] ui-front: 편집 권한 게이팅 상수 `LIVE_MAP_LAYOUT_WRITE` 추가 ([permission.ts](../../src/shared/lib/permission.ts)) — Phase 2 에서 사용. Phase 1 엔 상수/`hasPermission` 배선만.
 
 ### Constraints
 
@@ -104,6 +104,18 @@ CREATE INDEX ix_tc_line_is_active ON public.tc_line (is_active);
 - Playwright e2e `tests/e2e/live-map-line-scope.spec.ts`: 상단바 라인 드롭다운 전환 시 live-map 설비가 해당 라인만으로 바뀜 assert + `page.on('console')` error 0 + `page.on('pageerror')` 0.
 - Playwright e2e `tests/e2e/eqp-line-select.spec.ts`: eqp 폼 line 드롭다운이 `GET /api/line` 으로 채워지고 선택·저장됨, line 미선택 시 저장 차단 assert + console.error 0 + pageerror 0.
 - 4 벤더 패치 SQL 이 `create_all_table/<vendor>_create_all_table.sql` 와 정합(컬럼/위치/FK/제약/명명 동일).
+
+### Validate 결과 (Phase 1) — 2026-06-02 (독립 세션 재현)
+
+12개 AC 전부 **PASS** (dev-report 인용이 아닌 별도 재실행/재인스펙션):
+- AC1 common build / AC2 publishToMavenLocal+ui-backend(-PuseLocalMaven) / AC3 build-trace gw·biz bootJar(`--rerun-tasks`) / AC4 ui-backend build : 전부 BUILD SUCCESSFUL exit 0.
+- AC5 `LiveMapQueryServiceTest#getEquipmentViewsReturnsLineValueAndLabelFromEqpTcLine`(B_LINE assert) / AC6 `JpaEqpCrudPortTest#createEqpRejectsUnregisteredLineKey`(미등록 stub→UiBadRequestException + never upsert) : `cleanTest` 강제 재실행 PASS.
+- AC7 tsc exit 0 / AC8 eslint src exit 0 / AC9 unit 94/94(line-scope selector 5케이스) / AC10·AC11 e2e 3 passed.
+
+후속 권고 3건 (AC 통과에는 무영향, 별도 처리 권장):
+- **AC8**: `eslint src` exit 0 이 `eslint.config.js`의 `react-hooks/set-state-in-effect` error→warn 다운그레이드에 부분 의존. 14 warning 전부 라인 기능 무관 기존 파일(eslint-plugin-react-hooks@7 업그레이드 부채). 전수 리팩터링 별도 작업 권장.
+- **AC11**: `eqp-line-select.spec.ts`의 "라인 미선택 저장 차단" 테스트에 console/pageerror guard 미부착(드롭다운 채움 테스트에만 부착). `attachConsoleGuards` 1줄 추가 권장.
+- **AC12 부수**: `tc_line`이 4벤더 `create_all_table`의 DROP/cleanup 섹션에 누락 — 비어있지 않은 DB 재실행 시 멱등성 흠(AC12 정합 항목 자체엔 무영향). 각 벤더 `tc_eqp` DROP 직후 `tc_line` DROP 추가 권장.
 
 ---
 
@@ -246,9 +258,9 @@ CREATE INDEX ix_tc_live_map_placement_eqp_key   ON public.tc_live_map_placement 
 
 ### Phase 1
 - [x] **Specify** — 본 SPEC 작성 (산출물: `.claude/specs/live-map-layout-builder.md`)
-- [ ] **Plan** — (산출물: `.claude/specs/live-map-layout-builder-phase1-plan.md`)
-- [ ] **Implement** — (산출물: `.claude/specs/live-map-layout-builder-phase1-dev-report.md`)
-- [ ] **Validate** — Phase 1 AC 체크박스 업데이트
+- [x] **Plan** — (산출물: `.claude/specs/live-map-layout-builder-phase1-plan.md`)
+- [x] **Implement** — (산출물: `.claude/specs/live-map-layout-builder-phase1-dev-report.md`)
+- [x] **Validate** — Phase 1 AC 12개 전부 재실행/재인스펙션 PASS (2026-06-02, 후속 권고 3건은 AC 통과 무영향). Phase 2 착수 가능.
 
 ### Phase 2 (Phase 1 완료 후 착수)
 - [ ] **Specify** — JSONB 키 스키마(shape_json/transform_json/canvas_json = konva 직렬화 형식) 동결 (3 테이블·렌더링은 확정)
