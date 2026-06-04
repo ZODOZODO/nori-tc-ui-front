@@ -33,6 +33,7 @@ export function LiveMapMachineNode({
     <button
       type="button"
       onClick={() => onSelect(eqpId)}
+      data-testid={`live-map-node-${eqpId}`}
       aria-label={`${eqpId} ${t('livemap.node.selectSuffix')}`}
       aria-pressed={selected}
       disabled={dimmed}

@@ -1,10 +1,11 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * AC8 — live-map 2.5D 빌더 비-admin 읽기 전용 e2e.
+ * AC8 — live-map 비-admin 권한 e2e.
  *
- * LIVE_MAP_LAYOUT_WRITE 가 없는 사용자는 그리기/편집/복제/우클릭 편집 메뉴에 진입할 수 없고,
- * 읽기 전용 캔버스만 본다(이중 차단의 프론트 절반). console.error / pageerror 0 도 단언.
+ * LIVE_MAP_LAYOUT_WRITE 가 없는 사용자는 테마형 뷰어(공정 플로우 board)만 보고,
+ * "구조물 편집" 토글/빌더 저작 UI 에 진입할 수 없다(이중 차단의 프론트 절반).
+ * console.error / pageerror 0 도 단언.
  */
 
 const apiSuccess = <TData>(data: TData) => ({
@@ -88,7 +89,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('비-admin: 읽기 전용 캔버스만 보이고 저작 UI 진입 불가 (console/pageerror 0)', async ({ page }) => {
+test('비-admin: 뷰어만 보이고 구조물 편집(빌더) 진입 불가 (console/pageerror 0)', async ({ page }) => {
   await setupMocks(page)
   const { consoleErrors, pageErrors } = attachConsoleGuards(page)
 
@@ -96,18 +97,15 @@ test('비-admin: 읽기 전용 캔버스만 보이고 저작 UI 진입 불가 (c
   await page.getByTestId('line-scope-trigger').click()
   await page.getByTestId('line-scope-option-B_LINE').click()
 
-  // 읽기 전용 캔버스 + 안내, 저작 툴바/팔레트 미렌더.
-  await expect(page.getByTestId('live-map-builder-readonly')).toBeVisible()
-  await expect(page.getByTestId('live-map-builder-canvas')).toBeVisible()
+  // 테마형 뷰어(공정 플로우 board)만 노출. WRITE 권한이 없어 "구조물 편집" 토글 자체가 렌더되지 않고
+  // 빌더 저작 툴바/팔레트도 없다.
+  await expect(page.getByTestId('live-map-viewer-board')).toBeVisible()
+  await expect(page.getByTestId('live-map-mode-builder')).toHaveCount(0)
+  await expect(page.getByTestId('live-map-mode-viewer')).toHaveCount(0)
   await expect(page.getByTestId('live-map-builder-toolbar')).toHaveCount(0)
   await expect(page.getByTestId('live-map-builder-palette')).toHaveCount(0)
   await expect(page.getByTestId('builder-add-rect')).toHaveCount(0)
   await expect(page.getByTestId('builder-save-object')).toHaveCount(0)
-
-  // 우클릭해도 편집 컨텍스트 메뉴가 열리지 않는다.
-  const canvas = page.locator('[data-testid="live-map-builder-canvas"] canvas').first()
-  await canvas.click({ button: 'right', position: { x: 200, y: 160 } })
-  await expect(page.getByTestId('placement-context-menu')).toHaveCount(0)
 
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])

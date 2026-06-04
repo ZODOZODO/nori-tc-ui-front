@@ -41,7 +41,10 @@ export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardPro
   ]
 
   return (
-    <div className="flex h-full w-full flex-col rounded-[20px] border border-border bg-card p-4 shadow-soft-md">
+    <div
+      data-testid="live-map-detail-panel"
+      className="flex h-full w-full flex-col rounded-[20px] border border-border bg-card p-4 shadow-soft-md"
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-bold tracking-[0.08em] text-muted-foreground">
           {t('livemap.detail.selectedLabel')}

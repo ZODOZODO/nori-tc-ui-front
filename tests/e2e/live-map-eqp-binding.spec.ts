@@ -158,6 +158,11 @@ const setupMocks = async (page: Page, state: MockState) => {
       body: JSON.stringify(apiSuccess({ items: [], offset: 0, limit: 500, count: 0 })),
     })
   })
+  // 뷰어가 빌더 진입 전 잠깐 렌더되며 자동 선택된 설비의 상세 패널이 /comm-logs/{eqpId} 를 호출한다.
+  // CommLogEntry[] 배열로 mock(마지막 등록 = 우선순위). {items:[]} 객체면 [...logs] 에서 throw.
+  await page.route(/.*\/api\/comm-logs(\/.*)?(\?.*)?$/, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
+  })
 }
 
 const attachConsoleGuards = (page: Page) => {
@@ -185,6 +190,8 @@ test('admin: EQUIPMENT 배치 → 라인 스코프 설비 eqpKey 바인딩 → �
   await page.goto('/eqp/live-map')
   await page.getByTestId('line-scope-trigger').click()
   await page.getByTestId('line-scope-option-B_LINE').click()
+  // 뷰어가 기본 뷰이므로 "구조물 편집" 토글로 빌더 모드에 진입한다.
+  await page.getByTestId('live-map-mode-builder').click()
 
   await expect(page.getByTestId('live-map-builder-toolbar')).toBeVisible()
   await expect(page.getByTestId('palette-place-10')).toBeVisible()

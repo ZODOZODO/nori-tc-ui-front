@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
-import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
+import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Stage, Text, Transformer } from 'react-konva'
 import { Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
 import type { LineConfig } from 'konva/lib/shapes/Line'
@@ -43,6 +43,11 @@ const STAGE_HEIGHT = 560
 const DEFAULT_PLACE_X = 220
 const DEFAULT_PLACE_Y = 160
 const SCALE_STEP = 1.2
+
+// 캔버스 표면(soft modern) — 살짝 밝은 다크 베이스 + 은은한 도트 그리드.
+const CANVAS_BG = '#0e1422'
+const GRID_GAP = 24
+const GRID_DOT_COLOR = 'rgba(148, 163, 184, 0.16)'
 
 type PrimitiveClassName = 'Rect' | 'Line' | 'Text' | 'Image'
 
@@ -125,28 +130,55 @@ function renderPrimitive(node: KonvaNode, key: string) {
 }
 
 function createDraftPrimitive(className: PrimitiveClassName, index: number): KonvaNode {
-  const offset = index * 14
+  const offset = index * 16
   if (className === 'Rect') {
     return {
       className,
-      attrs: { x: 24 + offset, y: 24 + offset, width: 96, height: 48, fill: '#2563eb', cornerRadius: 6 },
+      attrs: {
+        x: 96 + offset,
+        y: 80 + offset,
+        width: 132,
+        height: 72,
+        fill: 'rgba(59, 130, 246, 0.18)',
+        stroke: '#3b82f6',
+        strokeWidth: 1.5,
+        cornerRadius: 10,
+        shadowColor: '#000000',
+        shadowBlur: 14,
+        shadowOpacity: 0.35,
+        shadowOffsetY: 4,
+      },
     }
   }
   if (className === 'Line') {
     return {
       className,
-      attrs: { points: [24 + offset, 96, 152 + offset, 96], stroke: '#94a3b8', strokeWidth: 3 },
+      attrs: {
+        points: [96 + offset, 180, 236 + offset, 180],
+        stroke: '#60a5fa',
+        strokeWidth: 3,
+        lineCap: 'round',
+        lineJoin: 'round',
+      },
     }
   }
   if (className === 'Image') {
     return {
       className,
-      attrs: { x: 24 + offset, y: 24 + offset, width: 64, height: 64, src: DEFAULT_IMAGE_SRC },
+      attrs: { x: 96 + offset, y: 80 + offset, width: 72, height: 72, src: DEFAULT_IMAGE_SRC },
     }
   }
   return {
     className,
-    attrs: { x: 24 + offset, y: 24 + offset, text: 'Label', fontSize: 16, fill: '#e2e8f0' },
+    attrs: {
+      x: 96 + offset,
+      y: 80 + offset,
+      text: 'Label',
+      fontSize: 18,
+      fontStyle: '600',
+      fill: '#e2e8f0',
+      fontFamily: 'Inter, system-ui, sans-serif',
+    },
   }
 }
 
@@ -297,6 +329,7 @@ export function LiveMapLayoutCanvas() {
       {
         onSuccess: () => {
           setDraft([])
+          setSelectedIds([])
           setObjectName('')
           setObjectKind('STRUCTURE')
           setIsSaveDialogOpen(false)
@@ -552,10 +585,24 @@ export function LiveMapLayoutCanvas() {
           y={0}
           width={STAGE_WIDTH}
           height={STAGE_HEIGHT}
-          fill="#0b0f1a"
+          fill={CANVAS_BG}
           onClick={() => {
             setSelectedIds([])
             setContextMenu(null)
+          }}
+        />
+        <Shape
+          listening={false}
+          fill={GRID_DOT_COLOR}
+          sceneFunc={(context, shape) => {
+            context.beginPath()
+            for (let x = GRID_GAP; x < STAGE_WIDTH; x += GRID_GAP) {
+              for (let y = GRID_GAP; y < STAGE_HEIGHT; y += GRID_GAP) {
+                context.moveTo(x + 1, y)
+                context.arc(x, y, 1, 0, Math.PI * 2)
+              }
+            }
+            context.fillStrokeShape(shape)
           }}
         />
         {sortedWorking.map((placement) => {
@@ -646,7 +693,7 @@ export function LiveMapLayoutCanvas() {
         </div>
         <div
           data-testid="live-map-builder-canvas"
-          className="overflow-auto rounded-[18px] border border-border bg-[#0b0f1a]"
+          className="overflow-auto rounded-[18px] border border-border bg-[#0e1422]"
         >
           {stage}
         </div>
@@ -692,63 +739,6 @@ export function LiveMapLayoutCanvas() {
           <span data-testid="builder-selected-count">{selectedIds.length}</span>
         </span>
       </div>
-
-      {selectedIds.length > 0 ? (
-        <div
-          data-testid="builder-selection-bar"
-          className="flex flex-wrap items-center gap-2 rounded-[12px] border border-primary/40 bg-card px-3 py-2"
-        >
-          {hasWorkingSelected ? (
-            <>
-              <button type="button" data-testid="selection-front" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(true)}>
-                Bring to Front
-              </button>
-              <button type="button" data-testid="selection-back" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(false)}>
-                Send to Back
-              </button>
-              <button type="button" data-testid="selection-scale-up" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(SCALE_STEP)}>
-                Scale +
-              </button>
-              <button type="button" data-testid="selection-scale-down" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(1 / SCALE_STEP)}>
-                Scale −
-              </button>
-            </>
-          ) : null}
-          <button type="button" data-testid="selection-delete" className="rounded-md border border-danger px-3 py-1.5 text-xs font-semibold text-danger" onClick={deleteSelected}>
-            Delete
-          </button>
-
-          {isEquipmentSelected && singleSelected ? (
-            <span data-testid="placement-eqp-binding" className="flex items-center gap-2 text-xs font-semibold">
-              <span className="text-muted-foreground">Equipment</span>
-              <select
-                data-testid="placement-eqp-select"
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                value={singleSelected.eqpKey ?? ''}
-                onChange={(event) =>
-                  bindEqp(singleSelected.localId, event.target.value === '' ? null : Number(event.target.value))
-                }
-              >
-                <option value="">— select equipment —</option>
-                {lineEquipments.map((equipment) => (
-                  <option key={equipment.eqpKey} value={equipment.eqpKey}>
-                    {equipment.eqpName}
-                  </option>
-                ))}
-              </select>
-              <span data-testid="placement-eqp-status" className="text-muted-foreground">
-                {singleSelectedStatus ?? 'unbound'}
-              </span>
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {statusMessage ? (
-        <div data-testid="builder-status" className="text-xs font-semibold text-muted-foreground">
-          {statusMessage}
-        </div>
-      ) : null}
 
       <div className="flex gap-3">
         <div
@@ -796,36 +786,99 @@ export function LiveMapLayoutCanvas() {
           )}
         </div>
 
-        <div
-          data-testid="live-map-builder-canvas"
-          className="relative flex-1 overflow-auto rounded-[18px] border border-border bg-[#0b0f1a]"
-          onClick={() => setContextMenu(null)}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={handlePaletteDrop}
-        >
-          {stage}
-          {contextMenu ? (
+        <div className="relative flex-1">
+          <div
+            data-testid="live-map-builder-canvas"
+            className="relative h-full overflow-auto rounded-[18px] border border-border bg-[#0e1422]"
+            onClick={() => setContextMenu(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handlePaletteDrop}
+          >
+            {stage}
+            {contextMenu ? (
+              <div
+                data-testid="placement-context-menu"
+                className="absolute z-10 w-32 rounded-md border border-border bg-card py-1 shadow-soft-sm"
+                style={{ left: contextMenu.x, top: contextMenu.y }}
+              >
+                <button
+                  type="button"
+                  data-testid="context-copy"
+                  className="block w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-muted"
+                  onClick={() => duplicatePlacement(contextMenu.localId)}
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  data-testid="context-delete"
+                  className="block w-full px-3 py-1.5 text-left text-xs font-semibold text-danger hover:bg-muted"
+                  onClick={() => deletePlacement(contextMenu.localId)}
+                >
+                  Delete
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 선택 액션바는 캔버스 위에 떠 있는 overlay — 선택/해제 시 아래 레이아웃을 밀지 않는다(레이아웃 점프 방지). */}
+          {selectedIds.length > 0 ? (
             <div
-              data-testid="placement-context-menu"
-              className="absolute z-10 w-32 rounded-md border border-border bg-card py-1 shadow-soft-sm"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
+              data-testid="builder-selection-bar"
+              className="absolute left-1/2 top-3 z-10 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border border-primary/40 bg-card/95 px-3 py-1.5 shadow-soft-lg backdrop-blur"
             >
-              <button
-                type="button"
-                data-testid="context-copy"
-                className="block w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-muted"
-                onClick={() => duplicatePlacement(contextMenu.localId)}
-              >
-                Copy
-              </button>
-              <button
-                type="button"
-                data-testid="context-delete"
-                className="block w-full px-3 py-1.5 text-left text-xs font-semibold text-danger hover:bg-muted"
-                onClick={() => deletePlacement(contextMenu.localId)}
-              >
+              {hasWorkingSelected ? (
+                <>
+                  <button type="button" data-testid="selection-front" className="rounded-full border border-border px-3 py-1 text-xs font-semibold" onClick={() => reorderSelected(true)}>
+                    Bring to Front
+                  </button>
+                  <button type="button" data-testid="selection-back" className="rounded-full border border-border px-3 py-1 text-xs font-semibold" onClick={() => reorderSelected(false)}>
+                    Send to Back
+                  </button>
+                  <button type="button" data-testid="selection-scale-up" className="rounded-full border border-border px-3 py-1 text-xs font-semibold" onClick={() => scaleSelected(SCALE_STEP)}>
+                    Scale +
+                  </button>
+                  <button type="button" data-testid="selection-scale-down" className="rounded-full border border-border px-3 py-1 text-xs font-semibold" onClick={() => scaleSelected(1 / SCALE_STEP)}>
+                    Scale −
+                  </button>
+                </>
+              ) : null}
+              <button type="button" data-testid="selection-delete" className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger" onClick={deleteSelected}>
                 Delete
               </button>
+
+              {isEquipmentSelected && singleSelected ? (
+                <span data-testid="placement-eqp-binding" className="flex items-center gap-2 text-xs font-semibold">
+                  <span className="text-muted-foreground">Equipment</span>
+                  <select
+                    data-testid="placement-eqp-select"
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                    value={singleSelected.eqpKey ?? ''}
+                    onChange={(event) =>
+                      bindEqp(singleSelected.localId, event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  >
+                    <option value="">— select equipment —</option>
+                    {lineEquipments.map((equipment) => (
+                      <option key={equipment.eqpKey} value={equipment.eqpKey}>
+                        {equipment.eqpName}
+                      </option>
+                    ))}
+                  </select>
+                  <span data-testid="placement-eqp-status" className="text-muted-foreground">
+                    {singleSelectedStatus ?? 'unbound'}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {statusMessage ? (
+            <div
+              data-testid="builder-status"
+              className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-soft-sm backdrop-blur"
+            >
+              {statusMessage}
             </div>
           ) : null}
         </div>

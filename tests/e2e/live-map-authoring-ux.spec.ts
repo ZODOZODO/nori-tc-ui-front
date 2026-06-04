@@ -150,9 +150,11 @@ const newState = (): MockState => ({
   objectSeq: 2,
 })
 
+// 뷰어가 기본 뷰이므로 B 라인 선택 후 "구조물 편집" 토글로 빌더 모드에 진입한다.
 const selectBLine = async (page: Page) => {
   await page.getByTestId('line-scope-trigger').click()
   await page.getByTestId('line-scope-option-B_LINE').click()
+  await page.getByTestId('live-map-mode-builder').click()
 }
 
 test('admin: 팔레트 검색이 객체 목록을 이름으로 필터한다 (console/pageerror 0)', async ({ page }) => {

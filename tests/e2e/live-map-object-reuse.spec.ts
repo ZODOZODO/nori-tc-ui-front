@@ -163,9 +163,11 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
+// 뷰어가 기본 뷰이므로 B 라인 선택 후 "구조물 편집" 토글로 빌더 모드에 진입한다.
 const selectBLine = async (page: Page) => {
   await page.getByTestId('line-scope-trigger').click()
   await page.getByTestId('line-scope-option-B_LINE').click()
+  await page.getByTestId('live-map-mode-builder').click()
 }
 
 test('admin: 합성 객체 저장 → 팔레트 배치 → 우클릭 복사 → 레이아웃 저장 → 새로고침 영속 (console/pageerror 0)', async ({
@@ -213,9 +215,9 @@ test('admin: 합성 객체 저장 → 팔레트 배치 → 우클릭 복사 → 
   await expect(page.getByTestId('builder-placement-count')).toHaveText('1')
 
   // 우클릭 복사 → placement 2.
-  // 배치 그룹은 (220,160), 객체의 첫 Rect 는 로컬 (24,24,96x48) → 화면 중심 ≈ (292,208).
+  // 배치 그룹은 (220,160), 객체의 첫 Rect 는 로컬 (96,80,132x72) → 화면 중심 ≈ (382,276).
   const canvas = page.locator('[data-testid="live-map-builder-canvas"] canvas').first()
-  await canvas.click({ button: 'right', position: { x: 292, y: 208 } })
+  await canvas.click({ button: 'right', position: { x: 382, y: 276 } })
   await expect(page.getByTestId('placement-context-menu')).toBeVisible()
   await page.getByTestId('context-copy').click()
   await expect(page.getByTestId('builder-placement-count')).toHaveText('2')

@@ -120,7 +120,8 @@ test('admin: 도구 클릭 시 도형이 즉시 추가·자동선택되고 draft
 
   await page.goto('/eqp/live-map')
 
-  // 전체 라인 스코프 없음 → 첫 라인 자동선택 → admin 빌더 툴바 노출.
+  // 전체 라인 스코프 없음 → 첫 라인 자동선택. 뷰어가 기본이므로 "구조물 편집" 토글로 빌더 진입.
+  await page.getByTestId('live-map-mode-builder').click()
   await expect(page.getByTestId('live-map-builder-toolbar')).toBeVisible()
   await expect(page.getByTestId('builder-draft-count')).toHaveText('0')
 
@@ -156,6 +157,7 @@ test('admin: 추가한 draft 도형을 Save as Object 로 저장하면 POST shap
   const { consoleErrors, pageErrors } = attachConsoleGuards(page)
 
   await page.goto('/eqp/live-map')
+  await page.getByTestId('live-map-mode-builder').click()
   await expect(page.getByTestId('live-map-builder-toolbar')).toBeVisible()
 
   await page.getByTestId('builder-add-rect').click()

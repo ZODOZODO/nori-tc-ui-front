@@ -1,9 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/i18n/i18n-context'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
+import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
+import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
+import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
 import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
 
@@ -11,44 +14,89 @@ import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
 const LiveMapDemoModal = lazy(() =>
   import('./LiveMapDemoModal').then((module) => ({ default: module.LiveMapDemoModal })),
 )
-import { LIVE_MAP_CLUSTER_ITEMS } from '../mocks/live-map.mock'
+import {
+  applyLiveMapClusterPositionDrafts,
+  applyLiveMapEquipmentPositionDrafts,
+} from '../lib/live-map-layout'
+import { LIVE_MAP_CLUSTER_ITEMS, LIVE_MAP_STATE_OPTIONS } from '../mocks/live-map.mock'
 import {
   filterLiveMapEquipmentNodes,
+  formatLiveMapSyncLabel,
+  resolveSelectedLiveMapEquipment,
   summarizeLiveMapEquipmentNodes,
 } from '../lib/live-map-selectors'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
 
+type LiveMapViewMode = 'viewer' | 'builder'
+
 /**
- * live-map 페이지(Phase 2): 상단 KPI 헤더 + react-konva 2.5D 레이아웃 빌더 캔버스.
+ * live-map 페이지: 테마형 공정 플로우 뷰어({@link LiveMapBoard}) 가 기본 뷰이고,
+ * LIVE_MAP_LAYOUT_WRITE 권한자는 "구조물 편집" 모드로 react-konva 빌더({@link LiveMapLayoutCanvas})
+ * 에 진입해 라인 구조물/장애물을 저작한다.
  *
- * <p>cluster polygon 캔버스(LiveMapBoard)는 폐기되고 {@link LiveMapLayoutCanvas} 가 캔버스를 담당한다.
- * KPI 요약/데모 테스터는 보존한다(데모 테스터는 설비 그룹 입력으로 cluster 메타를 계속 사용).</p>
+ * <p>뷰어는 GET /live-map 의 실설비를 공정 카드 그리드에 배치하고(라인 스코프 필터), IN→OUT
+ * 흐름·실시간 상태를 보여주며, 설비 선택 시 우측 상세 패널(속성/포트/통신로그)을 연다.</p>
  */
 export function LiveMapPage() {
   const { t } = useI18n()
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<LiveMapViewMode>('viewer')
+  // 상세 패널 닫기(X) — resolver 가 selectedEqpId=null 일 때 ERROR 설비로 자동 폴백하므로,
+  // "사용자가 명시적으로 닫음" 을 별도 플래그로 구분해 폴백 복귀를 막는다.
+  const [isDetailDismissed, setIsDetailDismissed] = useState(false)
 
-  const liveMapQuery = useLiveMap()
-  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+  const meQuery = useMe()
+  const canEdit = hasPermission(meQuery.data?.permissionCodes, LIVE_MAP_LAYOUT_WRITE_PERMISSION)
+
+  const searchKeyword = useLiveMapUiStore((state) => state.searchKeyword)
+  const selectedStatus = useLiveMapUiStore((state) => state.selectedStatus)
+  const selectedEqpId = useLiveMapUiStore((state) => state.selectedEqpId)
+  const isLayoutEditEnabled = useLiveMapUiStore((state) => state.isLayoutEditEnabled)
+  const clusterPositionDrafts = useLiveMapUiStore((state) => state.clusterPositionDrafts)
+  const equipmentPositionDrafts = useLiveMapUiStore((state) => state.equipmentPositionDrafts)
+  const zoomLevel = useLiveMapUiStore((state) => state.zoomLevel)
+  const lastSyncAt = useLiveMapUiStore((state) => state.lastSyncAt)
+  const [now, setNow] = useState(lastSyncAt)
+  const setSearchKeyword = useLiveMapUiStore((state) => state.setSearchKeyword)
+  const setSelectedStatus = useLiveMapUiStore((state) => state.setSelectedStatus)
+  const setSelectedEqpId = useLiveMapUiStore((state) => state.setSelectedEqpId)
+  const setLayoutEditEnabled = useLiveMapUiStore((state) => state.setLayoutEditEnabled)
+  const updateClusterLayout = useLiveMapUiStore((state) => state.updateClusterLayout)
+  const zoomIn = useLiveMapUiStore((state) => state.zoomIn)
+  const zoomOut = useLiveMapUiStore((state) => state.zoomOut)
+  const resetZoom = useLiveMapUiStore((state) => state.resetZoom)
   const markSynced = useLiveMapUiStore((state) => state.markSynced)
   const reset = useLiveMapUiStore((state) => state.reset)
+  const liveMapQuery = useLiveMap()
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+
+  const deferredSearchKeyword = useDeferredValue(searchKeyword)
+
+  const clusterItems = useMemo(
+    () => applyLiveMapClusterPositionDrafts(LIVE_MAP_CLUSTER_ITEMS, clusterPositionDrafts),
+    [clusterPositionDrafts],
+  )
 
   const equipmentNodes = useMemo(
-    () => buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? [], LIVE_MAP_CLUSTER_ITEMS),
-    [liveMapQuery.data?.equipmentItems],
+    () =>
+      applyLiveMapEquipmentPositionDrafts(
+        buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? [], clusterItems),
+        equipmentPositionDrafts,
+      ),
+    [clusterItems, equipmentPositionDrafts, liveMapQuery.data?.equipmentItems],
   )
 
   const visibleEquipmentNodes = useMemo(
     () =>
       filterLiveMapEquipmentNodes(equipmentNodes, {
-        statusFilter: 'ALL',
-        searchKeyword: '',
+        statusFilter: selectedStatus,
+        searchKeyword: deferredSearchKeyword,
         lineFilter: selectedLineValue,
       }),
-    [equipmentNodes, selectedLineValue],
+    [deferredSearchKeyword, equipmentNodes, selectedStatus, selectedLineValue],
   )
 
   const summary = useMemo(
@@ -56,11 +104,51 @@ export function LiveMapPage() {
     [visibleEquipmentNodes],
   )
 
+  const selectedEquipment = useMemo(
+    () => resolveSelectedLiveMapEquipment(equipmentNodes, visibleEquipmentNodes, selectedEqpId),
+    [equipmentNodes, selectedEqpId, visibleEquipmentNodes],
+  )
+
+  // 사용자가 X 로 닫았으면 폴백 설비를 표시하지 않는다.
+  const displayedEquipment = isDetailDismissed ? null : selectedEquipment
+
+  const handleSelectEquipment = (eqpId: string) => {
+    setIsDetailDismissed(false)
+    setSelectedEqpId(eqpId)
+  }
+
+  const handleClearSelection = () => {
+    setIsDetailDismissed(true)
+  }
+
+  const visibleEquipmentIds = useMemo(
+    () => new Set(visibleEquipmentNodes.map((item) => item.eqpId)),
+    [visibleEquipmentNodes],
+  )
+
+  const syncLabel = useMemo(() => formatLiveMapSyncLabel(lastSyncAt, now), [lastSyncAt, now])
+
   useEffect(() => {
     return () => {
       reset()
     }
   }, [reset])
+
+  useEffect(() => {
+    if (selectedEquipment?.eqpId !== selectedEqpId) {
+      setSelectedEqpId(selectedEquipment?.eqpId ?? null)
+    }
+  }, [selectedEquipment?.eqpId, selectedEqpId, setSelectedEqpId])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   useEffect(() => {
     if (liveMapQuery.dataUpdatedAt > 0) {
@@ -73,6 +161,8 @@ export function LiveMapPage() {
     setIsProfileModalOpen(false)
     reset()
   }
+
+  const isBuilderMode = viewMode === 'builder' && canEdit
 
   return (
     <AppPageShell
@@ -88,17 +178,72 @@ export function LiveMapPage() {
               {liveMapQuery.error instanceof Error ? liveMapQuery.error.message : t('livemap.error')}
             </div>
           ) : null}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              data-testid="live-map-open-demo"
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold"
-              onClick={() => setIsDemoModalOpen(true)}
-            >
-              Demo Tester
-            </button>
-          </div>
-          <LiveMapLayoutCanvas />
+
+          {canEdit ? (
+            <div className="flex justify-end">
+              <div className="inline-flex rounded-pill border border-border bg-card p-1 shadow-soft-sm">
+                <button
+                  type="button"
+                  data-testid="live-map-mode-viewer"
+                  aria-pressed={!isBuilderMode}
+                  onClick={() => setViewMode('viewer')}
+                  className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
+                    isBuilderMode
+                      ? 'text-muted-foreground hover:text-foreground'
+                      : 'bg-brand-primary/10 text-brand-primary'
+                  }`}
+                >
+                  {t('livemap.mode.viewer')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="live-map-mode-builder"
+                  aria-pressed={isBuilderMode}
+                  onClick={() => setViewMode('builder')}
+                  className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
+                    isBuilderMode
+                      ? 'bg-brand-primary/10 text-brand-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {t('livemap.mode.builder')}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isBuilderMode ? (
+            <LiveMapLayoutCanvas />
+          ) : (
+            <LiveMapBoard
+              clusters={clusterItems}
+              syncLabel={syncLabel}
+              searchKeyword={searchKeyword}
+              selectedStatus={selectedStatus}
+              stateOptions={LIVE_MAP_STATE_OPTIONS}
+              onSearchKeywordChange={setSearchKeyword}
+              onSelectedStatusChange={setSelectedStatus}
+              equipmentNodes={equipmentNodes}
+              visibleEquipmentIds={visibleEquipmentIds}
+              selectedEquipment={displayedEquipment}
+              zoomLevel={zoomLevel}
+              isLayoutEditEnabled={isLayoutEditEnabled}
+              onSelectEquipment={handleSelectEquipment}
+              onClearSelection={handleClearSelection}
+              onOpenDemo={() => setIsDemoModalOpen(true)}
+              onLayoutEditEnabledChange={setLayoutEditEnabled}
+              onMoveCluster={(clusterId, position) => updateClusterLayout(clusterId, position, {})}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onResetZoom={resetZoom}
+            />
+          )}
+
+          {liveMapQuery.isLoading && equipmentNodes.length === 0 ? (
+            <div className="rounded-[18px] border border-border bg-card px-4 py-3 text-sm font-semibold text-muted-foreground">
+              {t('livemap.loading')}
+            </div>
+          ) : null}
         </div>
       </main>
 
@@ -108,7 +253,7 @@ export function LiveMapPage() {
           <LiveMapDemoModal
             open
             equipmentNodes={equipmentNodes}
-            clusterItems={LIVE_MAP_CLUSTER_ITEMS}
+            clusterItems={clusterItems}
             onClose={() => setIsDemoModalOpen(false)}
           />
         </Suspense>

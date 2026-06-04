@@ -394,7 +394,10 @@ export function LiveMapBoard({
       : []
 
   return (
-    <section className="relative overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg">
+    <section
+      data-testid="live-map-viewer-board"
+      className="relative overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-[620px]">
           <div className="flex items-center gap-2.5">

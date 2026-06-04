@@ -1,10 +1,10 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * live-map 상단바 라인 스코프 e2e (Phase 2 재설계 반영).
+ * live-map 상단바 라인 스코프 e2e.
  *
- * Phase 2 에서 cluster polygon 보드는 react-konva 2.5D 빌더로 대체되었다. 전체(ALL) 스코프는
- * 없다 — 라인 목록 로드 시 첫 라인이 자동 선택되어 캔버스가 바로 노출되고, 드롭다운으로 라인을 전환한다.
+ * 기본 뷰는 테마형 공정 플로우 뷰어(board)다. 전체(ALL) 스코프는 없다 — 라인 목록 로드 시
+ * 첫 라인이 자동 선택되어 뷰어가 바로 노출되고, 드롭다운으로 라인을 전환한다.
  * 모든 백엔드 응답은 route.fulfill 로 mock. console error / pageerror 0 도 함께 단언.
  */
 
@@ -82,15 +82,14 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('상단바 라인 스코프가 2.5D 빌더 캔버스를 게이팅한다 (console/pageerror 0)', async ({ page }) => {
+test('상단바 라인 스코프가 뷰어(공정 플로우 board)를 게이팅한다 (console/pageerror 0)', async ({ page }) => {
   await setupMocks(page)
   const { consoleErrors, pageErrors } = attachConsoleGuards(page)
 
   await page.goto('/eqp/live-map')
 
-  // 전체 라인 스코프는 없다 — 첫 라인(A_LINE, line_code 오름차순)이 자동 선택되어 캔버스가 바로 노출된다.
-  await expect(page.getByTestId('live-map-builder-canvas')).toBeVisible()
-  await expect(page.getByTestId('builder-select-line-hint')).toHaveCount(0)
+  // 전체 라인 스코프는 없다 — 첫 라인(A_LINE, line_code 오름차순)이 자동 선택되어 뷰어가 바로 노출된다.
+  await expect(page.getByTestId('live-map-viewer-board')).toBeVisible()
   await expect(page.getByTestId('line-scope-trigger')).toContainText('A Line')
 
   // 드롭다운에 "전체 라인(ALL)" 옵션이 없고 실제 라인만 나열된다.
@@ -98,10 +97,9 @@ test('상단바 라인 스코프가 2.5D 빌더 캔버스를 게이팅한다 (co
   await expect(page.getByTestId('line-scope-option-ALL')).toHaveCount(0)
   await expect(page.getByTestId('line-scope-option-A_LINE')).toBeVisible()
 
-  // B Line 으로 전환 → 캔버스 유지, 안내 미노출, 트리거 라벨 갱신.
+  // B Line 으로 전환 → 뷰어 유지, 트리거 라벨 갱신.
   await page.getByTestId('line-scope-option-B_LINE').click()
-  await expect(page.getByTestId('live-map-builder-canvas')).toBeVisible()
-  await expect(page.getByTestId('builder-select-line-hint')).toHaveCount(0)
+  await expect(page.getByTestId('live-map-viewer-board')).toBeVisible()
   await expect(page.getByTestId('line-scope-trigger')).toContainText('B Line')
 
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
