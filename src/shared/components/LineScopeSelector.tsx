@@ -3,7 +3,7 @@ import { Check, ChevronDown, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import { useLineList } from '@/shared/hooks/useLineList'
-import { ALL_LINES_VALUE, useLineScopeStore } from '@/shared/stores/line-scope.store'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 
 interface LineScopeOption {
   value: string
@@ -37,13 +37,27 @@ export function LineScopeSelector() {
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [isOpen])
 
-  const options = useMemo<LineScopeOption[]>(() => {
-    const lineOptions = (lineListQuery.data ?? []).map((line) => ({
-      value: line.lineCode,
-      label: line.lineName,
-    }))
-    return [{ value: ALL_LINES_VALUE, label: t('lineScope.all') }, ...lineOptions]
-  }, [lineListQuery.data, t])
+  // 전체 라인 스코프는 없다 — 라인 목록이 로드되면 첫 라인(line_code 오름차순)을 자동 선택해
+  // 항상 단일 라인 1개가 선택된 상태를 보장한다. 이미 유효한 라인이 선택돼 있으면 건드리지 않는다.
+  useEffect(() => {
+    const lines = lineListQuery.data
+    if (!lines || lines.length === 0) {
+      return
+    }
+    const hasValidSelection = lines.some((line) => line.lineCode === selectedLineValue)
+    if (!hasValidSelection) {
+      setSelectedLineValue(lines[0].lineCode)
+    }
+  }, [lineListQuery.data, selectedLineValue, setSelectedLineValue])
+
+  const options = useMemo<LineScopeOption[]>(
+    () =>
+      (lineListQuery.data ?? []).map((line) => ({
+        value: line.lineCode,
+        label: line.lineName,
+      })),
+    [lineListQuery.data],
+  )
 
   const currentOption =
     options.find((option) => option.value === selectedLineValue) ?? options[0]
@@ -61,7 +75,7 @@ export function LineScopeSelector() {
         data-testid="line-scope-trigger"
       >
         <Layers className="size-4" aria-hidden="true" />
-        {currentOption?.label ?? t('lineScope.all')}
+        {currentOption?.label ?? ''}
         <ChevronDown className="size-3.5" aria-hidden="true" />
       </Button>
 

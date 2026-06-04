@@ -9,7 +9,7 @@ import type { Transformer as KonvaTransformerNode } from 'konva/lib/shapes/Trans
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
-import { ALL_LINES_VALUE, useLineScopeStore } from '@/shared/stores/line-scope.store'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
 import type { LiveMapEqpStatus, LiveMapPortStatus } from '../types/live-map.types'
 import type { LiveMapEquipmentResponse } from '../api/live-map.api'
@@ -152,12 +152,10 @@ export function LiveMapLayoutCanvas() {
 
   const canEdit = hasPermission(meQuery.data?.permissionCodes, LIVE_MAP_LAYOUT_WRITE_PERMISSION)
 
-  const lineKey = useMemo(() => {
-    if (selectedLineValue === ALL_LINES_VALUE) {
-      return null
-    }
-    return lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null
-  }, [lineListQuery.data, selectedLineValue])
+  const lineKey = useMemo(
+    () => lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null,
+    [lineListQuery.data, selectedLineValue],
+  )
 
   const layoutQuery = useLayout(lineKey)
   const objectsQuery = useLayoutObjects(canEdit)
