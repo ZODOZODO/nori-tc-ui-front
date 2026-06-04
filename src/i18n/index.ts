@@ -8,16 +8,18 @@ const STORAGE_KEY = 'nori-tc-lang'
 
 /**
  * 초기 언어 결정 로직 — 기존 경량 Provider 의 resolveInitialLang 과 동등.
- * 1) localStorage('nori-tc-lang') 가 ko/en 이면 그 값, 2) 아니면 브라우저 언어가
+ * 1) localStorage('nori-tc-lang') 가 지원 언어(supportedLngs)면 그 값, 2) 아니면 브라우저 언어가
  * ko 로 시작하면 'ko', 그 외 전부 'en'. (i18next 기본 fallback 동작과 달리
  * 비지원 locale 도 'en' 으로 수렴시켜 기존 동작을 보존한다.)
+ * 화이트리스트를 supportedLngs 추종으로 둬, 새 언어 추가 시 새로고침 후에도 영속된다.
  */
 const noriLanguageDetector = new LanguageDetector()
 noriLanguageDetector.addDetector({
   name: 'noriInitial',
   lookup() {
     const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (stored === 'ko' || stored === 'en') {
+    const supported = i18nBaseOptions.supportedLngs
+    if (stored && Array.isArray(supported) && supported.includes(stored)) {
       return stored
     }
     return navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en'

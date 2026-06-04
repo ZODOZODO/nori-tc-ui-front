@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Eye, EyeOff, Globe, LogIn, Lock, Loader2, User } from 'lucide-react'
 import { useI18n } from '@/i18n/i18n-context'
+import { LANGUAGES } from '@/i18n/LanguageToggle'
 import { useLogin } from '../hooks/useLogin'
 
 type RecoveryModalType = 'forgotId' | 'forgotPassword' | null
@@ -284,12 +285,15 @@ export function LoginPage() {
           <span>{t('login.copyright')}</span>
           <button
             type="button"
-            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+            onClick={() => {
+              const index = LANGUAGES.findIndex((item) => item.code === lang)
+              setLang(LANGUAGES[(index + 1) % LANGUAGES.length].code)
+            }}
             aria-label={t('language.toggleLabel')}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-[7px] text-xs text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Globe className="size-[15px]" aria-hidden="true" />
-            <span>{lang === 'ko' ? t('language.ko') : t('language.en')}</span>
+            <span>{t(`language.${lang}`)}</span>
           </button>
         </div>
       </section>

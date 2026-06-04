@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
-export type Lang = 'ko' | 'en'
+export type Lang = 'ko' | 'en' | 'vi'
 
 export interface I18nContextValue {
   lang: Lang

@@ -8,7 +8,7 @@ import type { InitOptions } from 'i18next'
  */
 export const i18nBaseOptions: InitOptions = {
   fallbackLng: 'ko', // ko 가 번역 베이스 — en 에 누락된 키는 ko 값으로 폴백.
-  supportedLngs: ['ko', 'en'],
+  supportedLngs: ['ko', 'en', 'vi'],
   // locale JSON 이 "eqp.sidebar.title" 같은 flat key 라 중첩 해석을 끈다. 미설정 시 전 키 깨짐.
   keySeparator: false,
   nsSeparator: false,
