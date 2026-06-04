@@ -36,3 +36,4 @@ blob-report/
 .claude/progress/
 .claude/harness/
 .claude/perf/measurements
+.claude/mr-review/
