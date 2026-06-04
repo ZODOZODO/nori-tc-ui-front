@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { Beaker, Maximize2, Minus, Move, Plus, Radar, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,8 @@ import type {
 } from '../types/live-map.types'
 
 interface LiveMapBoardProps {
+  /** board 캔버스 뒤에 깔리는 배경 레이어(구조물 floor-plan 등). 캔버스 스케일을 함께 받는다. */
+  backgroundLayer?: ReactNode
   clusters: readonly LiveMapClusterItem[]
   syncLabel: string
   searchKeyword: string
@@ -121,6 +123,7 @@ const STATUS_SEGMENTS: readonly { key: LiveMapEquipmentNode['status']; cls: stri
 ]
 
 export function LiveMapBoard({
+  backgroundLayer,
   clusters,
   syncLabel,
   searchKeyword,
@@ -477,6 +480,7 @@ export function LiveMapBoard({
                   transformOrigin: 'top left',
                 }}
               >
+                {backgroundLayer}
                 {edges.length > 0 ? (
                   <svg
                     className="pointer-events-none absolute inset-0 text-brand-primary/45"

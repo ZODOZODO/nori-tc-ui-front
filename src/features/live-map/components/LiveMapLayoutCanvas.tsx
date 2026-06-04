@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
-import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Shape, Stage, Text, Transformer } from 'react-konva'
+import { Circle, Group, Layer, Line, Rect, Shape, Stage, Text, Transformer } from 'react-konva'
 import { Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
 import type { LineConfig } from 'konva/lib/shapes/Line'
 import type { TextConfig } from 'konva/lib/shapes/Text'
-import type { ImageConfig } from 'konva/lib/shapes/Image'
 import type { Transformer as KonvaTransformerNode } from 'konva/lib/shapes/Transformer'
 import type { KonvaEventObject, Node as KonvaNodeRef } from 'konva/lib/Node'
 import { useMe } from '@/features/profile/hooks/useProfile'
@@ -37,9 +36,16 @@ import {
   type LiveMapObjectKind,
   type TransformJson,
 } from '../lib/live-map-layout.model'
+import {
+  KonvaPrimitive,
+  LIVE_MAP_AUTHORING_HEIGHT,
+  LIVE_MAP_AUTHORING_WIDTH,
+  PrimitiveImage,
+  type KonvaPrimitiveEditProps,
+} from './LiveMapKonvaPrimitive'
 
-const STAGE_WIDTH = 1100
-const STAGE_HEIGHT = 560
+const STAGE_WIDTH = LIVE_MAP_AUTHORING_WIDTH
+const STAGE_HEIGHT = LIVE_MAP_AUTHORING_HEIGHT
 const DEFAULT_PLACE_X = 220
 const DEFAULT_PLACE_Y = 160
 const SCALE_STEP = 1.2
@@ -73,60 +79,10 @@ interface WorkingPlacement {
   transform: TransformJson
 }
 
-/** draft primitive 를 캔버스에서 직접 편집(드래그/리사이즈/회전)하기 위한 Konva 노드 props. */
-interface EditableNodeProps {
-  ref: (node: KonvaNodeRef | null) => void
-  draggable: boolean
-  onClick: (event: KonvaEventObject<MouseEvent>) => void
-  onTap: () => void
-  onDragEnd: (event: KonvaEventObject<DragEvent>) => void
-  onTransformEnd: (event: KonvaEventObject<Event>) => void
-}
-
 /** 캔버스에서 개별 편집되는 draft primitive. localId 로 선택/Transformer/삭제를 건다. */
 interface DraftItem {
   localId: string
   node: KonvaNode
-}
-
-/** shape_json 의 Image primitive — src URL 로 이미지를 로드해 Konva Image 로 렌더한다. */
-function PrimitiveImage({ attrs, nodeProps }: { attrs: Record<string, unknown>; nodeProps?: EditableNodeProps }) {
-  const src = typeof attrs.src === 'string' ? attrs.src : ''
-  const [image, setImage] = useState<HTMLImageElement | null>(null)
-
-  useEffect(() => {
-    if (src.length === 0) {
-      return
-    }
-    const element = new window.Image()
-    element.src = src
-    // setImage 는 load 이벤트(비동기 콜백)에서만 호출 — 동기 setState-in-effect 회피.
-    const handleLoad = () => setImage(element)
-    element.addEventListener('load', handleLoad)
-    return () => element.removeEventListener('load', handleLoad)
-  }, [src])
-
-  if (!image) {
-    return null
-  }
-  const { src: _src, ...rest } = attrs
-  void _src
-  return <KonvaImage {...(rest as ImageConfig)} {...nodeProps} image={image} />
-}
-
-function renderPrimitive(node: KonvaNode, key: string) {
-  switch (node.className) {
-    case 'Rect':
-      return <Rect key={key} {...(node.attrs as RectConfig)} />
-    case 'Line':
-      return <Line key={key} {...(node.attrs as LineConfig)} />
-    case 'Text':
-      return <Text key={key} {...(node.attrs as TextConfig)} />
-    case 'Image':
-      return <PrimitiveImage key={key} attrs={node.attrs} />
-    default:
-      return null
-  }
 }
 
 function createDraftPrimitive(className: PrimitiveClassName, index: number): KonvaNode {
@@ -542,7 +498,7 @@ export function LiveMapLayoutCanvas() {
   // 위치/크기/회전을 노드 자신의 attrs 에 보관 → Save as Object 직렬화가 그대로 동작).
   const renderDraftNode = (item: DraftItem) => {
     const attrs = item.node.attrs
-    const editProps: EditableNodeProps = {
+    const editProps: KonvaPrimitiveEditProps = {
       ref: (node) => {
         if (node) {
           nodeRefs.current.set(item.localId, node)
@@ -653,9 +609,9 @@ export function LiveMapLayoutCanvas() {
                 setContextMenu({ x: event.evt.offsetX, y: event.evt.offsetY, localId: placement.localId })
               }}
             >
-              {(object.shapeJson.root.children ?? []).map((child, index) =>
-                renderPrimitive(child, `${placement.localId}-${index}`),
-              )}
+              {(object.shapeJson.root.children ?? []).map((child, index) => (
+                <KonvaPrimitive key={`${placement.localId}-${index}`} node={child} />
+              ))}
               {isEquipment && equipment ? (
                 <>
                   <Circle x={-2} y={-2} radius={6} fill={STATUS_FILL[equipment.status]} stroke="#0b0f1a" strokeWidth={1} />

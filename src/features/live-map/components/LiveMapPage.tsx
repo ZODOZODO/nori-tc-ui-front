@@ -5,10 +5,12 @@ import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
+import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
 import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
+import { LiveMapStructureLayer } from './LiveMapStructureLayer'
 
 // 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
 const LiveMapDemoModal = lazy(() =>
@@ -72,6 +74,13 @@ export function LiveMapPage() {
   const reset = useLiveMapUiStore((state) => state.reset)
   const liveMapQuery = useLiveMap()
   const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+  const lineListQuery = useLineList()
+
+  // 선택 라인의 lineKey — 구조물 레이어가 라인별 저장 배치를 조회하는 키.
+  const lineKey = useMemo(
+    () => lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null,
+    [lineListQuery.data, selectedLineValue],
+  )
 
   const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
@@ -216,6 +225,7 @@ export function LiveMapPage() {
             <LiveMapLayoutCanvas />
           ) : (
             <LiveMapBoard
+              backgroundLayer={<LiveMapStructureLayer lineKey={lineKey} />}
               clusters={clusterItems}
               syncLabel={syncLabel}
               searchKeyword={searchKeyword}
