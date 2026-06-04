@@ -191,25 +191,99 @@ CREATE INDEX ix_tc_live_map_placement_layout_key ON public.tc_live_map_placement
 CREATE INDEX ix_tc_live_map_placement_object_key ON public.tc_live_map_placement (object_key);
 CREATE INDEX ix_tc_live_map_placement_eqp_key   ON public.tc_live_map_placement (eqp_key);
 ```
-> `object_kind='EQUIPMENT'` 배치는 `eqp_key` 필수, `'STRUCTURE'` 배치는 `eqp_key` NULL — 상호 배타는 서버 검증으로 강제. `shape_json`/`transform_json`/`canvas_json` 키 스키마(konva 직렬화 형식)는 react-konva 도형 모델 확정과 함께 Phase 2 Specify 보강에서 동결. **새 도형 타입·2.5D 속성 추가는 JSONB 라 DB 변경 없이 프론트만 확장**.
+> `object_kind='EQUIPMENT'` 배치는 `eqp_key` 필수, `'STRUCTURE'` 배치는 `eqp_key` NULL — 상호 배타는 서버 검증으로 강제. `shape_json`/`transform_json`/`canvas_json` 키 스키마(konva 직렬화 형식)는 아래 **「JSONB 키 스키마 동결」에서 확정(2026-06-02)**. **새 도형 타입·2.5D 속성 추가는 JSONB 라 DB 변경 없이 프론트만 확장**.
+
+### JSONB 키 스키마 동결 (Phase 2 Specify — 2026-06-02 확정)
+
+> 3 JSONB 컬럼의 키 계약만 동결한다. **DDL/FK/CHECK 는 이미 확정(위) — 불변**. 본 절은 컬럼 *내용*의 키 스키마를 정한다.
+> 직렬화 원천은 **Konva `node.toObject()`** — `{attrs, className, children?}` 트리, 기본값 생략, 컨테이너 노드만 `children`, `Node.create(json)` 로 복원(검증: konva `src/Node.ts`). 3 컬럼 모두 최상위에 **스키마 버전 `v`(현재 `1`)** 를 둔다 — konva 메이저 버전업 시 직렬화 형식 변동을 식별하기 위함(JSONB 라 키 추가 비용 0, tc_deploy_* JSONB 선례 존재).
+
+#### (a) `tc_live_map_object.shape_json` — 합성 객체 원형 (Konva `Group` 직렬화)
+
+| 키 | 타입 | Null | 의미 |
+|---|---|---|---|
+| `v` | number | NOT NULL | 스키마 버전(현재 `1`) |
+| `root` | object | NOT NULL | Konva `Group` 의 `toObject()` 결과(합성 객체 = primitive 트리) |
+| `root.className` | string | NOT NULL | 루트는 `"Group"` 고정 |
+| `root.attrs` | object | NOT NULL | Group attrs(기본값 제외). 좌표는 **객체 로컬 원점(0,0) 기준** |
+| `root.children[]` | array | NOT NULL | primitive 노드 배열. 각 원소 `{attrs, className, children?}` |
+
+primitive `className` 화이트리스트(1차): `Rect` / `Line` / `Text` / `Image`. (추후 `RegularPolygon`/`Path`/`Circle` 등은 **JSONB 라 DB 변경 없이 프론트만 추가**.) 노드별 대표 attrs(전부 Konva 네이티브, 기본값 생략):
+
+- `Rect`: `x,y,width,height,fill,stroke,strokeWidth,cornerRadius,opacity`
+- `Line`: `points([x1,y1,x2,y2,…]),stroke,strokeWidth,closed,dash`
+- `Text`: `x,y,text,fontSize,fontFamily,fontStyle,fill,align`
+- `Image`: `x,y,width,height,src` — **`src`(URL 문자열) custom attr**. Konva `image`(HTMLImageElement)는 직렬화 불가(`toObject` 가 non-plain object skip)라 저장 금지. `Node.create` 후 `src` 로 이미지를 로드해 주입(Out of Scope: 바이너리 업로드 아닌 URL 참조만).
+
+```json
+{ "v": 1,
+  "root": { "className": "Group", "attrs": { "name": "pump-01" },
+    "children": [
+      { "className": "Rect", "attrs": { "x":0,"y":0,"width":80,"height":40,"fill":"#888" } },
+      { "className": "Line", "attrs": { "points":[0,40,80,40],"stroke":"#444","strokeWidth":2 } },
+      { "className": "Text", "attrs": { "x":4,"y":4,"text":"P-01","fontSize":12 } } ] } }
+```
+
+#### (b) `tc_live_map_placement.transform_json` — 배치 변환 (skew 기반 의사 2.5D)
+
+객체 원형을 라인 캔버스에 놓을 때의 변환. 화면 좌표는 `x/y` 직접, 아이소메트릭 외관은 `skewX/skewY` 로 표현(논리 아이소 좌표 투영 레이어 없음).
+
+| 키 | 타입 | Null | Konva | 의미 |
+|---|---|---|---|---|
+| `v` | number | NOT NULL | — | 스키마 버전(현재 `1`) |
+| `x` / `y` | number | NOT NULL | 네이티브 | 캔버스 절대 좌표(px) |
+| `rotation` | number | NOT NULL | 네이티브 | 회전(deg) |
+| `scaleX` / `scaleY` | number | NOT NULL | 네이티브 | 배율 |
+| `skewX` / `skewY` | number | NOT NULL | 네이티브 | **2.5D 아이소메트릭 기울임** |
+| `zIndex` | integer | NOT NULL | 네이티브 | 형제 간 draw order |
+| `depth` | number | NOT NULL | custom | **2.5D painter 깊이 정렬 가중치**(겹침 정렬용, `zIndex` 와 별개) |
+
+**2.5D 아이소메트릭 필드 동결 목록**: `skewX`, `skewY`(외관 기울임) + `depth`(겹침 정렬). 그 외 좌표/변환은 `x,y,rotation,scaleX,scaleY,zIndex`(전부 Konva 네이티브). 진짜 3D 깊이축(논리 elevation) 미도입 — Out of Scope.
+
+```json
+{ "v":1, "x":320,"y":180, "rotation":0, "scaleX":1,"scaleY":1, "skewX":0,"skewY":0, "zIndex":5, "depth":12 }
+```
+
+#### (c) `tc_live_map_layout.canvas_json` — 캔버스 메타 (크기/배경/그리드)
+
+DDL 상 NULL 허용(신규 layout 은 비어 생성 가능). 비면 프론트 기본값 적용.
+
+| 키 | 타입 | Null | 의미 |
+|---|---|---|---|
+| `v` | number | NOT NULL | 스키마 버전(현재 `1`) |
+| `width` / `height` | number | NOT NULL | Stage 크기(px) |
+| `background` | string | NOT NULL | 배경색(hex/rgba) |
+| `grid` | object | NOT NULL | `{ visible: boolean, size: number(px), color: string }` |
+
+```json
+{ "v":1, "width":1920,"height":1080, "background":"#0b0f1a", "grid":{ "visible":true,"size":32,"color":"#1e2638" } }
+```
+
+#### (d) EQUIPMENT / STRUCTURE ↔ `eqp_key` 서버 검증 규칙 (명문화)
+
+`placement` 는 `object_key` 로 객체를 참조한다. 서버는 PUT 수신 시 해당 object 의 `object_kind` 를 조회해 다음을 **강제**(DB CHECK 불가 — `object_kind` 가 타 테이블이므로 **서버 검증으로만**):
+
+- `object_kind = 'EQUIPMENT'` → `eqp_key` **NOT NULL 필수**. NULL 이면 거부(400).
+- `object_kind = 'STRUCTURE'` → `eqp_key` **NULL 강제**. 값이 있으면 거부(400).
+- `eqp_key` 가 주어지면 `tc_eqp` 존재 + 해당 layout 의 `line_key` 와 동일 라인 소속(Phase 1 스코프) 검증. 위반 시 FK 500 이 아닌 **명시 400**.
 
 ### Requirements (Backend — nori-tc-exec + ui-backend)
 
-- [ ] DB(nori-tc-exec): 위 3 테이블(`tc_live_map_object` / `tc_live_map_layout` / `tc_live_map_placement`) 신설 — 명시 DDL(JSONB 기하 + CASCADE FK). 4 벤더 패치 + `create_all_table` 반영.
-- [ ] ui-backend: **객체 정의 CRUD**(object: 합성 객체 shape_json 저장/조회/수정/삭제) 포트·서비스·컨트롤러 — write 는 `LIVE_MAP_LAYOUT_WRITE` 필요. `@Import` 등록.
-- [ ] ui-backend: **레이아웃/배치 GET**(전 권한) / **PUT**(`LIVE_MAP_LAYOUT_WRITE` 필요) 포트·서비스·컨트롤러. 서버측 권한 enforce. EQUIPMENT 배치 eqp_key 필수·STRUCTURE eqp_key 금지 검증.
+- [x] DB(nori-tc-exec): 위 3 테이블(`tc_live_map_object` / `tc_live_map_layout` / `tc_live_map_placement`) 신설 — 명시 DDL(JSONB 기하 + CASCADE FK). 4 벤더 패치 + `create_all_table` 반영.
+- [x] ui-backend: **객체 정의 CRUD**(object: 합성 객체 shape_json 저장/조회/수정/삭제) 포트·서비스·컨트롤러 — write 는 `LIVE_MAP_LAYOUT_WRITE` 필요. `@Import` 등록.
+- [x] ui-backend: **레이아웃/배치 GET**(전 권한) / **PUT**(`LIVE_MAP_LAYOUT_WRITE` 필요) 포트·서비스·컨트롤러. 서버측 권한 enforce. EQUIPMENT 배치 eqp_key 필수·STRUCTURE eqp_key 금지 검증.
 
 ### Requirements (Frontend — ui-front, react-konva)
 
-- [ ] live-map 을 react-konva 2.5D 캔버스로 재설계 — cluster/IN·OUT 종단 폐기.
-- [ ] **2.5D primitive 자유 그리기**: 사각/선/텍스트/이미지(+추후 polygon/path 확장 가능) 추가·이동·리사이즈·회전.
-- [ ] **합성 객체화**: 여러 primitive 다중선택→그룹화해 1개 객체로 만들고 이름/종류(STRUCTURE/EQUIPMENT) 부여해 **저장**(객체 CRUD 호출, shape_json 직렬화).
-- [ ] **재사용 — 우클릭 컨텍스트 메뉴**: 복사/붙여넣기/복제 + **객체 팔레트에서 신규 배치**(저장 객체를 캔버스에 인스턴스 생성). 각 인스턴스 = `tc_live_map_placement` 1행.
-- [ ] **객체 팔레트/라이브러리** 패널: 저장 객체 목록·검색, 드래그/클릭 배치.
-- [ ] 다중선택·z-order·삭제·배율(scale) 조정.
-- [ ] EQUIPMENT 객체 배치 시 **eqpId 바인딩** → `GET /live-map` 실시간 상태(RUN/IDLE/ERROR/DOWN)·포트 표시 유지.
-- [ ] 그리기/편집/복제/팔레트는 **admin 전용**(`hasPermission(...,'LIVE_MAP_LAYOUT_WRITE')`). 비-admin 읽기 전용(이동/편집/우클릭 편집 메뉴 진입 불가).
-- [ ] 레이아웃 저장(PUT)/불러오기(GET), 선택 라인 스코프 연동.
+- [x] live-map 을 react-konva 2.5D 캔버스로 재설계 — cluster/IN·OUT 종단 폐기. (`LiveMapBoard`→`LiveMapLayoutCanvas`. `LIVE_MAP_CLUSTER_ITEMS` mock 은 캔버스 미사용, Demo Tester 모달에만 잔존.)
+- [x] **2.5D primitive 자유 그리기**: 사각/선/텍스트/이미지(+추후 polygon/path 확장 가능) 추가·이동·리사이즈·회전. *(후속 구현 완료 2026-06-04 — dev-report §8: Image 추가 버튼+`PrimitiveImage`(src URL) 렌더, Konva `Transformer` 리사이즈/회전 wired+`onTransformEnd` 영속. Transformer 핸들 드래그는 wired+e2e console-clean 검증, 배율은 selection bar Scale± 로 결정적 e2e 검증)*
+- [x] **합성 객체화**: 여러 primitive 다중선택→그룹화해 1개 객체로 만들고 이름/종류(STRUCTURE/EQUIPMENT) 부여해 **저장**(객체 CRUD 호출, shape_json 직렬화). (draft 누적→1 Group 객체 저장으로 충족, e2e 검증. 캔버스 상 다중선택 핸들 인터랙션은 대신 draft 누적.)
+- [x] **재사용 — 우클릭 컨텍스트 메뉴**: 복사/붙여넣기/복제 + **객체 팔레트에서 신규 배치**(저장 객체를 캔버스에 인스턴스 생성). 각 인스턴스 = `tc_live_map_placement` 1행. (context-copy=즉시 복제 배치 + palette 신규로 인스턴스 재사용 충족, e2e 검증. 별도 clipboard 붙여넣기 액션은 없음.)
+- [x] **객체 팔레트/라이브러리** 패널: 저장 객체 목록·검색, 드래그/클릭 배치. *(후속 구현 완료 2026-06-04 — dev-report §8: `palette-search` 이름 필터 + 팔레트 행 `draggable`→캔버스 `onDrop` 좌표 배치)*
+- [x] 다중선택·z-order·삭제·배율(scale) 조정. *(후속 구현 완료 2026-06-04 — dev-report §8: `selectedIds` shift/ctrl 토글 다중선택 + selection bar Bring to Front/Send to Back(`liftTransformsToFront`/`sinkTransformsToBack`)·Scale ±(`scaleTransform`)·Delete. PUT 페이로드 zIndex/scaleX e2e 검증)*
+- [x] EQUIPMENT 객체 배치 시 **eqpId 바인딩** → `GET /live-map` 실시간 상태(RUN/IDLE/ERROR/DOWN)·포트 표시 유지. *(후속 구현 완료 2026-06-04 — dev-report §8: GET /live-map 에 eqpKey 추가→라인 스코프 설비 드롭다운 바인딩, 캔버스 EQUIPMENT 노드에 상태 dot+포트 오버레이, binding 패널 실시간 상태 텍스트. e2e `live-map-eqp-binding`)*
+- [x] 그리기/편집/복제/팔레트는 **admin 전용**(`hasPermission(...,'LIVE_MAP_LAYOUT_WRITE')`). 비-admin 읽기 전용(이동/편집/우클릭 편집 메뉴 진입 불가). (e2e `live-map-readonly` 검증.)
+- [x] 레이아웃 저장(PUT)/불러오기(GET), 선택 라인 스코프 연동. (e2e `live-map-object-reuse` 새로고침 영속 검증.)
 
 ### Constraints
 
@@ -229,6 +303,34 @@ CREATE INDEX ix_tc_live_map_placement_eqp_key   ON public.tc_live_map_placement 
 - `cd nori-tc-ui-front && npm run test:unit` 전부 PASS (합성 객체 shape_json 직렬화/배치 모델 유닛 테스트 추가).
 - Playwright e2e `tests/e2e/live-map-object-reuse.spec.ts`: admin 으로 primitive 여러 개→합성 객체 저장→우클릭 복사·팔레트 신규 배치→레이아웃 저장→새로고침 후 객체·배치 영속 확인 assert + console.error 0 + pageerror 0.
 - Playwright e2e `tests/e2e/live-map-readonly.spec.ts`: 비-admin 권한에서 그리기/편집/복제/우클릭 편집 메뉴 진입 불가 assert + console.error 0 + pageerror 0.
+- (후속 추가 2026-06-04) Playwright e2e `tests/e2e/live-map-eqp-binding.spec.ts`: admin 이 EQUIPMENT 객체를 배치→캔버스 선택→라인 스코프 실설비(`GET /live-map` eqpKey) 바인딩→실시간 상태(RUN) 표시→레이아웃 저장 PUT 페이로드에 eqpKey 단언 + console.error 0 + pageerror 0. (기존 AC7 의 STRUCTURE-only 검증 격차를 막는 AC.)
+- (후속 추가 2026-06-04) Playwright e2e `tests/e2e/live-map-authoring-ux.spec.ts`: 팔레트 검색 필터 / 드래그-드롭 배치 / 다중선택+배율(Scale)+z-order(Bring to Front) PUT 페이로드(scaleX>1·zIndex≥2) 반영 / Image primitive 추가·저장·배치 렌더 — 4 케이스 각 console.error 0 + pageerror 0.
+- (후속 추가 2026-06-04) ui-backend `LiveMapQueryServiceTest#getEquipmentViewsReturnsEqpKeyForLayoutPlacementBinding`: `GET /live-map` 뷰가 eqpKey 를 반환(placement.eqpKey↔실시간 상태 매칭 전제) PASS.
+
+### Validate 결과 (Phase 2) — 2026-06-04 (독립 세션 재현)
+
+8개 AC 전부 **PASS** (dev-report 인용이 아닌 별도 재실행/재인스펙션):
+- AC1 `cd nori-tc-ui-backend && ./gradlew build -PuseLocalMaven` → `BUILD SUCCESSFUL`(starter context-load 포함 = 빈 그래프 무결성, @Import 누락 0).
+- AC2 `LiveMapLayoutPermissionTest`(`cleanTest` 강제 재실행) — `readOnlyUserCanGetButCannotWriteLayout`(GET 허용 + PUT/POST/DELETE 403) + `writeUserCanPerformAllLayoutOperations`. failure/error 0.
+- AC3 `LiveMapLayoutServiceTest`(`cleanTest`) — equipment eqpKey 필수 / structure eqpKey 금지 / 미등록 object / 미등록 eqp / 타라인 eqp / canvas·transform `v` 누락 / 정상 저장 9 케이스. failure/error 0.
+- AC4 `npx tsc -b` exit 0 / AC5 `npx eslint src` exit 0(0 errors, 16 warnings 전부 기존 react-hooks) / AC6 `npm run test:unit` 106/106 pass.
+- AC7 `live-map-object-reuse.spec` + AC8 `live-map-readonly.spec` + 회귀 `live-map-line-scope.spec` → 3 passed, console.error 0 + pageerror 0 (각 spec `toEqual([])` 단언 통과).
+
+Plan 결정 준수 (코드 재인스펙션):
+- D1 nori-tc-common `git status` clean(무변경) + 영속화 = ui-backend `tc-ui-db-adapter` raw JDBC(`@Repository`+`NamedParameterJdbcTemplate`, DeployJdbcStorePort 답습).
+- D2 write `CAST(:x AS JSONB)` / read `getString→readTree` / IDENTITY `RETURNING` / layout `ON CONFLICT (line_key) DO UPDATE … RETURNING`(LiveMapLayoutJdbcStorePort:90-122). `v` 검증 = `LiveMapSchemaSupport.requireSchemaVersion`(최상위 정수 v).
+- D3 `LIVE_MAP_LAYOUT_READ` = PREFIX `/api/live-map/layout` + **`http_method='GET'`** + ADMIN/DEVELOPER/OPERATOR backfill(4벤더 권한 패치). WRITE 재사용. PUT 가 WRITE 에만 매칭(AC2 증명).
+- D4 4벤더 DDL parity(postgres JSONB / mysql JSON / mssql NVARCHAR(MAX) / oracle CLOB · IDENTITY·BOOLEAN·CHECK·FK CASCADE·명명 동일) + `create_all_table` 반영(`2.7 LIVE MAP LAYOUT`) + DROP 자식→부모 역순 + Phase 1 잔여 `tc_line` DROP 보정.
+- D5 object(라인 독립 CRUD) 별도 + layout/placement 통합, `saveLayout` = upsert layout + placement delete-then-insert 단일 `@Transactional`.
+- JSONB 키 스키마 동결안 = ui-front `live-map-layout.model.ts` 와 일치(shape_json `{v,root:Group}` / transform_json skew 의사 2.5D `{v,x,y,rotation,scaleX/Y,skewX/Y,zIndex,depth}` / canvas_json `{v,width,height,background,grid}` · primitive 화이트리스트 Rect/Line/Text/Image).
+- @Import 3 ModuleConfiguration: `UiDbAdapterModuleConfiguration`(+LiveMapObject/LayoutJdbcStorePort) · `UiCoreServiceModuleConfiguration`(+LiveMapLayout/ObjectService) · `UiWebAdapterModuleConfiguration`(+LiveMapLayoutController).
+
+후속 연기였던 1차 빌더 미구현 항목 — **2026-06-04 마저 구현 완료**(dev-report §8 append). 당시 AC 8개 통과엔 무영향이었고, 누락을 잡는 e2e(eqp-binding·authoring-ux)를 AC 로 신설:
+- **req 279**: ✅ Image primitive 추가(`builder-add-image`)+`PrimitiveImage`(src URL) 렌더, Konva `Transformer` 리사이즈/회전 wired+`onTransformEnd` 영속(핸들 드래그는 wired+console-clean, 배율은 selection bar Scale± 로 결정적 e2e).
+- **req 282**: ✅ 팔레트 검색(`palette-search` 이름 필터) + 드래그-드롭 배치(`palette-item-*` draggable→캔버스 `onDrop`).
+- **req 283**: ✅ 다중선택(`selectedIds` shift/ctrl 토글) + selection bar z-order(`liftTransformsToFront`/`sinkTransformsToBack`)·배율(`scaleTransform`)·삭제. PUT 페이로드 zIndex/scaleX e2e 검증.
+- **req 284**: ✅ `GET /live-map` 에 eqpKey 추가→라인 스코프 설비 드롭다운 바인딩 + 캔버스 EQUIPMENT 노드 실시간 상태 dot/포트 오버레이 + binding 패널 상태 텍스트. e2e `live-map-eqp-binding`.
+- req 281: 별도 clipboard 붙여넣기 액션 없음(context-copy=즉시 복제 + 팔레트 신규로 인스턴스 재사용은 충족) — 설계상 유지(SPEC Constraints: clipboard 백엔드 없음).
 
 ---
 
@@ -253,6 +355,11 @@ CREATE INDEX ix_tc_live_map_placement_eqp_key   ON public.tc_live_map_placement 
 - 합성 객체 모델: 선/도형 여러 primitive 가 합쳐진 1개 객체를 저장(object) → 라인 캔버스에 인스턴스로 배치(placement). 우클릭 복사/팔레트 신규로 재사용은 프론트 인터랙션. (사용자 확정)
 - Phase 분할 + 상단바 라인 선택 드롭다운 → 선택 라인 스코프 전체 적용. (사용자 확정)
 - 렌더링: **react-konva 2.5D**. (사용자 확정)
+- JSONB 직렬화 래핑: 3 컬럼 모두 최상위 **스키마 버전 `v`(현재 1) wrapper**. `shape_json = { v, root: <Konva Group toObject()> }`, `transform_json`/`canvas_json` 도 최상위 `v`. konva 메이저 버전업 시 직렬화 형식 변동 식별용, JSONB 라 키 1개 비용. 순수 toObject 직접 저장(wrapper 무) 미채택. (사용자 확정 2026-06-02)
+- 2.5D 깊이 모델: **skew 기반 의사 2.5D** — `transform_json` 의 `skewX/skewY`(Konva 네이티브)로 아이소 외관, `zIndex`=draw order, `depth`=painter 깊이 정렬 가중치(custom). 논리 아이소 좌표 투영(gridX/gridY/elevation + 투영 공식) 미채택 — 투영/역투영 레이어 복잡도. (사용자 확정 2026-06-02)
+- **D1 편차 명시(영속화 트랙)**: 본 SPEC 343줄의 "RDB(JPA, tc-ui-db-adapter)" 는 느슨한 라벨이며, **실제 구현체는 raw JDBC**(`LiveMapObjectJdbcStorePort`/`LiveMapLayoutJdbcStorePort`, `NamedParameterJdbcTemplate` + `CAST(:x AS JSONB)`/`RETURNING`, `DeployJdbcStorePort` 답습)다. 설계 축 = "JSONB 보유 여부"(JPA/JDBC 선택 아님) — nori-tc-common 42 테이블은 순수 scalar(JSONB 0건)라 JSONB 보유 테이블은 소유 앱(ui-backend) JDBC 트랙. **nori-tc-common 무변경**. (Plan D1, phase2-plan §0.1~0.2)
+- **D3 편차 명시(권한)**: SPEC Phase 2 본문은 `LIVE_MAP_LAYOUT_WRITE` enforce 만 명시했으나, GET layout 을 비-admin 에 열려면 **신규 `LIVE_MAP_LAYOUT_READ`(PREFIX `/api/live-map/layout`, `http_method='GET'` 한정, ADMIN/DEVELOPER/OPERATOR)** 가 추가됐다. closed-by-default + ANY-of 매칭에서 READ 를 GET 한정해야 PUT/POST/DELETE 가 WRITE 권한에만 매칭 → 비-admin write 403(이중 차단 백엔드 절반). (Plan D3, phase2-plan §0.3)
+- **GET /live-map 에 eqpKey 추가(2026-06-04, 후속 구현)**: live-map placement 는 `eqp_key`(BIGINT PK)로 실설비를 바인딩하나 기존 `LiveMapResponse` 는 `eqpId`(String)만 노출 → placement.eqpKey↔실시간 상태 매칭 불가. `LiveMapEquipmentView`/`LiveMapResponse.EquipmentResponse` 에 `eqpKey` 1필드 추가(최소 변경). `UiEqp.eqpKey` 는 Phase 1 기존 필드라 **nori-tc-common 무변경**, ui-backend 뷰/DTO/Support/QueryService 매핑만. (dev-report §8)
 
 ## SDD 진행 상태
 
@@ -263,10 +370,12 @@ CREATE INDEX ix_tc_live_map_placement_eqp_key   ON public.tc_live_map_placement 
 - [x] **Validate** — Phase 1 AC 12개 전부 재실행/재인스펙션 PASS (2026-06-02, 후속 권고 3건은 AC 통과 무영향). Phase 2 착수 가능.
 
 ### Phase 2 (Phase 1 완료 후 착수)
-- [ ] **Specify** — JSONB 키 스키마(shape_json/transform_json/canvas_json = konva 직렬화 형식) 동결 (3 테이블·렌더링은 확정)
-- [ ] **Plan** — (산출물: `.claude/specs/live-map-layout-builder-phase2-plan.md`)
-- [ ] **Implement** — (산출물: `.claude/specs/live-map-layout-builder-phase2-dev-report.md`)
-- [ ] **Validate** — Phase 2 AC 체크박스 업데이트
+- [x] **Specify** — JSONB 키 스키마 동결 완료(2026-06-02): `shape_json`=`{v, root:<Konva Group toObject>}` / `transform_json`=skew 기반 의사 2.5D `{v,x,y,rotation,scaleX/Y,skewX/Y,zIndex,depth}` / `canvas_json`=`{v,width,height,background,grid}` + EQUIPMENT/STRUCTURE↔`eqp_key` 서버 검증 규칙 명문화. 3 테이블 DDL/FK/CHECK·react-konva 렌더링은 기확정(불변). 2.5D 아이소 필드 = `skewX/skewY`+`depth`.
+- [x] **Plan** — (산출물: `.claude/specs/live-map-layout-builder-phase2-plan.md`). 핵심 결정: 영속화 트랙 = ui-backend JDBC 어댑터(DeployJdbcStorePort 답습, JSONB 보유 ⇒ 소유 앱 JDBC 라는 검증된 설계 원칙, nori-tc-common 무변경) / 권한 = LIVE_MAP_LAYOUT_WRITE 재사용 + GET-한정 LIVE_MAP_LAYOUT_READ 신규(ANY-of 보안) / 4벤더 DDL parity + postgres 전용 앱.
+- [x] **Implement** — (산출물: `.claude/specs/live-map-layout-builder-phase2-dev-report.md`). exec 4벤더 DDL 3테이블+권한패치 / ui-backend 헥사고날 JDBC(JsonNode↔String·CAST AS JSONB·RETURNING, common 무변경) + 3 ModuleConfiguration @Import + LIVE_MAP_LAYOUT_READ(GET 한정) 신규 / ui-front react-konva 2.5D 빌더(권한 게이팅·팔레트·우클릭·영속). AC1~AC8 전부 자체 실행 PASS(ui-backend build·tsc·eslint src·unit 106·e2e 3종 console/pageerror 0). 전체 e2e 의 48 실패는 사전 존재 환경 이슈(stash 후 model-flow 동일 실패로 검증, Phase 2 무관).
+- [x] **Validate** — Phase 2 AC 8개 전부 독립 재실행/재인스펙션 PASS (2026-06-04). D1~D5 + JSONB 키 스키마 동결안 + @Import 3 ModuleConfiguration 준수 확인.
+- [x] **후속 구현(2026-06-04)** — Validate 가 `[~]` 로 식별했던 req 279/282/283/284(Transformer 리사이즈/회전·Image 렌더·다중선택·z-order·배율·팔레트 검색/드래그·eqp 바인딩 UI·실시간 오버레이) 마저 구현 완료. 누락을 잡는 e2e 2종(`live-map-eqp-binding`·`live-map-authoring-ux`) + 백엔드 eqpKey 테스트 신설 AC 추가. 검증: ui-front tsc 0 / eslint 0 errors(15 warn) / unit 112 / e2e 8 passed(console·pageerror 0) + ui-backend `./gradlew build -PuseLocalMaven` BUILD SUCCESSFUL. GET /live-map 에 eqpKey 추가(common 무변경). 상세 = dev-report §8.
+- [x] **운영 반영 + 최종 검증(2026-06-04)** — 실 DB(`192.168.0.150:16432/nori_tc`, postgres 18.3)에 Phase 1+2 스키마·권한 **수동 적용 완료**(Flyway 없음). 데이터 손실 0(tc_eqp 54행 유지, 백업 `tc_eqp_backup_20260602.sql`). `tc_eqp.line_key` 가 ALTER ADD COLUMN 으로 끝(18번)에 붙던 것을 **단일 트랜잭션 테이블 재생성으로 3번(eqp_id↔comm_interface) 재배치**(시퀀스 `seq_tc_eqp_eqp_key` last_value=78 보존, 12 inbound FK 재생성, ops 스크립트 `tc_eqp_reorder_line_key.sql`). 독립 e2e 재현 live-map 5파일 **8 passed**(console/pageerror 0). 커밋: exec `8df11ca` / ui-backend `e8e4559` / ui-front (본 Phase 2 커밋).
 
 ## 다음 단계 진입 프롬프트
 
@@ -296,9 +405,33 @@ Phase 1 Acceptance Criteria 모두 만족하도록 각 AC 당 실패 테스트 �
 누락 / 위반 발견 시 보고. 통과 항목은 SPEC 의 Phase 1 AC 체크박스 + SDD 진행 상태를 [x] 로 업데이트.
 ```
 
-**Phase 2 — Specify 보강 진입 (Phase 1 Validate 완료 후, 새 세션)**:
+**Phase 2 — Specify 보강 진입 (완료 2026-06-02)**:
 ```
 @.claude/specs/live-map-layout-builder.md 의 Phase 2 섹션 구체화.
 tc_live_map_object.shape_json / tc_live_map_placement.transform_json / tc_live_map_layout.canvas_json 의 JSONB 키 스키마(react-konva 직렬화 형식) 동결.
 확정 후 Phase 2 Plan 진입.
+```
+
+**Phase 2 — Plan 진입 (새 세션 + Plan Mode)**:
+```
+@.claude/specs/live-map-layout-builder.md 의 Phase 2 보고 구현 계획 수립.
+영향 레포(nori-tc-exec 4 벤더 패치 3 테이블 + ui-backend 객체 CRUD·레이아웃/배치 GET/PUT 헥사고날 + ui-front react-konva 2.5D 캔버스 재설계) / 단계 / 위험 / 롤백 포함.
+JSONB 키 스키마(shape_json {v,root} / transform_json skew 의사 2.5D / canvas_json) 동결안 + EQUIPMENT/STRUCTURE eqp_key 서버 검증 + JSONB 의 ui-backend ORM 매핑(JsonNode/String) + react-konva 신규 의존성 도입 + 비-admin 읽기전용 이중 차단 포함.
+실행 / 코드 수정 금지.
+산출물: .claude/specs/live-map-layout-builder-phase2-plan.md 에 저장.
+```
+
+**Phase 2 — Implement 진입 (새 세션)**:
+```
+@.claude/specs/live-map-layout-builder.md @.claude/specs/live-map-layout-builder-phase2-plan.md 둘 다 읽고 Phase 2 구현.
+Phase 2 Acceptance Criteria 모두 만족하도록 각 AC 당 실패 테스트 먼저.
+헥사고날 @Import / LIVE_MAP_LAYOUT_WRITE write enforce / JSONB 키 스키마 동결안(v 래퍼·skew 의사 2.5D) / EQUIPMENT eqp_key 필수·STRUCTURE 금지 / 비-admin 읽기전용 엄수.
+산출물: .claude/specs/live-map-layout-builder-phase2-dev-report.md.
+```
+
+**Phase 2 — Validate 진입 (새 세션)**:
+```
+@.claude/specs/live-map-layout-builder.md @.claude/specs/live-map-layout-builder-phase2-plan.md @.claude/specs/live-map-layout-builder-phase2-dev-report.md
+셋 다 읽고, Phase 2 구현이 모든 Phase 2 Acceptance Criteria 와 Plan 결정·JSONB 키 스키마 동결안을 만족하는지 검증.
+누락 / 위반 발견 시 보고. 통과 항목은 SPEC 의 Phase 2 AC 체크박스 + SDD 진행 상태를 [x] 로 업데이트.
 ```

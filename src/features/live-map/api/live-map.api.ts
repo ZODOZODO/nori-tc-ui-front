@@ -11,6 +11,7 @@ export interface LiveMapPortResponse {
 }
 
 export interface LiveMapEquipmentResponse {
+  eqpKey: number
   eqpId: string
   eqpName: string
   lineValue: string

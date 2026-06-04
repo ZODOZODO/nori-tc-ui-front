@@ -1,0 +1,790 @@
+import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
+import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
+import type { RectConfig } from 'konva/lib/shapes/Rect'
+import type { LineConfig } from 'konva/lib/shapes/Line'
+import type { TextConfig } from 'konva/lib/shapes/Text'
+import type { ImageConfig } from 'konva/lib/shapes/Image'
+import type { Group as KonvaGroupNode } from 'konva/lib/Group'
+import type { Transformer as KonvaTransformerNode } from 'konva/lib/shapes/Transformer'
+import type { KonvaEventObject } from 'konva/lib/Node'
+import { useMe } from '@/features/profile/hooks/useProfile'
+import { useLineList } from '@/shared/hooks/useLineList'
+import { ALL_LINES_VALUE, useLineScopeStore } from '@/shared/stores/line-scope.store'
+import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
+import type { LiveMapEqpStatus, LiveMapPortStatus } from '../types/live-map.types'
+import type { LiveMapEquipmentResponse } from '../api/live-map.api'
+import { useLiveMap } from '../hooks/useLiveMap'
+import type { LiveMapObjectResponse } from '../api/layout.api'
+import {
+  useCreateObject,
+  useDeleteObject,
+  useLayout,
+  useLayoutObjects,
+  useSaveLayout,
+} from '../hooks/useLayout'
+import {
+  buildShapeJson,
+  buildTransformJson,
+  DEFAULT_CANVAS_JSON,
+  DEFAULT_IMAGE_SRC,
+  liftTransformsToFront,
+  scaleTransform,
+  sinkTransformsToBack,
+  sortByDepth,
+  toggleSelection,
+  validatePlacementEqpBinding,
+  type KonvaNode,
+  type LiveMapObjectKind,
+  type TransformJson,
+} from '../lib/live-map-layout.model'
+
+const STAGE_WIDTH = 1100
+const STAGE_HEIGHT = 560
+const DEFAULT_PLACE_X = 220
+const DEFAULT_PLACE_Y = 160
+const SCALE_STEP = 1.2
+
+type PrimitiveClassName = 'Rect' | 'Line' | 'Text' | 'Image'
+
+/** 실시간 설비 상태 → Konva 채움색(hex). 캔버스는 tailwind 토큰이 아닌 raw 색이 필요. */
+const STATUS_FILL: Record<LiveMapEqpStatus, string> = {
+  RUN: '#22c55e',
+  IDLE: '#0ea5e9',
+  ERROR: '#ef4444',
+  DOWN: '#64748b',
+}
+
+const PORT_STATUS_FILL: Record<LiveMapPortStatus, string> = {
+  RUN: '#22c55e',
+  IDLE: '#0ea5e9',
+  DOWN: '#64748b',
+}
+
+interface WorkingPlacement {
+  localId: string
+  placementKey: number | null
+  objectKey: number
+  eqpKey: number | null
+  transform: TransformJson
+}
+
+/** shape_json 의 Image primitive — src URL 로 이미지를 로드해 Konva Image 로 렌더한다. */
+function PrimitiveImage({ attrs }: { attrs: Record<string, unknown> }) {
+  const src = typeof attrs.src === 'string' ? attrs.src : ''
+  const [image, setImage] = useState<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    if (src.length === 0) {
+      return
+    }
+    const element = new window.Image()
+    element.src = src
+    // setImage 는 load 이벤트(비동기 콜백)에서만 호출 — 동기 setState-in-effect 회피.
+    const handleLoad = () => setImage(element)
+    element.addEventListener('load', handleLoad)
+    return () => element.removeEventListener('load', handleLoad)
+  }, [src])
+
+  if (!image) {
+    return null
+  }
+  const { src: _src, ...rest } = attrs
+  void _src
+  return <KonvaImage {...(rest as ImageConfig)} image={image} />
+}
+
+function renderPrimitive(node: KonvaNode, key: string) {
+  switch (node.className) {
+    case 'Rect':
+      return <Rect key={key} {...(node.attrs as RectConfig)} />
+    case 'Line':
+      return <Line key={key} {...(node.attrs as LineConfig)} />
+    case 'Text':
+      return <Text key={key} {...(node.attrs as TextConfig)} />
+    case 'Image':
+      return <PrimitiveImage key={key} attrs={node.attrs} />
+    default:
+      return null
+  }
+}
+
+function createDraftPrimitive(className: PrimitiveClassName, index: number): KonvaNode {
+  const offset = index * 14
+  if (className === 'Rect') {
+    return {
+      className,
+      attrs: { x: 24 + offset, y: 24 + offset, width: 96, height: 48, fill: '#2563eb', cornerRadius: 6 },
+    }
+  }
+  if (className === 'Line') {
+    return {
+      className,
+      attrs: { points: [24 + offset, 96, 152 + offset, 96], stroke: '#94a3b8', strokeWidth: 3 },
+    }
+  }
+  if (className === 'Image') {
+    return {
+      className,
+      attrs: { x: 24 + offset, y: 24 + offset, width: 64, height: 64, src: DEFAULT_IMAGE_SRC },
+    }
+  }
+  return {
+    className,
+    attrs: { x: 24 + offset, y: 24 + offset, text: 'Label', fontSize: 16, fill: '#e2e8f0' },
+  }
+}
+
+/**
+ * live-map 2.5D 레이아웃 빌더 캔버스(react-konva)입니다.
+ *
+ * <p>저작(그리기/그룹화 저장/팔레트 배치/복사/리사이즈·회전/다중선택/z-order·배율/삭제/저장)은
+ * admin 전용(`hasPermission(..., LIVE_MAP_LAYOUT_WRITE)`). 비-admin 은 캔버스 읽기 전용 —
+ * 툴바/팔레트/우클릭 편집 메뉴가 렌더되지 않는다(이중 차단의 프론트 절반).</p>
+ *
+ * <p>EQUIPMENT 객체 배치는 라인 스코프 실설비를 골라 eqpKey 를 바인딩하고, `GET /live-map` 의
+ * 실시간 상태(RUN/IDLE/ERROR/DOWN)·포트를 캔버스 노드에 오버레이한다(비-admin 도 상태 조회).</p>
+ */
+export function LiveMapLayoutCanvas() {
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+  const lineListQuery = useLineList()
+  const meQuery = useMe()
+  const liveMapQuery = useLiveMap()
+
+  const canEdit = hasPermission(meQuery.data?.permissionCodes, LIVE_MAP_LAYOUT_WRITE_PERMISSION)
+
+  const lineKey = useMemo(() => {
+    if (selectedLineValue === ALL_LINES_VALUE) {
+      return null
+    }
+    return lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null
+  }, [lineListQuery.data, selectedLineValue])
+
+  const layoutQuery = useLayout(lineKey)
+  const objectsQuery = useLayoutObjects(canEdit)
+  const saveLayout = useSaveLayout(lineKey)
+  const createObject = useCreateObject()
+  const deleteObject = useDeleteObject()
+
+  const idRef = useRef(0)
+  const nextLocalId = () => {
+    idRef.current += 1
+    return `wp-${idRef.current}`
+  }
+
+  const nodeRefs = useRef(new Map<string, KonvaGroupNode>())
+  const transformerRef = useRef<KonvaTransformerNode | null>(null)
+
+  const [draft, setDraft] = useState<KonvaNode[]>([])
+  const [working, setWorking] = useState<WorkingPlacement[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; localId: string } | null>(null)
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
+  const [objectName, setObjectName] = useState('')
+  const [objectKind, setObjectKind] = useState<LiveMapObjectKind>('STRUCTURE')
+  const [paletteSearch, setPaletteSearch] = useState('')
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+
+  // 서버 layout 이 바뀌면 작업 사본을 재시드(저장 후/라인 전환/새로고침 영속 반영).
+  useEffect(() => {
+    const placements = layoutQuery.data?.placements
+    setSelectedIds([])
+    if (!placements) {
+      setWorking([])
+      return
+    }
+    setWorking(
+      placements.map((placement) => ({
+        localId: nextLocalId(),
+        placementKey: placement.placementKey,
+        objectKey: placement.objectKey,
+        eqpKey: placement.eqpKey,
+        transform: placement.transformJson,
+      })),
+    )
+    // layoutQuery.data 식별자가 바뀔 때만 재시드.
+  }, [layoutQuery.data])
+
+  const objectsByKey = useMemo(() => {
+    const map = new Map<number, LiveMapObjectResponse>()
+    for (const object of layoutQuery.data?.objects ?? []) {
+      map.set(object.objectKey, object)
+    }
+    for (const object of objectsQuery.data ?? []) {
+      map.set(object.objectKey, object)
+    }
+    return map
+  }, [layoutQuery.data?.objects, objectsQuery.data])
+
+  // 실시간 상태 — eqpKey 로 GET /live-map 설비를 매칭. 라인 스코프 실설비 = eqp 바인딩 후보.
+  const equipmentByKey = useMemo(() => {
+    const map = new Map<number, LiveMapEquipmentResponse>()
+    for (const equipment of liveMapQuery.data?.equipmentItems ?? []) {
+      map.set(equipment.eqpKey, equipment)
+    }
+    return map
+  }, [liveMapQuery.data?.equipmentItems])
+
+  const lineEquipments = useMemo(
+    () => (liveMapQuery.data?.equipmentItems ?? []).filter((equipment) => equipment.lineValue === selectedLineValue),
+    [liveMapQuery.data?.equipmentItems, selectedLineValue],
+  )
+
+  const filteredObjects = useMemo(() => {
+    const keyword = paletteSearch.trim().toLowerCase()
+    const all = objectsQuery.data ?? []
+    if (keyword.length === 0) {
+      return all
+    }
+    return all.filter((object) => object.objectName.toLowerCase().includes(keyword))
+  }, [objectsQuery.data, paletteSearch])
+
+  const sortedWorking = useMemo(
+    () =>
+      sortByDepth(
+        working.map((placement) => ({
+          ...placement,
+          depth: placement.transform.depth,
+          zIndex: placement.transform.zIndex,
+        })),
+      ),
+    [working],
+  )
+
+  // 선택 노드에 Transformer(리사이즈/회전 핸들) 부착 — react-konva 표준 패턴.
+  useEffect(() => {
+    const transformer = transformerRef.current
+    if (!transformer) {
+      return
+    }
+    const nodes = selectedIds
+      .map((id) => nodeRefs.current.get(id))
+      .filter((node): node is KonvaGroupNode => Boolean(node))
+    transformer.nodes(nodes)
+    transformer.getLayer()?.batchDraw()
+  }, [selectedIds, sortedWorking])
+
+  const addPrimitive = (className: PrimitiveClassName) => {
+    setStatusMessage(null)
+    setDraft((previous) => [...previous, createDraftPrimitive(className, previous.length)])
+  }
+
+  const handleConfirmSaveObject = () => {
+    const trimmedName = objectName.trim()
+    if (trimmedName.length === 0) {
+      setStatusMessage('Object name is required.')
+      return
+    }
+    const shapeJson = buildShapeJson({ name: trimmedName }, draft)
+    createObject.mutate(
+      { objectName: trimmedName, objectKind, shapeJson },
+      {
+        onSuccess: () => {
+          setDraft([])
+          setObjectName('')
+          setObjectKind('STRUCTURE')
+          setIsSaveDialogOpen(false)
+          setStatusMessage('Object saved.')
+        },
+        onError: (error) => setStatusMessage(error instanceof Error ? error.message : 'Save object failed.'),
+      },
+    )
+  }
+
+  const placeObject = (object: LiveMapObjectResponse, x: number, y: number) => {
+    setStatusMessage(null)
+    setWorking((previous) => [
+      ...previous,
+      {
+        localId: nextLocalId(),
+        placementKey: null,
+        objectKey: object.objectKey,
+        // EQUIPMENT 객체는 실설비 바인딩 필요 — 선택 후 binding 패널에서 라인 스코프 설비를 고른다.
+        eqpKey: null,
+        transform: buildTransformJson({ x, y, depth: previous.length, zIndex: previous.length }),
+      },
+    ])
+  }
+
+  const handlePaletteDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const objectKey = Number(event.dataTransfer.getData('text/plain'))
+    if (!Number.isInteger(objectKey)) {
+      return
+    }
+    const object = objectsByKey.get(objectKey)
+    if (!object) {
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    placeObject(object, event.clientX - rect.left, event.clientY - rect.top)
+  }
+
+  const duplicatePlacement = (localId: string) => {
+    setWorking((previous) => {
+      const source = previous.find((placement) => placement.localId === localId)
+      if (!source) {
+        return previous
+      }
+      return [
+        ...previous,
+        {
+          ...source,
+          localId: nextLocalId(),
+          placementKey: null,
+          transform: {
+            ...source.transform,
+            x: source.transform.x + 28,
+            y: source.transform.y + 28,
+            depth: previous.length,
+            zIndex: previous.length,
+          },
+        },
+      ]
+    })
+    setContextMenu(null)
+  }
+
+  const deletePlacement = (localId: string) => {
+    setWorking((previous) => previous.filter((placement) => placement.localId !== localId))
+    setSelectedIds((current) => current.filter((id) => id !== localId))
+    setContextMenu(null)
+  }
+
+  const deleteSelected = () => {
+    setWorking((previous) => previous.filter((placement) => !selectedIds.includes(placement.localId)))
+    setSelectedIds([])
+  }
+
+  const updatePosition = (localId: string, x: number, y: number) => {
+    setWorking((previous) =>
+      previous.map((placement) =>
+        placement.localId === localId
+          ? { ...placement, transform: { ...placement.transform, x, y } }
+          : placement,
+      ),
+    )
+  }
+
+  const applyTransform = (
+    localId: string,
+    next: { x: number; y: number; rotation: number; scaleX: number; scaleY: number },
+  ) => {
+    setWorking((previous) =>
+      previous.map((placement) =>
+        placement.localId === localId
+          ? { ...placement, transform: { ...placement.transform, ...next } }
+          : placement,
+      ),
+    )
+  }
+
+  const selectedIndexSet = (): ReadonlySet<number> => {
+    const set = new Set<number>()
+    working.forEach((placement, index) => {
+      if (selectedIds.includes(placement.localId)) {
+        set.add(index)
+      }
+    })
+    return set
+  }
+
+  const reorderSelected = (toFront: boolean) => {
+    const indices = selectedIndexSet()
+    const transforms = working.map((placement) => placement.transform)
+    const reordered = toFront
+      ? liftTransformsToFront(transforms, indices)
+      : sinkTransformsToBack(transforms, indices)
+    setWorking((previous) => previous.map((placement, index) => ({ ...placement, transform: reordered[index] })))
+  }
+
+  const scaleSelected = (factor: number) => {
+    setWorking((previous) =>
+      previous.map((placement) =>
+        selectedIds.includes(placement.localId)
+          ? { ...placement, transform: scaleTransform(placement.transform, factor) }
+          : placement,
+      ),
+    )
+  }
+
+  const bindEqp = (localId: string, eqpKey: number | null) => {
+    setStatusMessage(null)
+    setWorking((previous) =>
+      previous.map((placement) =>
+        placement.localId === localId ? { ...placement, eqpKey } : placement,
+      ),
+    )
+  }
+
+  const handleSelectPlacement = (event: KonvaEventObject<MouseEvent>, localId: string) => {
+    if (!canEdit) {
+      return
+    }
+    // Konva 는 우클릭에도 click 을 발화한다 — 우클릭은 컨텍스트 메뉴 전담이라 선택에서 제외.
+    if (event.evt.button === 2) {
+      return
+    }
+    const additive = event.evt.shiftKey || event.evt.ctrlKey || event.evt.metaKey
+    setSelectedIds((previous) => toggleSelection(previous, localId, additive))
+  }
+
+  const handleSaveLayout = () => {
+    for (const placement of working) {
+      const object = objectsByKey.get(placement.objectKey)
+      if (!object) {
+        continue
+      }
+      const violation = validatePlacementEqpBinding(object.objectKind, placement.eqpKey)
+      if (violation) {
+        setStatusMessage(violation)
+        return
+      }
+    }
+    saveLayout.mutate(
+      {
+        canvasJson: layoutQuery.data?.canvasJson ?? DEFAULT_CANVAS_JSON,
+        placements: working.map((placement) => ({
+          objectKey: placement.objectKey,
+          eqpKey: placement.eqpKey,
+          transformJson: placement.transform,
+        })),
+      },
+      {
+        onSuccess: () => setStatusMessage('Layout saved.'),
+        onError: (error) => setStatusMessage(error instanceof Error ? error.message : 'Save layout failed.'),
+      },
+    )
+  }
+
+  const singleSelected =
+    selectedIds.length === 1 ? working.find((placement) => placement.localId === selectedIds[0]) ?? null : null
+  const singleSelectedObject = singleSelected ? objectsByKey.get(singleSelected.objectKey) ?? null : null
+  const isEquipmentSelected = singleSelectedObject?.objectKind === 'EQUIPMENT'
+  const singleSelectedStatus =
+    singleSelected?.eqpKey != null ? equipmentByKey.get(singleSelected.eqpKey)?.status ?? null : null
+
+  if (lineKey === null) {
+    return (
+      <div
+        data-testid="builder-select-line-hint"
+        className="rounded-[18px] border border-border bg-card px-4 py-6 text-sm font-semibold text-muted-foreground"
+      >
+        Select a single line from the top bar to view or edit its 2.5D layout.
+      </div>
+    )
+  }
+
+  const stage = (
+    <Stage width={STAGE_WIDTH} height={STAGE_HEIGHT}>
+      <Layer>
+        <Rect
+          x={0}
+          y={0}
+          width={STAGE_WIDTH}
+          height={STAGE_HEIGHT}
+          fill="#0b0f1a"
+          onClick={() => {
+            setSelectedIds([])
+            setContextMenu(null)
+          }}
+        />
+        {sortedWorking.map((placement) => {
+          const object = objectsByKey.get(placement.objectKey)
+          if (!object) {
+            return null
+          }
+          const transform = placement.transform
+          const isEquipment = object.objectKind === 'EQUIPMENT'
+          const equipment = placement.eqpKey != null ? equipmentByKey.get(placement.eqpKey) ?? null : null
+          return (
+            <Group
+              key={placement.localId}
+              ref={(node) => {
+                if (node) {
+                  nodeRefs.current.set(placement.localId, node)
+                } else {
+                  nodeRefs.current.delete(placement.localId)
+                }
+              }}
+              x={transform.x}
+              y={transform.y}
+              rotation={transform.rotation}
+              scaleX={transform.scaleX}
+              scaleY={transform.scaleY}
+              skewX={transform.skewX}
+              skewY={transform.skewY}
+              draggable={canEdit}
+              onClick={(event) => handleSelectPlacement(event, placement.localId)}
+              onTap={() => canEdit && setSelectedIds([placement.localId])}
+              onDragEnd={(event) => updatePosition(placement.localId, event.target.x(), event.target.y())}
+              onTransformEnd={(event) =>
+                applyTransform(placement.localId, {
+                  x: event.target.x(),
+                  y: event.target.y(),
+                  rotation: event.target.rotation(),
+                  scaleX: event.target.scaleX(),
+                  scaleY: event.target.scaleY(),
+                })
+              }
+              onContextMenu={(event) => {
+                if (!canEdit) {
+                  return
+                }
+                // 우클릭은 컨텍스트 메뉴만 연다 — 선택(selectedIds)·selection bar 는 좌클릭 전담.
+                // (우클릭 시 selectedIds 를 바꾸면 selection bar 가 떠 레이아웃이 밀리고 메뉴가 닫힌다.)
+                event.evt.preventDefault()
+                setContextMenu({ x: event.evt.offsetX, y: event.evt.offsetY, localId: placement.localId })
+              }}
+            >
+              {(object.shapeJson.root.children ?? []).map((child, index) =>
+                renderPrimitive(child, `${placement.localId}-${index}`),
+              )}
+              {isEquipment && equipment ? (
+                <>
+                  <Circle x={-2} y={-2} radius={6} fill={STATUS_FILL[equipment.status]} stroke="#0b0f1a" strokeWidth={1} />
+                  <Text x={8} y={-18} text={equipment.status} fontSize={11} fill={STATUS_FILL[equipment.status]} />
+                  {equipment.portItems.map((port, portIndex) => (
+                    <Circle
+                      key={`${placement.localId}-port-${port.id}`}
+                      x={6 + portIndex * 12}
+                      y={84}
+                      radius={4}
+                      fill={PORT_STATUS_FILL[port.status]}
+                    />
+                  ))}
+                </>
+              ) : null}
+            </Group>
+          )
+        })}
+        {canEdit && selectedIds.length > 0 ? (
+          <Transformer ref={transformerRef} rotateEnabled resizeEnabled ignoreStroke />
+        ) : null}
+      </Layer>
+    </Stage>
+  )
+
+  if (!canEdit) {
+    return (
+      <section className="flex flex-col gap-3" data-testid="live-map-builder">
+        <div
+          data-testid="live-map-builder-readonly"
+          className="rounded-[12px] border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
+        >
+          Read-only — layout editing requires the LIVE_MAP_LAYOUT_WRITE permission.
+        </div>
+        <div
+          data-testid="live-map-builder-canvas"
+          className="overflow-auto rounded-[18px] border border-border bg-[#0b0f1a]"
+        >
+          {stage}
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="flex flex-col gap-3" data-testid="live-map-builder">
+      <div
+        data-testid="live-map-builder-toolbar"
+        className="flex flex-wrap items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
+      >
+        <button type="button" data-testid="builder-add-rect" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Rect')}>
+          Add Rectangle
+        </button>
+        <button type="button" data-testid="builder-add-line" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Line')}>
+          Add Line
+        </button>
+        <button type="button" data-testid="builder-add-text" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Text')}>
+          Add Text
+        </button>
+        <button type="button" data-testid="builder-add-image" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Image')}>
+          Add Image
+        </button>
+        <button
+          type="button"
+          data-testid="builder-save-object"
+          className="rounded-md border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"
+          disabled={draft.length === 0}
+          onClick={() => setIsSaveDialogOpen(true)}
+        >
+          Save as Object
+        </button>
+        <button type="button" data-testid="builder-save-layout" className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground" onClick={handleSaveLayout}>
+          Save Layout
+        </button>
+        <span className="ml-2 text-xs text-muted-foreground">
+          draft <span data-testid="builder-draft-count">{draft.length}</span> · placements{' '}
+          <span data-testid="builder-placement-count">{working.length}</span> · selected{' '}
+          <span data-testid="builder-selected-count">{selectedIds.length}</span>
+        </span>
+      </div>
+
+      {selectedIds.length > 0 ? (
+        <div
+          data-testid="builder-selection-bar"
+          className="flex flex-wrap items-center gap-2 rounded-[12px] border border-primary/40 bg-card px-3 py-2"
+        >
+          <button type="button" data-testid="selection-front" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(true)}>
+            Bring to Front
+          </button>
+          <button type="button" data-testid="selection-back" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(false)}>
+            Send to Back
+          </button>
+          <button type="button" data-testid="selection-scale-up" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(SCALE_STEP)}>
+            Scale +
+          </button>
+          <button type="button" data-testid="selection-scale-down" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(1 / SCALE_STEP)}>
+            Scale −
+          </button>
+          <button type="button" data-testid="selection-delete" className="rounded-md border border-danger px-3 py-1.5 text-xs font-semibold text-danger" onClick={deleteSelected}>
+            Delete
+          </button>
+
+          {isEquipmentSelected && singleSelected ? (
+            <span data-testid="placement-eqp-binding" className="flex items-center gap-2 text-xs font-semibold">
+              <span className="text-muted-foreground">Equipment</span>
+              <select
+                data-testid="placement-eqp-select"
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                value={singleSelected.eqpKey ?? ''}
+                onChange={(event) =>
+                  bindEqp(singleSelected.localId, event.target.value === '' ? null : Number(event.target.value))
+                }
+              >
+                <option value="">— select equipment —</option>
+                {lineEquipments.map((equipment) => (
+                  <option key={equipment.eqpKey} value={equipment.eqpKey}>
+                    {equipment.eqpName}
+                  </option>
+                ))}
+              </select>
+              <span data-testid="placement-eqp-status" className="text-muted-foreground">
+                {singleSelectedStatus ?? 'unbound'}
+              </span>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {statusMessage ? (
+        <div data-testid="builder-status" className="text-xs font-semibold text-muted-foreground">
+          {statusMessage}
+        </div>
+      ) : null}
+
+      <div className="flex gap-3">
+        <div
+          data-testid="live-map-builder-palette"
+          className="flex w-56 shrink-0 flex-col gap-1.5 rounded-[18px] border border-border bg-card p-3"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Object Palette</span>
+          <input
+            data-testid="palette-search"
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+            placeholder="Search objects…"
+            value={paletteSearch}
+            onChange={(event) => setPaletteSearch(event.target.value)}
+          />
+          {filteredObjects.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No matching objects.</span>
+          ) : (
+            filteredObjects.map((object) => (
+              <div
+                key={object.objectKey}
+                data-testid={`palette-item-${object.objectKey}`}
+                draggable
+                onDragStart={(event) => event.dataTransfer.setData('text/plain', String(object.objectKey))}
+                className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5"
+              >
+                <button
+                  type="button"
+                  data-testid={`palette-place-${object.objectKey}`}
+                  className="flex-1 truncate text-left text-xs font-semibold"
+                  title={`${object.objectName} (${object.objectKind})`}
+                  onClick={() => placeObject(object, DEFAULT_PLACE_X, DEFAULT_PLACE_Y)}
+                >
+                  {object.objectName}
+                </button>
+                <button
+                  type="button"
+                  data-testid={`palette-delete-${object.objectKey}`}
+                  className="text-[11px] text-danger"
+                  onClick={() => deleteObject.mutate(object.objectKey)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div
+          data-testid="live-map-builder-canvas"
+          className="relative flex-1 overflow-auto rounded-[18px] border border-border bg-[#0b0f1a]"
+          onClick={() => setContextMenu(null)}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handlePaletteDrop}
+        >
+          {stage}
+          {contextMenu ? (
+            <div
+              data-testid="placement-context-menu"
+              className="absolute z-10 w-32 rounded-md border border-border bg-card py-1 shadow-soft-sm"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button
+                type="button"
+                data-testid="context-copy"
+                className="block w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-muted"
+                onClick={() => duplicatePlacement(contextMenu.localId)}
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                data-testid="context-delete"
+                className="block w-full px-3 py-1.5 text-left text-xs font-semibold text-danger hover:bg-muted"
+                onClick={() => deletePlacement(contextMenu.localId)}
+              >
+                Delete
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {isSaveDialogOpen ? (
+        <div data-testid="object-save-dialog" className="flex flex-wrap items-end gap-2 rounded-[18px] border border-primary/40 bg-card p-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold">
+            Object name
+            <input
+              data-testid="object-name-input"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              value={objectName}
+              onChange={(event) => setObjectName(event.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold">
+            Kind
+            <select
+              data-testid="object-kind-select"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              value={objectKind}
+              onChange={(event) => setObjectKind(event.target.value as LiveMapObjectKind)}
+            >
+              <option value="STRUCTURE">STRUCTURE</option>
+              <option value="EQUIPMENT">EQUIPMENT</option>
+            </select>
+          </label>
+          <button type="button" data-testid="object-save-confirm" className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground" onClick={handleConfirmSaveObject}>
+            Save
+          </button>
+          <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => setIsSaveDialogOpen(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
+    </section>
+  )
+}

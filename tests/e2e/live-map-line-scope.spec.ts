@@ -1,31 +1,20 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * live-map 상단바 라인 스코프 e2e.
+ * live-map 상단바 라인 스코프 e2e (Phase 2 재설계 반영).
  *
- * - GET /api/line 로 상단바 라인 드롭다운이 채워지고,
- * - 라인 전환 시 해당 라인 설비만 활성(나머지는 dimmed=disabled)됨을 검증한다.
- * - 모든 백엔드 응답은 route.fulfill 로 mock. console error / pageerror 0 도 함께 단언.
+ * Phase 2 에서 cluster polygon 보드는 react-konva 2.5D 빌더로 대체되었다. 라인 스코프는
+ * 빌더 캔버스를 게이팅한다 — 전체(ALL) 스코프면 "라인 선택" 안내, 특정 라인 선택 시 캔버스 노출.
+ * 모든 백엔드 응답은 route.fulfill 로 mock. console error / pageerror 0 도 함께 단언.
  */
 
-const apiSuccess = <TData>(data: TData) => ({
-  success: true,
-  data,
-  errorCode: null,
-  errorMsg: null,
-})
-
-const apiNullSuccess = () => ({
-  success: true,
-  data: null,
-  errorCode: null,
-  errorMsg: null,
-})
+const apiSuccess = <TData>(data: TData) => ({ success: true, data, errorCode: null, errorMsg: null })
+const apiNullSuccess = () => ({ success: true, data: null, errorCode: null, errorMsg: null })
 
 const ME = {
   userPk: 100,
   userId: 'admin',
-  permissionCodes: ['LIVE_MAP_READ', 'LINE_READ'],
+  permissionCodes: ['LIVE_MAP_READ', 'LINE_READ', 'LIVE_MAP_LAYOUT_READ'],
 }
 
 const LINES = [
@@ -33,28 +22,15 @@ const LINES = [
   { lineKey: 2, lineCode: 'B_LINE', lineName: 'B Line' },
 ]
 
-const liveMapEquipment = (eqpId: string, lineValue: string, lineLabel: string, clusterId: string) => ({
-  eqpId,
-  eqpName: eqpId,
-  lineValue,
-  lineLabel,
-  clusterId,
-  clusterName: clusterId.toUpperCase(),
-  equipmentModeLabel: 'Single',
-  status: 'RUN' as const,
-  statusLabel: 'RUN',
-  portItems: [],
-  tooltipMeta: '',
-  tooltipStep: '',
-  alertMessage: null,
-})
+const LIVE_MAP = { equipmentItems: [] }
 
-const LIVE_MAP = {
-  equipmentItems: [
-    liveMapEquipment('EQP-A1', 'A_LINE', 'A Line', 'cvd'),
-    liveMapEquipment('EQP-B1', 'B_LINE', 'B Line', 'cmp'),
-  ],
-}
+const emptyLayout = (lineKey: number) => ({
+  layoutKey: null,
+  lineKey,
+  canvasJson: null,
+  placements: [],
+  objects: [],
+})
 
 const setupMocks = async (page: Page) => {
   await page.route('**/api/auth/csrf', async (route) => {
@@ -74,15 +50,16 @@ const setupMocks = async (page: Page) => {
   await page.route('**/api/line', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LINES)) })
   })
-  // 자동 선택된 설비의 comm-log 패널이 호출하는 엔드포인트(미목 시 500 → console error).
-  await page.route(/.*\/api\/comm-logs\/.*$/, async (route) => {
+  await page.route(/\/api\/live-map\/layout\/objects(\/\d+)?(\?.*)?$/, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
+  })
+  await page.route(/\/api\/live-map\/layout(\?.*)?$/, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(emptyLayout(2))) })
   })
   await page.route(/.*\/api\/live-map(\?.*)?$/, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LIVE_MAP)) })
   })
-  // live-map 외 메뉴 prefetch(eqp/model) 가 401 → /login redirect 되지 않도록 빈 응답.
-  await page.route(/.*\/api\/(eqp|model)(\/.*)?(\?.*)?$/, async (route) => {
+  await page.route(/.*\/api\/(eqp|model|comm-logs)(\/.*)?(\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -105,28 +82,28 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('상단바 라인 드롭다운 전환 시 해당 라인 설비만 활성화된다 (console/pageerror 0)', async ({ page }) => {
+test('상단바 라인 스코프가 2.5D 빌더 캔버스를 게이팅한다 (console/pageerror 0)', async ({ page }) => {
   await setupMocks(page)
   const { consoleErrors, pageErrors } = attachConsoleGuards(page)
 
   await page.goto('/eqp/live-map')
 
-  const eqpA1 = page.getByRole('button', { name: /EQP-A1/ })
-  const eqpB1 = page.getByRole('button', { name: /EQP-B1/ })
-
-  // 초기(전체 라인): 두 설비 모두 활성.
-  await expect(eqpA1).toBeVisible()
-  await expect(eqpB1).toBeVisible()
-  await expect(eqpA1).toBeEnabled()
-  await expect(eqpB1).toBeEnabled()
+  // 초기(전체 라인): 라인 미선택 안내, 캔버스 미노출.
+  await expect(page.getByTestId('builder-select-line-hint')).toBeVisible()
+  await expect(page.getByTestId('live-map-builder-canvas')).toHaveCount(0)
 
   // 상단바 라인 드롭다운 → B Line 선택.
   await page.getByTestId('line-scope-trigger').click()
   await page.getByTestId('line-scope-option-B_LINE').click()
 
-  // B_LINE 설비만 활성, A_LINE 설비는 dimmed(disabled).
-  await expect(eqpB1).toBeEnabled()
-  await expect(eqpA1).toBeDisabled()
+  // 선택 라인 캔버스 노출, 안내 사라짐.
+  await expect(page.getByTestId('live-map-builder-canvas')).toBeVisible()
+  await expect(page.getByTestId('builder-select-line-hint')).toHaveCount(0)
+
+  // 다시 전체(ALL) → 안내 복귀.
+  await page.getByTestId('line-scope-trigger').click()
+  await page.getByTestId('line-scope-option-ALL').click()
+  await expect(page.getByTestId('builder-select-line-hint')).toBeVisible()
 
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
