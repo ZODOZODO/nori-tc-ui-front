@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
+import { Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
 import type { LineConfig } from 'konva/lib/shapes/Line'
 import type { TextConfig } from 'konva/lib/shapes/Text'
 import type { ImageConfig } from 'konva/lib/shapes/Image'
-import type { Group as KonvaGroupNode } from 'konva/lib/Group'
 import type { Transformer as KonvaTransformerNode } from 'konva/lib/shapes/Transformer'
-import type { KonvaEventObject } from 'konva/lib/Node'
+import type { KonvaEventObject, Node as KonvaNodeRef } from 'konva/lib/Node'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -68,8 +68,24 @@ interface WorkingPlacement {
   transform: TransformJson
 }
 
+/** draft primitive 를 캔버스에서 직접 편집(드래그/리사이즈/회전)하기 위한 Konva 노드 props. */
+interface EditableNodeProps {
+  ref: (node: KonvaNodeRef | null) => void
+  draggable: boolean
+  onClick: (event: KonvaEventObject<MouseEvent>) => void
+  onTap: () => void
+  onDragEnd: (event: KonvaEventObject<DragEvent>) => void
+  onTransformEnd: (event: KonvaEventObject<Event>) => void
+}
+
+/** 캔버스에서 개별 편집되는 draft primitive. localId 로 선택/Transformer/삭제를 건다. */
+interface DraftItem {
+  localId: string
+  node: KonvaNode
+}
+
 /** shape_json 의 Image primitive — src URL 로 이미지를 로드해 Konva Image 로 렌더한다. */
-function PrimitiveImage({ attrs }: { attrs: Record<string, unknown> }) {
+function PrimitiveImage({ attrs, nodeProps }: { attrs: Record<string, unknown>; nodeProps?: EditableNodeProps }) {
   const src = typeof attrs.src === 'string' ? attrs.src : ''
   const [image, setImage] = useState<HTMLImageElement | null>(null)
 
@@ -90,7 +106,7 @@ function PrimitiveImage({ attrs }: { attrs: Record<string, unknown> }) {
   }
   const { src: _src, ...rest } = attrs
   void _src
-  return <KonvaImage {...(rest as ImageConfig)} image={image} />
+  return <KonvaImage {...(rest as ImageConfig)} {...nodeProps} image={image} />
 }
 
 function renderPrimitive(node: KonvaNode, key: string) {
@@ -169,10 +185,10 @@ export function LiveMapLayoutCanvas() {
     return `wp-${idRef.current}`
   }
 
-  const nodeRefs = useRef(new Map<string, KonvaGroupNode>())
+  const nodeRefs = useRef(new Map<string, KonvaNodeRef>())
   const transformerRef = useRef<KonvaTransformerNode | null>(null)
 
-  const [draft, setDraft] = useState<KonvaNode[]>([])
+  const [draft, setDraft] = useState<DraftItem[]>([])
   const [working, setWorking] = useState<WorkingPlacement[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; localId: string } | null>(null)
@@ -256,14 +272,17 @@ export function LiveMapLayoutCanvas() {
     }
     const nodes = selectedIds
       .map((id) => nodeRefs.current.get(id))
-      .filter((node): node is KonvaGroupNode => Boolean(node))
+      .filter((node): node is KonvaNodeRef => Boolean(node))
     transformer.nodes(nodes)
     transformer.getLayer()?.batchDraw()
-  }, [selectedIds, sortedWorking])
+  }, [selectedIds, sortedWorking, draft])
 
   const addPrimitive = (className: PrimitiveClassName) => {
     setStatusMessage(null)
-    setDraft((previous) => [...previous, createDraftPrimitive(className, previous.length)])
+    const localId = nextLocalId()
+    setDraft((previous) => [...previous, { localId, node: createDraftPrimitive(className, previous.length) }])
+    // 추가 즉시 선택 → 캔버스에 도형이 나타나고 곧장 드래그/리사이즈/회전 핸들이 붙는다.
+    setSelectedIds([localId])
   }
 
   const handleConfirmSaveObject = () => {
@@ -272,7 +291,7 @@ export function LiveMapLayoutCanvas() {
       setStatusMessage('Object name is required.')
       return
     }
-    const shapeJson = buildShapeJson({ name: trimmedName }, draft)
+    const shapeJson = buildShapeJson({ name: trimmedName }, draft.map((item) => item.node))
     createObject.mutate(
       { objectName: trimmedName, objectKind, shapeJson },
       {
@@ -350,7 +369,19 @@ export function LiveMapLayoutCanvas() {
 
   const deleteSelected = () => {
     setWorking((previous) => previous.filter((placement) => !selectedIds.includes(placement.localId)))
+    setDraft((previous) => previous.filter((item) => !selectedIds.includes(item.localId)))
     setSelectedIds([])
+  }
+
+  // 캔버스에서 draft 도형을 드래그/리사이즈/회전한 결과를 해당 도형의 attrs 에 직접 반영한다.
+  const updateDraftNode = (localId: string, attrs: Record<string, unknown>) => {
+    setDraft((previous) =>
+      previous.map((item) =>
+        item.localId === localId
+          ? { ...item, node: { ...item.node, attrs: { ...item.node.attrs, ...attrs } } }
+          : item,
+      ),
+    )
   }
 
   const updatePosition = (localId: string, x: number, y: number) => {
@@ -460,6 +491,8 @@ export function LiveMapLayoutCanvas() {
   const isEquipmentSelected = singleSelectedObject?.objectKind === 'EQUIPMENT'
   const singleSelectedStatus =
     singleSelected?.eqpKey != null ? equipmentByKey.get(singleSelected.eqpKey)?.status ?? null : null
+  // working 배치 전용 액션(z-order/Scale±/eqp 바인딩)은 working 이 선택됐을 때만 노출 — draft 선택 시 무력 버튼 회피.
+  const hasWorkingSelected = working.some((placement) => selectedIds.includes(placement.localId))
 
   if (lineKey === null) {
     return (
@@ -470,6 +503,45 @@ export function LiveMapLayoutCanvas() {
         Select a single line from the top bar to view or edit its 2.5D layout.
       </div>
     )
+  }
+
+  // draft primitive 를 캔버스에 직접 드래그 가능한 Konva 노드로 렌더한다(working 배치와 달리 Group 미경유,
+  // 위치/크기/회전을 노드 자신의 attrs 에 보관 → Save as Object 직렬화가 그대로 동작).
+  const renderDraftNode = (item: DraftItem) => {
+    const attrs = item.node.attrs
+    const editProps: EditableNodeProps = {
+      ref: (node) => {
+        if (node) {
+          nodeRefs.current.set(item.localId, node)
+        } else {
+          nodeRefs.current.delete(item.localId)
+        }
+      },
+      draggable: canEdit,
+      onClick: (event) => handleSelectPlacement(event, item.localId),
+      onTap: () => canEdit && setSelectedIds([item.localId]),
+      onDragEnd: (event) => updateDraftNode(item.localId, { x: event.target.x(), y: event.target.y() }),
+      onTransformEnd: (event) =>
+        updateDraftNode(item.localId, {
+          x: event.target.x(),
+          y: event.target.y(),
+          rotation: event.target.rotation(),
+          scaleX: event.target.scaleX(),
+          scaleY: event.target.scaleY(),
+        }),
+    }
+    switch (item.node.className) {
+      case 'Rect':
+        return <Rect key={item.localId} {...editProps} {...(attrs as RectConfig)} />
+      case 'Line':
+        return <Line key={item.localId} {...editProps} {...(attrs as LineConfig)} />
+      case 'Text':
+        return <Text key={item.localId} {...editProps} {...(attrs as TextConfig)} />
+      case 'Image':
+        return <PrimitiveImage key={item.localId} attrs={attrs} nodeProps={editProps} />
+      default:
+        return null
+    }
   }
 
   const stage = (
@@ -555,6 +627,7 @@ export function LiveMapLayoutCanvas() {
             </Group>
           )
         })}
+        {draft.map((item) => renderDraftNode(item))}
         {canEdit && selectedIds.length > 0 ? (
           <Transformer ref={transformerRef} rotateEnabled resizeEnabled ignoreStroke />
         ) : null}
@@ -587,18 +660,20 @@ export function LiveMapLayoutCanvas() {
         data-testid="live-map-builder-toolbar"
         className="flex flex-wrap items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
       >
-        <button type="button" data-testid="builder-add-rect" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Rect')}>
-          Add Rectangle
-        </button>
-        <button type="button" data-testid="builder-add-line" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Line')}>
-          Add Line
-        </button>
-        <button type="button" data-testid="builder-add-text" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Text')}>
-          Add Text
-        </button>
-        <button type="button" data-testid="builder-add-image" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => addPrimitive('Image')}>
-          Add Image
-        </button>
+        <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label="Add shape">
+          <button type="button" data-testid="builder-add-rect" title="Add Rectangle" aria-label="Add Rectangle" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrimitive('Rect')}>
+            <Square className="size-4" aria-hidden="true" />
+          </button>
+          <button type="button" data-testid="builder-add-line" title="Add Line" aria-label="Add Line" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrimitive('Line')}>
+            <Minus className="size-4" aria-hidden="true" />
+          </button>
+          <button type="button" data-testid="builder-add-text" title="Add Text" aria-label="Add Text" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrimitive('Text')}>
+            <Type className="size-4" aria-hidden="true" />
+          </button>
+          <button type="button" data-testid="builder-add-image" title="Add Image" aria-label="Add Image" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrimitive('Image')}>
+            <ImageIcon className="size-4" aria-hidden="true" />
+          </button>
+        </div>
         <button
           type="button"
           data-testid="builder-save-object"
@@ -623,18 +698,22 @@ export function LiveMapLayoutCanvas() {
           data-testid="builder-selection-bar"
           className="flex flex-wrap items-center gap-2 rounded-[12px] border border-primary/40 bg-card px-3 py-2"
         >
-          <button type="button" data-testid="selection-front" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(true)}>
-            Bring to Front
-          </button>
-          <button type="button" data-testid="selection-back" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(false)}>
-            Send to Back
-          </button>
-          <button type="button" data-testid="selection-scale-up" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(SCALE_STEP)}>
-            Scale +
-          </button>
-          <button type="button" data-testid="selection-scale-down" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(1 / SCALE_STEP)}>
-            Scale −
-          </button>
+          {hasWorkingSelected ? (
+            <>
+              <button type="button" data-testid="selection-front" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(true)}>
+                Bring to Front
+              </button>
+              <button type="button" data-testid="selection-back" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => reorderSelected(false)}>
+                Send to Back
+              </button>
+              <button type="button" data-testid="selection-scale-up" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(SCALE_STEP)}>
+                Scale +
+              </button>
+              <button type="button" data-testid="selection-scale-down" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold" onClick={() => scaleSelected(1 / SCALE_STEP)}>
+                Scale −
+              </button>
+            </>
+          ) : null}
           <button type="button" data-testid="selection-delete" className="rounded-md border border-danger px-3 py-1.5 text-xs font-semibold text-danger" onClick={deleteSelected}>
             Delete
           </button>
