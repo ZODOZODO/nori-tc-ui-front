@@ -70,14 +70,14 @@ Tier A/B 목록에 용어를 추가/제거하려면 **이 SPEC 을 수정**해�
 
 ## Requirements
 
-- [ ] 위 Canonical Jargon Policy 가 이 SPEC 에 불변으로 고정됨 (Specify 산출물)
-- [ ] `src/i18n/locales/vi.json` 생성 — 893 키 + `language.vi`, 정책대로 번역
-- [ ] `supportedLngs` / `Lang` / `LANGUAGES` 3곳에 `vi` 등록 + 전 locale 에 `language.vi` 라벨
-- [ ] index.ts detector localStorage 화이트리스트 supportedLngs 추종(vi 새로고침 영속) + LoginPage 별도 토글 LANGUAGES 기반 일반화
-- [ ] locale parity 검증 자동화 — 새 언어 locale 이 en 과 키 집합 동일함을 기계 검증
-- [ ] Layer 1 / Tier A jargon 보존 자동 검증 — vi 에서 해당 토큰이 verbatim 유지됨을 기계 검증
-- [ ] Deploy → vi 번역 적용 (jargon 아님)
-- [ ] Tier B(Upload/TOTAL/Map Live 등) 현장-번역 여부 First Execution 에서 결정·반영
+- [x] 위 Canonical Jargon Policy 가 이 SPEC 에 불변으로 고정됨 (Specify 산출물)
+- [x] `src/i18n/locales/vi.json` 생성 — 정책대로 번역·parity·Tier A 보존 충족, **키 총수 894** (V-1 수정으로 `lineScope.all` 복원 후 894 회복).
+- [x] `supportedLngs` / `Lang` / `LANGUAGES` 3곳에 `vi` 등록 + 전 locale 에 `language.vi` 라벨
+- [x] index.ts detector localStorage 화이트리스트 supportedLngs 추종(vi 새로고침 영속) + LoginPage 별도 토글 LANGUAGES 기반 일반화
+- [x] locale parity 검증 자동화 — 새 언어 locale 이 en 과 키 집합 동일함을 기계 검증
+- [x] Layer 1 / Tier A jargon 보존 자동 검증 — vi 에서 해당 토큰이 verbatim 유지됨을 기계 검증
+- [x] Deploy → vi 번역 적용 (jargon 아님)
+- [x] Tier B(Upload/TOTAL/Map Live 등) 현장-번역 여부 First Execution 에서 결정·반영
 
 ## Constraints
 
@@ -121,8 +121,42 @@ vi 고유 결정(다른 언어는 자기 섹션에서 별도 결정):
 
 - [x] **Specify** — 이 SPEC 작성 완료 (산출물: `.claude/specs/i18n-language-addition.md`)
 - [x] **Plan** — 완료 (산출물: `.claude/specs/i18n-language-addition-plan.md`). 검증으로 touch-point 4→6 확장 + Tier B=Upload만 번역 결정.
-- [ ] **Implement** — 별 세션, AC 만족 구현 (산출물: `.claude/specs/i18n-language-addition-dev-report.md`)
-- [ ] **Validate** — 별 세션, SPEC + Plan + Dev report 입력 검증
+- [x] **Implement** — 완료 (산출물: `.claude/specs/i18n-language-addition-dev-report.md`). 커밋 0cd185c.
+- [x] **Validate** — 완료 (2026-06-04). AC1~AC8 + D1/D2/정책 전부 독립 재검증 PASS. Constraint 위반 1건(V-1, `lineScope.all` 삭제) 발견 후 **수정 완료**(작업트리, 커밋 대기). 아래 Validate 결과 참조.
+
+## Validate 결과 (2026-06-04, 독립 재검증)
+
+> 검증 대상: main 로컬 커밋 0cd185c (push 안 됨). 검증자는 Dev report 자기평가를 신뢰하지 않고 모든 명령을 직접 재실행했다.
+
+### 기계 검증 — AC1~AC8 전부 PASS (직접 재실행)
+
+| AC | 명령 | 결과 |
+|---|---|---|
+| AC1 parity | `node --test tests/i18n-vi-parity.test.ts` | `ok 1` — onlyInVi=0/onlyInEn=0, vi 키수==en 키수 |
+| AC2 Layer1 값보존 | 동일 | `ok 2` — 7키 전부 `vi[k]===en[k]` (Gateway/Business DLQ, Repair Task, Eqp ID) |
+| AC3 Tier A verbatim | 동일 | `ok 3` — 위반 0건. vacuous 7토큰 = Identity/Trigger/Collection Rule/Variable Id/Source MDF/Parent Model Commit/Diff Preview (**Plan D4 와 정확히 일치**) |
+| AC4 네이티브 라벨 | 동일 | `ok 4` — vi.language.ko=한국어, .en=English, language.vi 3 locale 동일 |
+| AC5 빌드 | `npm run build` | `✓ built in 13.23s`, `dist/assets/vi-BXtebNGS.js 62.02 kB` 청크 분리 (en/ko 와 동급) |
+| AC6 단위 회귀 | `npm run test:unit` | `# pass 116 / # fail 0` |
+| AC7 전환 동작 | `npx playwright test i18n-language-toggle` | `2 passed` — 3언어 노출 + vi 렌더 + console/pageerror 0 단언 실재 확인 |
+| AC8 vi 영속 | 동일 | reload 후 vi 유지 단언 PASS |
+
+### 정책/Plan 준수 (코드 인스펙션)
+
+- **D1 Tier B**: `deploy.register.upload` vi="Tải lên"/en=ko="Upload" ✓, `livemap.kpi.total`="TOTAL"(3언어 동일) ✓, `livemap.live`="Map Live"(3언어 동일) ✓.
+- **D2 Deploy**: ko "배포" 16키 → vi 16/16 "Triển khai" 계열 ✓.
+- **flat key 계약**: config.ts `keySeparator:false`/`nsSeparator:false`/`fallbackLng:'ko'` 무변경, `supportedLngs` 만 +vi ✓.
+- **6 touch-point**: config/Lang/LANGUAGES(+export)/index.ts 화이트리스트(navigator fallback 줄 무변경)/LoginPage 순환 모두 커밋에 존재 ✓.
+- **user-page e2e 9 fail**: 본 작업 무관 pre-existing 재확인 — 실패 스냅샷이 로그인 화면("Sign in")으로, `/api/auth/me` mock 세션 미확립 auth 리다이렉트. i18n 무관(영어 로그인 라벨 정상 렌더). 본 SPEC FAIL 로 미카운트(사전 합의).
+
+### V-1 위반 — SPEC Constraint "기존 ko/en 값 무변경(추가만)" 위배 → **수정 완료 (2026-06-04, 작업트리)**
+
+> **수정 결과**: `lineScope.all` 을 ko="전체 라인"/en="All Lines"/vi="Tất cả dây chuyền"(toggleLabel "dây chuyền" 일관)로 세 locale 에 복원. 검증: 키 수 en=ko=vi=**894**, `git diff 17772d5 -- ko.json en.json` 가 **`+ language.vi` 단일 추가만**(삭제 0) → Constraint 회복. `npm run test:unit` 116 pass/0 fail(vi-parity ok 4), `npm run build` `✓ built in 11.81s`. 미커밋 live-map 4파일은 미수정. **커밋 귀속은 사용자 결정**(0cd185c amend vs 후속 fix 커밋).
+
+- **사실**: 부모 17772d5 의 ko.json/en.json 은 `lineScope.all`("전체 라인"/"All Lines", L9)을 가졌으나, 커밋 0cd185c 가 ko/en/vi 세 locale 에서 이 키를 **삭제**했다. 키 총수 893→893(−lineScope.all +language.vi), 즉 Plan/Dev-report 의 "894키" 주장과 불일치.
+- **영향**: 커밋 스냅샷에서 `LineScopeSelector.tsx`(커밋된 코드)는 `t('lineScope.all')` 를 L45·L64 에서 여전히 참조 → 키 부재로 raw key "lineScope.all" 렌더 회귀. 현재 작업트리의 **미커밋** live-map 변경이 그 참조를 제거해 가려져 있을 뿐, **커밋 자체는 self-contained 하지 않다**.
+- **근본 원인**: Dev report §5 의 git stash 복구 사고 — live-map 라인스코프 리팩터의 JSON 절반(lineScope.all 삭제)이 vi 커밋에 섞여 들어가고, 코드 절반(LineScopeSelector)은 미커밋으로 남음 (커밋 경계 오염). Dev report §1 + 커밋 메시지의 "ko/en: language.vi 추가(그 외 무변경)" 는 사실과 다름.
+- **권장 수정**: vi 커밋 범위에서 `lineScope.all` 을 ko/en/vi 에 복원(=vi 커밋을 진짜 add-only 로) → lineScope.all 삭제는 live-map 라인스코프 커밋(LineScopeSelector 코드 변경과 함께)으로 귀속. 이로써 vi 커밋이 자기 Constraint 를 지키고 self-contained 해진다. (코드 수정은 git 히스토리·진행 중 live-map 작업에 영향 → 사용자 결정 게이트.)
 
 ## 다음 단계 진입 프롬프트
 

@@ -7,6 +7,7 @@
   "language.ko": "한국어",
   "language.en": "English",
   "language.vi": "Tiếng Việt",
+  "lineScope.all": "전체 라인",
   "lineScope.toggleLabel": "라인 스코프 선택",
   "login.title": "로그인",
   "login.idLabel": "아이디",
