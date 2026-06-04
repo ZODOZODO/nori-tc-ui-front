@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n/i18n-context'
 import type { ModelInfo, ProtocolType } from '../types/model.types'
 
 type ModelCreateOrUpdateMode = 'create' | 'update'
@@ -39,6 +40,7 @@ export function ModelCreateOrUpdateModal({
   onOpenChange,
   onSubmit,
 }: ModelCreateOrUpdateModalProps) {
+  const { t } = useI18n()
   const [modelName, setModelName] = useState(() => targetModel?.modelName ?? '')
   const [maker, setMaker] = useState(() => targetModel?.maker ?? '')
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
@@ -51,13 +53,13 @@ export function ModelCreateOrUpdateModal({
 
   const dialogDescription =
     mode === 'create'
-      ? 'root model 기본 정보를 입력합니다. root는 기준선으로 유지되며 상세 변경은 branch에서 수행합니다.'
-      : 'root model의 공통 정보를 수정합니다. Model Name은 변경할 수 없습니다.'
+      ? t('model.create.descCreate')
+      : t('model.create.descUpdate')
 
   const handleSubmit = async () => {
     const normalizedModelName = modelName.trim()
     if (mode === 'create' && !normalizedModelName) {
-      setFormErrorMessage('Model Name을 입력해 주세요.')
+      setFormErrorMessage(t('model.create.nameRequired'))
       return
     }
 
@@ -90,48 +92,48 @@ export function ModelCreateOrUpdateModal({
         </DialogHeader>
 
         <div className="grid gap-4">
-          <section className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4">
+          <section className="rounded-2xl border border-border bg-muted p-4">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-[#1F2D26]">기본 정보</h3>
-              <p className="mt-1 text-xs text-[#65726B]">
-                root model은 기준 정보만 수정할 수 있으며, 상세 편집은 branch checkout 이후에만 가능합니다.
+              <h3 className="text-sm font-semibold text-foreground">{t('model.create.sectionBasic')}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('model.create.basicHint')}
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">
+                <label className="text-xs font-semibold text-foreground">
                   Model Name
-                  {mode === 'create' ? <span className="ml-1 text-[#C5534B]">*</span> : null}
+                  {mode === 'create' ? <span className="ml-1 text-danger">*</span> : null}
                 </label>
                 <Input
                   value={modelName}
                   onChange={(event) => setModelName(event.target.value)}
                   readOnly={mode === 'update'}
-                  className={mode === 'update' ? 'bg-[#F4F7F5]' : undefined}
-                  placeholder="예: MODEL_A"
+                  className={mode === 'update' ? 'bg-muted' : undefined}
+                  placeholder={t('common.example', { value: 'MODEL_A' })}
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">Maker</label>
+                <label className="text-xs font-semibold text-foreground">Maker</label>
                 <Input
                   value={maker}
                   onChange={(event) => setMaker(event.target.value)}
-                  placeholder="제조사명을 입력해 주세요."
+                  placeholder={t('model.create.makerPlaceholder')}
                 />
               </div>
             </div>
           </section>
 
           {formErrorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {formErrorMessage}
             </p>
           ) : null}
 
           {errorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}

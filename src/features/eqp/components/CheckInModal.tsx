@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,6 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 
 export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
 
@@ -49,8 +50,10 @@ export function CheckInModal({
   onSave,
   onCancel,
 }: CheckInModalProps) {
+  const { t } = useI18n()
   const [description, setDescription] = useState('')
   const hasDiff = diffRows.length > 0
+  const diffColumns = useMemo(() => buildDiffColumns(t('eqp.checkin.diffKind')), [t])
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!isPending) {
@@ -72,15 +75,15 @@ export function CheckInModal({
         <DialogHeader>
           <DialogTitle>Check In</DialogTitle>
           <DialogDescription>
-            버전은 서버가 `YY.MM.DD.0000` 형식으로 자동 생성합니다.
+            {t('eqp.checkin.versionDesc')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[65vh] overflow-y-auto pr-1">
-          <section className="mb-4 overflow-hidden rounded-2xl border border-[#E4EAE6]">
-            <div className="flex items-center justify-between bg-[#F6F9F7] px-4 py-2.5">
-              <span className="text-sm font-semibold text-[#1E3D33]">Diff Preview</span>
-              <span className="text-xs text-[#647169]">
+          <section className="mb-4 overflow-hidden rounded-2xl border border-border">
+            <div className="flex items-center justify-between bg-muted px-4 py-2.5">
+              <span className="text-sm font-semibold text-foreground">Diff Preview</span>
+              <span className="text-xs text-muted-foreground">
                 Add {diffRows.filter((row) => row.status === 'added').length} / Change{' '}
                 {diffRows.filter((row) => row.status === 'changed').length} / Delete{' '}
                 {diffRows.filter((row) => row.status === 'deleted').length}
@@ -91,8 +94,8 @@ export function CheckInModal({
               <div className="overflow-x-auto">
                 <Table className="min-w-[760px]">
                   <TableHeader>
-                    <TableRow className="bg-[#FAFCFB] hover:bg-[#FAFCFB]">
-                      <TableHead className="w-24">구분</TableHead>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="w-24">{t('eqp.checkin.diffKind')}</TableHead>
                       <TableHead className="w-48">Param Name</TableHead>
                       <TableHead>Param Value</TableHead>
                       <TableHead>Description</TableHead>
@@ -112,13 +115,13 @@ export function CheckInModal({
                 </Table>
               </div>
             ) : !hasDiff ? (
-              <p className="py-10 text-center text-sm text-[#647169]">
-                이전 버전과 비교하여 변경된 설비 파라미터가 없습니다.
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                {t('eqp.checkin.noDiff')}
               </p>
             ) : (
               <SelectableTable<EqpParamDiffRow>
                 testId="selectable-table-check-in-diff"
-                columns={EQP_PARAM_DIFF_COLUMNS}
+                columns={diffColumns}
                 rows={diffRows}
                 rowKey={(row) => `${row.status}-${row.paramName}`}
                 features={{ rangeCopy: true }}
@@ -130,33 +133,33 @@ export function CheckInModal({
 
           <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">
+            <label className="text-xs font-semibold text-foreground">
               Version
             </label>
-            <div className="rounded-lg border border-[#D7E1DB] bg-[#F5F8F6] px-3 py-2 text-xs text-[#51605A]">
-              저장 시 자동 생성됩니다. 예: 25.03.12.0000
+            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+              {t('eqp.checkin.versionAuto')}
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="checkin-description" className="text-xs font-semibold text-[#1E3D33]">
+            <label htmlFor="checkin-description" className="text-xs font-semibold text-foreground">
               Description
             </label>
             <textarea
               id="checkin-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="변경 내용 설명 (선택)"
+              placeholder={t('eqp.checkin.descPlaceholder')}
               disabled={isPending}
               rows={3}
-              className="rounded-lg border border-[#97A8A1] bg-white px-3 py-2 text-xs text-[#1E3D33] placeholder-[#8A8A8A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30 disabled:cursor-not-allowed disabled:bg-[#F5F8F6] resize-none"
+              className="rounded-lg border border-input bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted resize-none"
             />
           </div>
           </div>
         </div>
 
         {errorMessage ? (
-          <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}
@@ -165,7 +168,7 @@ export function CheckInModal({
           <Button
             type="button"
             variant="outline"
-            className="h-9 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+            className="h-9 rounded-full border-border px-4 text-xs font-semibold"
             onClick={onCancel}
             disabled={isPending}
           >
@@ -173,7 +176,7 @@ export function CheckInModal({
           </Button>
           <Button
             type="button"
-            className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+            className="h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
             onClick={handleSave}
             disabled={isPending || isDiffLoading}
           >
@@ -197,10 +200,11 @@ const resolveDiffValue = (
   branchValue: string,
 ): string => (status === 'deleted' ? parentValue : branchValue)
 
-const EQP_PARAM_DIFF_COLUMNS: ColumnDef<EqpParamDiffRow>[] = [
+// 모듈 상수 배열은 React 밖이라 t() 를 쓸 수 없어, '구분' 헤더만 인자로 받아 렌더 시점에 주입한다.
+const buildDiffColumns = (kindHeader: string): ColumnDef<EqpParamDiffRow>[] => [
   {
     key: 'status',
-    header: '구분',
+    header: kindHeader,
     width: '6rem',
     accessor: (row) => resolveDiffTone(row.status).label,
     renderCell: (row) => {
@@ -221,8 +225,8 @@ const EQP_PARAM_DIFF_COLUMNS: ColumnDef<EqpParamDiffRow>[] = [
       <span
         className={
           row.status === 'deleted'
-            ? 'text-xs text-[#97A39C] line-through'
-            : 'text-xs text-[#22322B]'
+            ? 'text-xs text-muted-foreground line-through'
+            : 'text-xs text-foreground'
         }
       >
         {row.paramName || '-'}
@@ -281,21 +285,21 @@ function DiffValuePair({
   branchValue: string
 }) {
   if (status === 'added') {
-    return <DiffCellValue value={branchValue} className="text-[#22322B]" />
+    return <DiffCellValue value={branchValue} className="text-foreground" />
   }
 
   if (status === 'deleted') {
-    return <DiffCellValue value={parentValue} className="text-[#97A39C] line-through" />
+    return <DiffCellValue value={parentValue} className="text-muted-foreground line-through" />
   }
 
   if (parentValue === branchValue) {
-    return <DiffCellValue value={branchValue} className="text-[#22322B]" />
+    return <DiffCellValue value={branchValue} className="text-foreground" />
   }
 
   return (
     <div className="space-y-1">
-      <DiffCellValue value={parentValue} className="text-[#97A39C] line-through" />
-      <DiffCellValue value={branchValue} className="font-medium text-[#1C7F59]" />
+      <DiffCellValue value={parentValue} className="text-muted-foreground line-through" />
+      <DiffCellValue value={branchValue} className="font-medium text-success" />
     </div>
   )
 }
@@ -313,7 +317,7 @@ function DiffCellValue({ value, className }: { value: string; className: string 
   return (
     <span className={className} title={value}>
       {value.slice(0, maxLength)}
-      <span className="text-[#97A39C]">...</span>
+      <span className="text-muted-foreground">...</span>
     </span>
   )
 }
@@ -322,25 +326,25 @@ function resolveDiffTone(status: EqpParamDiffStatus) {
   if (status === 'added') {
     return {
       label: 'Add',
-      rowClassName: 'bg-[#F0FFF7]',
-      hoverClassName: 'hover:bg-[#F0FFF7]',
-      badgeClassName: 'bg-[#D1F5E7] text-[#1C7F59]',
+      rowClassName: 'bg-success/5',
+      hoverClassName: 'hover:bg-success/5',
+      badgeClassName: 'bg-success/15 text-success',
     }
   }
 
   if (status === 'changed') {
     return {
       label: 'Change',
-      rowClassName: 'bg-[#FFFDF0]',
-      hoverClassName: 'hover:bg-[#FFFDF0]',
-      badgeClassName: 'bg-[#FFF0C0] text-[#7A5800]',
+      rowClassName: 'bg-warning/5',
+      hoverClassName: 'hover:bg-warning/5',
+      badgeClassName: 'bg-warning/20 text-warning-foreground',
     }
   }
 
   return {
     label: 'Delete',
-    rowClassName: 'bg-[#FFF7F7]',
-    hoverClassName: 'hover:bg-[#FFF7F7]',
-    badgeClassName: 'bg-[#FAD9D7] text-[#B4483F]',
+    rowClassName: 'bg-danger/5',
+    hoverClassName: 'hover:bg-danger/5',
+    badgeClassName: 'bg-danger/15 text-danger',
   }
 }

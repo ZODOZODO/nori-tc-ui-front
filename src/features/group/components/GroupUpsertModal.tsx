@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n/i18n-context'
 import { useCreateGroup, useUpdateGroup } from '../hooks/useGroupMutations'
 import { useGroupDetail } from '../hooks/useGroups'
 import type { GroupUpsertRequest } from '../types/group.types'
@@ -36,6 +37,7 @@ type DraftFormState = Partial<GroupUpsertFormState>
  * UserUpsertModal 와 동일 패턴 — draft + 서버 응답을 useMemo 로 머지.
  */
 export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUpsertModalProps) {
+  const { t } = useI18n()
   const [draftFormState, setDraftFormState] = useState<DraftFormState>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -92,7 +94,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
     }
 
     if (!trimmed.groupCode || !trimmed.groupName) {
-      setErrorMessage('필수 입력값(그룹 코드, 그룹 이름)을 모두 채워주세요.')
+      setErrorMessage(t('group.upsert.requiredFields'))
       return
     }
 
@@ -108,7 +110,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
         await createGroupMutation.mutateAsync(request)
       } else {
         if (targetGroupId === null) {
-          setErrorMessage('수정 대상 그룹을 확인할 수 없습니다.')
+          setErrorMessage(t('group.upsert.targetNotFound'))
           return
         }
         await updateGroupMutation.mutateAsync({ groupId: targetGroupId, request })
@@ -120,7 +122,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
         setErrorMessage(error.payload.errorMsg)
         return
       }
-      setErrorMessage('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+      setErrorMessage(t('group.upsert.saveError'))
     }
   }
 
@@ -128,18 +130,16 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : null)}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? '그룹 등록' : '그룹 수정'}</DialogTitle>
+          <DialogTitle>{mode === 'create' ? t('group.create') : t('group.upsert.titleEdit')}</DialogTitle>
           <DialogDescription>
-            {mode === 'create'
-              ? '새 그룹을 등록합니다. 그룹 코드는 시스템 전체에서 유일해야 합니다.'
-              : '그룹 정보를 수정합니다. 그룹 코드는 수정할 수 없습니다.'}
+            {mode === 'create' ? t('group.upsert.descCreate') : t('group.upsert.descEdit')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-upsert-code" className="text-xs font-semibold text-[#4A5A52]">
-              그룹 코드
+            <label htmlFor="group-upsert-code" className="text-xs font-semibold text-muted-foreground">
+              {t('group.form.code')}
             </label>
             <Input
               id="group-upsert-code"
@@ -149,8 +149,8 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-upsert-name" className="text-xs font-semibold text-[#4A5A52]">
-              그룹 이름
+            <label htmlFor="group-upsert-name" className="text-xs font-semibold text-muted-foreground">
+              {t('group.form.name')}
             </label>
             <Input
               id="group-upsert-name"
@@ -160,15 +160,15 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
-            <label htmlFor="group-upsert-description" className="text-xs font-semibold text-[#4A5A52]">
-              설명
+            <label htmlFor="group-upsert-description" className="text-xs font-semibold text-muted-foreground">
+              {t('group.form.description')}
             </label>
             <Input
               id="group-upsert-description"
               value={resolvedFormState.description}
               onChange={(event) => handleChange('description', event.target.value)}
               disabled={isBusy}
-              placeholder="(선택)"
+              placeholder={t('group.form.descPlaceholder')}
             />
           </div>
           <div className="flex items-center gap-2 md:col-span-2">
@@ -178,23 +178,23 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
               checked={resolvedFormState.isActive}
               onChange={(event) => handleChange('isActive', event.target.checked)}
               disabled={isBusy}
-              className="size-4 rounded border-[#CFD8D2]"
+              className="size-4 rounded border-input"
             />
-            <label htmlFor="group-upsert-is-active" className="text-xs text-[#4A5A52]">
-              활성화 (사용자에게 부여 가능)
+            <label htmlFor="group-upsert-is-active" className="text-xs text-muted-foreground">
+              {t('group.form.isActive')}
             </label>
           </div>
         </div>
 
         {errorMessage ? (
-          <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose} disabled={isBusy}>
-            취소
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -203,7 +203,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             data-testid="group-upsert-submit"
           >
             {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {mode === 'create' ? '등록' : '저장'}
+            {mode === 'create' ? t('group.upsert.submitCreate') : t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

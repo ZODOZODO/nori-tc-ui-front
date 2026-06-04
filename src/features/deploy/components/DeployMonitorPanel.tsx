@@ -27,9 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
+import { PageCard, PageCardGrid } from '@/shared/layout/PageCard'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { EqpModelOption } from '@/features/eqp/types/eqp.types'
+import { DeployStatusChart, type DeployStatusAggregate } from './DeployStatusChart'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployHistoryList } from '../hooks/useDeployHistoryList'
 import { useDeployScenarios } from '../hooks/useDeployScenarios'
@@ -55,8 +59,6 @@ type DeleteDialogState = {
   deleteHistory: boolean
 } | null
 
-const cardClassName =
-  'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
 const EMPTY_SELECT_VALUE = '__all__'
 const EMPTY_MODEL_OPTIONS: EqpModelOption[] = []
 
@@ -133,7 +135,7 @@ const formatDateTime = (value: string | null): string => {
     return '-'
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -225,15 +227,19 @@ const toUniqueModelOptions = (modelOptions: EqpModelOption[]) => {
 }
 
 export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelProps) {
+  const { t } = useI18n()
   const localHistory = useDeployUiStore((state) => state.localHistory)
   const activeDeployKey = useDeployUiStore((state) => state.activeDeployKey)
   const deployListOffset = useDeployUiStore((state) => state.deployListOffset)
   const historyListOffset = useDeployUiStore((state) => state.historyListOffset)
   const serverBackedDeployKeys = useDeployUiStore((state) => state.serverBackedDeployKeys)
   const localTargetsByDeployKey = useDeployUiStore((state) => state.localTargetsByDeployKey)
-  const monitorFilters = useDeployUiStore((state) => state.monitorFilters)
+  const deployFilters = useDeployUiStore((state) => state.deployFilters)
+  const historyFilters = useDeployUiStore((state) => state.historyFilters)
   const setMonitorFilters = useDeployUiStore((state) => state.setMonitorFilters)
   const resetMonitorFilters = useDeployUiStore((state) => state.resetMonitorFilters)
+  // 배포 / 배포이력은 각각 독립된 조회 필터를 갖는다 (모드 전환 시 패널 remount → draft 재초기화).
+  const monitorFilters = historyOnly ? historyFilters : deployFilters
   const setMonitorListOffset = useDeployUiStore((state) => state.setMonitorListOffset)
   const resetMonitorListOffsets = useDeployUiStore((state) => state.resetMonitorListOffsets)
   const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
@@ -317,7 +323,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     deployHistoryQuery.isError
       ? deployHistoryQuery.error instanceof Error
         ? deployHistoryQuery.error.message
-        : 'Deploy 목록을 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+        : t('deploy.monitor.historyLoadError')
       : null
 
   const serverHistoryItems = useMemo(
@@ -363,6 +369,24 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     [activeDeployKey, resolvedHistoryItems],
   )
 
+  const statusAggregate = useMemo<DeployStatusAggregate>(
+    () =>
+      resolvedHistoryItems.reduce<DeployStatusAggregate>(
+        (acc, item) => {
+          const summary = item.targetSummary
+          acc.total += summary.total
+          acc.completed += summary.completed + summary.noChange
+          acc.running += summary.running
+          acc.pending += summary.pending
+          acc.failed += summary.failed + summary.compensationFailed
+          acc.canceled += summary.canceled + summary.rolledBack
+          return acc
+        },
+        { total: 0, completed: 0, running: 0, pending: 0, failed: 0, canceled: 0 },
+      ),
+    [resolvedHistoryItems],
+  )
+
   const isServerBackedRow = (deployKey: number) =>
     serverHistoryKeySet.has(deployKey) || serverBackedDeployKeys.includes(deployKey)
 
@@ -391,7 +415,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       renderCell: (row) => (
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={resolveStatusVariant(row.deployStatus)}>{row.deployStatus}</Badge>
-          {row.pauseRequested ? <Badge variant="warning">Hold 요청됨</Badge> : null}
+          {row.pauseRequested ? <Badge variant="warning">{t('deploy.monitor.holdRequested')}</Badge> : null}
         </div>
       ),
     },
@@ -530,14 +554,14 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     deploySummaryQuery.isError && !historyOnly
       ? deploySummaryQuery.error instanceof Error
         ? deploySummaryQuery.error.message
-        : 'Deploy 정보 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+        : t('deploy.monitor.summaryLoadError')
       : null
 
   const targetsErrorMessage =
     deployTargetsQuery.isError && !historyOnly
       ? deployTargetsQuery.error instanceof Error
         ? deployTargetsQuery.error.message
-        : 'Deploy 대상 상태를 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+        : t('deploy.monitor.targetsLoadError')
       : null
   const monitorOptionsErrorMessage =
     monitorOptionsQuery.isError && monitorOptionsQuery.error instanceof Error
@@ -551,13 +575,13 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     commentSummaryQuery.isError && commentSummaryQuery.error instanceof Error
       ? commentSummaryQuery.error.message
       : commentSummaryQuery.isError
-        ? 'Deploy 상세 정보를 조회하지 못했습니다.'
+        ? t('deploy.monitor.commentSummaryError')
         : null
   const commentTargetsErrorMessage =
     commentTargetsQuery.isError && commentTargetsQuery.error instanceof Error
       ? commentTargetsQuery.error.message
       : commentTargetsQuery.isError
-        ? 'Deploy 실패 상세를 조회하지 못했습니다.'
+        ? t('deploy.monitor.commentTargetsError')
         : null
   const commentTargets = useMemo(() => {
     if (commentDeployKey === null) {
@@ -585,7 +609,8 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   )
   const commentResultMessage = commentSummaryQuery.data?.resultMessage?.message?.trim() ?? null
   const commentResultTitle = commentSummaryQuery.data?.resultMessage?.title?.trim() ?? null
-  const commentTaskTypeLabel = useMemo(
+  // resolveDeployTaskLabel 은 i18n 키를 반환한다 — 렌더 시점에 t(key) 로 번역.
+  const commentTaskTypeLabelKey = useMemo(
     () =>
       resolveDeployTaskLabel(
         commentSummaryQuery.data?.resolvedScenarioCode ?? null,
@@ -617,7 +642,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
     if (commentHistoryItem?.selectedModelName || commentHistoryItem?.selectedModelVersion) {
       lines.push(
-        `모델: ${commentHistoryItem?.selectedModelName ?? '-'} / ${commentHistoryItem?.selectedModelVersion ?? '-'}`,
+        t('deploy.monitor.lineModel', {
+          name: commentHistoryItem?.selectedModelName ?? '-',
+          version: commentHistoryItem?.selectedModelVersion ?? '-',
+        }),
       )
     }
 
@@ -627,7 +655,9 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
     if (commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode) {
       lines.push(
-        `시나리오: ${commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}`,
+        t('deploy.monitor.lineScenario', {
+          name: commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-',
+        }),
       )
     }
 
@@ -636,6 +666,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     commentHistoryItem,
     commentScenario?.name,
     commentSummaryQuery.data?.resolvedScenarioCode,
+    t,
   ])
   const commentAsIsLines = useMemo(() => {
     const lines: string[] = []
@@ -646,10 +677,15 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     }
 
     if (asIsState.interfaceType) {
-      lines.push(`인터페이스: ${asIsState.interfaceType}`)
+      lines.push(t('deploy.monitor.lineInterface', { type: asIsState.interfaceType }))
     }
     if (asIsState.modelName || asIsState.modelVersion) {
-      lines.push(`모델: ${asIsState.modelName ?? '-'} / ${asIsState.modelVersion ?? '-'}`)
+      lines.push(
+        t('deploy.monitor.lineModel', {
+          name: asIsState.modelName ?? '-',
+          version: asIsState.modelVersion ?? '-',
+        }),
+      )
     }
     if (asIsState.businessJarName) {
       lines.push(`Business JAR: ${asIsState.businessJarName}`)
@@ -659,7 +695,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     }
 
     return lines
-  }, [commentSummaryQuery.data?.asIsState])
+  }, [commentSummaryQuery.data?.asIsState, t])
 
   const serverTotalCount = deployHistoryQuery.data?.count ?? 0
   const displayTotalCount = serverTotalCount + bridgeHistoryItems.length
@@ -669,7 +705,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const canGoNext = currentOffset + MONITOR_PAGE_SIZE < serverTotalCount
 
   const handleSearch = () => {
-    setMonitorFilters({
+    setMonitorFilters(historyOnly, {
       modelName: draftModelName === EMPTY_SELECT_VALUE ? '' : draftModelName.trim(),
       requestedBy: draftRequestedBy === EMPTY_SELECT_VALUE ? '' : draftRequestedBy.trim(),
       fromDate: draftFromDate,
@@ -686,7 +722,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setDraftRequestedBy('')
     setDraftFromDate(defaultMonitorFilters.fromDate)
     setDraftToDate(defaultMonitorFilters.toDate)
-    resetMonitorFilters()
+    resetMonitorFilters(historyOnly)
     resetMonitorListOffsets()
     setFeedbackMessage(null)
     setFeedbackTone('info')
@@ -698,12 +734,12 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
     if (isServerBacked) {
       if (!historyOnly) {
-        setFeedbackMessage('진행 중 Deploy 는 다시 실행할 수 없습니다.')
+        setFeedbackMessage(t('deploy.monitor.redeployRunningBlocked'))
         setFeedbackTone('error')
         return
       }
 
-      if (!window.confirm('선택한 Deploy를 다시 실행하시겠습니까?')) {
+      if (!window.confirm(t('deploy.monitor.redeployConfirm'))) {
         return
       }
 
@@ -721,12 +757,12 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         })
         setMode('deploy')
         setFeedbackMessage(
-          result.resultMessage?.message || '새 Deploy를 생성했습니다. Deploy 탭에서 실행해 주세요.',
+          result.resultMessage?.message || t('deploy.monitor.redeployServerSuccess'),
         )
         setFeedbackTone('success')
       } catch (error) {
         setFeedbackMessage(
-          error instanceof Error ? error.message : 'Deploy 재실행에 실패했습니다.',
+          error instanceof Error ? error.message : t('error.deploy.redeploy'),
         )
         setFeedbackTone('error')
       }
@@ -736,13 +772,13 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     const nextDeployKey = redeployLocalHistoryItem(deployKey)
 
     if (nextDeployKey === null) {
-      setFeedbackMessage('선택한 Deploy 를 다시 실행할 수 없습니다.')
+      setFeedbackMessage(t('deploy.monitor.redeployLocalBlocked'))
       setFeedbackTone('error')
       return
     }
 
     setMode('deploy')
-    setFeedbackMessage(`Deploy #${nextDeployKey} 를 대기 상태 로컬 항목으로 다시 생성했습니다.`)
+    setFeedbackMessage(t('deploy.monitor.redeployLocalSuccess', { key: nextDeployKey }))
     setFeedbackTone('success')
   }
 
@@ -751,13 +787,13 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
 
     if (targetHistoryItem === null) {
-      setFeedbackMessage('선택한 Deploy 정보를 찾을 수 없습니다.')
+      setFeedbackMessage(t('deploy.monitor.deployNotFound'))
       setFeedbackTone('error')
       return
     }
 
     if (isServerBackedRow(deployKey) && !isServerDeleteAllowed(targetHistoryItem)) {
-      setFeedbackMessage('실행 중 Deploy 는 삭제할 수 없습니다.')
+      setFeedbackMessage(t('deploy.monitor.deleteRunningBlocked'))
       setFeedbackTone('error')
       return
     }
@@ -781,7 +817,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
 
       if (targetHistoryItem === null) {
-        setFeedbackMessage('선택한 Deploy 정보를 찾을 수 없습니다.')
+        setFeedbackMessage(t('deploy.monitor.deployNotFound'))
         setFeedbackTone('error')
         setDeleteDialogState(null)
         return
@@ -793,18 +829,20 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         if (activeDeployKey === deployKey) {
           setActiveDeployKey(null)
         }
-        setFeedbackMessage(result.resultMessage?.message || `Deploy #${deployKey} 항목을 삭제했습니다.`)
+        setFeedbackMessage(
+          result.resultMessage?.message || t('deploy.monitor.deleteServerSuccess', { key: deployKey }),
+        )
         setFeedbackTone('success')
         setDeleteDialogState(null)
       } catch (error) {
-        setFeedbackMessage(error instanceof Error ? error.message : 'Deploy 삭제에 실패했습니다.')
+        setFeedbackMessage(error instanceof Error ? error.message : t('deploy.monitor.deleteError'))
         setFeedbackTone('error')
       }
       return
     }
 
     deleteLocalDeploy(deployKey)
-    setFeedbackMessage(`Deploy #${deployKey} 항목을 목록에서 제거했습니다.`)
+    setFeedbackMessage(t('deploy.monitor.deleteLocalSuccess', { key: deployKey }))
     setFeedbackTone('success')
     setDeleteDialogState(null)
   }
@@ -819,10 +857,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       if (result.deployStatus) {
         markDeployStatus(deployKey, result.deployStatus, result.pauseRequested ?? false)
       }
-      setFeedbackMessage(result.resultMessage?.message || 'Deploy를 시작했습니다.')
+      setFeedbackMessage(result.resultMessage?.message || t('deploy.monitor.startSuccess'))
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : 'Deploy 실행에 실패했습니다.')
+      setFeedbackMessage(error instanceof Error ? error.message : t('error.deploy.start'))
       setFeedbackTone('error')
     }
   }
@@ -837,10 +875,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       if (result.deployStatus) {
         markDeployStatus(deployKey, result.deployStatus, result.pauseRequested ?? true)
       }
-      setFeedbackMessage(result.resultMessage?.message || 'Hold 요청이 접수되었습니다.')
+      setFeedbackMessage(result.resultMessage?.message || t('deploy.monitor.holdSuccess'))
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : 'Deploy hold 요청에 실패했습니다.')
+      setFeedbackMessage(error instanceof Error ? error.message : t('error.deploy.hold'))
       setFeedbackTone('error')
     }
   }
@@ -865,16 +903,19 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         }}
         title={
           deleteDialogState?.deleteHistory
-            ? 'Deploy 이력을 삭제하시겠습니까?'
-            : 'Deploy 를 삭제하시겠습니까?'
+            ? t('deploy.monitor.deleteHistoryTitle')
+            : t('deploy.monitor.deleteTitle')
         }
         description={
           deleteDialogState
-            ? `${deleteDialogState.deployName} (#${deleteDialogState.deployKey}) 항목이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
+            ? t('deploy.monitor.deleteDesc', {
+                name: deleteDialogState.deployName,
+                key: deleteDialogState.deployKey,
+              })
             : undefined
         }
-        confirmText="삭제"
-        cancelText="취소"
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         confirmVariant="destructive"
         isConfirming={deleteDeployMutation.isPending}
         onConfirm={() => void handleDelete()}
@@ -891,59 +932,62 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         {commentHistoryItem ? (
           <DialogContent className="max-h-[85vh] max-w-[920px] overflow-hidden rounded-2xl p-0">
             <div className="flex max-h-[85vh] flex-col">
-              <DialogHeader className="border-b border-[#EDF1EE] px-6 py-5">
-                <DialogTitle className="flex flex-wrap items-center gap-2 text-[#243129]">
+              <DialogHeader className="border-b border-border px-6 py-5">
+                <DialogTitle className="flex flex-wrap items-center gap-2 text-foreground">
                   <span>Deploy View</span>
-                  <span className="text-sm font-medium text-[#607067]">#{commentHistoryItem.deployKey}</span>
+                  <span className="text-sm font-medium text-muted-foreground">#{commentHistoryItem.deployKey}</span>
                   <Badge variant={resolveStatusVariant(commentHistoryItem.deployStatus)}>
                     {commentHistoryItem.deployStatus}
                   </Badge>
                 </DialogTitle>
-                <DialogDescription className="text-sm text-[#56635C]">
-                  선택한 deploy의 작업 유형, 시나리오, 대상별 진행 현황을 확인합니다.
+                <DialogDescription className="text-sm text-muted-foreground">
+                  {t('deploy.monitor.viewDialogDesc')}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto px-6 py-5">
                 <div>
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#243129]">대상별 진행 현황</p>
-                    <p className="text-xs text-[#6C7B72]">
-                      전체 {commentTargets.length}건 · 실패 {commentFailureTargets.length}건
+                    <p className="text-sm font-semibold text-foreground">{t('deploy.monitor.targetProgressTitle')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('deploy.monitor.targetProgressCount', {
+                        total: commentTargets.length,
+                        failed: commentFailureTargets.length,
+                      })}
                     </p>
                   </div>
 
                   {isCommentLoading ? (
-                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
-                      대상별 진행 현황을 불러오고 있습니다.
+                    <div className="mt-3 rounded-2xl border border-border bg-muted px-4 py-6 text-sm text-muted-foreground">
+                      {t('deploy.monitor.targetProgressLoading')}
                     </div>
                   ) : commentTargets.length === 0 ? (
-                    <div className="mt-3 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
-                      확인 가능한 대상 정보가 없습니다.
+                    <div className="mt-3 rounded-2xl border border-border bg-muted px-4 py-6 text-sm text-muted-foreground">
+                      {t('deploy.monitor.targetProgressEmpty')}
                     </div>
                   ) : (
-                    <div className="mt-3 overflow-hidden rounded-2xl border border-[#E7EDE8] bg-white">
+                    <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>EQP ID</TableHead>
-                            <TableHead>작업</TableHead>
-                            <TableHead>결과</TableHead>
-                            <TableHead>상세 상태</TableHead>
-                            <TableHead>현재 Step</TableHead>
-                            <TableHead>Step 상태</TableHead>
-                            <TableHead>오류 요약</TableHead>
-                            <TableHead className="text-right">갱신 시각</TableHead>
+                            <TableHead>{t('deploy.monitor.colTask')}</TableHead>
+                            <TableHead>{t('deploy.monitor.colResult')}</TableHead>
+                            <TableHead>{t('deploy.monitor.colDetailStatus')}</TableHead>
+                            <TableHead>{t('deploy.monitor.colCurrentStep')}</TableHead>
+                            <TableHead>{t('deploy.monitor.colStepStatus')}</TableHead>
+                            <TableHead>{t('deploy.monitor.colErrorSummary')}</TableHead>
+                            <TableHead className="text-right">{t('deploy.monitor.colUpdatedAt')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {commentTargets.map((target) => (
                             <TableRow key={target.deployTargetKey}>
-                              <TableCell className="font-medium text-[#243129]">{target.eqpId}</TableCell>
+                              <TableCell className="font-medium text-foreground">{target.eqpId}</TableCell>
                               <TableCell>
                                 <div className="min-w-[180px]">
-                                  <p className="font-medium text-[#243129]">{commentTaskTypeLabel}</p>
-                                  <p className="text-xs text-[#6C7B72]">
+                                  <p className="font-medium text-foreground">{t(commentTaskTypeLabelKey)}</p>
+                                  <p className="text-xs text-muted-foreground">
                                     {commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}
                                   </p>
                                 </div>
@@ -966,10 +1010,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                                   '-'
                                 )}
                               </TableCell>
-                              <TableCell className="max-w-[280px] whitespace-pre-wrap break-words text-xs text-[#526058]">
+                              <TableCell className="max-w-[280px] whitespace-pre-wrap break-words text-xs text-muted-foreground">
                                 {target.lastErrorMessage || target.lastErrorCode || '-'}
                               </TableCell>
-                              <TableCell className="text-right text-xs text-[#6C7B72]">
+                              <TableCell className="text-right text-xs text-muted-foreground">
                                 {formatDateTime(target.updatedAt)}
                               </TableCell>
                             </TableRow>
@@ -981,32 +1025,34 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
-                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">요약</p>
-                    <div className="mt-3 grid gap-2 text-sm text-[#526058] sm:grid-cols-2">
-                      <p>전체 대상: {commentHistoryItem.targetSummary.total}대</p>
-                      <p>완료: {commentHistoryItem.targetSummary.completed}대</p>
-                      <p>실패: {commentHistoryItem.targetSummary.failed}대</p>
-                      <p>보상 실패: {commentHistoryItem.targetSummary.compensationFailed}대</p>
+                  <div className="rounded-2xl border border-border bg-muted p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground">{t('deploy.overview.summaryTitle')}</p>
+                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                      <p>{t('deploy.monitor.summaryTotal', { count: commentHistoryItem.targetSummary.total })}</p>
+                      <p>{t('deploy.monitor.summaryCompleted', { count: commentHistoryItem.targetSummary.completed })}</p>
+                      <p>{t('deploy.monitor.summaryFailed', { count: commentHistoryItem.targetSummary.failed })}</p>
+                      <p>{t('deploy.monitor.summaryCompensationFailed', { count: commentHistoryItem.targetSummary.compensationFailed })}</p>
                     </div>
                     {commentHistoryItem.selectedModelName || commentHistoryItem.selectedModelVersion ? (
-                      <p className="mt-3 text-sm text-[#526058]">
-                        모델: {commentHistoryItem.selectedModelName ?? '-'} /{' '}
-                        {commentHistoryItem.selectedModelVersion ?? '-'}
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {t('deploy.monitor.lineModel', {
+                          name: commentHistoryItem.selectedModelName ?? '-',
+                          version: commentHistoryItem.selectedModelVersion ?? '-',
+                        })}
                       </p>
                     ) : null}
                     {commentHistoryItem.selectedBusinessJarName ? (
-                      <p className="mt-2 text-sm text-[#526058]">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         Business JAR: {commentHistoryItem.selectedBusinessJarName}
                       </p>
                     ) : null}
                     {commentResultTitle || commentSummaryQuery.data?.resultCode || commentResultMessage ? (
-                      <div className="mt-3 rounded-xl border border-[#E3EADF] bg-white px-3 py-3 text-sm text-[#425149]">
+                      <div className="mt-3 rounded-xl border border-border bg-card px-3 py-3 text-sm text-muted-foreground">
                         {commentResultTitle ? (
-                          <p className="font-semibold text-[#243129]">{commentResultTitle}</p>
+                          <p className="font-semibold text-foreground">{commentResultTitle}</p>
                         ) : null}
                         {commentSummaryQuery.data?.resultCode ? (
-                          <p className="mt-1">결과 코드: {commentSummaryQuery.data.resultCode}</p>
+                          <p className="mt-1">{t('deploy.monitor.resultCode', { code: commentSummaryQuery.data.resultCode })}</p>
                         ) : null}
                         {commentResultMessage ? (
                           <p className="mt-1 whitespace-pre-wrap break-words">{commentResultMessage}</p>
@@ -1015,69 +1061,69 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                     ) : null}
                   </div>
 
-                  <div className="rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] p-4">
-                    <p className="text-xs font-semibold tracking-[0.08em] text-[#6C7B72]">작업</p>
-                    <p className="mt-2 text-base font-semibold text-[#243129]">
-                      {commentTaskTypeLabel}
+                  <div className="rounded-2xl border border-border bg-muted p-4">
+                    <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground">{t('deploy.monitor.colTask')}</p>
+                    <p className="mt-2 text-base font-semibold text-foreground">
+                      {t(commentTaskTypeLabelKey)}
                     </p>
-                    <div className="mt-3 space-y-3 text-sm text-[#526058]">
+                    <div className="mt-3 space-y-3 text-sm text-muted-foreground">
                       <div>
-                        <p className="font-semibold text-[#243129]">AS-IS</p>
+                        <p className="font-semibold text-foreground">AS-IS</p>
                         <div className="mt-1 space-y-1">
                           {commentAsIsLines.length > 0 ? (
                             commentAsIsLines.map((line) => <p key={line}>{line}</p>)
                           ) : (
                             <>
-                              <p>변경 전 상세 값을 확인할 수 없습니다.</p>
-                              <p>이 deploy는 AS-IS snapshot이 없거나 아직 생성 전 상태입니다.</p>
+                              <p>{t('deploy.monitor.asIsUnavailable')}</p>
+                              <p>{t('deploy.monitor.asIsNoSnapshot')}</p>
                             </>
                           )}
                         </div>
                       </div>
                       <div>
-                        <p className="font-semibold text-[#243129]">TO-BE</p>
+                        <p className="font-semibold text-foreground">TO-BE</p>
                         <div className="mt-1 space-y-1">
                           {commentToBeLines.length > 0 ? (
                             commentToBeLines.map((line) => <p key={line}>{line}</p>)
                           ) : (
-                            <p>변경 예정 정보가 없습니다.</p>
+                            <p>{t('deploy.monitor.toBeEmpty')}</p>
                           )}
                         </div>
                       </div>
-                      <div className="space-y-1 border-t border-[#E3EADF] pt-3">
-                        <p>작업명: {commentHistoryItem.deployName}</p>
-                        <p>시나리오 코드: {commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}</p>
-                        {commentScenario?.summary ? <p>시나리오 설명: {commentScenario.summary}</p> : null}
-                        <p>요청자: {commentHistoryItem.requestedBy}</p>
-                        <p>생성 시각: {formatDateTime(commentHistoryItem.createdAt)}</p>
-                        <p>시작 시각: {formatDateTime(commentHistoryItem.startedAt)}</p>
-                        <p>종료 시각: {formatDateTime(commentHistoryItem.finishedAt)}</p>
+                      <div className="space-y-1 border-t border-border pt-3">
+                        <p>{t('deploy.monitor.taskName', { name: commentHistoryItem.deployName })}</p>
+                        <p>{t('deploy.monitor.scenarioCode', { code: commentSummaryQuery.data?.resolvedScenarioCode ?? '-' })}</p>
+                        {commentScenario?.summary ? <p>{t('deploy.monitor.scenarioSummary', { summary: commentScenario.summary })}</p> : null}
+                        <p>{t('deploy.monitor.requestedByDetail', { user: commentHistoryItem.requestedBy })}</p>
+                        <p>{t('deploy.monitor.createdAtDetail', { time: formatDateTime(commentHistoryItem.createdAt) })}</p>
+                        <p>{t('deploy.monitor.startedAtDetail', { time: formatDateTime(commentHistoryItem.startedAt) })}</p>
+                        <p>{t('deploy.monitor.finishedAtDetail', { time: formatDateTime(commentHistoryItem.finishedAt) })}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {isCommentLoading ? (
-                  <div className="mt-4 rounded-2xl border border-[#E7EDE8] bg-[#FAFCFA] px-4 py-6 text-sm text-[#607067]">
-                    상세 정보를 불러오고 있습니다.
+                  <div className="mt-4 rounded-2xl border border-border bg-muted px-4 py-6 text-sm text-muted-foreground">
+                    {t('deploy.monitor.detailLoading')}
                   </div>
                 ) : null}
                 {commentSummaryErrorMessage ? (
-                  <div className="mt-4 rounded-2xl border border-[#F4D5D2] bg-[#FFF7F6] px-4 py-3 text-sm text-[#B33A33]">
+                  <div className="mt-4 rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
                     {commentSummaryErrorMessage}
                   </div>
                 ) : null}
                 {commentTargetsErrorMessage ? (
-                  <div className="mt-4 rounded-2xl border border-[#F4D5D2] bg-[#FFF7F6] px-4 py-3 text-sm text-[#B33A33]">
+                  <div className="mt-4 rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
                     {commentTargetsErrorMessage}
                   </div>
                 ) : null}
 
               </div>
 
-              <DialogFooter className="border-t border-[#EDF1EE] px-6 py-4">
+              <DialogFooter className="border-t border-border px-6 py-4">
                 <Button type="button" variant="outline" onClick={() => setCommentDeployKey(null)}>
-                  닫기
+                  {t('common.close')}
                 </Button>
               </DialogFooter>
             </div>
@@ -1085,23 +1131,49 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         ) : null}
       </Dialog>
 
-      <section className={cardClassName}>
-        <div className="border-b border-[#EDF1EE] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#243129]">
-            {historyOnly ? 'Deploy History Search' : 'Deploy Search'}
-          </h2>
-        </div>
+      {!historyOnly && resolvedHistoryItems.length > 0 ? (
+        <PageCardGrid className="shrink-0 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
+          <PageCard title={t('deploy.overview.statusTitle')}>
+            <DeployStatusChart aggregate={statusAggregate} />
+          </PageCard>
+          <PageCard title={t('deploy.overview.summaryTitle')}>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div>
+                <dt className="text-xs text-muted-foreground">{t('deploy.overview.totalTargets')}</dt>
+                <dd className="text-2xl font-semibold text-foreground">{statusAggregate.total}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">{t('deploy.overview.deployCount')}</dt>
+                <dd className="text-2xl font-semibold text-foreground">{displayTotalCount}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">{t('deploy.chart.completed')}</dt>
+                <dd className="text-2xl font-semibold text-success">{statusAggregate.completed}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">{t('deploy.chart.failed')}</dt>
+                <dd className="text-2xl font-semibold text-danger">{statusAggregate.failed}</dd>
+              </div>
+            </dl>
+          </PageCard>
+        </PageCardGrid>
+      ) : null}
 
+      <PageCard
+        title={historyOnly ? t('deploy.monitor.historySearchTitle') : t('deploy.monitor.searchTitle')}
+        className="shrink-0"
+        bodyClassName="p-0"
+      >
         <div className="grid gap-3 px-6 py-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px_180px_92px_92px]">
           <Select
             value={draftModelName || EMPTY_SELECT_VALUE}
             onValueChange={(value) => setDraftModelName(value === EMPTY_SELECT_VALUE ? '' : value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Model 선택" />
+              <SelectValue placeholder={t('deploy.monitor.modelPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>전체 Model</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.monitor.allModels')}</SelectItem>
               {modelOptions.map((option) => (
                 <SelectItem key={option.modelName} value={option.modelName}>
                   {option.modelName}
@@ -1117,10 +1189,10 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="User 선택" />
+              <SelectValue placeholder={t('deploy.monitor.userPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>전체 User</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('deploy.monitor.allUsers')}</SelectItem>
               {userOptions.map((option) => (
                 <SelectItem key={option.userId} value={option.userId}>
                   {option.label}
@@ -1133,31 +1205,31 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
             type="date"
             value={draftFromDate}
             onChange={(event) => setDraftFromDate(event.target.value)}
-            aria-label="시작 기간"
+            aria-label={t('deploy.monitor.fromDateAria')}
           />
 
           <Input
             type="date"
             value={draftToDate}
             onChange={(event) => setDraftToDate(event.target.value)}
-            aria-label="종료 기간"
+            aria-label={t('deploy.monitor.toDateAria')}
           />
 
           <Button
             type="button"
             onClick={handleSearch}
-            className="h-11 rounded-xl bg-[#243E33] text-white hover:bg-[#1D332B]"
+            className="h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Search
+            {t('deploy.common.search')}
           </Button>
 
           <Button
             type="button"
             variant="outline"
             onClick={handleClear}
-            className="h-11 rounded-xl border-[#D8E1DB] bg-[#F8FBF9] text-[#526058]"
+            className="h-11 rounded-xl border-border bg-muted text-muted-foreground"
           >
-            Clear
+            {t('deploy.common.clear')}
           </Button>
         </div>
 
@@ -1165,95 +1237,102 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           <div
             className={`px-6 pb-3 text-sm ${
               feedbackTone === 'error'
-                ? 'text-[#C5534B]'
+                ? 'text-danger'
                 : feedbackTone === 'success'
-                  ? 'text-[#215A43]'
-                  : 'text-[#567062]'
+                  ? 'text-success'
+                  : 'text-muted-foreground'
             }`}
           >
             {feedbackMessage}
           </div>
         ) : null}
         {summaryErrorMessage ? (
-          <div className="px-6 pb-2 text-sm text-[#C5534B]">{summaryErrorMessage}</div>
+          <div className="px-6 pb-2 text-sm text-danger">{summaryErrorMessage}</div>
         ) : null}
         {targetsErrorMessage ? (
-          <div className="px-6 pb-5 text-sm text-[#C5534B]">{targetsErrorMessage}</div>
+          <div className="px-6 pb-5 text-sm text-danger">{targetsErrorMessage}</div>
         ) : null}
         {monitorOptionsErrorMessage ? (
-          <div className="px-6 pb-5 text-sm text-[#C5534B]">{monitorOptionsErrorMessage}</div>
+          <div className="px-6 pb-5 text-sm text-danger">{monitorOptionsErrorMessage}</div>
         ) : null}
         {userListErrorMessage ? (
-          <div className="px-6 pb-5 text-sm text-[#C5534B]">{userListErrorMessage}</div>
+          <div className="px-6 pb-5 text-sm text-danger">{userListErrorMessage}</div>
         ) : null}
         {historyErrorMessage ? (
-          <div className="px-6 pb-5 text-sm text-[#C5534B]">{historyErrorMessage}</div>
+          <div className="px-6 pb-5 text-sm text-danger">{historyErrorMessage}</div>
         ) : null}
-      </section>
+      </PageCard>
 
-      <section className={cardClassName}>
-        <div className="border-b border-[#EDF1EE] px-6 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-sm font-semibold text-[#243129]">
-              {historyOnly ? 'Deploy History' : 'Deploy'}
-            </h2>
-
-            {!historyOnly && activeHistoryItem ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[#5C6A63]">
-                <span className="font-medium text-[#243129]">
-                  현재 선택: #{activeHistoryItem.deployKey}
-                </span>
-                <Badge variant={resolveStatusVariant(activeHistoryItem.deployStatus)}>
-                  {activeHistoryItem.deployStatus}
-                </Badge>
-                {activeHistoryItem.pauseRequested ? (
-                  <Badge variant="warning">Hold 요청됨</Badge>
-                ) : null}
-                <Badge variant={isServerBackedRow(activeHistoryItem.deployKey) ? 'info' : 'secondary'}>
-                  {isServerBackedRow(activeHistoryItem.deployKey) ? 'SERVER' : 'LOCAL'}
-                </Badge>
-                {isServerBackedRow(activeHistoryItem.deployKey) &&
-                !activeHistoryItem.terminal &&
-                activeHistoryItem.deployStatus === 'RUNNING' ? (
-                  <span>
-                    {deploySummaryQuery.isFetching || deployTargetsQuery.isFetching
-                      ? '실시간 상태 동기화 중...'
-                      : '실시간 상태를 반영하고 있습니다.'}
-                  </span>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 rounded-lg border-[#D8E1DB] bg-white px-3 text-xs text-[#425149]"
-                  onClick={() => handleOpenComment(activeHistoryItem.deployKey)}
-                >
-                  View
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          {!historyOnly && activeHistoryItem ? (
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#5C6A63]">
-              <span>총 {activeHistoryItem.targetSummary.total}대</span>
-              <span>완료 {activeHistoryItem.targetSummary.completed}대</span>
-              <span>실패 {activeHistoryItem.targetSummary.failed}대</span>
-              {isServerBackedRow(activeHistoryItem.deployKey) && deployTargetsQuery.data ? (
-                <span>Target 동기화 {deployTargetsQuery.data.targets.length}건</span>
+      <PageCard
+        title={historyOnly ? t('deploy.monitor.historyTitle') : t('deploy.monitor.deployTitle')}
+        count={resolvedHistoryItems.length}
+        className="shrink-0"
+        bodyClassName="p-0"
+      >
+        {!historyOnly && activeHistoryItem ? (
+          <div className="border-b border-border px-6 py-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {t('deploy.monitor.currentSelection')} #{activeHistoryItem.deployKey}
+              </span>
+              <Badge variant={resolveStatusVariant(activeHistoryItem.deployStatus)}>
+                {activeHistoryItem.deployStatus}
+              </Badge>
+              {activeHistoryItem.pauseRequested ? (
+                <Badge variant="warning">{t('deploy.monitor.holdRequested')}</Badge>
               ) : null}
-              <span>실행자 {activeHistoryItem.requestedBy}</span>
+              <Badge variant={isServerBackedRow(activeHistoryItem.deployKey) ? 'info' : 'secondary'}>
+                {isServerBackedRow(activeHistoryItem.deployKey) ? 'SERVER' : 'LOCAL'}
+              </Badge>
+              {isServerBackedRow(activeHistoryItem.deployKey) &&
+              !activeHistoryItem.terminal &&
+              activeHistoryItem.deployStatus === 'RUNNING' ? (
+                <span>
+                  {deploySummaryQuery.isFetching || deployTargetsQuery.isFetching
+                    ? t('deploy.monitor.liveSyncing')
+                    : t('deploy.monitor.liveSynced')}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 rounded-lg border-border bg-card px-3 text-xs text-muted-foreground"
+                onClick={() => handleOpenComment(activeHistoryItem.deployKey)}
+              >
+                {t('deploy.monitor.view')}
+              </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <span>
+                {t('deploy.monitor.total')} {activeHistoryItem.targetSummary.total}
+              </span>
+              <span>
+                {t('deploy.chart.completed')} {activeHistoryItem.targetSummary.completed}
+              </span>
+              <span>
+                {t('deploy.chart.failed')} {activeHistoryItem.targetSummary.failed}
+              </span>
+              {isServerBackedRow(activeHistoryItem.deployKey) && deployTargetsQuery.data ? (
+                <span>
+                  {t('deploy.monitor.targetSync')} {deployTargetsQuery.data.targets.length}
+                </span>
+              ) : null}
+              <span>
+                {t('deploy.monitor.requestedBy')} {activeHistoryItem.requestedBy}
+              </span>
               {deploySummaryQuery.data?.resultMessage?.message ? (
-                <span className="text-[#425149]">{deploySummaryQuery.data.resultMessage.message}</span>
+                <span className="text-muted-foreground">{deploySummaryQuery.data.resultMessage.message}</span>
               ) : null}
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <div className="px-6 py-5">
           {deployHistoryQuery.isLoading ? (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-[#F6F8F6]">
-                  <TableRow className="bg-[#F6F8F6] hover:bg-[#F6F8F6]">
+                <TableHeader className="bg-muted">
+                  <TableRow className="bg-muted hover:bg-muted">
                     <TableHead>Deploy Name</TableHead>
                     <TableHead>Event Type</TableHead>
                     <TableHead>Status</TableHead>
@@ -1281,12 +1360,13 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
               </Table>
             </div>
           ) : resolvedHistoryItems.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[#7B8781]">
-              {historyOnly ? '완료된 Deploy 이력이 없습니다.' : '표시할 Deploy 데이터가 없습니다.'}
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {historyOnly ? t('deploy.monitor.emptyHistory') : t('deploy.monitor.emptyDeploy')}
             </p>
           ) : (
             <SelectableTable<DeployHistoryItem>
               testId="deploy-monitor-history"
+              containerClassName="max-h-[60vh]"
               columns={deployHistoryColumns}
               rows={resolvedHistoryItems}
               rowKey={(row) => row.deployKey}
@@ -1294,7 +1374,6 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
                     <TableRow
-                      data-state={activeDeployKey === item.deployKey ? 'selected' : undefined}
                       className="cursor-pointer"
                       onClick={() => setActiveDeployKey(item.deployKey)}
                       onContextMenu={() => setActiveDeployKey(item.deployKey)}
@@ -1355,7 +1434,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                             disabled={item.pauseRequested}
                             onSelect={() => void handleHold(item.deployKey)}
                           >
-                            {item.pauseRequested ? 'Hold 요청됨' : 'Hold'}
+                            {item.pauseRequested ? t('deploy.monitor.holdRequested') : 'Hold'}
                           </ContextMenuItem>
                         </>
                       ) : (
@@ -1363,7 +1442,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                           <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
                             View
                           </ContextMenuItem>
-                          <ContextMenuItem disabled>동작 없음</ContextMenuItem>
+                          <ContextMenuItem disabled>{t('deploy.monitor.noAction')}</ContextMenuItem>
                         </>
                       )
                     ) : (
@@ -1389,13 +1468,17 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           )}
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-[#EDF1EE] px-6 py-4 text-xs text-[#5C6A63] md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
           <span>
-            총 {displayTotalCount}건 · {currentPage} / {totalPages} 페이지
+            {t('deploy.monitor.pagination', {
+              count: displayTotalCount,
+              page: currentPage,
+              total: totalPages,
+            })}
           </span>
 
           <div className="flex items-center gap-2">
-            {deployHistoryQuery.isFetching ? <span>목록 동기화 중...</span> : null}
+            {deployHistoryQuery.isFetching ? <span>{t('deploy.monitor.listSyncing')}</span> : null}
             <Button
               type="button"
               variant="outline"
@@ -1403,7 +1486,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
               disabled={!canGoPrev}
               onClick={() => handleMovePage(Math.max(0, currentOffset - MONITOR_PAGE_SIZE))}
             >
-              Prev
+              {t('deploy.common.prev')}
             </Button>
             <Button
               type="button"
@@ -1412,11 +1495,11 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
               disabled={!canGoNext}
               onClick={() => handleMovePage(currentOffset + MONITOR_PAGE_SIZE)}
             >
-              Next
+              {t('deploy.common.next')}
             </Button>
           </div>
         </div>
-      </section>
+      </PageCard>
     </div>
   )
 }

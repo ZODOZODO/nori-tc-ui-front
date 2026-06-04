@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TableCell, TableRow } from '@/components/ui/table'
+import { useI18n } from '@/i18n/i18n-context'
 import { useDeployEqpParamVersions } from '../hooks/useDeployEqpParamVersions'
 import { EMPTY_SELECT_VALUE, formatActiveDeployHint, getErrorMessage } from '../lib/deploy-register-utils'
 import type { DeployRegisterTargetItem } from '../types/deploy.types'
@@ -21,6 +22,7 @@ export function SelectedEquipmentRow({
   onChangeEqpParamVersion,
   onRemove,
 }: SelectedEquipmentRowProps) {
+  const { t } = useI18n()
   const paramVersionsQuery = useDeployEqpParamVersions(item.eqpId)
 
   const paramVersionOptions = useMemo(() => {
@@ -56,8 +58,8 @@ export function SelectedEquipmentRow({
             ) : null}
           </div>
           {item.blockedByActiveDeploy ? (
-            <p className="mt-1 text-xs text-[#A66518]">
-              {formatActiveDeployHint(item) ?? '이미 active Deploy에 포함된 설비입니다.'}
+            <p className="mt-1 text-xs text-warning">
+              {formatActiveDeployHint(item) ?? t('deploy.register.activeFallback')}
             </p>
           ) : null}
         </TableCell>
@@ -75,12 +77,14 @@ export function SelectedEquipmentRow({
           }}
         >
           <SelectTrigger className="h-9 min-w-[160px]">
-            <SelectValue placeholder="Eqp Param Version 선택" />
+            <SelectValue placeholder={t('deploy.register.paramVersionPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {paramVersionOptions.length === 0 ? (
               <SelectItem value={EMPTY_SELECT_VALUE} disabled>
-                {paramVersionsQuery.isLoading ? '버전 조회 중...' : '사용 가능한 버전이 없습니다.'}
+                {paramVersionsQuery.isLoading
+                  ? t('deploy.register.paramVersionLoading')
+                  : t('deploy.register.paramVersionEmpty')}
               </SelectItem>
             ) : (
               paramVersionOptions.map((version) => (
@@ -93,10 +97,10 @@ export function SelectedEquipmentRow({
         </Select>
 
         {paramVersionsQuery.isError ? (
-          <p className="mt-1 text-xs text-[#C5534B]">
+          <p className="mt-1 text-xs text-danger">
             {getErrorMessage(
               paramVersionsQuery.error,
-              '설비 파라미터 버전 목록을 조회하지 못했습니다.',
+              t('error.deploy.eqpParamVersions'),
             )}
           </p>
         ) : null}
@@ -106,9 +110,9 @@ export function SelectedEquipmentRow({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+          className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
           onClick={() => onRemove(item.eqpId)}
-          aria-label={`${item.eqpId} 삭제`}
+          aria-label={t('deploy.register.removeAria', { eqpId: item.eqpId })}
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </Button>

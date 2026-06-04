@@ -38,11 +38,17 @@ User / Group 관리 페이지에 다음 2 기능이 **e2e 로 선행 명세**되
 
 ## Acceptance Criteria
 
-- [ ] `tests/e2e/group-page.spec.ts:356` (Group-AC-7) PASS — `group-member-panel` 노출 + 멤버 추가/제거 API 호출 + console.error/pageerror 0
-- [ ] `tests/e2e/user-page.spec.ts:502` PASS — `user-group-chip-{groupId}` 표시 + 제거 + console.error/pageerror 0
-- [ ] `npx tsc -b` PASS (변경 파일 0 신규 에러)
-- [ ] `npm run lint` PASS (변경 파일 신규 에러/warning 0)
-- [ ] `npx vite build` PASS
+- [x] `tests/e2e/group-page.spec.ts` (Group-AC-7) PASS — **현 설계(모달)로 충족**: `group-row-members-{id}` → GroupAddMembersModal 에서 체크박스 add(POST) + 기존 멤버 `group-member-remove-{userPk}` remove(DELETE). console.error/pageerror 0.
+- [x] `tests/e2e/user-page.spec.ts` (사용자 그룹 매핑 표시) PASS — **현 설계로 충족**: `user-row-group-{userPk}-{groupId}` chip 인라인 표시. 제거는 Group 페이지 모달이 담당(UserListTable 은 표시 전용 — 코드 주석 명시).
+- [x] `npx tsc -b` / `npm run build` PASS (변경 파일 0 신규 에러)
+- [x] `npm run lint` PASS (변경 파일 신규 에러/warning 0)
+
+### 해소 결정 (2026-05-29 — 사용자 승인 "현재 모달 설계에 맞춰 e2e 갱신 + 누락된 remove 구현")
+
+- 이 SPEC 작성(2026-05-27) 이후 production 이 **모달 기반 멤버 관리**(`GroupAddMembersModal`)로 재설계됨. 원 SPEC 의 인라인 `group-member-panel` / `group-member-add-input` / `user-group-chip-remove` 계약 대신 **현 설계를 정본으로 채택**.
+- **구현(F1)**: `useRemoveGroupMember` 훅 신규 + GroupAddMembersModal 기존 멤버에 `group-member-remove-{userPk}` 버튼(DELETE) 추가. (멤버 add 는 기존 모달에 이미 존재.)
+- **F2**: user 페이지는 그룹 chip **표시 전용**(설계 정합 — "그룹 add/remove 는 Group 페이지에서 관리"). 멤버 제거는 F1 모달이 담당.
+- **e2e 갱신**: 두 테스트를 현 설계 testId/흐름으로 재작성. 테스트 약화 아님 — add+remove 동작을 현 UI 경유로 동일하게 검증.
 
 ## Out of Scope
 
@@ -52,6 +58,4 @@ User / Group 관리 페이지에 다음 2 기능이 **e2e 로 선행 명세**되
 ## SDD 진행 상태
 
 - [x] **Specify** — 이 SPEC.md 작성 (2026-05-27). e2e contract 가 이미 존재하므로 Plan 단계에서 e2e 역분석으로 구현 범위 확정 가능.
-- [ ] **Plan** — 미수행
-- [ ] **Implement** — 미수행
-- [ ] **Validate** — 미수행
+- [x] **Plan/Implement/Validate** — 2026-05-29 통합 수행. 현 모달 설계 채택 + F1 멤버 제거 구현 + e2e 2건 현 설계로 갱신 → group-page 8 passed / user-page 10 passed (단독·전체 실행 모두 통과).

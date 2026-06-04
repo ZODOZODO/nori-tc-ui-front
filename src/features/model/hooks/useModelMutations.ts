@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import i18n from '@/i18n'
 import { modelApi } from '../api/model.api'
 import {
   invalidateModelTreeQueries,
@@ -69,8 +70,8 @@ const createCheckoutConflictError = (owner: string | null): ModelApiError =>
       data: null,
       errorCode: 'CHECKOUT_CONFLICT',
       errorMsg: owner
-        ? `${owner}님이 체크아웃한 모델이라 수정할 수 없습니다.`
-        : '다른 사용자가 체크아웃한 모델이라 수정할 수 없습니다.',
+        ? i18n.t('error.model.checkoutConflictBy', { owner })
+        : i18n.t('error.model.checkoutConflict'),
     }),
     409,
   )

@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import type {
   ColumnDef,
   SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import type { EqpParamRow } from '../types/eqp.types'
 
 const EQP_PARAM_SKELETON_ROW_COUNT = 8
@@ -47,9 +48,7 @@ export const EqpParamTable = memo(function EqpParamTable({
   onAddRow,
   onDeleteRow,
 }: EqpParamTableProps) {
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
-  const effectiveSelectedRowId =
-    selectedRowId ?? (rows[0] ? (rows[0].rowId ?? rows[0].paramName) : null)
+  const { t } = useI18n()
 
   const columns = useMemo<ReadonlyArray<ColumnDef<EqpParamTableRow>>>(
     () => [
@@ -62,7 +61,7 @@ export const EqpParamTable = memo(function EqpParamTable({
             <Input
               value={row.paramName}
               onChange={(event) => onChangeParamName(row.rowId as string, event.target.value)}
-              className="h-8 rounded-lg border-[#D4DDD7]"
+              className="h-8 rounded-lg border-input"
               placeholder="Param Name"
             />
           ) : (
@@ -78,7 +77,7 @@ export const EqpParamTable = memo(function EqpParamTable({
             <Input
               value={row.paramValue}
               onChange={(event) => onChangeValue(row.rowId as string, event.target.value)}
-              className="h-8 rounded-lg border-[#D4DDD7]"
+              className="h-8 rounded-lg border-input"
               placeholder="Param Value"
             />
           ) : (
@@ -94,7 +93,7 @@ export const EqpParamTable = memo(function EqpParamTable({
             <Input
               value={row.description}
               onChange={(event) => onChangeDescription(row.rowId as string, event.target.value)}
-              className="h-8 rounded-lg border-[#D4DDD7]"
+              className="h-8 rounded-lg border-input"
               placeholder="Description"
             />
           ) : (
@@ -109,7 +108,7 @@ export const EqpParamTable = memo(function EqpParamTable({
     () =>
       isEditMode
         ? {
-            header: '작업',
+            header: t('eqp.param.action'),
             width: '92px',
             render: (row) =>
               row.rowId ? (
@@ -117,36 +116,36 @@ export const EqpParamTable = memo(function EqpParamTable({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                  className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
                   onClick={() => onDeleteRow(row.rowId as string)}
-                  aria-label={`${row.paramName || '새 파라미터'} 행 삭제`}
+                  aria-label={t('eqp.param.deleteRowAria', { name: row.paramName || t('eqp.param.newParam') })}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
               ) : null,
           }
         : undefined,
-    [isEditMode, onDeleteRow],
+    [isEditMode, onDeleteRow, t],
   )
 
-  const emptyMessage = isEditMode
-    ? '편집 중인 파라미터가 없습니다. 행 추가로 새 파라미터를 작성하거나 Undo로 체크아웃을 취소해 주세요.'
-    : '설정된 파라미터가 없습니다.'
+  const emptyMessage = isEditMode ? t('eqp.param.emptyEdit') : t('eqp.param.emptyRead')
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#213028]">설비 파라미터</h2>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {t('eqp.param.title')}
+        </h2>
 
         {isEditMode ? (
           <Button
             type="button"
             variant="outline"
-            className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+            className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
             onClick={onAddRow}
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            행 추가
+            {t('eqp.param.addRow')}
           </Button>
         ) : null}
       </div>
@@ -155,11 +154,11 @@ export const EqpParamTable = memo(function EqpParamTable({
         {isLoading ? (
           <Table className="min-w-[960px]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
+              <TableRow className="bg-muted">
                 <TableHead>Param Name</TableHead>
                 <TableHead>Param Value</TableHead>
                 <TableHead>Description</TableHead>
-                {isEditMode ? <TableHead className="w-[92px]">작업</TableHead> : null}
+                {isEditMode ? <TableHead className="w-[92px]">{t('eqp.param.action')}</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,7 +177,7 @@ export const EqpParamTable = memo(function EqpParamTable({
             </TableBody>
           </Table>
         ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#647169]">{emptyMessage}</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : (
           <SelectableTable<EqpParamTableRow>
             testId="selectable-table-eqp-param"
@@ -187,18 +186,6 @@ export const EqpParamTable = memo(function EqpParamTable({
             rowKey={(row) => row.rowId ?? row.paramName}
             actionColumn={actionColumn}
             tableClassName="min-w-[960px]"
-            wrapRow={(row, _rowIdx, children) => {
-              const rowId = row.rowId ?? row.paramName
-              return (
-                <TableRow
-                  data-state={effectiveSelectedRowId === rowId ? 'selected' : undefined}
-                  onClick={() => setSelectedRowId(rowId)}
-                  onContextMenu={() => setSelectedRowId(rowId)}
-                >
-                  {children}
-                </TableRow>
-              )
-            }}
           />
         )}
       </div>

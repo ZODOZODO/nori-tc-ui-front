@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 interface PageHeadingWithActionsProps {
@@ -8,6 +9,8 @@ interface PageHeadingWithActionsProps {
   name: string
   /** 제목 아래 보조 설명. */
   description?: string
+  /** 총건수 pill (nori-client `.total-tag`). 숫자면 제목 우측에 pill 노출. */
+  total?: number
   /** 우측 정렬 액션 영역 (버튼 group 등). */
   actions?: ReactNode
   className?: string
@@ -23,6 +26,7 @@ export function PageHeadingWithActions({
   icon,
   name,
   description,
+  total,
   actions,
   className,
 }: PageHeadingWithActionsProps) {
@@ -34,6 +38,11 @@ export function PageHeadingWithActions({
           <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">
             {name}
           </h1>
+          {typeof total === 'number' ? (
+            <Badge variant="secondary" className="tabular-nums">
+              {total.toLocaleString()}
+            </Badge>
+          ) : null}
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>

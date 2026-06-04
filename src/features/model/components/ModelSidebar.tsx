@@ -10,6 +10,14 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n/i18n-context'
+import {
+  LNB_FOCUS_RING,
+  lnbGroupClass,
+  lnbLeafClass,
+  lnbLeafDotClass,
+  lnbSubLinkClass,
+} from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import { buildModelTreeGroups, type ModelTreeNode } from '../lib/model-tree.util'
 import type { ModelInfo, ProtocolType } from '../types/model.types'
@@ -39,242 +47,31 @@ interface ModelSidebarProps {
   onResizeSidebar: (deltaX: number) => void
 }
 
-interface SectionProps {
-  title: string
-  interfaceType: ProtocolType
-  nodes: ModelTreeNode[]
-  selectedModelName: string | null
-  isSelected: boolean
-  onSelectInterfaceGroup: (interfaceType: ProtocolType) => void
-  onSelectModel: (model: ModelInfo) => void
-  onOpenRootCreate: (interfaceType: ProtocolType) => void
-  onOpenRootUpdate: (model: ModelInfo) => void
-  onOpenBranchCreate: (model: ModelInfo) => void
-  onOpenDeleteDeprecatedBranches: (model: ModelInfo) => void
-  onOpenModelDelete: (model: ModelInfo) => void
-  onOpenParentCommit: (model: ModelInfo) => void
-  onOpenBranchDelete: (model: ModelInfo) => void
-  isRootDeleteDisabled: (model: ModelInfo) => boolean
-  isDeprecatedBranchDeleteDisabled: (model: ModelInfo) => boolean
-  isBranchCommitDisabled: (model: ModelInfo) => boolean
-  isBranchDeleteDisabled: (model: ModelInfo) => boolean
-}
+const isDeprecatedNode = (node: ModelTreeNode): boolean =>
+  node.latestStatus.trim().toUpperCase() === 'DEPRECATED'
 
 /**
- * Sidebar의 단일 root/branch 노드를 렌더링합니다.
+ * 선택된 modelVersionKey 를 포함하는 최상위 root 노드의 modelName 을 찾습니다.
+ * 아코디언 lazy-init(새로고침 복원 시 선택 모델의 root 를 펼쳐 보여주기) 용도.
  */
-function TreeNode({
-  node,
-  depth,
-  selectedModelName,
-  onSelectModel,
-  onOpenRootUpdate,
-  onOpenBranchCreate,
-  onOpenDeleteDeprecatedBranches,
-  onOpenModelDelete,
-  onOpenParentCommit,
-  onOpenBranchDelete,
-  isRootDeleteDisabled,
-  isDeprecatedBranchDeleteDisabled,
-  isBranchCommitDisabled,
-  isBranchDeleteDisabled,
-}: Omit<
-  SectionProps,
-  'title' | 'interfaceType' | 'nodes' | 'isSelected' | 'onSelectInterfaceGroup' | 'onOpenRootCreate'
-> & {
-  node: ModelTreeNode
-  depth: number
-}) {
-  const isSelected = selectedModelName === node.representative.modelName
-  const isRootModel = !node.representative.parentModel
-  const isDeprecatedNode = node.latestStatus.trim().toUpperCase() === 'DEPRECATED'
-
-  const triggerButton = (
-    <button
-      type="button"
-      onClick={() => onSelectModel(node.representative)}
-      className={cn(
-        'flex w-full items-start gap-2 rounded-md px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
-        isSelected
-          ? 'bg-[#EAF5EE] text-[#1F2D26]'
-          : 'text-[#51605A] hover:bg-[#F1F6F3]',
-      )}
-    >
-      <span
-        className={cn(
-          'mt-1.5 inline-block size-1.5 shrink-0 rounded-full',
-          isSelected ? 'bg-[#2AAE67]' : 'bg-[#9AACA2]',
-        )}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-semibold">
-          {node.representative.modelName}
-        </span>
-      </span>
-      {isDeprecatedNode ? (
-        <span className="shrink-0 rounded-full border border-[#EFC7B4] bg-[#FFF5EF] px-2 py-0.5 text-[10px] font-semibold text-[#A05A39]">
-          DEPRECATED
-        </span>
-      ) : null}
-    </button>
-  )
-
-  return (
-    <div className={cn('space-y-1', depth > 0 ? 'ml-3 border-l border-[#E1E9E4] pl-3' : null)}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>{triggerButton}</ContextMenuTrigger>
-        <ContextMenuContent className="w-56">
-          <ContextMenuLabel>{node.representative.modelName}</ContextMenuLabel>
-          <ContextMenuSeparator />
-          {isRootModel ? (
-            <>
-              <ContextMenuItem onSelect={() => onOpenRootUpdate(node.representative)}>
-                Model Info Update
-              </ContextMenuItem>
-              <ContextMenuItem onSelect={() => onOpenBranchCreate(node.representative)}>
-                Branch Model Create
-              </ContextMenuItem>
-              <ContextMenuItem
-                disabled={isDeprecatedBranchDeleteDisabled(node.representative)}
-                onSelect={() => onOpenDeleteDeprecatedBranches(node.representative)}
-              >
-                Branch Deprecated Model Delete
-              </ContextMenuItem>
-              <ContextMenuItem
-                variant="destructive"
-                disabled={isRootDeleteDisabled(node.representative)}
-                onSelect={() => onOpenModelDelete(node.representative)}
-              >
-                Model Delete
-              </ContextMenuItem>
-            </>
-          ) : (
-            <>
-              <ContextMenuItem
-                disabled={isBranchCommitDisabled(node.representative)}
-                onSelect={() => onOpenParentCommit(node.representative)}
-              >
-                Parent Model Commit
-              </ContextMenuItem>
-              <ContextMenuItem
-                variant="destructive"
-                disabled={isBranchDeleteDisabled(node.representative)}
-                onSelect={() => onOpenBranchDelete(node.representative)}
-              >
-                Branch Model Delete
-              </ContextMenuItem>
-            </>
-          )}
-        </ContextMenuContent>
-      </ContextMenu>
-
-      {node.branches.length > 0 ? (
-        <div className="space-y-1">
-          {node.branches.map((branchNode) => (
-            <TreeNode
-              key={`${branchNode.representative.modelName}-${branchNode.representative.modelVersionKey}`}
-              node={branchNode}
-              depth={depth + 1}
-              selectedModelName={selectedModelName}
-              onSelectModel={onSelectModel}
-              onOpenRootUpdate={onOpenRootUpdate}
-              onOpenBranchCreate={onOpenBranchCreate}
-              onOpenDeleteDeprecatedBranches={onOpenDeleteDeprecatedBranches}
-              onOpenModelDelete={onOpenModelDelete}
-              onOpenParentCommit={onOpenParentCommit}
-              onOpenBranchDelete={onOpenBranchDelete}
-              isRootDeleteDisabled={isRootDeleteDisabled}
-              isDeprecatedBranchDeleteDisabled={isDeprecatedBranchDeleteDisabled}
-              isBranchCommitDisabled={isBranchCommitDisabled}
-              isBranchDeleteDisabled={isBranchDeleteDisabled}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
+const findOwningRootName = (roots: ModelTreeNode[], selectedKey: number | null): string | null => {
+  if (selectedKey === null) {
+    return null
+  }
+  const contains = (node: ModelTreeNode): boolean =>
+    node.representative.modelVersionKey === selectedKey || node.branches.some(contains)
+  return roots.find(contains)?.representative.modelName ?? null
 }
 
 /**
- * 통신 프로토콜별 섹션을 렌더링합니다.
- */
-function InterfaceSection({
-  title,
-  interfaceType,
-  nodes,
-  selectedModelName,
-  isSelected,
-  onSelectInterfaceGroup,
-  onSelectModel,
-  onOpenRootCreate,
-  onOpenRootUpdate,
-  onOpenBranchCreate,
-  onOpenDeleteDeprecatedBranches,
-  onOpenModelDelete,
-  onOpenParentCommit,
-  onOpenBranchDelete,
-  isRootDeleteDisabled,
-  isDeprecatedBranchDeleteDisabled,
-  isBranchCommitDisabled,
-  isBranchDeleteDisabled,
-}: SectionProps) {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <section className="rounded-lg border border-[#DDE8E1] bg-[#FAFCFB] p-2">
-          <button
-            type="button"
-            onClick={() => onSelectInterfaceGroup(interfaceType)}
-            className={cn(
-              'mb-1 w-full rounded-sm px-1 py-0.5 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
-              isSelected
-                ? 'bg-[#EAF5EE] text-[#1F2D26]'
-                : 'text-[#315343] hover:bg-[#F1F6F3]',
-            )}
-          >
-            {title}
-          </button>
-          <div className="space-y-2 pl-1">
-            {nodes.length === 0 ? (
-              <p className="py-1 text-[11px] text-[#97A39C]">표시할 모델이 없습니다.</p>
-            ) : (
-              nodes.map((node) => (
-                <TreeNode
-                  key={`${node.representative.modelName}-${node.representative.modelVersionKey}`}
-                  node={node}
-                  depth={0}
-                  selectedModelName={selectedModelName}
-                  onSelectModel={onSelectModel}
-                  onOpenRootUpdate={onOpenRootUpdate}
-                  onOpenBranchCreate={onOpenBranchCreate}
-                  onOpenDeleteDeprecatedBranches={onOpenDeleteDeprecatedBranches}
-                  onOpenModelDelete={onOpenModelDelete}
-                  onOpenParentCommit={onOpenParentCommit}
-                  onOpenBranchDelete={onOpenBranchDelete}
-                  isRootDeleteDisabled={isRootDeleteDisabled}
-                  isDeprecatedBranchDeleteDisabled={isDeprecatedBranchDeleteDisabled}
-                  isBranchCommitDisabled={isBranchCommitDisabled}
-                  isBranchDeleteDisabled={isBranchDeleteDisabled}
-                />
-              ))
-            )}
-          </div>
-        </section>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuLabel>{title}</ContextMenuLabel>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => onOpenRootCreate(interfaceType)}>
-          {title === 'SECS' ? 'SECS Model Create' : 'Socket Model Create'}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  )
-}
-
-/**
- * Model 페이지 좌측 Sidebar 컴포넌트입니다.
- * parent(root) → branch 구조를 항상 펼친 상태로 표시하고 각 노드에 관리 컨텍스트 메뉴를 연결합니다.
+ * Model 페이지 좌측 Sidebar.
+ *
+ * nori-client 리뉴얼 LNB 의 3단 클릭 아코디언을 EqpSidebar 와 동일 패턴으로 적용한다:
+ *   SECS / Socket 섹션(그룹 헤더, 클릭 = 인터페이스 그룹 선택 + 펼침/접힘)
+ *     → operator/root 모델(하위 링크, 클릭 = 선택 + 하위 branch 펼침/접힘)
+ *       → branch 모델(리프, root 펼쳤을 때만 노출)
+ * 시각 클래스는 `@/shared/layout/lnb-sidebar` 공용 헬퍼(eqp/model 공유). 선택/라우팅/
+ * ContextMenu/검색/testId 불변(R4.1), R4.2(접기/리사이즈) 인프라 그대로.
  */
 export const ModelSidebar = memo(function ModelSidebar({
   modelItems,
@@ -300,6 +97,7 @@ export const ModelSidebar = memo(function ModelSidebar({
   onToggleSidebar,
   onResizeSidebar,
 }: ModelSidebarProps) {
+  const { t } = useI18n()
   const [searchKeyword, setSearchKeyword] = useState('')
   // 입력 자체는 즉시 반영, 트리 빌드는 deferred 로 — 큰 목록에서 입력 지연 완화.
   const deferredSearchKeyword = useDeferredValue(searchKeyword)
@@ -308,24 +106,203 @@ export const ModelSidebar = memo(function ModelSidebar({
     () => modelItems.find((item) => item.modelVersionKey === selectedModelVersionKey) ?? null,
     [modelItems, selectedModelVersionKey],
   )
+  const selectedModelName = selectedModel?.modelName ?? null
 
   const { secsRoots, socketRoots } = useMemo(
     () => buildModelTreeGroups(modelItems, deferredSearchKeyword),
     [modelItems, deferredSearchKeyword],
   )
 
+  // 섹션 펼침/접힘 (nori-client sidebar__top 아코디언). 초기값 = 선택 컨텍스트 기반.
+  const [secsOpen, setSecsOpen] = useState(
+    () =>
+      selectedInterfaceGroup === 'SECS' || findOwningRootName(secsRoots, selectedModelVersionKey) !== null,
+  )
+  const [socketOpen, setSocketOpen] = useState(
+    () =>
+      selectedInterfaceGroup === 'SOCKET' ||
+      findOwningRootName(socketRoots, selectedModelVersionKey) !== null,
+  )
+  // root 별 하위 branch 펼침/접힘 (2단계 아코디언). root 클릭으로 토글.
+  const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => {
+    const initial = new Set<string>()
+    const secsOwner = findOwningRootName(secsRoots, selectedModelVersionKey)
+    const socketOwner = findOwningRootName(socketRoots, selectedModelVersionKey)
+    if (secsOwner) {
+      initial.add(secsOwner)
+    }
+    if (socketOwner) {
+      initial.add(socketOwner)
+    }
+    return initial
+  })
+  // 검색 중에는 결과가 접혀 안 보이는 걸 막기 위해 모두 강제로 펼친다(파생값, effect 미사용).
+  const hasSearch = deferredSearchKeyword.trim().length > 0
+
+  const toggleRoot = (modelName: string) => {
+    setExpandedRoots((prev) => {
+      const next = new Set(prev)
+      if (next.has(modelName)) {
+        next.delete(modelName)
+      } else {
+        next.add(modelName)
+      }
+      return next
+    })
+  }
+
+  /** branch 리프 노드 (root 펼쳤을 때 노출, 다단 branch 는 들여쓰기 재귀). */
+  const renderBranch = (node: ModelTreeNode, depth: number) => {
+    const isSelected = selectedModelName === node.representative.modelName
+    return (
+      <div
+        key={`${node.representative.modelName}-${node.representative.modelVersionKey}`}
+        className={depth > 1 ? 'ml-3 border-l border-border pl-1' : undefined}
+      >
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={() => onSelectModel(node.representative)}
+              className={lnbLeafClass(isSelected)}
+            >
+              <span className={lnbLeafDotClass(isSelected)} />
+              <span className="min-w-0 flex-1 truncate">{node.representative.modelName}</span>
+              {isDeprecatedNode(node) ? (
+                <span className="shrink-0 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">
+                  DEPRECATED
+                </span>
+              ) : null}
+            </button>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuLabel>{node.representative.modelName}</ContextMenuLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={isBranchCommitDisabled(node.representative)}
+              onSelect={() => onOpenParentCommit(node.representative)}
+            >
+              Parent Model Commit
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              disabled={isBranchDeleteDisabled(node.representative)}
+              onSelect={() => onOpenBranchDelete(node.representative)}
+            >
+              Branch Model Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+        {node.branches.map((child) => renderBranch(child, depth + 1))}
+      </div>
+    )
+  }
+
+  /** operator/root 모델 (하위 링크 + 클릭 시 branch 펼침/접힘). */
+  const renderRoot = (node: ModelTreeNode) => {
+    const isSelected = selectedModelName === node.representative.modelName
+    const rootName = node.representative.modelName
+    return (
+      <div key={`${rootName}-${node.representative.modelVersionKey}`} className="flex flex-col gap-0.5">
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={() => {
+                onSelectModel(node.representative)
+                toggleRoot(rootName)
+              }}
+              className={lnbSubLinkClass(isSelected)}
+            >
+              {rootName}
+            </button>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuLabel>{rootName}</ContextMenuLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => onOpenRootUpdate(node.representative)}>
+              Model Info Update
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onOpenBranchCreate(node.representative)}>
+              Branch Model Create
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={isDeprecatedBranchDeleteDisabled(node.representative)}
+              onSelect={() => onOpenDeleteDeprecatedBranches(node.representative)}
+            >
+              Branch Deprecated Model Delete
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              disabled={isRootDeleteDisabled(node.representative)}
+              onSelect={() => onOpenModelDelete(node.representative)}
+            >
+              Model Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+        {expandedRoots.has(rootName) || hasSearch
+          ? node.branches.map((branch) => renderBranch(branch, 1))
+          : null}
+      </div>
+    )
+  }
+
+  /** SECS / Socket 섹션 (그룹 헤더 아코디언 + root 목록). */
+  const renderSection = (
+    title: string,
+    interfaceType: ProtocolType,
+    roots: ModelTreeNode[],
+    isOpen: boolean,
+    onToggleOpen: () => void,
+  ) => (
+    <ContextMenu>
+      <div className="flex flex-col gap-0.5">
+        <ContextMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={() => {
+              onSelectInterfaceGroup(interfaceType)
+              onToggleOpen()
+            }}
+            className={lnbGroupClass(selectedInterfaceGroup === interfaceType)}
+          >
+            <span className="flex-1 truncate">{title}</span>
+          </button>
+        </ContextMenuTrigger>
+        {isOpen || hasSearch ? (
+          roots.length === 0 ? (
+            <p className="py-1 pl-8 text-[11px] text-muted-foreground">{t('model.sidebar.empty')}</p>
+          ) : (
+            roots.map((root) => renderRoot(root))
+          )
+        ) : null}
+      </div>
+      <ContextMenuContent className="w-52">
+        <ContextMenuLabel>{title}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => onOpenRootCreate(interfaceType)}>
+          {title === 'SECS' ? 'SECS Model Create' : 'Socket Model Create'}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+
   if (!sidebarOpen) {
     return (
       <aside
-        className="flex flex-col self-stretch border-r border-[#E4EAE6] bg-white"
+        className="flex flex-col self-stretch border-r border-border bg-card"
         style={{ width: `${sidebarWidth}px` }}
       >
-        <div className="flex h-[52px] items-center justify-center border-b border-[#E4EAE6]">
+        <div className="flex h-[52px] items-center justify-center border-b border-border">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex size-8 items-center justify-center rounded-md border border-[#D8E1DB] text-[#516058] hover:bg-[#F2F7F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-            aria-label="사이드바 펼치기"
+            className={cn(
+              'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
+              LNB_FOCUS_RING,
+            )}
+            aria-label={t('model.sidebar.expand')}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -336,18 +313,21 @@ export const ModelSidebar = memo(function ModelSidebar({
 
   return (
     <aside
-      className="flex flex-col self-stretch border-r border-[#E4EAE6] bg-white"
+      className="flex flex-col self-stretch border-r border-border bg-card"
       style={{ width: `${sidebarWidth}px` }}
     >
-      <div className="flex min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-[52px] items-center justify-between border-b border-[#E4EAE6] px-3">
-            <span className="truncate text-sm font-semibold text-[#243129]">Model Info</span>
+          <div className="flex h-[52px] items-center justify-between border-b border-border px-3">
+            <span className="truncate text-sm font-semibold text-foreground">{t('model.sidebar.title')}</span>
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="flex size-8 items-center justify-center rounded-md border border-[#D8E1DB] text-[#516058] hover:bg-[#F2F7F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-              aria-label="사이드바 축소"
+              className={cn(
+                'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
+                LNB_FOCUS_RING,
+              )}
+              aria-label={t('model.sidebar.collapse')}
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -355,62 +335,29 @@ export const ModelSidebar = memo(function ModelSidebar({
 
           <div className="px-3 py-3">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[#9AA49E]" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchKeyword}
                 onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder="Model Name 검색"
-                className="h-9 bg-[#F7FAF8] pl-8 text-xs"
+                placeholder={t('model.sidebar.searchPlaceholder')}
+                className="h-9 bg-muted pl-8 text-xs"
               />
             </div>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-3">
-            <InterfaceSection
-              title="SECS"
-              interfaceType="SECS"
-              nodes={secsRoots}
-              selectedModelName={selectedModel?.modelName ?? null}
-              isSelected={selectedInterfaceGroup === 'SECS'}
-              onSelectInterfaceGroup={onSelectInterfaceGroup}
-              onSelectModel={onSelectModel}
-              onOpenRootCreate={onOpenRootCreate}
-              onOpenRootUpdate={onOpenRootUpdate}
-              onOpenBranchCreate={onOpenBranchCreate}
-              onOpenDeleteDeprecatedBranches={onOpenDeleteDeprecatedBranches}
-              onOpenModelDelete={onOpenModelDelete}
-              onOpenParentCommit={onOpenParentCommit}
-              onOpenBranchDelete={onOpenBranchDelete}
-              isRootDeleteDisabled={isRootDeleteDisabled}
-              isDeprecatedBranchDeleteDisabled={isDeprecatedBranchDeleteDisabled}
-              isBranchCommitDisabled={isBranchCommitDisabled}
-              isBranchDeleteDisabled={isBranchDeleteDisabled}
-            />
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
+            {renderSection('SECS', 'SECS', secsRoots, secsOpen, () => setSecsOpen((open) => !open))}
+            <div className="mt-2 flex flex-col gap-0.5">
+              {renderSection('Socket', 'SOCKET', socketRoots, socketOpen, () =>
+                setSocketOpen((open) => !open),
+              )}
+            </div>
 
-            <InterfaceSection
-              title="Socket"
-              interfaceType="SOCKET"
-              nodes={socketRoots}
-              selectedModelName={selectedModel?.modelName ?? null}
-              isSelected={selectedInterfaceGroup === 'SOCKET'}
-              onSelectInterfaceGroup={onSelectInterfaceGroup}
-              onSelectModel={onSelectModel}
-              onOpenRootCreate={onOpenRootCreate}
-              onOpenRootUpdate={onOpenRootUpdate}
-              onOpenBranchCreate={onOpenBranchCreate}
-              onOpenDeleteDeprecatedBranches={onOpenDeleteDeprecatedBranches}
-              onOpenModelDelete={onOpenModelDelete}
-              onOpenParentCommit={onOpenParentCommit}
-              onOpenBranchDelete={onOpenBranchDelete}
-              isRootDeleteDisabled={isRootDeleteDisabled}
-              isDeprecatedBranchDeleteDisabled={isDeprecatedBranchDeleteDisabled}
-              isBranchCommitDisabled={isBranchCommitDisabled}
-              isBranchDeleteDisabled={isBranchDeleteDisabled}
-            />
-
-            {isLoading ? <p className="px-2 text-xs text-[#6D7972]">모델 목록을 불러오는 중입니다.</p> : null}
-            {errorMessage ? <p className="px-2 text-xs text-[#C5534B]">{errorMessage}</p> : null}
-          </div>
+            {isLoading ? (
+              <p className="px-3 pt-1 text-xs text-muted-foreground">{t('model.sidebar.loading')}</p>
+            ) : null}
+            {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
+          </nav>
         </div>
 
         <SidebarResizeHandle onDrag={onResizeSidebar} />

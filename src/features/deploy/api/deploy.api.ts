@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
 import type {
@@ -22,18 +23,20 @@ import type {
   DeployTargetPage,
 } from '../types/deploy.types'
 
-const DEFAULT_DEPLOY_ERROR_MESSAGE = 'Deploy 대상 설비 목록을 조회하지 못했습니다.'
-const DEFAULT_DEPLOY_CREATE_ERROR_MESSAGE = 'Deploy 생성에 실패했습니다.'
-const DEFAULT_DEPLOY_HISTORY_ERROR_MESSAGE = 'Deploy 목록을 조회하지 못했습니다.'
-const DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE = 'Deploy 정보를 조회하지 못했습니다.'
-const DEFAULT_DEPLOY_TARGETS_ERROR_MESSAGE = 'Deploy 대상 상태를 조회하지 못했습니다.'
-const DEFAULT_DEPLOY_START_ERROR_MESSAGE = 'Deploy 실행에 실패했습니다.'
-const DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE = 'Deploy hold 요청에 실패했습니다.'
-const DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE = 'Deploy 취소에 실패했습니다.'
-const DEFAULT_DEPLOY_REDEPLOY_ERROR_MESSAGE = 'Deploy 재실행에 실패했습니다.'
-const DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE = 'Deploy 이력 삭제에 실패했습니다.'
-const DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE = '시나리오 목록을 조회하지 못했습니다.'
-const DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE = '시나리오 preview를 조회하지 못했습니다.'
+// 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
+// (default 파라미터 식은 호출마다 평가되므로 fallback 이 현재 언어를 따른다.)
+const fallbackRegisterTargetsError = () => i18n.t('error.deploy.registerTargets')
+const fallbackCreateError = () => i18n.t('error.deploy.create')
+const fallbackHistoryError = () => i18n.t('error.deploy.history')
+const fallbackSummaryError = () => i18n.t('error.deploy.summary')
+const fallbackTargetsError = () => i18n.t('error.deploy.targets')
+const fallbackStartError = () => i18n.t('error.deploy.start')
+const fallbackHoldError = () => i18n.t('error.deploy.hold')
+const fallbackCancelError = () => i18n.t('error.deploy.cancel')
+const fallbackRedeployError = () => i18n.t('error.deploy.redeploy')
+const fallbackDeleteError = () => i18n.t('error.deploy.delete')
+const fallbackScenarioError = () => i18n.t('error.deploy.scenarios')
+const fallbackScenarioPreviewError = () => i18n.t('error.deploy.scenarioPreview')
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 
@@ -123,7 +126,7 @@ const getCookieValue = (name: string): string | null => {
 
 const createDeployFailResponse = (
   payload: unknown,
-  fallbackMessage = DEFAULT_DEPLOY_ERROR_MESSAGE,
+  fallbackMessage = fallbackRegisterTargetsError(),
 ): DeployFailResponse => {
   if (isApiResponse(payload) && payload.success === false) {
     return {
@@ -161,9 +164,9 @@ const issueCsrfToken = async (): Promise<string> => {
           success: false,
           data: null,
           errorCode: 'CSRF_TOKEN_MISSING',
-          errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+          errorMsg: i18n.t('error.deploy.csrf'),
         },
-        DEFAULT_DEPLOY_CREATE_ERROR_MESSAGE,
+        fallbackCreateError(),
       ),
     )
   }
@@ -185,7 +188,7 @@ export class DeployApiError extends Error {
 
 const normalizeDeployError = (
   error: unknown,
-  fallbackMessage = DEFAULT_DEPLOY_ERROR_MESSAGE,
+  fallbackMessage = fallbackRegisterTargetsError(),
 ): DeployApiError => {
   if (error instanceof DeployApiError) {
     return error
@@ -421,7 +424,7 @@ const normalizeDeployHistoryPage = (
 ): DeployHistoryPage => {
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new DeployApiError(
-      createDeployFailResponse(payload, DEFAULT_DEPLOY_HISTORY_ERROR_MESSAGE),
+      createDeployFailResponse(payload, fallbackHistoryError()),
     )
   }
 
@@ -446,7 +449,7 @@ const normalizeDeployTargetPage = (
   requestedSize: number,
 ): DeployTargetPage => {
   if (!isRecord(payload) || !Array.isArray(payload.targets)) {
-    throw new DeployApiError(createDeployFailResponse(payload, DEFAULT_DEPLOY_TARGETS_ERROR_MESSAGE))
+    throw new DeployApiError(createDeployFailResponse(payload, fallbackTargetsError()))
   }
 
   return {
@@ -466,7 +469,7 @@ const normalizeDeployTargetPage = (
 
 const normalizeDeployActionResult = (
   payload: unknown,
-  fallbackMessage = DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
+  fallbackMessage = fallbackCancelError(),
 ): DeployActionResult => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number') {
     throw new DeployApiError(createDeployFailResponse(payload, fallbackMessage))
@@ -494,7 +497,7 @@ const normalizeDeployActionResult = (
 
 const normalizeDeploySummary = (payload: unknown): DeploySummary => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number' || typeof payload.deployName !== 'string') {
-    throw new DeployApiError(createDeployFailResponse(payload, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE))
+    throw new DeployApiError(createDeployFailResponse(payload, fallbackSummaryError()))
   }
 
   return {
@@ -583,7 +586,7 @@ const normalizeDeploySummary = (payload: unknown): DeploySummary => {
 
 const normalizeDeployScenarioCatalog = (payload: unknown): DeployScenarioCatalogResponse => {
   if (!isRecord(payload) || !Array.isArray(payload.scenarios) || typeof payload.scenarioCount !== 'number') {
-    throw new DeployApiError(createDeployFailResponse(payload, DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE))
+    throw new DeployApiError(createDeployFailResponse(payload, fallbackScenarioError()))
   }
 
   const scenarios = payload.scenarios.filter(isDeployScenarioSummary)
@@ -610,7 +613,7 @@ const normalizeDeployRegisterScenarioPreview = (
     !Array.isArray(payload.scenarios)
   ) {
     throw new DeployApiError(
-      createDeployFailResponse(payload, DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE),
+      createDeployFailResponse(payload, fallbackScenarioPreviewError()),
     )
   }
 
@@ -623,7 +626,7 @@ const normalizeDeployRegisterScenarioPreview = (
     recommendedReason:
       typeof payload.recommendedReason === 'string'
         ? payload.recommendedReason
-        : '권장 시나리오를 계산하지 못했습니다.',
+        : i18n.t('error.deploy.recommendedReasonFallback'),
     scenarios: payload.scenarios.filter(isDeployRegisterScenarioCandidate),
   }
 }
@@ -650,13 +653,13 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_ERROR_MESSAGE,
+          fallbackRegisterTargetsError(),
         ),
         offset,
         limit,
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackRegisterTargetsError())
     }
   },
 
@@ -675,10 +678,10 @@ export const deployApi = {
       return resolveSuccessPayload<DeployCreateResult>(
         response.data,
         response.status,
-        DEFAULT_DEPLOY_CREATE_ERROR_MESSAGE,
+        fallbackCreateError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_CREATE_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackCreateError())
     }
   },
 
@@ -698,12 +701,12 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_START_ERROR_MESSAGE,
+          fallbackStartError(),
         ),
-        DEFAULT_DEPLOY_START_ERROR_MESSAGE,
+        fallbackStartError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_START_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackStartError())
     }
   },
 
@@ -723,12 +726,12 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE,
+          fallbackHoldError(),
         ),
-        DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE,
+        fallbackHoldError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_HOLD_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackHoldError())
     }
   },
 
@@ -748,12 +751,12 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
+          fallbackCancelError(),
         ),
-        DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE,
+        fallbackCancelError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_CANCEL_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackCancelError())
     }
   },
 
@@ -772,10 +775,10 @@ export const deployApi = {
       return resolveSuccessPayload<DeployCreateResult>(
         response.data,
         response.status,
-        DEFAULT_DEPLOY_REDEPLOY_ERROR_MESSAGE,
+        fallbackRedeployError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_REDEPLOY_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackRedeployError())
     }
   },
 
@@ -795,12 +798,12 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE,
+          fallbackDeleteError(),
         ),
-        DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE,
+        fallbackDeleteError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_DELETE_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackDeleteError())
     }
   },
 
@@ -815,11 +818,11 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE,
+          fallbackScenarioError(),
         ),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_SCENARIO_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackScenarioError())
     }
   },
 
@@ -841,11 +844,11 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE,
+          fallbackScenarioPreviewError(),
         ),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_SCENARIO_PREVIEW_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackScenarioPreviewError())
     }
   },
 
@@ -873,13 +876,13 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_HISTORY_ERROR_MESSAGE,
+          fallbackHistoryError(),
         ),
         offset,
         limit,
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_HISTORY_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackHistoryError())
     }
   },
 
@@ -890,10 +893,10 @@ export const deployApi = {
       })
 
       return normalizeDeploySummary(
-        resolveSuccessPayload<unknown>(response.data, response.status, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE),
+        resolveSuccessPayload<unknown>(response.data, response.status, fallbackSummaryError()),
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_SUMMARY_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackSummaryError())
     }
   },
 
@@ -919,13 +922,13 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          DEFAULT_DEPLOY_TARGETS_ERROR_MESSAGE,
+          fallbackTargetsError(),
         ),
         page,
         size,
       )
     } catch (error) {
-      throw normalizeDeployError(error, DEFAULT_DEPLOY_TARGETS_ERROR_MESSAGE)
+      throw normalizeDeployError(error, fallbackTargetsError())
     }
   },
 }

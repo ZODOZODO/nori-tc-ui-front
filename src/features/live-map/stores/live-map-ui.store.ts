@@ -15,7 +15,6 @@ const clampZoomLevel = (zoomLevel: number): number =>
 
 interface LiveMapUiState {
   searchKeyword: string
-  selectedLine: string
   selectedStatus: LiveMapStatusFilter
   selectedEqpId: string | null
   isLayoutEditEnabled: boolean
@@ -24,7 +23,6 @@ interface LiveMapUiState {
   zoomLevel: number
   lastSyncAt: number
   setSearchKeyword: (searchKeyword: string) => void
-  setSelectedLine: (selectedLine: string) => void
   setSelectedStatus: (selectedStatus: LiveMapStatusFilter) => void
   setSelectedEqpId: (selectedEqpId: string | null) => void
   setLayoutEditEnabled: (isLayoutEditEnabled: boolean) => void
@@ -44,7 +42,6 @@ interface LiveMapUiState {
 
 const createInitialState = () => ({
   searchKeyword: '',
-  selectedLine: 'A_LINE',
   selectedStatus: 'ALL' as LiveMapStatusFilter,
   selectedEqpId: null,
   isLayoutEditEnabled: false,
@@ -60,7 +57,6 @@ const createInitialState = () => ({
 export const useLiveMapUiStore = create<LiveMapUiState>()((set) => ({
   ...createInitialState(),
   setSearchKeyword: (searchKeyword) => set({ searchKeyword }),
-  setSelectedLine: (selectedLine) => set({ selectedLine }),
   setSelectedStatus: (selectedStatus) => set({ selectedStatus }),
   setSelectedEqpId: (selectedEqpId) => set({ selectedEqpId }),
   setLayoutEditEnabled: (isLayoutEditEnabled) => set({ isLayoutEditEnabled }),

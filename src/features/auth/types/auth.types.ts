@@ -1,3 +1,5 @@
+import i18n from '@/i18n'
+
 /**
  * 백엔드 공통 응답 래퍼 타입입니다.
  * - success: 요청 처리 성공 여부
@@ -57,9 +59,9 @@ export type LoginResponse = LoginSuccessResponse | LoginFailResponse
 /**
  * 서버에서 예측하지 못한 응답이 오거나 네트워크 오류가 발생했을 때
  * 사용자에게 보여줄 기본 메시지입니다.
+ * 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
  */
-export const DEFAULT_AUTH_ERROR_MESSAGE =
-  '로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+export const defaultAuthErrorMessage = () => i18n.t('error.auth.login')
 
 /**
  * 런타임 타입 가드를 위한 공용 객체 검사 유틸입니다.
@@ -124,7 +126,7 @@ export const isLoginFailResponse = (value: unknown): value is LoginFailResponse 
  */
 export const createLoginFailResponse = (
   payload: unknown,
-  fallbackMessage = DEFAULT_AUTH_ERROR_MESSAGE
+  fallbackMessage = defaultAuthErrorMessage()
 ): LoginFailResponse => {
   if (isLoginFailResponse(payload)) {
     return payload

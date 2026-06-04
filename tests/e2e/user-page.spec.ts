@@ -345,7 +345,9 @@ test('topbar User 클릭 시 /user 로 라우팅', async ({ page }) => {
   await userMenu.click()
 
   await expect(page).toHaveURL(/\/user$/)
-  await expect(page.getByRole('heading', { name: '사용자 관리' })).toBeVisible()
+  // 패널 제목이 i18n(t('user.title'))로 배선돼 locale 따라 텍스트가 바뀌므로,
+  // locale 무관한 user-list-table testId 로 User 패널 활성을 확인한다 (단언 의미 동일).
+  await expect(page.getByTestId('user-list-table')).toBeVisible()
 })
 
 test('사용자 목록 표시', async ({ page }) => {
@@ -410,7 +412,8 @@ test('사용자 삭제 성공', async ({ page }) => {
 
   await expect(page.getByTestId('user-row-2')).toBeVisible()
   await page.getByTestId('user-row-delete-2').click()
-  await page.getByRole('button', { name: '삭제' }).click()
+  // e2e 는 EN 모드 — P5 i18n 적용으로 ConfirmDialog 확인 버튼이 common.delete('Delete') 로 전환됨.
+  await page.getByRole('button', { name: 'Delete' }).click()
 
   await expect.poll(() => state.deleteUserCalls.length).toBeGreaterThan(0)
   expect(state.deleteUserCalls[0]).toBe(2)
@@ -499,20 +502,23 @@ test('/user 직접 접근 차단', async ({ page }) => {
   await expect(page).toHaveURL(/\/(login|forbidden|eqp)/)
 })
 
-test('사용자 그룹 매핑 표시 + 제거', async ({ page }) => {
+// 사용자 행에 소속 그룹을 chip(Badge) 으로 인라인 표시한다.
+// (그룹 add/remove 는 Group 페이지 모달에서 관리 — UserListTable 은 표시 전용. Group-AC-7 가 제거를 검증.)
+test('사용자 그룹 매핑 표시', async ({ page }) => {
   const state = createDefaultMockState()
+  // 기본 fixture 의 alice(userPk 1) 에 소속 그룹 부여.
+  state.users[0].groups = [
+    { userPk: 1, groupId: 10, groupCode: 'ADMINS', groupName: '관리자' },
+    { userPk: 1, groupId: 11, groupCode: 'OPS', groupName: '운영자' },
+  ]
   await setupMocks(page, state)
   await page.goto('/user')
 
   await expect(page.getByTestId('user-row-1')).toBeVisible()
-  await page.getByTestId('user-row-1').click()
 
-  await expect(page.getByTestId('user-group-chip-10')).toBeVisible()
-  await expect(page.getByTestId('user-group-chip-11')).toBeVisible()
-  await expect(page.getByTestId('user-group-chip-10')).toContainText('ADMINS')
-
-  await page.getByTestId('user-group-chip-remove-10').click()
-  await expect.poll(() => state.removeGroupCalls.length).toBeGreaterThan(0)
-  expect(state.removeGroupCalls[0]).toEqual({ userPk: 1, groupId: 10 })
-  await expect(page.getByTestId('user-group-chip-10')).toHaveCount(0)
+  // 그룹 chip 은 행에 인라인 렌더 (클릭 불필요).
+  await expect(page.getByTestId('user-row-group-1-10')).toBeVisible()
+  await expect(page.getByTestId('user-row-group-1-11')).toBeVisible()
+  await expect(page.getByTestId('user-row-group-1-10')).toContainText('ADMINS')
+  await expect(page.getByTestId('user-row-group-1-11')).toContainText('OPS')
 })

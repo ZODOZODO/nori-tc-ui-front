@@ -1,10 +1,10 @@
-import { LIVE_MAP_STATUS_THEME } from '../lib/live-map-status-theme'
+import { LIVE_MAP_STATUS_CLASS } from '../lib/live-map-status-theme'
 
 const LEGEND_ITEMS = [
-  { label: 'RUN', theme: LIVE_MAP_STATUS_THEME.RUN },
-  { label: 'IDLE', theme: LIVE_MAP_STATUS_THEME.IDLE },
-  { label: 'ERROR', theme: LIVE_MAP_STATUS_THEME.ERROR },
-  { label: 'DOWN', theme: LIVE_MAP_STATUS_THEME.DOWN },
+  { label: 'RUN', variant: LIVE_MAP_STATUS_CLASS.RUN },
+  { label: 'IDLE', variant: LIVE_MAP_STATUS_CLASS.IDLE },
+  { label: 'ERROR', variant: LIVE_MAP_STATUS_CLASS.ERROR },
+  { label: 'DOWN', variant: LIVE_MAP_STATUS_CLASS.DOWN },
 ] as const
 
 export function LiveMapLegend() {
@@ -13,17 +13,9 @@ export function LiveMapLegend() {
       {LEGEND_ITEMS.map((item) => (
         <div
           key={item.label}
-          className="inline-flex h-[26px] items-center gap-2 rounded-[13px] border px-3 text-[11px] font-bold"
-          style={{
-            backgroundColor: item.theme.legendBackground,
-            borderColor: item.theme.legendBorder,
-            color: item.theme.legendText,
-          }}
+          className={`inline-flex h-[26px] items-center gap-2 rounded-pill border px-3 text-[11px] font-bold ${item.variant.chip}`}
         >
-          <span
-            className="size-2 rounded-full"
-            style={{ backgroundColor: item.theme.legendDot }}
-          />
+          <span className={`size-2 rounded-full ${item.variant.dot}`} />
           {item.label}
         </div>
       ))}

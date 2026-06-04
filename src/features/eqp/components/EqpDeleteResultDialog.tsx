@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n/i18n-context'
 
 interface EqpDeleteResultDialogProps {
   open: boolean
@@ -28,12 +29,13 @@ export function EqpDeleteResultDialog({
   message,
   onOpenChange,
 }: EqpDeleteResultDialogProps) {
+  const { t } = useI18n()
   const isSuccess = status === 'success'
   const resolvedMessage =
     message ??
-    (isSuccess
-      ? `${eqpId ?? '선택한 설비'} 삭제가 완료되었습니다.`
-      : `${eqpId ?? '선택한 설비'} 삭제에 실패했습니다.`)
+    t(isSuccess ? 'eqp.delete.resultSuccess' : 'eqp.delete.resultFailure', {
+      eqpId: eqpId ?? t('eqp.common.selectedTarget'),
+    })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,22 +43,24 @@ export function EqpDeleteResultDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             {isSuccess ? (
-              <CheckCircle2 className="size-5 text-[#1C7F59]" aria-hidden="true" />
+              <CheckCircle2 className="size-5 text-success" aria-hidden="true" />
             ) : (
-              <XCircle className="size-5 text-[#B4483F]" aria-hidden="true" />
+              <XCircle className="size-5 text-danger" aria-hidden="true" />
             )}
-            <DialogTitle>{isSuccess ? '설비 삭제 완료' : '설비 삭제 실패'}</DialogTitle>
+            <DialogTitle>
+              {isSuccess ? t('eqp.delete.successTitle') : t('eqp.delete.failureTitle')}
+            </DialogTitle>
           </div>
           <DialogDescription>
-            결과: {isSuccess ? 'PASS' : 'FAIL'}
+            {t('eqp.result.label')}: {isSuccess ? 'PASS' : 'FAIL'}
           </DialogDescription>
         </DialogHeader>
 
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             isSuccess
-              ? 'border-[#CAE7D8] bg-[#F4FBF7] text-[#1E5B43]'
-              : 'border-[#F0D2D0] bg-[#FFF7F7] text-[#B4483F]'
+              ? 'border-success/30 bg-success/10 text-foreground'
+              : 'border-danger/30 bg-danger/5 text-danger'
           }`}
         >
           {resolvedMessage}
@@ -64,7 +68,7 @@ export function EqpDeleteResultDialog({
 
         <DialogFooter>
           <Button type="button" onClick={() => onOpenChange(false)}>
-            확인
+            {t('eqp.common.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

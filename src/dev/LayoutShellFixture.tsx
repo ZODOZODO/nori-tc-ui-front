@@ -1,12 +1,35 @@
 import { useState } from 'react'
-import { Boxes } from 'lucide-react'
+import { Boxes, Gauge, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { PageActionBar } from '@/shared/layout/PageActionBar'
+import { PageCard, PageCardGrid } from '@/shared/layout/PageCard'
+import { PageFilterBar } from '@/shared/layout/PageFilterBar'
 import { PageHeading } from '@/shared/layout/PageHeading'
 import { PageHeadingWithActions } from '@/shared/layout/PageHeadingWithActions'
 import { PageLayoutShell } from '@/shared/layout/PageLayoutShell'
 import { PageLocation } from '@/shared/layout/PageLocation'
 import { PageModal } from '@/shared/layout/PageModal'
+import { PagePagination } from '@/shared/layout/PagePagination'
+
+interface DemoRow {
+  id: string
+  name: string
+  status: string
+}
+
+const DEMO_COLUMNS: readonly ColumnDef<DemoRow>[] = [
+  { key: 'name', header: '이름', accessor: (row) => row.name, sortable: true, width: '200px' },
+  { key: 'status', header: '상태', accessor: (row) => row.status, sortable: true, width: '160px' },
+]
+
+const DEMO_ROWS: readonly DemoRow[] = [
+  { id: 'd0', name: 'EQP-001', status: 'OPERATE' },
+  { id: 'd1', name: 'EQP-002', status: 'IDLE' },
+  { id: 'd2', name: 'EQP-003', status: 'DOWN' },
+]
 
 /**
  * R8 (공통 layout shell pattern) 시각 확인 전용 fixture — 6 variant scene.
@@ -30,6 +53,8 @@ function Scene({ label, children }: { label: string; children: React.ReactNode }
 
 export function LayoutShellFixture() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(12)
 
   return (
     <div className="flex flex-col gap-6 bg-muted p-6" data-testid="layout-shell-fixture">
@@ -38,11 +63,12 @@ export function LayoutShellFixture() {
         <PageLocation subtitle="설비 관리" name="설비 목록" />
       </Scene>
 
-      {/* 2. heading만 */}
-      <Scene label="2. heading만 (PageHeading)">
+      {/* 2. heading만 (+ 총건수 pill) */}
+      <Scene label="2. heading만 (PageHeading + 총건수 pill)">
         <PageHeading
           icon={<Boxes />}
           name="설비 목록"
+          total={240}
           description="등록된 설비를 조회하고 관리합니다."
         />
       </Scene>
@@ -100,8 +126,75 @@ export function LayoutShellFixture() {
         </PageLayoutShell>
       </Scene>
 
-      {/* 6. modal */}
-      <Scene label="6. modal (PageModal)">
+      {/* 6. 필터 바 (PageFilterBar) */}
+      <Scene label="6. 필터/검색 바 (PageFilterBar)">
+        <PageFilterBar
+          actions={
+            <>
+              <Button variant="outline" size="sm">
+                초기화
+              </Button>
+              <Button size="sm">조회</Button>
+            </>
+          }
+        >
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            설비명
+            <div className="relative">
+              <Search className="absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="설비명 검색" className="h-9 w-56 pl-8" />
+            </div>
+          </label>
+        </PageFilterBar>
+      </Scene>
+
+      {/* 7. 데이터 테이블 (SelectableTable — 엔진 불변, 시각만) */}
+      <Scene label="7. 데이터 테이블 (SelectableTable)">
+        <div className="flex h-56 flex-col">
+          <SelectableTable
+            testId="layout-shell-fixture-table"
+            columns={DEMO_COLUMNS}
+            rows={DEMO_ROWS}
+            rowKey={(row) => row.id}
+            features={{ rangeCopy: true, sortable: true }}
+          />
+        </div>
+      </Scene>
+
+      {/* 8. 페이지네이션 (PagePagination) */}
+      <Scene label="8. 페이지네이션 (PagePagination)">
+        <PagePagination
+          total={240}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next)
+            setPage(1)
+          }}
+        />
+      </Scene>
+
+      {/* 9. 대시보드 카드 (PageCard + PageCardGrid) */}
+      <Scene label="9. 대시보드 카드 (PageCard + PageCardGrid)">
+        <PageCardGrid>
+          <PageCard title="가동 설비" icon={<Gauge />}>
+            <p className="text-2xl font-semibold tabular-nums text-foreground">182</p>
+            <p className="text-xs text-muted-foreground">전체 240 대 중</p>
+          </PageCard>
+          <PageCard title="대기" icon={<Gauge />}>
+            <p className="text-2xl font-semibold tabular-nums text-foreground">42</p>
+            <p className="text-xs text-muted-foreground">IDLE</p>
+          </PageCard>
+          <PageCard title="다운" icon={<Gauge />}>
+            <p className="text-2xl font-semibold tabular-nums text-danger">16</p>
+            <p className="text-xs text-muted-foreground">점검 필요</p>
+          </PageCard>
+        </PageCardGrid>
+      </Scene>
+
+      {/* 10. modal */}
+      <Scene label="10. modal (PageModal)">
         <Button onClick={() => setModalOpen(true)}>모달 열기</Button>
         <PageModal
           open={modalOpen}

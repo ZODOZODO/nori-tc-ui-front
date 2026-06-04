@@ -10,7 +10,9 @@ import { expect, test, type Page } from '@playwright/test'
 const navigateToGroupPanel = async (page: Page) => {
   await page.goto('/user')
   await page.getByTestId('user-management-sidebar-group').click()
-  await expect(page.getByRole('heading', { name: '그룹 관리' })).toBeVisible()
+  // 패널 제목이 i18n(t('group.title'))로 배선돼 locale 따라 텍스트가 바뀌므로,
+  // locale 무관한 group-list-table testId 로 Group 패널 활성을 확인한다 (단언 의미 동일).
+  await expect(page.getByTestId('group-list-table')).toBeVisible()
 }
 
 interface MockGroupRow {
@@ -59,9 +61,45 @@ const buildGroup = (overrides: Partial<MockGroupRow>): MockGroupRow => ({
   updatedAt: overrides.updatedAt ?? '2025-05-01T00:00:00Z',
 })
 
+// user.api.ts isUserListItem 이 요구하는 전체 필드 (누락 시 normalizeUserPagePayload 가 행을 필터링).
+interface MockUserRow {
+  userPk: number
+  userId: string
+  userIdNorm: string
+  userName: string
+  company: string
+  department: string
+  email: string
+  status: string
+  createdAt: string
+  updatedAt: string
+  createdBy: string
+  updatedBy: string
+  groups: { groupId: number; groupCode: string; groupName: string }[]
+}
+
+const buildUser = (overrides: Partial<MockUserRow> & { userPk: number; userId: string }): MockUserRow => ({
+  userIdNorm: overrides.userId.toLowerCase(),
+  userName: overrides.userName ?? overrides.userId,
+  company: overrides.company ?? '노리',
+  department: overrides.department ?? 'PE',
+  email: overrides.email ?? `${overrides.userId}@nori.co.kr`,
+  status: overrides.status ?? 'ACTIVE',
+  createdAt: overrides.createdAt ?? '2025-01-01T00:00:00Z',
+  updatedAt: overrides.updatedAt ?? '2025-05-01T00:00:00Z',
+  createdBy: overrides.createdBy ?? 'system',
+  updatedBy: overrides.updatedBy ?? 'system',
+  groups: overrides.groups ?? [],
+  ...overrides,
+})
+
 interface GroupApiMockState {
   meResponse: typeof PERMISSIONED_ME
   groups: MockGroupRow[]
+  // GroupAddMembersModal 의 useAllUsers 가 받는 전체 사용자 (멤버 추가 후보).
+  allUsers: MockUserRow[]
+  // 그룹별 기존 멤버 (모달의 useGroupMembers + 멤버 제거 대상).
+  membersByGroup: Record<number, MockUserRow[]>
   totalCount?: number
   createGroupCalls: { body: unknown }[]
   updateGroupCalls: { groupId: number; body: unknown }[]
@@ -110,17 +148,40 @@ const setupMocks = async (page: Page, state: GroupApiMockState) => {
     })
   })
 
-  // /api/user GET — Group 페이지에서는 /api/user 호출이 발생하지 않지만 안전 차원에서 빈 응답.
+  // /api/user GET — GroupAddMembersModal 의 useAllUsers(getUserList) 가 호출. 멤버 추가 후보 목록.
   await page.route(/.*\/api\/user(\?.*)?$/, async (route, request) => {
     if (request.method() === 'GET') {
+      const url = new URL(request.url())
+      const offset = Number(url.searchParams.get('offset') ?? '0')
+      const limit = Number(url.searchParams.get('limit') ?? '500')
+      const slice = state.allUsers.slice(offset, offset + limit)
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(apiSuccess({ items: [], offset: 0, limit: 20, count: 0 })),
+        body: JSON.stringify(apiSuccess({ items: slice, offset, limit, count: state.allUsers.length })),
       })
       return
     }
     await route.fallback()
+  })
+
+  // /api/group/{groupId}/user GET — GroupAddMembersModal 의 useGroupMembers (기존 멤버).
+  await page.route(/.*\/api\/group\/(\d+)\/user(\?.*)?$/, async (route, request) => {
+    const url = new URL(request.url())
+    const match = url.pathname.match(/\/api\/group\/(\d+)\/user$/)
+    if (!match || request.method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    const groupId = Number(match[1])
+    const members = state.membersByGroup[groupId] ?? []
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiSuccess({ items: members, offset: 0, limit: 500, count: members.length }),
+      ),
+    })
   })
 
   await page.route(/.*\/api\/group(\?.*)?$/, async (route, request) => {
@@ -254,12 +315,22 @@ const setupMocks = async (page: Page, state: GroupApiMockState) => {
   })
 }
 
+const ADMINS_GROUP_SUMMARY = { groupId: 10, groupCode: 'ADMINS', groupName: '관리자' }
+
 const createDefaultMockState = (): GroupApiMockState => ({
   meResponse: { ...PERMISSIONED_ME },
   groups: [
     buildGroup({ groupId: 10, groupCode: 'ADMINS', groupName: '관리자' }),
     buildGroup({ groupId: 11, groupCode: 'OPS', groupName: '운영자', isActive: false }),
   ],
+  allUsers: [
+    // userPk 50 은 ADMINS(10) 기존 멤버 (제거 대상), 42 는 미가입 (추가 대상).
+    buildUser({ userPk: 50, userId: 'member', userName: 'Member', department: 'OP', groups: [ADMINS_GROUP_SUMMARY] }),
+    buildUser({ userPk: 42, userId: 'newbie', userName: 'Newbie', department: 'QA' }),
+  ],
+  membersByGroup: {
+    10: [buildUser({ userPk: 50, userId: 'member', userName: 'Member', department: 'OP', groups: [ADMINS_GROUP_SUMMARY] })],
+  },
   createGroupCalls: [],
   updateGroupCalls: [],
   deleteGroupCalls: [],
@@ -279,7 +350,9 @@ test('Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널
 
   await expect(page).toHaveURL(/\/user$/)
   await page.getByTestId('user-management-sidebar-group').click()
-  await expect(page.getByRole('heading', { name: '그룹 관리' })).toBeVisible()
+  // 패널 제목이 i18n(t('group.title'))로 배선돼 locale 따라 텍스트가 바뀌므로,
+  // locale 무관한 group-list-table testId 로 Group 패널 활성을 확인한다 (단언 의미 동일).
+  await expect(page.getByTestId('group-list-table')).toBeVisible()
 })
 
 // [Group-AC-3] /api/group?offset=0&limit=20 mock 으로 목록 표시
@@ -345,34 +418,41 @@ test('Group-AC-6: 그룹 삭제 성공', async ({ page }) => {
 
   await expect(page.getByTestId('group-row-11')).toBeVisible()
   await page.getByTestId('group-row-delete-11').click()
-  await page.getByRole('button', { name: '삭제' }).click()
+  // e2e 는 EN 모드 — P6 i18n 적용으로 ConfirmDialog 확인 버튼이 common.delete('Delete') 로 전환됨.
+  await page.getByRole('button', { name: 'Delete' }).click()
 
   await expect.poll(() => state.deleteGroupCalls.length).toBeGreaterThan(0)
   expect(state.deleteGroupCalls[0]).toBe(11)
   await expect(page.getByTestId('group-row-11')).toHaveCount(0)
 })
 
-// [Group-AC-7] 멤버 추가 → POST /api/user/{userPk}/group/{groupId}, 제거 → DELETE
+// [Group-AC-7] 그룹 행의 멤버 버튼 → GroupAddMembersModal:
+//   - 미가입 사용자 체크 + 추가 → POST /api/user/{userPk}/group/{groupId}
+//   - 기존 멤버 "멤버 제거" → DELETE /api/user/{userPk}/group/{groupId}
+// (멤버십 add/remove 는 Group 페이지 모달에서 관리 — UserListTable 은 표시만.)
 test('Group-AC-7: 그룹 멤버 추가/제거', async ({ page }) => {
   const state = createDefaultMockState()
   await setupMocks(page, state)
   await navigateToGroupPanel(page)
 
   await expect(page.getByTestId('group-row-10')).toBeVisible()
-  await page.getByTestId('group-row-10').click()
+  // 행의 멤버 관리 버튼 → 모달 오픈.
+  await page.getByTestId('group-row-members-10').click()
+  await expect(page.getByTestId('group-add-members-list')).toBeVisible()
 
-  await expect(page.getByTestId('group-member-panel')).toBeVisible()
-  await page.getByTestId('group-member-add-input').fill('42')
-  await page.getByTestId('group-member-add-submit').click()
+  // 추가: 미가입 사용자 42 체크 → 추가.
+  await page.getByTestId('group-add-members-checkbox-42').check()
+  await page.getByTestId('group-add-members-submit').click()
 
   await expect.poll(() => state.addMemberCalls.length).toBeGreaterThan(0)
   expect(state.addMemberCalls[0]).toEqual({ userPk: 42, groupId: 10 })
-  await expect(page.getByTestId('group-member-chip-42')).toBeVisible()
+  // EN 모드 — group.members.resultSummary = 'Added {{added}} / failed {{failed}}'.
+  await expect(page.getByTestId('group-add-members-result')).toContainText('Added 1')
 
-  await page.getByTestId('group-member-chip-remove-42').click()
+  // 제거: 기존 멤버 50 의 "멤버 제거" → DELETE.
+  await page.getByTestId('group-member-remove-50').click()
   await expect.poll(() => state.removeMemberCalls.length).toBeGreaterThan(0)
-  expect(state.removeMemberCalls[0]).toEqual({ userPk: 42, groupId: 10 })
-  await expect(page.getByTestId('group-member-chip-42')).toHaveCount(0)
+  expect(state.removeMemberCalls[0]).toEqual({ userPk: 50, groupId: 10 })
 })
 
 // [Group-AC-8] USER_READ 없는 사용자에게 User 메뉴 미표시 + /user 직접 접근 차단

@@ -16,6 +16,8 @@ import { useMe } from '@/features/profile/hooks/useProfile'
 import { userApi } from '@/features/user/api/user.api'
 import { userQueryKeys } from '@/features/user/lib/user-query-keys'
 import { USER_PAGE_SIZE } from '@/features/user/components/UserListTable'
+import { ThemeToggle } from './ThemeToggle'
+import { LineScopeSelector } from './LineScopeSelector'
 import type { AppTopNavigationKey } from '../lib/app-navigation'
 import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
 import { clearCsrfCookie } from '../lib/session'
@@ -139,12 +141,9 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-white px-5">
-      <div className="flex items-center gap-2.5">
-        <div className="flex size-7 items-center justify-center rounded-md bg-[#d95d39]">
-          <span className="font-fraunces text-sm font-medium text-white">N</span>
-        </div>
-        <span className="font-fraunces text-lg text-foreground">Nori-TC</span>
+    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
+      <div className="flex items-center">
+        <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-10 w-auto" />
       </div>
 
       <div className="flex min-w-0 items-center justify-center overflow-hidden">
@@ -163,7 +162,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
                 onFocus={
                   isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
                 }
-                className={`group relative inline-flex h-[38px] items-center px-2 text-[14px] font-medium tracking-[0.01em] transition-colors ${
+                className={`group relative inline-flex h-[38px] items-center px-2 text-[15px] font-medium tracking-[0.01em] transition-colors ${
                   isCurrentMenu ? 'text-foreground' : 'text-muted-foreground hover:text-accent-foreground'
                 }`}
               >
@@ -182,6 +181,8 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        <LineScopeSelector />
+        <ThemeToggle />
         <LanguageToggle />
 
         <Button

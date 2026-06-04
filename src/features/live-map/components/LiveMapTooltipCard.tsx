@@ -1,129 +1,122 @@
+import { X } from 'lucide-react'
+import { useI18n } from '@/i18n/i18n-context'
 import {
-  LIVE_MAP_PORT_STATUS_THEME,
-  LIVE_MAP_STATUS_THEME,
+  LIVE_MAP_PORT_STATUS_CLASS,
+  LIVE_MAP_STATUS_CLASS,
 } from '../lib/live-map-status-theme'
 import type { LiveMapEquipmentNode } from '../types/live-map.types'
 import { LiveMapCommLogPanel } from './LiveMapCommLogPanel'
 
 interface LiveMapTooltipCardProps {
   equipment: LiveMapEquipmentNode | null
+  onClose: () => void
 }
 
-export function LiveMapTooltipCard({ equipment }: LiveMapTooltipCardProps) {
+export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardProps) {
+  const { t } = useI18n()
+
   if (!equipment) {
     return (
-      <div className="w-full rounded-[20px] border border-[#2B343D] bg-[#11161B] p-4 text-sm text-[#D6E0E8] shadow-[0_14px_28px_rgba(2,4,6,0.5)]">
-        선택된 설비가 없습니다.
+      <div className="flex h-full w-full items-center justify-center rounded-[20px] border border-border bg-card p-4 text-sm text-muted-foreground shadow-soft-md">
+        {t('livemap.detail.none')}
       </div>
     )
   }
 
-  const statusTone = LIVE_MAP_STATUS_THEME[equipment.status]
+  const statusVariant = LIVE_MAP_STATUS_CLASS[equipment.status]
   const statusMessage =
     equipment.alertMessage ??
     (equipment.status === 'ERROR'
-      ? '점검이 필요한 설비입니다.'
+      ? t('livemap.detail.msgError')
       : equipment.status === 'IDLE'
-        ? '대기 상태이며 다음 lot 투입을 기다리고 있습니다.'
+        ? t('livemap.detail.msgIdle')
         : equipment.status === 'DOWN'
-          ? 'Down 상태입니다.'
-          : '정상 가동 상태를 유지하고 있습니다.')
+          ? t('livemap.detail.msgDown')
+          : t('livemap.detail.msgRun'))
+
+  const fields = [
+    { label: t('livemap.detail.process'), value: equipment.clusterName },
+    { label: t('livemap.detail.line'), value: equipment.lineLabel },
+    { label: t('livemap.detail.waferMode'), value: equipment.processingTypeLabel },
+  ]
 
   return (
-    <div className="flex h-full w-full flex-col rounded-[20px] border border-[#2B343D] bg-[#11161B] p-4 shadow-[0_14px_28px_rgba(2,4,6,0.5)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-bold tracking-[0.08em] text-[#7E8892]">선택 설비</div>
-          <div className="mt-1 truncate text-[20px] font-extrabold text-[#F3F6F9]">
+    <div className="flex h-full w-full flex-col rounded-[20px] border border-border bg-card p-4 shadow-soft-md">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold tracking-[0.08em] text-muted-foreground">
+          {t('livemap.detail.selectedLabel')}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('livemap.detail.close')}
+          className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`size-2.5 shrink-0 rounded-full ${statusVariant.dot}`} />
+          <span className="truncate text-[20px] font-extrabold text-foreground">
             {equipment.eqpId}
-          </div>
+          </span>
         </div>
         <span
-          className="inline-flex h-7 shrink-0 items-center self-start whitespace-nowrap rounded-full border px-3 text-[11px] font-bold"
-          style={{
-            backgroundColor: statusTone.badgeBackground,
-            borderColor: statusTone.badgeBorder,
-            color: statusTone.badgeText,
-          }}
+          className={`inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-pill border px-3 text-[11px] font-bold ${statusVariant.chip}`}
         >
           {equipment.statusLabel}
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-[14px] border border-[#212A32] bg-[#151B20] p-3 xl:grid-cols-3">
-        <div className="min-w-0">
-          <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">공정</div>
-          <div className="mt-1 truncate text-[12px] font-semibold text-[#E1E8EE]">
-            {equipment.clusterName}
+      <dl className="mt-3 space-y-2 rounded-[12px] border border-border bg-muted/40 p-3">
+        {fields.map((field) => (
+          <div key={field.label} className="flex items-center justify-between gap-2 text-[12px]">
+            <dt className="shrink-0 text-muted-foreground">{field.label}</dt>
+            <dd className="min-w-0 truncate font-semibold text-foreground">{field.value}</dd>
           </div>
+        ))}
+        <div className="flex items-start justify-between gap-2 border-t border-border pt-2 text-[12px]">
+          <dt className="shrink-0 text-muted-foreground">{t('livemap.detail.realtimeStatus')}</dt>
+          <dd className={`min-w-0 text-right font-semibold ${statusVariant.text}`}>{statusMessage}</dd>
         </div>
-        <div className="min-w-0">
-          <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">라인</div>
-          <div className="mt-1 truncate text-[12px] font-semibold text-[#E1E8EE]">
-            {equipment.lineLabel}
-          </div>
-        </div>
-        <div className="min-w-0 col-span-2 xl:col-span-1">
-          <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">웨이퍼 모드</div>
-          <div className="mt-1 truncate whitespace-nowrap text-[12px] font-semibold text-[#E1E8EE]">
-            {equipment.processingTypeLabel}
-          </div>
-        </div>
-      </div>
+      </dl>
 
-      <div className="mt-3 rounded-[12px] border border-[#212A32] bg-[#151B20] px-3 py-3">
+      <div className="mt-3 rounded-[12px] border border-border bg-muted/40 p-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[10px] font-bold tracking-[0.08em] text-[#7E8892]">PORT 상태</div>
-          <div className="text-[10px] font-semibold text-[#91A0AC]">
-            총 {equipment.portItems.length}개
+          <div className="text-[10px] font-bold tracking-[0.08em] text-muted-foreground">
+            {t('livemap.detail.portStatus')}
+          </div>
+          <div className="text-[10px] font-semibold text-muted-foreground">
+            <span className="text-success">
+              {equipment.portItems.filter((portItem) => portItem.status === 'RUN').length}
+            </span>
+            {' / '}
+            {equipment.portItems.length}
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <ul className="mt-2 space-y-1.5">
           {equipment.portItems.map((portItem) => {
-            const portTone = LIVE_MAP_PORT_STATUS_THEME[portItem.status]
-
+            const portVariant = LIVE_MAP_PORT_STATUS_CLASS[portItem.status]
             return (
-              <div
-                key={portItem.id}
-                className="rounded-[10px] border px-2.5 py-2"
-                style={{
-                  backgroundColor: '#11161B',
-                  borderColor: '#29323B',
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="truncate text-[10px] font-bold tracking-[0.06em] text-[#D6E0E8]">
-                    {portItem.label}
-                  </div>
-                  <span
-                    className="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 text-[10px] font-bold"
-                    style={{
-                      backgroundColor: portTone.background,
-                      borderColor: portTone.border,
-                      color: portTone.text,
-                    }}
-                  >
-                    {portItem.statusLabel}
-                  </span>
-                </div>
-              </div>
+              <li key={portItem.id} className="flex items-center gap-2 text-[12px]">
+                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                  {portItem.label}
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold ${portVariant.text}`}
+                >
+                  <span className={`size-1.5 rounded-full ${portVariant.dot}`} />
+                  {portItem.statusLabel}
+                </span>
+              </li>
             )
           })}
-        </div>
+        </ul>
       </div>
 
-      <div
-        className="mt-3 rounded-[10px] border px-3 py-2 text-[10px] font-bold"
-        style={{
-          backgroundColor: statusTone.panelBackground,
-          borderColor: statusTone.panelBorder,
-          color: statusTone.panelText,
-        }}
-      >
-        {statusMessage}
-      </div>
-
-      <div className="flex-1 min-h-0">
+      <div className="mt-3 flex min-h-0 flex-1 flex-col">
         <LiveMapCommLogPanel eqpId={equipment.eqpId} />
       </div>
     </div>

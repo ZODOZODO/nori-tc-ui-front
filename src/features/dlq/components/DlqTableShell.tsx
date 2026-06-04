@@ -1,10 +1,17 @@
 import type { ReactNode } from 'react'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
+import { PagePagination } from '@/shared/layout/PagePagination'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 
 interface DlqTableShellProps {
   title: string
   testId: string
+  /** 필터 적용 후 총건수 (페이지네이션 / 헤더 pill 기준). */
   totalCount: number
   isLoading: boolean
   isFetching: boolean
@@ -12,24 +19,24 @@ interface DlqTableShellProps {
   errorMessage: string | null
   onRefresh: () => void
   lastUpdatedAt: number | null
-  pageIndex: number
-  pageCount: number
-  canGoPrev: boolean
-  canGoNext: boolean
-  onMovePage: (nextIndex: number) => void
+  /** 콘텐츠 키워드 검색 (전체 메모리 목록 대상). */
+  searchKeyword: string
+  onSearchChange: (value: string) => void
+  /** 현재 페이지 (1-base). */
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   emptyMessage: string
   children: ReactNode
 }
-
-const cardClassName =
-  'rounded-[18px] border border-[#E2E9E4] bg-white shadow-[0_10px_30px_-24px_rgba(30,54,40,0.35)]'
 
 const formatLastUpdated = (epochMs: number | null): string => {
   if (epochMs === null) {
     return '-'
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -40,8 +47,9 @@ const formatLastUpdated = (epochMs: number | null): string => {
 }
 
 /**
- * 4 DLQ 패널의 공통 외곽 — 헤더(타이틀/마지막 갱신/새로고침), 로딩/빈/에러 메시지,
- * 클라이언트 페이지네이션 (prev/next) 을 제공한다. 표 본체는 children 으로 주입.
+ * 4 DLQ 패널의 공통 외곽 — nori-client 리스트 페이지 틀(헤더 + 총건수 pill + 조회 조건 바 +
+ * list_pagination)을 ui-front coral 토큰으로 재구성한다. 표 본체는 children 으로 주입.
+ * 전체 목록이 메모리에 있으므로(클라 페이지네이션) 콘텐츠 키워드 검색 + PagePagination 을 제공.
  */
 export function DlqTableShell({
   title,
@@ -53,41 +61,56 @@ export function DlqTableShell({
   errorMessage,
   onRefresh,
   lastUpdatedAt,
-  pageIndex,
-  pageCount,
-  canGoPrev,
-  canGoNext,
-  onMovePage,
+  searchKeyword,
+  onSearchChange,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   emptyMessage,
   children,
 }: DlqTableShellProps) {
+  const { t } = useI18n()
+
   return (
-    <div
-      data-testid={testId}
-      className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6"
-    >
-      <section className={cardClassName}>
-        <div className="flex flex-col gap-3 border-b border-[#EDF1EE] px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-[#243129]">{title}</h2>
-            <p className="text-xs text-[#6C7B72]">
-              마지막 갱신: {formatLastUpdated(lastUpdatedAt)}
-              {isFetching ? ' · 동기화 중...' : ''}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isFetching}
-              data-testid={`${testId}-refresh`}
-            >
-              새로고침
-            </Button>
-          </div>
-        </div>
+    <div data-testid={testId} className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6">
+      <section className="rounded-xl border border-border bg-card shadow-soft-sm">
+        <TableSectionHeader
+          title={title}
+          count={totalCount}
+          className="border-b border-border px-6 py-4"
+          subtitle={
+            <>
+              {t('dlq.table.lastUpdated')}: {formatLastUpdated(lastUpdatedAt)}
+              {isFetching ? ` · ${t('dlq.table.syncing')}` : ''}
+            </>
+          }
+          actions={
+            <>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchKeyword}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder={t('dlq.table.searchPlaceholder')}
+                  className="h-9 w-56 pl-8"
+                  data-testid={`${testId}-search`}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isFetching}
+                data-testid={`${testId}-refresh`}
+              >
+                {t('dlq.table.refresh')}
+              </Button>
+            </>
+          }
+        />
 
         <div className="overflow-x-auto px-6 py-5">
           {isLoading ? (
@@ -95,58 +118,40 @@ export function DlqTableShell({
               className="space-y-2 py-2"
               data-testid={`${testId}-loading`}
               role="status"
-              aria-label="목록을 불러오는 중입니다."
+              aria-label={t('dlq.table.loadingAria')}
             >
               {Array.from({ length: 8 }).map((_, index) => (
                 <Skeleton key={index} className="h-9 w-full" />
               ))}
             </div>
           ) : isError ? (
-            <div className="flex flex-col items-center gap-3 py-8 text-sm text-[#C5534B]">
-              <span>{errorMessage ?? '목록을 조회하지 못했습니다.'}</span>
+            <div className="flex flex-col items-center gap-3 py-8 text-sm text-danger">
+              <span>{errorMessage ?? t('dlq.table.loadError')}</span>
               <Button type="button" variant="outline" size="sm" onClick={onRefresh}>
-                재시도
+                {t('dlq.table.retry')}
               </Button>
             </div>
           ) : totalCount === 0 ? (
-            <div className="py-8 text-center text-sm text-[#7B8781]">{emptyMessage}</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</div>
           ) : (
             children
           )}
         </div>
 
         {totalCount > 0 && !isError ? (
-          <div className="flex flex-col gap-3 border-t border-[#EDF1EE] px-6 py-4 text-xs text-[#5C6A63] md:flex-row md:items-center md:justify-between">
-            <span data-testid={`${testId}-pagination-summary`}>
-              총 {totalCount}건 · {pageIndex + 1} / {pageCount} 페이지
-            </span>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!canGoPrev}
-                onClick={() => onMovePage(pageIndex - 1)}
-                data-testid={`${testId}-prev`}
-              >
-                Prev
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!canGoNext}
-                onClick={() => onMovePage(pageIndex + 1)}
-                data-testid={`${testId}-next`}
-              >
-                Next
-              </Button>
-            </div>
+          <div className="border-t border-border px-6 py-4">
+            <PagePagination
+              total={totalCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={onPageChange}
+              onPageSizeChange={onPageSizeChange}
+              pageSizeOptions={[20, 50, 100]}
+              className="border-t-0 pt-0"
+            />
           </div>
         ) : null}
       </section>
     </div>
   )
 }
-

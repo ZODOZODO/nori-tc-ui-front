@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useI18n } from '@/i18n/i18n-context'
 import { useDeleteGroup } from '../hooks/useGroupMutations'
 import { GroupApiError } from '../types/group.types'
 
@@ -21,6 +22,7 @@ export function GroupDeleteConfirmDialog({
   onClose,
   onDeleted,
 }: GroupDeleteConfirmDialogProps) {
+  const { t } = useI18n()
   const deleteGroupMutation = useDeleteGroup()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -38,28 +40,28 @@ export function GroupDeleteConfirmDialog({
         setErrorMessage(error.payload.errorMsg)
         return
       }
-      setErrorMessage('그룹 삭제에 실패했습니다.')
+      setErrorMessage(t('error.group.delete'))
     }
   }
 
   const description = targetGroupCode
-    ? `그룹 ${targetGroupCode} 을(를) 삭제합니다. 되돌릴 수 없습니다.`
-    : '선택한 그룹을 삭제합니다. 되돌릴 수 없습니다.'
+    ? t('group.delete.confirmWithId', { code: targetGroupCode })
+    : t('group.delete.confirm')
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}
-      title="그룹 삭제"
+      title={t('group.delete.title')}
       description={description}
-      confirmText="삭제"
-      cancelText="취소"
+      confirmText={t('common.delete')}
+      cancelText={t('common.cancel')}
       confirmVariant="destructive"
       isConfirming={deleteGroupMutation.isPending}
       onConfirm={() => void handleConfirm()}
     >
       {errorMessage ? (
-        <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+        <p className="rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-sm text-danger">
           {errorMessage}
         </p>
       ) : null}

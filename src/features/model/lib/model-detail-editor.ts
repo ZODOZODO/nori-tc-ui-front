@@ -1,3 +1,5 @@
+import i18n from '@/i18n'
+
 const LOOKUP_SOURCE_OPTIONS = ['data', 'metadata', 'param'] as const
 const FLOW_COMPARISON_OPTIONS = [
   'equals',
@@ -110,7 +112,7 @@ const validateAllowedKeys = (
 ) => {
   const invalidKeys = Object.keys(candidate).filter((key) => !allowedKeys.has(key))
   if (invalidKeys.length > 0) {
-    throw new Error(`${label} 허용되지 않은 키: ${invalidKeys.join(', ')}`)
+    throw new Error(`${label} ${i18n.t('model.editor.disallowedKeys', { keys: invalidKeys.join(', ') })}`)
   }
 }
 
@@ -139,7 +141,7 @@ const parseFlowComparison = (value: unknown): FlowComparison => {
   if (
     !FLOW_COMPARISON_OPTIONS.includes(normalized as FlowComparison)
   ) {
-    throw new Error('workflow_filter 조건의 comparison은 표준 연산만 허용됩니다.')
+    throw new Error(i18n.t('model.editor.comparison'))
   }
   return normalized as FlowComparison
 }
@@ -183,18 +185,18 @@ const parseTransformValue = (value: unknown): string => {
   if (typeof value === 'string') {
     const normalized = normalizeText(value)
     if (!normalized) {
-      throw new Error('transform 문자열은 비어 있을 수 없습니다.')
+      throw new Error(i18n.t('model.editor.transformEmpty'))
     }
     return normalized
   }
 
   if (!isRecord(value)) {
-    throw new Error('transform은 문자열 또는 object여야 합니다.')
+    throw new Error(i18n.t('model.editor.transformType'))
   }
 
   const name = normalizeText(typeof value.name === 'string' ? value.name : '')
   if (!name) {
-    throw new Error('transform의 name은 필수입니다.')
+    throw new Error(i18n.t('model.editor.transformName'))
   }
 
   if (value.args === undefined || value.args === null) {
@@ -202,7 +204,7 @@ const parseTransformValue = (value: unknown): string => {
   }
 
   if (!Array.isArray(value.args)) {
-    throw new Error('transform의 args는 배열이어야 합니다.')
+    throw new Error(i18n.t('model.editor.transformArgs'))
   }
 
   return `${name.toLowerCase()}(${value.args
@@ -287,11 +289,11 @@ const parseFlowConditionDraft = (candidate: Record<string, unknown>): FlowCondit
   validateAllowedKeys(
     candidate,
     FLOW_CONDITION_KEYS,
-    'workflow_filter 조건에는 from, path, comparison, expected, transforms만 허용됩니다.',
+    i18n.t('model.editor.conditionAllowedKeys'),
   )
 
   if (isRecord(candidate.expected)) {
-    throw new Error('workflow_filter 조건의 expected는 object일 수 없습니다.')
+    throw new Error(i18n.t('model.editor.expectedObject'))
   }
 
   return {
@@ -299,24 +301,24 @@ const parseFlowConditionDraft = (candidate: Record<string, unknown>): FlowCondit
     nodeType: 'condition',
     from: parseLookupSource(
       candidate.from,
-      'workflow_filter 조건의 from은 data, metadata 또는 param만 허용됩니다.',
+      i18n.t('model.editor.conditionFrom'),
     ),
     path: parseRelativePath(
       candidate.path,
-      'workflow_filter 조건의 path는 from 기준 상대 경로여야 합니다.',
+      i18n.t('model.editor.conditionPath'),
     ),
     comparison: parseFlowComparison(candidate.comparison),
     expectedText: stringifyExpectedText(candidate.expected),
     transforms: parseTransforms(
       candidate.transforms,
-      'workflow_filter 조건의 transforms는 배열이어야 합니다.',
+      i18n.t('model.editor.conditionTransforms'),
     ),
   }
 }
 
 const parseFlowNodeDraft = (candidate: unknown, isRoot = false): FlowNodeDraft => {
   if (!isRecord(candidate)) {
-    throw new Error('workflow_filter 노드는 JSON object여야 합니다.')
+    throw new Error(i18n.t('model.editor.nodeObject'))
   }
 
   const hasAnd = Array.isArray(candidate.and)
@@ -324,28 +326,28 @@ const parseFlowNodeDraft = (candidate: unknown, isRoot = false): FlowNodeDraft =
 
   if (hasAnd || hasOr || 'and' in candidate || 'or' in candidate) {
     if (hasAnd && hasOr) {
-      throw new Error('workflow_filter 그룹 노드는 and와 or를 동시에 가질 수 없습니다.')
+      throw new Error(i18n.t('model.editor.groupBothAndOr'))
     }
 
     const groupType: FlowGroupType | null = hasAnd ? 'and' : hasOr ? 'or' : null
     if (!groupType) {
       throw new Error(
         isRoot
-          ? 'workflow_filter 루트는 and 또는 or 그룹이어야 합니다.'
-          : 'workflow_filter 그룹 노드는 and 또는 or 중 하나를 가져야 합니다.',
+          ? i18n.t('model.editor.rootGroup')
+          : i18n.t('model.editor.groupAndOr'),
       )
     }
 
     if (Object.keys(candidate).length !== 1) {
-      throw new Error('workflow_filter 그룹 노드는 and 또는 or 키만 가질 수 있습니다.')
+      throw new Error(i18n.t('model.editor.groupKeysOnly'))
     }
 
     const rawChildren = candidate[groupType]
     if (!Array.isArray(rawChildren)) {
-      throw new Error(`workflow_filter의 ${groupType} 값은 배열이어야 합니다.`)
+      throw new Error(i18n.t('model.editor.groupValueArray', { groupType }))
     }
     if (rawChildren.length === 0) {
-      throw new Error(`workflow_filter의 ${groupType} 그룹은 비어 있을 수 없습니다.`)
+      throw new Error(i18n.t('model.editor.groupEmpty', { groupType }))
     }
 
     return {
@@ -357,7 +359,7 @@ const parseFlowNodeDraft = (candidate: unknown, isRoot = false): FlowNodeDraft =
   }
 
   if (isRoot) {
-    throw new Error('workflow_filter 루트는 and 또는 or 그룹이어야 합니다.')
+    throw new Error(i18n.t('model.editor.rootGroup'))
   }
 
   return parseFlowConditionDraft(candidate)
@@ -374,20 +376,20 @@ const parseActionDataIndexFieldDraft = (
       from: 'data',
       path: parseRelativePath(
         candidate,
-        `action_data_index 필드 ${fieldName}의 path는 from 기준 상대 경로여야 합니다.`,
+        i18n.t('model.editor.fieldPath', { fieldName }),
       ),
       transforms: [],
     }
   }
 
   if (!isRecord(candidate)) {
-    throw new Error(`action_data_index 필드 ${fieldName}는 문자열 또는 object여야 합니다.`)
+    throw new Error(i18n.t('model.editor.fieldType', { fieldName }))
   }
 
   validateAllowedKeys(
     candidate,
     ACTION_DATA_INDEX_FIELD_KEYS,
-    `action_data_index 필드 ${fieldName}에는 from, path, transforms만 허용됩니다.`,
+    i18n.t('model.editor.fieldAllowedKeys', { fieldName }),
   )
 
   return {
@@ -395,15 +397,15 @@ const parseActionDataIndexFieldDraft = (
     fieldName,
     from: parseLookupSource(
       candidate.from,
-      `action_data_index 필드 ${fieldName}의 from은 data, metadata 또는 param만 허용됩니다.`,
+      i18n.t('model.editor.fieldFrom', { fieldName }),
     ),
     path: parseRelativePath(
       candidate.path,
-      `action_data_index 필드 ${fieldName}의 path는 from 기준 상대 경로여야 합니다.`,
+      i18n.t('model.editor.fieldPath', { fieldName }),
     ),
     transforms: parseTransforms(
       candidate.transforms,
-      `action_data_index 필드 ${fieldName}의 transforms는 배열이어야 합니다.`,
+      i18n.t('model.editor.fieldTransforms', { fieldName }),
     ),
   }
 }
@@ -514,7 +516,7 @@ export const parseFlowFilterEditor = (value: string): FlowFilterEditorDraft => {
   try {
     const rootGroup = parseFlowNodeDraft(parsed, true)
     if (rootGroup.nodeType !== 'group') {
-      throw new Error('workflow_filter 루트는 and 또는 or 그룹이어야 합니다.')
+      throw new Error(i18n.t('model.editor.rootGroup'))
     }
 
     return {
@@ -571,12 +573,12 @@ export const parseActionDataIndexEditor = (value: string): ActionDataIndexEditor
     validateAllowedKeys(
       parsed,
       ACTION_DATA_INDEX_ROOT_KEYS,
-      'action_data_index 루트에는 mdfTemplateName, fields만 허용됩니다.',
+      i18n.t('model.editor.rootAllowedKeys'),
     )
 
     const fieldsValue = parsed.fields
     if (!isRecord(fieldsValue)) {
-      throw new Error('action_data_index의 fields는 JSON object여야 합니다.')
+      throw new Error(i18n.t('model.editor.fieldsObject'))
     }
 
     const fields = Object.entries(fieldsValue).map(([fieldName, candidate]) =>

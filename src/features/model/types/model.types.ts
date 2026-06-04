@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import type { ApiResponse as BaseApiResponse } from '@/features/auth/types/auth.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
@@ -297,9 +298,9 @@ export type ModelFailResponse = ApiResponse<null> & {
 
 /**
  * Model API 계층 기본 오류 메시지입니다.
+ * 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
  */
-export const DEFAULT_MODEL_ERROR_MESSAGE =
-  '모델 정보를 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+export const defaultModelErrorMessage = (): string => i18n.t('error.model.default')
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -325,7 +326,7 @@ export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResp
  */
 export const createModelFailResponse = (
   payload: unknown,
-  fallbackMessage = DEFAULT_MODEL_ERROR_MESSAGE,
+  fallbackMessage = defaultModelErrorMessage(),
 ): ModelFailResponse => {
   if (isApiResponse(payload) && payload.success === false) {
     return {

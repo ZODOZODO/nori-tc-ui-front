@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   AuthApiError,
-  DEFAULT_AUTH_ERROR_MESSAGE,
+  defaultAuthErrorMessage,
   createLoginFailResponse,
   isLoginSuccessResponse,
   type LoginFailResponse,
@@ -13,15 +14,12 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const DEFAULT_LOGOUT_ERROR_MESSAGE = '로그아웃 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
-const LOGIN_CSRF_FORBIDDEN_MESSAGE =
-  '로그인 보안 토큰 발급이 차단되었습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요. 문제가 계속되면 백엔드의 CSRF/CORS 설정을 확인해 주세요.'
-const LOGIN_FORBIDDEN_MESSAGE =
-  '로그인 보안 검증에 실패했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요. 문제가 계속되면 백엔드의 CSRF/CORS 설정을 확인해 주세요.'
-const LOGOUT_CSRF_FORBIDDEN_MESSAGE =
-  '로그아웃 보안 토큰 발급이 차단되었습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
-const LOGOUT_FORBIDDEN_MESSAGE =
-  '로그아웃 보안 검증에 실패했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
+// 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
+const defaultLogoutErrorMessage = () => i18n.t('error.auth.logout')
+const loginCsrfForbiddenMessage = () => i18n.t('error.auth.loginCsrfBlocked')
+const loginForbiddenMessage = () => i18n.t('error.auth.loginCsrfFailed')
+const logoutCsrfForbiddenMessage = () => i18n.t('error.auth.logoutCsrfBlocked')
+const logoutForbiddenMessage = () => i18n.t('error.auth.logoutCsrfFailed')
 
 type AuthErrorContext = 'login-csrf' | 'login-submit' | 'logout-csrf' | 'logout-submit'
 type CsrfRequestPurpose = 'login' | 'logout'
@@ -56,28 +54,28 @@ const buildForbiddenAuthResponse = (context: AuthErrorContext): LoginFailRespons
         success: false,
         data: null,
         errorCode: 'LOGIN_CSRF_FORBIDDEN',
-        errorMsg: LOGIN_CSRF_FORBIDDEN_MESSAGE,
+        errorMsg: loginCsrfForbiddenMessage(),
       }
     case 'login-submit':
       return {
         success: false,
         data: null,
         errorCode: 'LOGIN_FORBIDDEN',
-        errorMsg: LOGIN_FORBIDDEN_MESSAGE,
+        errorMsg: loginForbiddenMessage(),
       }
     case 'logout-csrf':
       return {
         success: false,
         data: null,
         errorCode: 'LOGOUT_CSRF_FORBIDDEN',
-        errorMsg: LOGOUT_CSRF_FORBIDDEN_MESSAGE,
+        errorMsg: logoutCsrfForbiddenMessage(),
       }
     case 'logout-submit':
       return {
         success: false,
         data: null,
         errorCode: 'LOGOUT_FORBIDDEN',
-        errorMsg: LOGOUT_FORBIDDEN_MESSAGE,
+        errorMsg: logoutForbiddenMessage(),
       }
   }
 }
@@ -110,7 +108,7 @@ const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
     })
   } catch (error) {
     const fallbackMessage =
-      purpose === 'login' ? DEFAULT_AUTH_ERROR_MESSAGE : DEFAULT_LOGOUT_ERROR_MESSAGE
+      purpose === 'login' ? defaultAuthErrorMessage() : defaultLogoutErrorMessage()
     const errorContext: AuthErrorContext = purpose === 'login' ? 'login-csrf' : 'logout-csrf'
     throw normalizeAuthError(error, fallbackMessage, errorContext)
   }
@@ -123,7 +121,7 @@ const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.auth.csrf'),
       })
     )
   }
@@ -136,7 +134,7 @@ const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
  */
 const normalizeAuthError = (
   error: unknown,
-  fallbackMessage = DEFAULT_AUTH_ERROR_MESSAGE,
+  fallbackMessage = defaultAuthErrorMessage(),
   context: AuthErrorContext = 'login-submit'
 ): AuthApiError => {
   if (error instanceof AuthApiError) {
@@ -193,13 +191,13 @@ export const authApi = {
         createContextualAuthFailResponse(
           parsedResponse,
           response.status,
-          DEFAULT_AUTH_ERROR_MESSAGE,
+          defaultAuthErrorMessage(),
           'login-submit'
         ),
         response.status
       )
     } catch (error) {
-      const normalizedError = normalizeAuthError(error, DEFAULT_AUTH_ERROR_MESSAGE, 'login-submit')
+      const normalizedError = normalizeAuthError(error, defaultAuthErrorMessage(), 'login-submit')
       console.warn('[authApi] login failed', {
         status: normalizedError.status,
         errorCode: normalizedError.payload.errorCode,
@@ -235,7 +233,7 @@ export const authApi = {
           createContextualAuthFailResponse(
             response.data,
             response.status,
-            DEFAULT_LOGOUT_ERROR_MESSAGE,
+            defaultLogoutErrorMessage(),
             'logout-submit'
           ),
           response.status
@@ -246,7 +244,7 @@ export const authApi = {
     } catch (error) {
       const normalizedError = normalizeAuthError(
         error,
-        DEFAULT_LOGOUT_ERROR_MESSAGE,
+        defaultLogoutErrorMessage(),
         'logout-submit'
       )
       console.warn('[authApi] logout failed', {

@@ -182,7 +182,8 @@ test('Selectable-Table-R2-AC-3: GatewayGroupTable 2x2 영역 Ctrl+C → 클립�
   await page.goto('/eqp')
   await page.waitForLoadState('networkidle')
 
-  // 사이드바 gateway_app1 버튼 클릭
+  // 사이드바 Gateway 그룹 헤더 클릭 → 아코디언 펼침 후 gateway_app1 클릭
+  await page.getByRole('button', { name: 'Gateway', exact: true }).click()
   await page.getByRole('button', { name: 'gateway_app1', exact: true }).click()
 
   const container = page.getByTestId('selectable-table-gateway-group')
@@ -223,6 +224,7 @@ test('Selectable-Table-R2-AC-3 회귀: GatewayGroupTable 우클릭 ContextMenu L
 
   await page.goto('/eqp')
   await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'Gateway', exact: true }).click()
   await page.getByRole('button', { name: 'gateway_app1', exact: true }).click()
 
   const container = page.getByTestId('selectable-table-gateway-group')

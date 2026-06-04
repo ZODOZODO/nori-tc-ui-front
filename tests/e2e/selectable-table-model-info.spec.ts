@@ -209,6 +209,9 @@ const attachConsoleErrorListeners = (page: Page): ConsoleErrorBucket => {
 const openModelInfoTableWithBothRows = async (page: Page) => {
   await page.goto('/model')
   await page.waitForLoadState('networkidle')
+  // 사이드바 LNB 3단 아코디언(기본 접힘): SECS → FLOW_DEMO_MODEL(root) → branch 펼침.
+  await page.getByRole('button', { name: 'SECS', exact: true }).click()
+  await page.getByRole('button', { name: 'FLOW_DEMO_MODEL', exact: true }).click()
   await page.getByRole('button', { name: 'FLOW_DEMO_MODEL_admin' }).click()
   // ModelInfoTable 의 SelectableTable testId 노출 확인
   await expect(page.getByTestId('selectable-table-model-info')).toBeVisible()
@@ -257,7 +260,7 @@ test('Selectable-Table-R4-AC-1a: ModelInfoTable 2x2 영역 Ctrl+C → 클립보�
   expect(consoleBucket.errors, consoleBucket.errors.join('\n')).toEqual([])
 })
 
-test('Selectable-Table-R4-AC-1b: ModelInfoTable 단일 클릭 시 row select (data-state=selected) 보존', async ({
+test('Selectable-Table-R4-AC-1b: ModelInfoTable 단일 클릭 — 선택(onSelectRow)은 동작하되 row 하이라이트는 미표시', async ({
   page,
 }) => {
   const consoleBucket = attachConsoleErrorListeners(page)
@@ -266,15 +269,16 @@ test('Selectable-Table-R4-AC-1b: ModelInfoTable 단일 클릭 시 row select (da
 
   const container = page.getByTestId('selectable-table-model-info')
 
-  // row 0 = EDIT (modelVersionKey=101) 셀 클릭
+  // row 0 = EDIT (modelVersionKey=101) 셀 클릭 — 클릭→onSelectRow 는 유지(모델 선택 기능),
+  // 단 사용자 결정으로 선택 행 하이라이트(data-state=selected)는 더 이상 표시하지 않는다.
   await container.locator('[data-row-idx="0"][data-col-idx="0"]').click()
 
-  // wrapRow 의 onClick 으로 selectedModelVersionKey 가 EDIT 으로 변경 → row 0 의 TableRow
-  // 가 data-state="selected" 표식. (R4 SPEC L120 — 단일 클릭 시 cell anchor 와 row select
-  // 둘 다 발생, W-MI1=A.)
+  // 셀 anchor(셀 선택)는 동작 → 클릭이 정상 처리됐음을 보증.
   await expect(
-    container.locator('tr[data-state="selected"]').first(),
+    container.locator('[data-row-idx="0"][data-col-idx="0"]'),
   ).toBeVisible()
+  // 선택 행 배경 하이라이트는 없어야 한다.
+  await expect(container.locator('tr[data-state="selected"]')).toHaveCount(0)
 
   expect(consoleBucket.errors, consoleBucket.errors.join('\n')).toEqual([])
 })

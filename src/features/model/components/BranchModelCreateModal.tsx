@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useI18n } from '@/i18n/i18n-context'
 import type { ModelInfo } from '../types/model.types'
 
 const MAX_MODEL_NAME_LENGTH = 1000
@@ -48,6 +49,7 @@ export function BranchModelCreateModal({
   onOpenChange,
   onSubmit,
 }: BranchModelCreateModalProps) {
+  const { t } = useI18n()
   const resolvedDefaultSourceModelVersionKey =
     defaultSourceModelVersionKey ?? sourceVersions[0]?.modelVersionKey ?? null
   const [suffix, setSuffix] = useState('')
@@ -93,23 +95,23 @@ export function BranchModelCreateModal({
 
   const handleSubmit = async () => {
     if (!normalizedSuffix) {
-      setFormErrorMessage('suffix를 입력해 주세요.')
+      setFormErrorMessage(t('model.branch.suffixRequired'))
       return
     }
 
     if (!normalizedCurrentUserId) {
-      setFormErrorMessage('현재 사용자 정보를 확인한 뒤 다시 시도해 주세요.')
+      setFormErrorMessage(t('model.branch.userRequired'))
       return
     }
 
     const normalizedSourceModelVersionKey = Number(selectedSourceModelVersionKey)
     if (!Number.isInteger(normalizedSourceModelVersionKey) || normalizedSourceModelVersionKey <= 0) {
-      setFormErrorMessage('복제할 버전을 선택해 주세요.')
+      setFormErrorMessage(t('model.branch.sourceVersionRequired'))
       return
     }
 
     if (isModelNameTooLong) {
-      setFormErrorMessage('최종 Model Name이 1000자를 초과했습니다. suffix를 줄여 주세요.')
+      setFormErrorMessage(t('model.branch.nameTooLong'))
       return
     }
 
@@ -130,26 +132,25 @@ export function BranchModelCreateModal({
         <DialogHeader>
           <DialogTitle>Branch Model Create</DialogTitle>
           <DialogDescription>
-            선택한 root model 버전을 baseline branch로 복제하고, 생성 시점에는 임시 버전이 자동 부여됩니다.
-            생성 직후에는 읽기 전용이며 실제 편집은 Check Out 후 EDIT 작업본에서 진행합니다.
+            {t('model.branch.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
-          <section className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4">
+          <section className="rounded-2xl border border-border bg-muted p-4">
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#1E3D33]">Parent Model</label>
-                  <div className="flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                  <label className="text-xs font-semibold text-foreground">Parent Model</label>
+                  <div className="flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                     {parentModel?.modelName ?? '-'}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#1E3D33]">
+                  <label className="text-xs font-semibold text-foreground">
                     Source Version
-                    <span className="ml-1 text-[#C5534B]">*</span>
+                    <span className="ml-1 text-danger">*</span>
                   </label>
                   <Select
                     value={selectedSourceModelVersionKey || undefined}
@@ -157,7 +158,7 @@ export function BranchModelCreateModal({
                     disabled={isPending || sourceVersions.length === 0}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="복제할 버전을 선택해 주세요." />
+                      <SelectValue placeholder={t('model.branch.sourceVersionRequired')} />
                     </SelectTrigger>
                     <SelectContent>
                       {sourceVersions.map((version) => (
@@ -171,53 +172,53 @@ export function BranchModelCreateModal({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">Source Description</label>
-                <div className="min-h-11 rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 py-3 text-sm text-[#51605A]">
-                  {selectedSourceModel?.description?.trim() || '설명 없음'}
+                <label className="text-xs font-semibold text-foreground">Source Description</label>
+                <div className="min-h-11 rounded-xl border border-border bg-muted px-3 py-3 text-sm text-muted-foreground">
+                  {selectedSourceModel?.description?.trim() || t('model.branch.noDesc')}
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#1E3D33]">
+                <label className="text-xs font-semibold text-foreground">
                   suffix
-                  <span className="ml-1 text-[#C5534B]">*</span>
+                  <span className="ml-1 text-danger">*</span>
                 </label>
                 <Input
                   value={suffix}
                   onChange={(event) => setSuffix(event.target.value)}
-                  placeholder="예: hotfix"
+                  placeholder={t('common.example', { value: 'hotfix' })}
                 />
-                <p className="text-[11px] text-[#738078]">
-                  최종 모델명은 `parent + suffix + userId` 규칙으로 생성되며 최대 1000자까지 허용됩니다.
+                <p className="text-[11px] text-muted-foreground">
+                  {t('model.branch.nameRuleHint')}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-[#DCE5E0] bg-white px-3 py-3">
-                <p className="text-[11px] font-semibold text-[#738078]">최종 Model Name Preview</p>
-                <p className="mt-1 break-all text-sm font-semibold text-[#22322B]">{previewModelName}</p>
+              <div className="rounded-xl border border-border bg-card px-3 py-3">
+                <p className="text-[11px] font-semibold text-muted-foreground">{t('model.branch.previewLabel')}</p>
+                <p className="mt-1 break-all text-sm font-semibold text-foreground">{previewModelName}</p>
                 <p
                   className={`mt-2 text-[11px] ${
-                    isModelNameTooLong ? 'text-[#C5534B]' : 'text-[#738078]'
+                    isModelNameTooLong ? 'text-danger' : 'text-muted-foreground'
                   }`}
                 >
                   {remainingModelNameLength === null
-                    ? '현재 사용자 정보를 확인한 뒤 길이를 계산합니다.'
+                    ? t('model.branch.lengthPending')
                     : isModelNameTooLong
-                      ? `${Math.abs(remainingModelNameLength)}자 초과`
-                      : `남은 길이 ${remainingModelNameLength}자`}
+                      ? t('model.branch.lengthExceeded', { count: Math.abs(remainingModelNameLength) })
+                      : t('model.branch.lengthRemaining', { count: remainingModelNameLength })}
                 </p>
               </div>
             </div>
           </section>
 
           {formErrorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {formErrorMessage}
             </p>
           ) : null}
 
           {errorMessage ? (
-            <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}

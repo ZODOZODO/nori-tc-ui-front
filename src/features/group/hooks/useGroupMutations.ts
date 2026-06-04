@@ -71,3 +71,19 @@ export function useAddGroupMember() {
     },
   })
 }
+
+/**
+ * 그룹 멤버 제거 mutation 훅입니다. (`DELETE /api/user/{userPk}/group/{groupId}`)
+ * 성공 시 User 페이지의 사용자 목록 (group chip) 과 해당 그룹의 멤버 목록을 갱신합니다.
+ */
+export function useRemoveGroupMember() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ userPk, groupId }: MembershipVariables) => groupApi.removeMember(userPk, groupId),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ['user'] })
+      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.members(variables.groupId) })
+    },
+  })
+}

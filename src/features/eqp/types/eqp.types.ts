@@ -1,5 +1,6 @@
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
+import i18n from '@/i18n'
 
 export type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
@@ -232,6 +233,7 @@ export interface EqpPortStatus {
  */
 export interface EqpManageDetail {
   eqpId: string
+  lineKey: number
   commInterface: ProtocolType
   commMode: string
   isDev: boolean
@@ -306,6 +308,7 @@ export type EqpManageOptionsResponse = ApiResponse<EqpManageOptions>
  */
 export interface EqpCreateRequest {
   eqpId: string
+  lineKey: number
   interfaceType: EqpInterfaceType
   commMode: string
   isDev: boolean
@@ -325,6 +328,7 @@ export interface EqpCreateRequest {
  * EQP 수정 요청 DTO 입니다.
  */
 export interface EqpUpdateRequest {
+  lineKey: number
   commMode: string
   isDev: boolean
   routePartition: number
@@ -402,9 +406,9 @@ export type EqpFailResponse = ApiResponse<null> & {
 
 /**
  * EQP API 계층 공통 기본 오류 메시지입니다.
+ * 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
  */
-export const DEFAULT_EQP_ERROR_MESSAGE =
-  '설비 정보를 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+export const defaultEqpErrorMessage = (): string => i18n.t('error.eqp.default')
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -430,7 +434,7 @@ export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResp
  */
 export const createEqpFailResponse = (
   payload: unknown,
-  fallbackMessage = DEFAULT_EQP_ERROR_MESSAGE,
+  fallbackMessage = defaultEqpErrorMessage(),
 ): EqpFailResponse => {
   if (isApiResponse(payload) && payload.success === false) {
     return {

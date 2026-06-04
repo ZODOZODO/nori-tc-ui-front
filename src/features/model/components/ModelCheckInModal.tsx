@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,7 @@ function ModelCheckInModalBody({
   onUndo,
   onSave,
 }: ModelCheckInModalBodyProps) {
+  const { t } = useI18n()
   const [description, setDescription] = useState('')
 
   const handleSave = async () => {
@@ -97,23 +99,23 @@ function ModelCheckInModalBody({
 
       <div className="grid gap-3">
         <div className="grid gap-1.5">
-          <label htmlFor="model-checkin-description" className="text-xs font-semibold text-[#1E3D33]">
+          <label htmlFor="model-checkin-description" className="text-xs font-semibold text-foreground">
             Description
           </label>
           <textarea
             id="model-checkin-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="변경 내용을 입력해 주세요."
+            placeholder={t('model.checkin.commentPlaceholder')}
             disabled={isPending}
             rows={3}
-            className="resize-none rounded-lg border border-[#D8E1DB] bg-white px-3 py-2 text-xs text-[#1E3D33] placeholder-[#8A8A8A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30 disabled:cursor-not-allowed disabled:bg-[#F5F8F6]"
+            className="resize-none rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 disabled:cursor-not-allowed disabled:bg-muted"
           />
         </div>
       </div>
 
       {errorMessage ? (
-        <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+        <p className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
           {errorMessage}
         </p>
       ) : null}
@@ -122,7 +124,7 @@ function ModelCheckInModalBody({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+          className="h-9 rounded-full border-border px-4 text-xs font-semibold"
           onClick={onCancel}
           disabled={isPending}
         >
@@ -131,7 +133,7 @@ function ModelCheckInModalBody({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold text-[#4B5A52]"
+          className="h-9 rounded-full border-border px-4 text-xs font-semibold text-muted-foreground"
           onClick={() => void handleUndo()}
           disabled={isPending}
         >
@@ -139,7 +141,7 @@ function ModelCheckInModalBody({
         </Button>
         <Button
           type="button"
-          className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+          className="h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
           onClick={() => void handleSave()}
           disabled={isPending}
         >

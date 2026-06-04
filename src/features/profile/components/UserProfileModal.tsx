@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n/i18n-context'
 import { useMe, useResetPassword, useUpdateUser, useUserDetail } from '../hooks/useProfile'
 import { ProfileApiError } from '../types/profile.types'
 
@@ -25,6 +26,7 @@ interface ProfileFormState {
  * 저장 시 PUT /api/user/{userPk}, 비밀번호 변경 시 POST /api/user/{userPk}/password/reset을 호출합니다.
  */
 export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
+  const { t } = useI18n()
   const [draftFormState, setDraftFormState] = useState<Partial<ProfileFormState>>({})
   const [showPasswordEditor, setShowPasswordEditor] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -92,7 +94,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
 
   const handleSaveProfile = async () => {
     if (!userPk) {
-      setFeedbackMessage('현재 사용자 정보를 확인할 수 없어 저장할 수 없습니다.')
+      setFeedbackMessage(t('profile.feedback.noUserSave'))
       return
     }
 
@@ -118,19 +120,19 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
         return
       }
 
-      setFeedbackMessage('사용자 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      setFeedbackMessage(t('profile.feedback.saveError'))
     }
   }
 
   const handleResetPassword = async () => {
     if (!userPk) {
-      setFeedbackMessage('현재 사용자 정보를 확인할 수 없어 비밀번호를 변경할 수 없습니다.')
+      setFeedbackMessage(t('profile.feedback.noUserPw'))
       return
     }
 
     const trimmedPassword = newPassword.trim()
     if (trimmedPassword.length < 8) {
-      setFeedbackMessage('새 비밀번호는 8자 이상 입력해 주세요.')
+      setFeedbackMessage(t('profile.feedback.pwMin'))
       return
     }
 
@@ -145,14 +147,14 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
       })
       setNewPassword('')
       setShowPasswordEditor(false)
-      setFeedbackMessage('비밀번호가 변경되었습니다.')
+      setFeedbackMessage(t('profile.feedback.pwChanged'))
     } catch (error) {
       if (error instanceof ProfileApiError) {
         setFeedbackMessage(error.payload.errorMsg)
         return
       }
 
-      setFeedbackMessage('비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      setFeedbackMessage(t('profile.feedback.pwError'))
     }
   }
 
@@ -161,36 +163,36 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#121A174D] px-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-profile-modal-title"
-        className="w-full max-w-[640px] rounded-[24px] border border-[#E8E4DF] bg-white p-[26px] shadow-2xl"
+        className="w-full max-w-[640px] rounded-[24px] border border-border bg-card p-[26px] text-foreground shadow-soft-lg"
       >
         <div className="flex flex-col gap-[18px]">
           <header className="flex items-start gap-3">
-            <div className="flex size-11 items-center justify-center rounded-full bg-[#EDF4EF]">
-              <UserRound className="size-5 text-[#1C7F59]" />
+            <div className="flex size-11 items-center justify-center rounded-full bg-brand-primary/10">
+              <UserRound className="size-5 text-brand-primary" />
             </div>
             <div className="flex-1">
-              <h2 id="user-profile-modal-title" className="text-2xl font-bold text-[#1F2D26]">
-                사용자 정보 수정
+              <h2 id="user-profile-modal-title" className="text-2xl font-bold text-foreground">
+                {t('profile.title')}
               </h2>
-              <p className="text-xs text-[#6C7872]">기본 정보와 연락처를 수정할 수 있습니다.</p>
+              <p className="text-xs text-muted-foreground">{t('profile.subtitle')}</p>
             </div>
           </header>
 
           {meQuery.isLoading || userDetailQuery.isLoading ? (
-            <div className="flex items-center justify-center rounded-xl border border-[#E8E4DF] bg-[#FAFCFB] py-8 text-sm text-[#5D6963]">
+            <div className="flex items-center justify-center rounded-xl border border-border bg-muted/40 py-8 text-sm text-muted-foreground">
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              사용자 정보를 불러오는 중입니다.
+              {t('profile.loading')}
             </div>
           ) : (
             <>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="profile-company" className="text-[11px] font-bold text-[#4A5A52] uppercase">
+                  <label htmlFor="profile-company" className="text-[11px] font-bold uppercase text-muted-foreground">
                     company
                   </label>
                   <Input
@@ -201,7 +203,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="profile-user-name" className="text-[11px] font-bold text-[#4A5A52] uppercase">
+                  <label htmlFor="profile-user-name" className="text-[11px] font-bold uppercase text-muted-foreground">
                     user_name
                   </label>
                   <Input
@@ -214,20 +216,20 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="profile-user-id" className="text-[11px] font-bold text-[#4A5A52] uppercase">
+                <label htmlFor="profile-user-id" className="text-[11px] font-bold uppercase text-muted-foreground">
                   user_id
                 </label>
                 <Input
                   id="profile-user-id"
                   value={resolvedFormState.userId}
                   readOnly
-                  className="h-[46px] rounded-xl border-[#E2E6E3] bg-[#F4F3F0] text-[#7F8A84]"
+                  className="h-[46px] rounded-xl bg-muted text-muted-foreground"
                 />
-                <p className="text-[10px] text-[#9AA29D]">user_id는 수정할 수 없습니다.</p>
+                <p className="text-[10px] text-muted-foreground">{t('profile.userIdReadonly')}</p>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="profile-password" className="text-[11px] font-bold text-[#4A5A52] uppercase">
+                <label htmlFor="profile-password" className="text-[11px] font-bold uppercase text-muted-foreground">
                   password
                 </label>
                 <div className="flex gap-2">
@@ -237,13 +239,13 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                     value={newPassword}
                     onChange={(event) => setNewPassword(event.target.value)}
                     disabled={!showPasswordEditor}
-                    placeholder={showPasswordEditor ? '새 비밀번호 입력' : '••••••••'}
+                    placeholder={showPasswordEditor ? t('profile.pwPlaceholder') : '••••••••'}
                     className="h-[46px] rounded-xl"
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-[46px] rounded-[19px] border-[#CFE1D8] bg-[#EAF3EE] px-4 text-xs font-semibold text-[#2D5543]"
+                    className="h-[46px] rounded-[19px] px-4 text-xs font-semibold"
                     onClick={() => {
                       if (showPasswordEditor) {
                         void handleResetPassword()
@@ -257,13 +259,13 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                     {resetPasswordMutation.isPending ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     ) : null}
-                    {showPasswordEditor ? '저장하기' : '변경하기'}
+                    {showPasswordEditor ? t('profile.save') : t('profile.pwChange')}
                   </Button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="profile-email" className="text-[11px] font-bold text-[#4A5A52] uppercase">
+                <label htmlFor="profile-email" className="text-[11px] font-bold uppercase text-muted-foreground">
                   email
                 </label>
                 <Input
@@ -275,16 +277,14 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                 />
               </div>
 
-              <p className="text-[11px] text-[#8A9590]">
-                비밀번호는 우측 변경하기 버튼에서 수정할 수 있습니다.
-              </p>
+              <p className="text-[11px] text-muted-foreground">{t('profile.pwHint')}</p>
             </>
           )}
 
-          <div className="h-px w-full bg-[#ECEAE5]" />
+          <div className="h-px w-full bg-border" />
 
           {modalErrorMessage || feedbackMessage ? (
-            <p className="rounded-md border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+            <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
               {feedbackMessage ?? modalErrorMessage}
             </p>
           ) : null}
@@ -293,20 +293,20 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
             <Button
               type="button"
               variant="outline"
-              className="h-10 rounded-full border-[#E2E0DA] bg-white px-5 text-sm font-semibold text-[#4D5A53]"
+              className="h-10 rounded-full px-5 text-sm font-semibold"
               onClick={closeModal}
               disabled={isBusy}
             >
-              취소
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-full bg-[#1C7F59] px-5 text-sm font-semibold text-white hover:bg-[#166749]"
+              className="h-10 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleSaveProfile()}
               disabled={isBusy || meQuery.isLoading || userDetailQuery.isLoading}
             >
               {updateUserMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-              저장하기
+              {t('profile.save')}
             </Button>
           </footer>
         </div>

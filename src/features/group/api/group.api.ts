@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   createGroupFailResponse,
-  DEFAULT_GROUP_ERROR_MESSAGE,
+  defaultGroupErrorMessage,
   GroupApiError,
   isApiResponse,
   isRecord,
@@ -22,8 +23,9 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const GROUP_LIST_FALLBACK_MESSAGE = '그룹 목록을 조회하지 못했습니다.'
-const GROUP_MEMBER_LIST_FALLBACK_MESSAGE = '그룹 멤버 목록을 조회하지 못했습니다.'
+// 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
+const groupListFallbackMessage = () => i18n.t('error.group.list')
+const groupMemberListFallbackMessage = () => i18n.t('error.group.memberList')
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === 'undefined' || !document.cookie) {
@@ -52,7 +54,7 @@ const issueCsrfToken = async (): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.group.csrf'),
       }),
     )
   }
@@ -62,7 +64,7 @@ const issueCsrfToken = async (): Promise<string> => {
 
 const normalizeGroupError = (
   error: unknown,
-  fallbackMessage = DEFAULT_GROUP_ERROR_MESSAGE,
+  fallbackMessage = defaultGroupErrorMessage(),
 ): GroupApiError => {
   if (error instanceof GroupApiError) {
     return error
@@ -145,9 +147,9 @@ const normalizeGroupMemberPagePayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+          errorMsg: groupMemberListFallbackMessage(),
         },
-        GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+        groupMemberListFallbackMessage(),
       ),
     )
   }
@@ -183,9 +185,9 @@ const normalizeGroupPagePayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: GROUP_LIST_FALLBACK_MESSAGE,
+          errorMsg: groupListFallbackMessage(),
         },
-        GROUP_LIST_FALLBACK_MESSAGE,
+        groupListFallbackMessage(),
       ),
     )
   }
@@ -218,13 +220,13 @@ export const groupApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          GROUP_LIST_FALLBACK_MESSAGE,
+          groupListFallbackMessage(),
         ),
         offset,
         limit,
       )
     } catch (error) {
-      throw normalizeGroupError(error, GROUP_LIST_FALLBACK_MESSAGE)
+      throw normalizeGroupError(error, groupListFallbackMessage())
     }
   },
 
@@ -237,10 +239,10 @@ export const groupApi = {
       return resolveSuccessPayload<GroupInfo>(
         response.data,
         response.status,
-        '그룹 상세 정보를 조회하지 못했습니다.',
+        i18n.t('error.group.detail'),
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 상세 정보를 조회하지 못했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.detail'))
     }
   },
 
@@ -257,10 +259,10 @@ export const groupApi = {
       return resolveSuccessPayload<GroupInfo>(
         response.data,
         response.status,
-        '그룹 생성에 실패했습니다.',
+        i18n.t('error.group.create'),
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 생성에 실패했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.create'))
     }
   },
 
@@ -277,10 +279,10 @@ export const groupApi = {
       return resolveSuccessPayload<GroupInfo>(
         response.data,
         response.status,
-        '그룹 정보 저장에 실패했습니다.',
+        i18n.t('error.group.save'),
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 정보 저장에 실패했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.save'))
     }
   },
 
@@ -297,11 +299,11 @@ export const groupApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '그룹 삭제에 실패했습니다.',
+        i18n.t('error.group.delete'),
         true,
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 삭제에 실패했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.delete'))
     }
   },
 
@@ -316,13 +318,13 @@ export const groupApi = {
         resolveSuccessPayload<unknown>(
           response.data,
           response.status,
-          GROUP_MEMBER_LIST_FALLBACK_MESSAGE,
+          groupMemberListFallbackMessage(),
         ),
         offset,
         limit,
       )
     } catch (error) {
-      throw normalizeGroupError(error, GROUP_MEMBER_LIST_FALLBACK_MESSAGE)
+      throw normalizeGroupError(error, groupMemberListFallbackMessage())
     }
   },
 
@@ -343,11 +345,11 @@ export const groupApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '그룹 멤버 추가에 실패했습니다.',
+        i18n.t('error.group.addMember'),
         true,
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 멤버 추가에 실패했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.addMember'))
     }
   },
 
@@ -367,11 +369,11 @@ export const groupApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '그룹 멤버 제거에 실패했습니다.',
+        i18n.t('error.group.removeMember'),
         true,
       )
     } catch (error) {
-      throw normalizeGroupError(error, '그룹 멤버 제거에 실패했습니다.')
+      throw normalizeGroupError(error, i18n.t('error.group.removeMember'))
     }
   },
 }

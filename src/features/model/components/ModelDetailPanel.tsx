@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   summarizeActionDataIndexValue,
@@ -34,6 +35,7 @@ import {
 } from '../types/model.types'
 import { FlowFilterEditorModal } from './FlowFilterEditorModal'
 import { ActionDataIndexEditorModal } from './ActionDataIndexEditorModal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ModelFlowSidebar } from './ModelFlowSidebar'
 import { FlowCard, type FlowCardHandle } from './FlowCard'
 import { DcopItemPickerModal } from './DcopItemPickerModal'
@@ -193,7 +195,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const activeModelVersionKey = activeModel?.modelVersionKey ?? null
   const modelFlowListQuery = useModelFlowList(activeModelVersionKey)
   const modelFlowDetailQuery = useModelFlowDetail(activeModelVersionKey, selectedFlowId)
-  const { createFlowMutation, updateFlowMutation } = useModelFlowMutations(activeModelVersionKey)
+  const { createFlowMutation, updateFlowMutation, deleteFlowMutation } =
+    useModelFlowMutations(activeModelVersionKey)
+  const [flowIdToDelete, setFlowIdToDelete] = useState<number | null>(null)
 
   // activeTab 이 바뀌면 Flow 선택 / draft 초기화 — 다른 모델로 전환 시 stale 회피.
   useEffect(() => {
@@ -290,15 +294,16 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     [flowEventIdQuery.data?.rows],
   )
 
+  const { t } = useI18n()
   const hintText = !activeModel
-    ? '모델을 선택해 주세요.'
+    ? t('model.detail.hintSelectModel')
     : !isBranchModel
-      ? 'Root model은 항상 읽기 전용입니다.'
+      ? t('model.detail.hintRootReadOnly')
       : isDeprecatedBranch
-        ? 'DEPRECATED branch는 읽기 전용입니다.'
+        ? t('model.detail.hintDeprecatedReadOnly')
         : isReadOnly
-          ? '읽기 전용입니다. 수정하려면 Check Out이 필요합니다.'
-          : '편집 중입니다. Save로 저장하고 Check In으로 확정할 수 있습니다.'
+          ? t('model.detail.hintCheckoutNeeded')
+          : t('model.detail.hintEditing')
 
   const checkoutDisabled =
     !activeModel ||
@@ -564,14 +569,34 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
   const handleSaveFlow = (payload: ModelFlowUpdateRequest) => {
     if (isDraftMode) {
-      // 첫 저장은 Identity 만 — Trigger / Action 은 사용자가 별도 PUT 저장합니다
-      // (F5 결정 #1: POST 만 → 후속 PUT 으로 4 섹션 갱신).
+      // 신규 Flow: POST 로 생성(identity)한 뒤, 사용자가 draft 카드에 입력한 나머지 섹션
+      // (Trigger / Filter / actionName / actionDataIndex)을 같은 flowId 로 이어서 PUT 한다 —
+      // 한 번의 Save 로 사용자가 기입한 값을 전부 영속한다.
+      //
+      // dcopItems 는 draft 모드에서 편집 불가(FlowCard 의 isDraftCard 가드)이므로
+      // dcopItemKeys=null(Collect 미갱신) 로 보낸다 — Collect 바인딩은 저장 후 별도로 추가한다.
+      //
+      // actionName 이 비어 있으면 backend updateFlow 가 non-blank 를 요구해 400 이 되므로
+      // PUT 을 건너뛰고 POST-only 로 둔다(action_name 은 placeholder "TODO" 로 생성됨 —
+      // "빈 Flow 를 만들고 나중에 채우는" 경로를 보존).
       createFlowMutation.mutate(
         { workflowName: payload.workflowName, messageName: payload.messageName },
         {
           onSuccess: (data) => {
-            clearDraftFlow()
-            setSelectedFlowId(data.flowId)
+            if (payload.actionName.trim().length === 0) {
+              clearDraftFlow()
+              setSelectedFlowId(data.flowId)
+              return
+            }
+            updateFlowMutation.mutate(
+              { flowId: data.flowId, request: { ...payload, dcopItemKeys: null } },
+              {
+                onSuccess: () => {
+                  clearDraftFlow()
+                  setSelectedFlowId(data.flowId)
+                },
+              },
+            )
           },
         },
       )
@@ -581,6 +606,21 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       return
     }
     updateFlowMutation.mutate({ flowId: selectedFlowId, request: payload })
+  }
+
+  // ConfirmDialog 확인 시 실제 삭제 — 성공하면 해당 Flow 가 선택돼 있었으면 선택 해제.
+  const handleConfirmDeleteFlow = () => {
+    if (flowIdToDelete === null) {
+      return
+    }
+    deleteFlowMutation.mutate(flowIdToDelete, {
+      onSuccess: () => {
+        if (selectedFlowId === flowIdToDelete) {
+          setSelectedFlowId(null)
+        }
+        setFlowIdToDelete(null)
+      },
+    })
   }
 
   // 우상단 통합 Save 버튼 클릭 핸들러 — 현재 우측 영역에 FlowCard 가 보이면 그 카드의
@@ -595,7 +635,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   }
 
   // 우상단 Save 의 tooltip — 어떤 영역을 저장하는지 사용자에게 변별값 제공.
-  const topSaveTooltip = isFlowCardVisible ? 'Flow 저장' : 'Reference 저장'
+  const topSaveTooltip = isFlowCardVisible
+    ? t('model.detail.saveFlowTooltip')
+    : t('model.detail.saveReferenceTooltip')
 
   const handleTriggerUpload = () => {
     if (isReadOnly || !isMdfNode) {
@@ -616,14 +658,14 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     <>
       <section
         className={cn(
-          'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4',
-          isEditMode && !isLockedByOtherUser ? 'border-[#7C9082]' : null,
+          'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4',
+          isEditMode && !isLockedByOtherUser ? 'border-input' : null,
         )}
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
             {openedTabs.length === 0 ? (
-              <span className="text-xs text-[#8A8A8A]">더블 클릭으로 열린 모델 탭이 없습니다.</span>
+              <span className="text-xs text-muted-foreground">{t('model.detail.noOpenedTabs')}</span>
             ) : (
               openedTabs.map((tab) => (
                 <div
@@ -631,14 +673,14 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   className={cn(
                     'flex shrink-0 items-center rounded-lg border',
                     activeTab === tab.modelVersionKey
-                      ? 'border-[#7C9082] bg-[#EEF4F0] text-[#1E3D33]'
-                      : 'border-[#DCE5E0] bg-white text-[#5B6962] hover:bg-[#F3F7F5]',
+                      ? 'border-input bg-muted text-foreground'
+                      : 'border-border bg-card text-muted-foreground hover:bg-muted',
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => onSelectTab(tab.modelVersionKey)}
-                    className="px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                    className="px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                   >
                     {tab.modelName} / {tab.modelVersion}
                   </button>
@@ -649,12 +691,12 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       onCloseTab(tab.modelVersionKey)
                     }}
                     className={cn(
-                      'mr-1 inline-flex size-6 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                      'mr-1 inline-flex size-6 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
                       activeTab === tab.modelVersionKey
-                        ? 'text-[#365447] hover:bg-[#DCE9E2]'
-                        : 'text-[#7B8882] hover:bg-[#E8EFEB]',
+                        ? 'text-foreground hover:bg-muted'
+                        : 'text-muted-foreground hover:bg-muted',
                     )}
-                    aria-label={`${tab.modelName} ${tab.modelVersion} 탭 닫기`}
+                    aria-label={t('model.detail.tabCloseAria', { name: tab.modelName, version: tab.modelVersion })}
                   >
                     <X className="size-3.5" />
                   </button>
@@ -668,7 +710,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               <Button
                 type="button"
                 variant="outline"
-                className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                 onClick={onUndo}
                 disabled={isDetailSavePending || isCheckinPending || isMdfUploadPending || isUndoPending}
               >
@@ -683,7 +725,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                  className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                   onClick={handleTriggerUpload}
                   disabled={isMdfUploadPending || isLockedByOtherUser}
                 >
@@ -699,7 +741,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                    className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                     onClick={handleTopSave}
                     disabled={saveDisabled}
                     title={topSaveTooltip}
@@ -719,7 +761,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               <Button
                 type="button"
                 variant="outline"
-                className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                 onClick={onRequestCheckIn}
                 disabled={checkinDisabled}
               >
@@ -733,7 +775,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
             <Button
               type="button"
               variant="outline"
-              className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+              className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
               onClick={onCheckOut}
               disabled={checkoutDisabled}
             >
@@ -746,35 +788,36 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         </div>
 
         <div className="mb-3 text-xs">
-          <span className={cn(isReadOnly ? 'text-[#8A8A8A]' : 'font-medium text-[#7C9082]')}>
+          <span className={cn(isReadOnly ? 'text-muted-foreground' : 'font-medium text-muted-foreground')}>
             {hintText}
           </span>
         </div>
 
         {isBranchModel && isLockedByOtherUser ? (
-          <p className="mb-3 text-xs text-[#C5534B]">
+          <p className="mb-3 text-xs text-danger">
             {lockOwner
-              ? `${lockOwner}님이 EDIT 모델을 점유하고 있어 수정할 수 없습니다.`
-              : '다른 사용자가 EDIT 모델을 점유하고 있어 수정할 수 없습니다.'}
+              ? t('model.detail.lockOwnedBy', { owner: lockOwner })
+              : t('model.detail.lockOwnedByOther')}
           </p>
         ) : null}
 
         {actionErrorMessage ? (
-          <p className="mb-3 text-xs text-[#C5534B]">{actionErrorMessage}</p>
+          <p className="mb-3 text-xs text-danger">{actionErrorMessage}</p>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[#E4EAE6]">
-          <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-[#E4EAE6] bg-[#FAFCFB] p-2">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
+          <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-muted p-2">
             <ModelFlowSidebar
               summaries={messageFlowSummaries}
               selectedFlowId={selectedFlowId}
               onSelectFlow={handleSelectFlow}
               onAddFlow={handleAddFlow}
+              onDeleteFlow={(flowId) => setFlowIdToDelete(flowId)}
               isEditable={canEditTableRows}
             />
 
-            <section className="rounded-lg border border-[#DDE8E1] bg-white p-2">
-              <p className="px-1 pb-2 text-xs font-semibold text-[#243129]">Reference</p>
+            <section className="rounded-lg border border-border bg-card p-2">
+              <p className="px-1 pb-2 text-xs font-semibold text-foreground">Reference</p>
               <div className="flex flex-col gap-0.5">
                 {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
                     MesMessage / Parameter — workflow 는 Message Flows 가 대체. */}
@@ -788,10 +831,10 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       onSelectDetailNode(node)
                     }}
                     className={cn(
-                      'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30',
+                      'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
                       selectedFlowId === null && !isDraftMode && normalizedDetailNode === node
-                        ? 'bg-[#EAF5EE] font-semibold text-[#1F2D26]'
-                        : 'text-[#51605A] hover:bg-[#F1F6F3]',
+                        ? 'bg-muted font-semibold text-foreground'
+                        : 'text-muted-foreground hover:bg-muted',
                     )}
                   >
                     {MODEL_DETAIL_NODE_LABELS[node]}
@@ -818,13 +861,14 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 onEditFlowFilter={handleEditFlowFilter}
                 onEditActionDataIndex={handleFlowEditActionDataIndex}
                 onAddDcopItem={handleFlowAddDcopItem}
+                onDelete={null}
                 onCancelDraft={clearDraftFlow}
               />
             ) : selectedFlowId !== null ? (
               modelFlowDetailQuery.isLoading ? (
-                <p className="text-sm text-[#647169]">Flow 데이터를 불러오는 중입니다.</p>
+                <p className="text-sm text-muted-foreground">{t('model.detail.flowLoading')}</p>
               ) : modelFlowDetailQuery.isError ? (
-                <p className="text-sm text-[#C5534B]">Flow 데이터를 불러오지 못했습니다.</p>
+                <p className="text-sm text-danger">{t('model.detail.flowLoadError')}</p>
               ) : flowDetail ? (
                 <FlowCard
                   key={flowDetail.flowId}
@@ -840,10 +884,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                   onEditFlowFilter={handleEditFlowFilter}
                   onEditActionDataIndex={handleFlowEditActionDataIndex}
                   onAddDcopItem={handleFlowAddDcopItem}
+                  onDelete={() => setFlowIdToDelete(flowDetail.flowId)}
                   onCancelDraft={null}
                 />
               ) : (
-                <p className="text-sm text-[#647169]">선택된 Flow 가 없습니다.</p>
+                <p className="text-sm text-muted-foreground">{t('model.detail.noFlowSelected')}</p>
               )
             ) : isMdfNode ? (
               <div className="flex h-full min-h-0 flex-col">
@@ -857,15 +902,15 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
                 <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto pr-1">
                   {isDetailLoading ? (
-                    <p className="text-sm text-[#647169]">MDF 데이터를 불러오는 중입니다.</p>
+                    <p className="text-sm text-muted-foreground">{t('model.detail.mdfLoading')}</p>
                   ) : null}
 
                   {detailErrorMessage ? (
-                    <p className="text-sm text-[#C5534B]">{detailErrorMessage}</p>
+                    <p className="text-sm text-danger">{detailErrorMessage}</p>
                   ) : null}
 
                   {!isDetailLoading && !detailErrorMessage && mdfContents.length === 0 ? (
-                    <p className="text-sm text-[#647169]">표시할 MDF 데이터가 없습니다.</p>
+                    <p className="text-sm text-muted-foreground">{t('model.detail.mdfEmpty')}</p>
                   ) : null}
 
                   {mdfContents.map((content) => (
@@ -876,11 +921,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                         mdfContents.length === 1 ? 'flex-1' : null,
                       )}
                     >
-                      <p className="text-xs font-medium text-[#44544D]">{`DEFAULT: ${content.name || 'MDF'}`}</p>
+                      <p className="text-xs font-medium text-muted-foreground">{`DEFAULT: ${content.name || 'MDF'}`}</p>
                       <textarea
                         readOnly
                         value={content.xml}
-                        className="min-h-0 w-full flex-1 resize-none rounded-lg border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-xs text-[#22322B] focus-visible:outline-none"
+                        className="min-h-0 w-full flex-1 resize-none rounded-lg border border-border bg-muted p-3 font-mono text-xs text-foreground focus-visible:outline-none"
                       />
                     </div>
                   ))}
@@ -889,7 +934,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
             ) : (
               <div className="flex h-full min-h-0 flex-col">
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="flex items-center gap-2 text-base font-semibold text-[#213028]">
+                  <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                     {MODEL_DETAIL_NODE_LABELS[normalizedDetailNode ?? 'model-parameter']}
                   </h2>
 
@@ -897,11 +942,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-8 rounded-[10px] border-[#B8C9C1] bg-[#F3F7F5] px-3 text-xs font-semibold text-[#1E3D33]"
+                      className="h-8 rounded-[10px] border-border bg-muted px-3 text-xs font-semibold text-foreground"
                       onClick={onAddDetailRow}
                     >
                       <Plus className="size-3.5" aria-hidden="true" />
-                      행 추가
+                      {t('model.detail.addRow')}
                     </Button>
                   ) : null}
                 </div>
@@ -930,7 +975,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     </Table>
                   </div>
                 ) : detailErrorMessage ? (
-                  <p className="py-10 text-center text-sm text-[#C5534B]">
+                  <p className="py-10 text-center text-sm text-danger">
                     {detailErrorMessage}
                   </p>
                 ) : (
@@ -982,9 +1027,9 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                               type="button"
                               variant="ghost"
                               size="icon-sm"
-                              className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+                              className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
                               onClick={() => onDeleteDetailRow(row.id)}
-                              aria-label={`${row.values[0] || '새 row'} 삭제`}
+                              aria-label={t('model.detail.rowDeleteAria', { value: row.values[0] || t('model.detail.newRow') })}
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
                             </Button>
@@ -1004,8 +1049,8 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                         }
                         emptyState={
                           canEditTableRows
-                            ? '편집 중인 상세 데이터가 없습니다. 행 추가로 row를 추가하거나 Undo로 체크아웃을 취소해 주세요.'
-                            : '표시할 상세 데이터가 없습니다.'
+                            ? t('model.detail.emptyEditing')
+                            : t('model.detail.emptyReadonly')
                         }
                         testId={`selectable-table-${normalizedDetailNode ?? 'model-parameter'}`}
                       />
@@ -1017,6 +1062,22 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={flowIdToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFlowIdToDelete(null)
+          }
+        }}
+        title={t('model.detail.deleteFlowTitle')}
+        description={t('model.detail.deleteFlowDesc')}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
+        confirmVariant="destructive"
+        isConfirming={deleteFlowMutation.isPending}
+        onConfirm={handleConfirmDeleteFlow}
+      />
 
       <FlowFilterEditorModal
         open={isFilterEditorOpen}

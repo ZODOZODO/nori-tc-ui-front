@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n/i18n-context'
 
 interface EqpDeleteConfirmDialogProps {
   open: boolean
@@ -30,6 +31,7 @@ export function EqpDeleteConfirmDialog({
   onOpenChange,
   onConfirm,
 }: EqpDeleteConfirmDialogProps) {
+  const { t } = useI18n()
   return (
     <Dialog
       open={open}
@@ -44,13 +46,13 @@ export function EqpDeleteConfirmDialog({
           <DialogTitle>Eqp Delete</DialogTitle>
           <DialogDescription>
             {eqpId
-              ? `${eqpId} 설비를 삭제하시겠습니까? 삭제 전에 runtime 종료를 시도하며, 실패하면 삭제가 중단됩니다.`
-              : '선택한 설비를 삭제하시겠습니까?'}
+              ? t('eqp.delete.confirmWithId', { eqpId })
+              : t('eqp.delete.confirmNoId')}
           </DialogDescription>
         </DialogHeader>
 
         {errorMessage ? (
-          <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+          <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}

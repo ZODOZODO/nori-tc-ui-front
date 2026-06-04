@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   createProfileFailResponse,
-  DEFAULT_PROFILE_ERROR_MESSAGE,
+  defaultProfileErrorMessage,
   isApiResponse,
   ProfileApiError,
   type MeInfo,
@@ -14,7 +15,7 @@ import {
  */
 const normalizeProfileError = (
   error: unknown,
-  fallbackMessage = DEFAULT_PROFILE_ERROR_MESSAGE,
+  fallbackMessage = defaultProfileErrorMessage(),
 ): ProfileApiError => {
   if (error instanceof ProfileApiError) {
     return error
@@ -70,10 +71,10 @@ export const profileApi = {
       return resolveSuccessPayload<MeInfo>(
         response.data,
         response.status,
-        '현재 사용자 정보를 조회하지 못했습니다.',
+        i18n.t('error.profile.me'),
       )
     } catch (error) {
-      throw normalizeProfileError(error, '현재 사용자 정보를 조회하지 못했습니다.')
+      throw normalizeProfileError(error, i18n.t('error.profile.me'))
     }
   },
 }

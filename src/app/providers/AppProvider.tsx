@@ -24,9 +24,18 @@ const persister = createSyncStoragePersister({
 // 보안 민감 / polling / 동적 filter 의존 query 는 dehydrate 제외.
 // - auth: 로그인 사용자 권한 코드 — 권한 변경 즉시 반영을 위해 매번 fresh.
 // - user / group: 다른 사용자/그룹 정보 — 공유 PC 에서 localStorage 노출 차단.
-// - live-map: 5s polling — 재방문 즉시 refetch 되므로 persist 무의미.
+// - live-map / live-map-layout / live-map-objects: 재방문·저작 직후 항상 최신을 봐야 하므로 persist 제외.
+//   (특히 layout 은 PUT 직후 setQueryData 가 persist flush 되기 전 새로고침되면 stale 빈 캐시가 복원돼 영속이 깨진다.)
 // - deploy: 전부 동적 filter (history) / polling (targets/summary) 라 cache hit 가능성 낮음.
-const PERSIST_DENY_QUERY_HEADS = new Set(['auth', 'user', 'group', 'live-map', 'deploy'])
+const PERSIST_DENY_QUERY_HEADS = new Set([
+  'auth',
+  'user',
+  'group',
+  'live-map',
+  'live-map-layout',
+  'live-map-objects',
+  'deploy',
+])
 
 const shouldDehydrateQuery = (query: Query): boolean => {
   if (!defaultShouldDehydrateQuery(query)) {

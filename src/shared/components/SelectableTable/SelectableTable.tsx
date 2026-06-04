@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import { useGridRangeSelection } from '@/shared/hooks/useGridRangeSelection'
 import { useGridResize } from '@/shared/hooks/useGridResize'
 import { useGridSort } from '@/shared/hooks/useGridSort'
@@ -40,8 +41,10 @@ interface SelectableTableProps<TRow> {
    * 행 단위 wrapper. 셀들의 ReactNode (TableCell 묶음 + actionCell) 를 받아 페이지별로
    * `<TableRow>` 합성을 가져간다. row 단위 `data-testid` (DLQ 패널), shadcn `<ContextMenu>`
    * `<ContextMenuTrigger asChild>` (DeployMonitorPanel / EqpInfoTable / GatewayGroupTable),
-   * `data-state` 선택 표식 (BusinessGroupModelTable / EqpParamTable) 등 페이지 책임의
-   * row level 분기를 보존하기 위한 escape hatch.
+   * row onClick 핸들러 등 페이지 책임의 row level 분기를 보존하기 위한 escape hatch.
+   *
+   * 단 선택 행 하이라이트(`data-state="selected"`)는 표시하지 않는다 — 사용자 결정으로
+   * 모든 테이블 공통 금지(베이스 `<TableRow>` 에서 `data-[state=selected]` 스타일 제거).
    *
    * `children` 은 `TableCell` 들의 fragment 이며, wrapper 는 자기 `<TableRow ...>{children}</TableRow>`
    * 를 만들어 반환한다. 미지정 시 SelectableTable 이 기본 `<TableRow>` 로 렌더.
@@ -109,9 +112,8 @@ const AUTO_SCROLL_STEP = 18
 /**
  * shadcn `<Table>` 기반 제네릭 셀 영역 선택 / Ctrl+C TSV / Ctrl+V paste 테이블.
  *
- * 디자인 토큰 (헤더 bg-muted, anchor brand-accent/10, range brand-accent/5) 은
- * Phase 1 의 신규 토큰 시스템 (brand-accent = N coral, ring brand-primary alpha) 위에
- * 시각 일관성을 유지합니다 — "매우 옅은 N 색" 사용자 결정. 셀 내부 콘텐츠는 `column.renderCell` 로 위임하여
+ * 셀 선택 표식은 중립(anchor foreground/10, range foreground/05)으로 — 코랄은 포인트로만
+ * 쓰고 셀 범위 선택 같은 보조 affordance 는 무채색으로 둔다(사용자 결정). 셀 내부 콘텐츠는 `column.renderCell` 로 위임하여
  * picker/select/Input 같은 페이지별 분기를 보존합니다 (R3 이후 활용).
  */
 export const SelectableTable = <TRow,>({
@@ -148,6 +150,8 @@ export const SelectableTable = <TRow,>({
       containerRef.current?.focus()
     }
   }, [editing])
+
+  const { t } = useI18n()
 
   const rangeCopyEnabled = features?.rangeCopy ?? true
   const rangePasteEnabled =
@@ -386,9 +390,13 @@ export const SelectableTable = <TRow,>({
             beginEdit: () => beginEdit(rowIdx, colIdx),
             endEdit,
           }
+          const cellText = column.accessor(row) || '—'
           const cellContent = column.renderCell
             ? column.renderCell(row, rowIdx, colIdx, helpers)
-            : (column.accessor(row) || '—')
+            : cellText
+          // maxWidth 지정 + renderCell 없는 텍스트 셀은 nowrap 이라 박스를 넘쳐 옆 컬럼과
+          // 겹친다 → 폭 안에서 ellipsis 로 잘라낸다 (full text 는 title 로 노출).
+          const isTruncatable = column.maxWidth !== undefined && !column.renderCell
           const handleCellDoubleClick = column.editable
             ? () => beginEdit(rowIdx, colIdx)
             : undefined
@@ -398,7 +406,7 @@ export const SelectableTable = <TRow,>({
               className={cn(
                 'whitespace-nowrap p-1',
                 column.sticky
-                  ? 'sticky left-0 z-20 bg-white shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
+                  ? 'sticky left-0 z-20 bg-card shadow-[4px_0_8px_-8px_rgba(20,46,36,0.6)]'
                   : null,
               )}
               style={{
@@ -414,14 +422,21 @@ export const SelectableTable = <TRow,>({
                 onDoubleClick={handleCellDoubleClick}
                 className={cn(
                   'flex min-h-8 select-none items-center rounded-md border px-2 py-1 transition-colors',
+                  isTruncatable ? 'min-w-0' : null,
                   isAnchor
-                    ? 'border-brand-accent bg-brand-accent/10'
+                    ? 'border-foreground/30 bg-foreground/10'
                     : inRange
-                      ? 'border-brand-accent/25 bg-brand-accent/5'
+                      ? 'border-foreground/20 bg-foreground/[0.05]'
                       : 'border-transparent bg-transparent hover:bg-muted',
                 )}
               >
-                {cellContent}
+                {isTruncatable ? (
+                  <span className="block min-w-0 truncate" title={cellText}>
+                    {cellContent}
+                  </span>
+                ) : (
+                  cellContent
+                )}
               </div>
             </TableCell>
           )
@@ -474,10 +489,10 @@ export const SelectableTable = <TRow,>({
                   <button
                     type="button"
                     onClick={() => toggleColumn(column.key)}
-                    className="flex items-center gap-1 font-medium outline-none hover:text-brand-accent focus-visible:text-brand-accent"
+                    className="flex items-center gap-1 font-medium outline-none hover:text-foreground focus-visible:text-foreground"
                   >
                     {column.header}
-                    <span aria-hidden className="text-[10px] text-brand-accent">
+                    <span aria-hidden className="text-[10px] text-muted-foreground">
                       {sort.columnKey === column.key
                         ? sort.direction === 'asc'
                           ? '▲'
@@ -494,7 +509,7 @@ export const SelectableTable = <TRow,>({
                   <span
                     data-resize-handle={column.key}
                     onPointerDown={handleResizePointerDown(column.key)}
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-accent/40"
+                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-foreground/20"
                   />
                 ) : null}
               </TableHead>
@@ -504,7 +519,7 @@ export const SelectableTable = <TRow,>({
                 className="whitespace-nowrap"
                 style={{ width: actionColumn?.width, minWidth: actionColumn?.width }}
               >
-                {actionColumn?.header ?? '작업'}
+                {actionColumn?.header ?? t('common.table.action')}
               </TableHead>
             ) : null}
           </TableRow>
@@ -516,7 +531,7 @@ export const SelectableTable = <TRow,>({
                 colSpan={totalColSpan}
                 className="py-10 text-center text-sm text-muted-foreground"
               >
-                {emptyState ?? '표시할 데이터가 없습니다.'}
+                {emptyState ?? t('common.table.empty')}
               </TableCell>
             </TableRow>
           ) : virtual.enabled ? (

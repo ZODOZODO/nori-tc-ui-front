@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useI18n } from '@/i18n/i18n-context'
 import { useDcopItemPickerState } from '../hooks/useDcopItemPickerState'
 import type { ModelDcopItem } from '../types/model.types'
 
@@ -62,6 +63,7 @@ export function DcopItemPickerModal({
   onSave,
   onClose,
 }: DcopItemPickerModalProps) {
+  const { t } = useI18n()
   // referenceDcopItems 의 row 중 dcopItemKey 가 null 인 항목은 본 모달에서 다루지 않습니다 —
   // PUT body 의 `dcopItemKeys` 는 PK 가 필요하므로 신규 row 는 dcop-itemes 노드에서 먼저
   // 저장돼야 합니다. 따라서 PK 가 있는 행만 노출.
@@ -171,26 +173,26 @@ export function DcopItemPickerModal({
     >
       <DialogContent className="max-w-[960px]">
         <DialogHeader>
-          <DialogTitle>DCOP Item 선택</DialogTitle>
+          <DialogTitle>{t('model.dcop.title')}</DialogTitle>
           <DialogDescription>
-            Flow #{flowId} 의 Collect 섹션에 binding 할 DCOP item 을 선택합니다.
+            {t('model.dcop.desc', { flowId })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.2fr)_88px_minmax(0,1.45fr)]">
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-[#DCE7E0] bg-white p-4"
+            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-left"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-[#22332A]">Reference DCOP</h3>
-                <p className="mt-1 text-[11px] text-[#6D7A73]">
-                  model 의 dcop_item pool 전체. 이미 매핑된 항목은 비활성화됩니다.
+                <h3 className="text-sm font-semibold text-foreground">Reference DCOP</h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {t('model.dcop.poolHint')}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">선택 {leftSelection.size}건</Badge>
+                <Badge variant="outline">{t('model.dcop.selectedCount', { count: leftSelection.size })}</Badge>
                 <Button
                   type="button"
                   variant="outline"
@@ -200,27 +202,27 @@ export function DcopItemPickerModal({
                   data-testid="dcop-picker-toggle-select-all"
                   className="h-6 px-2 text-[11px]"
                 >
-                  {allSelectableChecked ? '모두 해제' : '모두 선택'}
+                  {allSelectableChecked ? t('model.dcop.deselectAll') : t('model.dcop.selectAll')}
                 </Button>
               </div>
             </div>
 
             <div className="relative mt-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#93A19A]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 value={searchKeyword}
                 onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder="DCOP item 이름으로 검색"
+                placeholder={t('model.dcop.searchPlaceholder')}
                 className="h-9 pl-9"
-                aria-label="DCOP item 검색"
+                aria-label={t('model.dcop.searchAria')}
               />
             </div>
 
-            <div className="mt-3 flex-1 overflow-y-auto rounded-[12px] bg-[#F8FBF9] p-2">
+            <div className="mt-3 flex-1 overflow-y-auto rounded-[12px] bg-muted p-2">
               {filteredReferenceItems.length === 0 ? (
-                <p className="px-2 py-4 text-center text-xs text-[#7B8A82]">
-                  표시할 DCOP item 이 없습니다.
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                  {t('model.dcop.empty')}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -232,7 +234,7 @@ export function DcopItemPickerModal({
                       <li key={key}>
                         <label
                           className={
-                            'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[#EEF4F0]' +
+                            'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted' +
                             (isAlreadyBound ? ' cursor-not-allowed opacity-50 hover:bg-transparent' : '')
                           }
                         >
@@ -241,14 +243,14 @@ export function DcopItemPickerModal({
                             checked={isChecked}
                             disabled={isAlreadyBound}
                             onChange={() => toggleLeftSelection(key)}
-                            aria-label={`${item.dcopItemName} 선택`}
+                            aria-label={t('model.dcop.selectAria', { name: item.dcopItemName })}
                           />
-                          <span className="min-w-0 flex-1 truncate font-medium text-[#22322B]">
+                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                             {item.dcopItemName}
                           </span>
                           {isAlreadyBound ? (
                             <Badge variant="outline" className="shrink-0 text-[10px]">
-                              매핑됨
+                              {t('model.dcop.boundBadge')}
                             </Badge>
                           ) : null}
                         </label>
@@ -265,8 +267,8 @@ export function DcopItemPickerModal({
               type="button"
               onClick={handleClickMove}
               disabled={!hasLeftSelection}
-              className="h-12 w-12 rounded-full bg-[#1A7A55] text-white hover:bg-[#176748]"
-              aria-label="선택한 DCOP item 추가"
+              className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+              aria-label={t('model.dcop.moveAria')}
               data-testid="dcop-picker-move-button"
             >
               <ArrowRight className="size-5" />
@@ -274,18 +276,18 @@ export function DcopItemPickerModal({
           </div>
 
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-[#DCE7E0] bg-white p-4"
+            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-right"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-[#22332A]">현재 Flow 의 DCOP</h3>
-                <p className="mt-1 text-[11px] text-[#6D7A73]">
-                  좌측에서 추가한 항목이 누적됩니다. Trash 로 1 행씩 제거할 수 있습니다.
+                <h3 className="text-sm font-semibold text-foreground">{t('model.dcop.currentTitle')}</h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {t('model.dcop.currentHint')}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge>{rightDisplayItems.length}개 매핑</Badge>
+                <Badge>{t('model.dcop.mappedCount', { count: rightDisplayItems.length })}</Badge>
                 <Button
                   type="button"
                   variant="outline"
@@ -295,32 +297,32 @@ export function DcopItemPickerModal({
                   data-testid="dcop-picker-clear-right"
                   className="h-6 px-2 text-[11px]"
                 >
-                  모두 제거
+                  {t('model.dcop.clearAll')}
                 </Button>
               </div>
             </div>
 
-            <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-[#E5ECE7]">
+            <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-border">
               <div className="h-full overflow-auto">
                 <Table className="min-w-[360px]">
                   <TableHeader>
-                    <TableRow className="bg-[#F6F9F7] hover:bg-[#F6F9F7]">
+                    <TableRow className="bg-muted hover:bg-muted">
                       <TableHead>DCOP Item Name</TableHead>
                       <TableHead>Variable Id</TableHead>
-                      <TableHead className="w-[70px] text-center">삭제</TableHead>
+                      <TableHead className="w-[70px] text-center">{t('common.delete')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rightDisplayItems.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="py-12 text-center text-xs text-[#708078]">
-                          좌측에서 항목을 체크한 뒤 화살표로 추가해 주세요.
+                        <TableCell colSpan={3} className="py-12 text-center text-xs text-muted-foreground">
+                          {t('model.dcop.emptyRight')}
                         </TableCell>
                       </TableRow>
                     ) : (
                       rightDisplayItems.map((item) => (
                         <TableRow key={item.dcopItemKey}>
-                          <TableCell className="font-semibold text-[#21332A]">
+                          <TableCell className="font-semibold text-foreground">
                             {item.dcopItemName}
                           </TableCell>
                           <TableCell>{item.variableId}</TableCell>
@@ -328,8 +330,8 @@ export function DcopItemPickerModal({
                             <button
                               type="button"
                               onClick={() => removeFromRight(item.dcopItemKey)}
-                              className="inline-flex size-8 items-center justify-center rounded-full border border-[#E0E8E3] text-[#6E7B74] transition hover:border-[#D65454] hover:bg-[#FFF4F4] hover:text-[#C64040]"
-                              aria-label={`${item.dcopItemName} 매핑 해제`}
+                              className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/5 hover:text-danger"
+                              aria-label={t('model.dcop.unmapAria', { name: item.dcopItemName })}
                             >
                               <Trash2 className="size-4" />
                             </button>
@@ -346,10 +348,10 @@ export function DcopItemPickerModal({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
-            취소
+            {t('common.cancel')}
           </Button>
           <Button type="button" onClick={handleClickSave} data-testid="dcop-picker-save-button">
-            저장
+            {t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

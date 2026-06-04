@@ -11,10 +11,15 @@ import {
 } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
+import { PagePagination } from '@/shared/layout/PagePagination'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
+import { useI18n } from '@/i18n/i18n-context'
+import { resolveDateLocale } from '@/shared/lib/date-locale'
 import type { ModelInfo } from '@/features/model/types/model.types'
 
 const BUSINESS_GROUP_MODEL_COLUMN_COUNT = 6
 const BUSINESS_GROUP_MODEL_SKELETON_ROW_COUNT = 8
+const BUSINESS_GROUP_MODEL_DEFAULT_PAGE_SIZE = 25
 
 interface BusinessGroupModelTableProps {
   groupName: string
@@ -53,7 +58,7 @@ const formatDateTime = (isoDateTime: string): string => {
     return isoDateTime
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(resolveDateLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -81,7 +86,9 @@ const BUSINESS_GROUP_MODEL_COLUMNS: ReadonlyArray<ColumnDef<ModelInfo>> = [
 ]
 
 /**
- * business_app 선택 시 메모리상 모델 정보와 동일한 형식의 모델 목록을 표시합니다.
+ * business_app 선택 시 메모리상 모델 정보를 nori-client 리스트 페이지 틀
+ * (헤더+총건수 pill / 데이터 테이블 / 페이지네이션)로 표시합니다.
+ * 검색은 좌측 사이드바에서만 제공하므로 콘텐츠 내 검색바는 두지 않습니다.
  */
 export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   groupName,
@@ -89,75 +96,85 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
   isLoading,
   isFetching,
 }: BusinessGroupModelTableProps) {
-  const [selectedModelVersionKey, setSelectedModelVersionKey] = useState<number | null>(null)
+  const { t } = useI18n()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(BUSINESS_GROUP_MODEL_DEFAULT_PAGE_SIZE)
 
   const sortedModels = useMemo(
     () => [...models].sort((firstItem, secondItem) => secondItem.updatedAt.localeCompare(firstItem.updatedAt)),
     [models],
   )
-  const effectiveSelectedModelVersionKey = selectedModelVersionKey ?? sortedModels[0]?.modelVersionKey ?? null
+
+  const pageCount = Math.max(1, Math.ceil(sortedModels.length / pageSize))
+
+  const pagedModels = useMemo(() => {
+    const safePage = Math.min(Math.max(page, 1), pageCount)
+    const start = (safePage - 1) * pageSize
+    return sortedModels.slice(start, start + pageSize)
+  }, [sortedModels, page, pageCount, pageSize])
 
   return (
-    <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-[#E4EAE6] bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#213028]">{groupName}</h2>
-        <span className="text-xs text-[#7A8680]">모델 {models.length}개</span>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <TableSectionHeader title={groupName} count={sortedModels.length} />
 
-      <div className="overflow-auto">
-        {isLoading ? (
-          <Table className="min-w-[980px]">
-            <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
-                <TableHead>Model Name</TableHead>
-                <TableHead>Model Version</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead>description</TableHead>
-                <TableHead>updated_by</TableHead>
-                <TableHead>updated_at</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: BUSINESS_GROUP_MODEL_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
-                <TableRow key={`business-group-model-skeleton-${rowIndex}`} data-testid="business-group-model-skeleton">
-                  {Array.from({ length: BUSINESS_GROUP_MODEL_COLUMN_COUNT }).map((_, cellIndex) => (
-                    <TableCell key={cellIndex}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
+        <div className="min-h-0 flex-1 overflow-auto">
+          {isLoading ? (
+            <Table className="min-w-[980px]">
+              <TableHeader>
+                <TableRow className="bg-muted">
+                  <TableHead>Model Name</TableHead>
+                  <TableHead>Model Version</TableHead>
+                  <TableHead>status</TableHead>
+                  <TableHead>description</TableHead>
+                  <TableHead>updated_by</TableHead>
+                  <TableHead>updated_at</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : sortedModels.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#647169]">
-            이 business app에서 참조 중인 모델이 없습니다.
-          </p>
-        ) : (
-          <SelectableTable<ModelInfo>
-            testId="selectable-table-business-group-model"
-            columns={BUSINESS_GROUP_MODEL_COLUMNS}
-            rows={sortedModels}
-            rowKey={(row) => row.modelVersionKey}
-            tableClassName="min-w-[980px]"
-            wrapRow={(row, _rowIdx, children) => (
-              <TableRow
-                data-state={
-                  effectiveSelectedModelVersionKey === row.modelVersionKey ? 'selected' : undefined
-                }
-                onClick={() => setSelectedModelVersionKey(row.modelVersionKey)}
-                onContextMenu={() => setSelectedModelVersionKey(row.modelVersionKey)}
-              >
-                {children}
-              </TableRow>
-            )}
-          />
-        )}
-      </div>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: BUSINESS_GROUP_MODEL_SKELETON_ROW_COUNT }).map((_, rowIndex) => (
+                  <TableRow key={`business-group-model-skeleton-${rowIndex}`} data-testid="business-group-model-skeleton">
+                    {Array.from({ length: BUSINESS_GROUP_MODEL_COLUMN_COUNT }).map((_, cellIndex) => (
+                      <TableCell key={cellIndex}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : sortedModels.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t('eqp.business.empty')}
+            </p>
+          ) : (
+            <SelectableTable<ModelInfo>
+              testId="selectable-table-business-group-model"
+              columns={BUSINESS_GROUP_MODEL_COLUMNS}
+              rows={pagedModels}
+              rowKey={(row) => row.modelVersionKey}
+              tableClassName="min-w-[980px]"
+            />
+          )}
+        </div>
 
-      {isFetching && !isLoading ? (
-        <p className="mt-2 text-xs text-[#7A8680]">모델 데이터를 동기화 중입니다.</p>
+        {isFetching && !isLoading ? (
+          <p className="mt-2 text-xs text-muted-foreground">{t('eqp.business.syncing')}</p>
+        ) : null}
+      </section>
+
+      {!isLoading && sortedModels.length > 0 ? (
+        <PagePagination
+          total={sortedModels.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize)
+            setPage(1)
+          }}
+        />
       ) : null}
-    </section>
+    </div>
   )
 })

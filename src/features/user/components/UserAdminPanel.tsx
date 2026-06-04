@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
+import { PageHeadingWithActions } from '@/shared/layout/PageHeadingWithActions'
+import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
 import { UserDeleteConfirmDialog } from './UserDeleteConfirmDialog'
@@ -8,6 +10,7 @@ import { UserPasswordResetModal } from './UserPasswordResetModal'
 import { UserUpsertModal } from './UserUpsertModal'
 
 export function UserAdminPanel() {
+  const { t } = useI18n()
   const listOffset = useUserUiStore((state) => state.listOffset)
   const activeUserPk = useUserUiStore((state) => state.activeUserPk)
   const isUpsertModalOpen = useUserUiStore((state) => state.isUpsertModalOpen)
@@ -39,17 +42,16 @@ export function UserAdminPanel() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1F2D26]">사용자 관리</h1>
-          <p className="text-xs text-[#6C7872]">
-            시스템 사용자 계정을 등록 / 수정 / 삭제합니다. 그룹 소속은 Group 페이지에서 관리합니다.
-          </p>
-        </div>
-        <Button type="button" data-testid="user-create-button" onClick={() => openCreateModal()}>
-          사용자 등록
-        </Button>
-      </header>
+      <PageHeadingWithActions
+        name={t('user.title')}
+        description={t('user.description')}
+        total={userListQuery.data?.count ?? 0}
+        actions={
+          <Button type="button" data-testid="user-create-button" onClick={() => openCreateModal()}>
+            {t('user.create')}
+          </Button>
+        }
+      />
 
       <UserListTable />
 

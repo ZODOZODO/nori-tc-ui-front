@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
+import { useI18n } from '@/i18n/i18n-context'
 import { MODEL_DETAIL_NODE_LABELS } from '../types/model.types'
 import type { ModelDiffSection } from '../types/model.types'
 
@@ -39,22 +40,23 @@ interface NormalizedCheckInDiffRow {
   parentValues: string[]
 }
 
-const KIND_BADGE_LABEL: Record<CheckInDiffRowKind, string> = {
-  added: '추가',
-  changed: '변경',
-  deleted: '삭제',
+// 모듈 상수라 컴포넌트 밖에서 t() 불가 — i18n 키만 담고 렌더 시점 t(key) 로 번역.
+const KIND_BADGE_LABEL_KEYS: Record<CheckInDiffRowKind, string> = {
+  added: 'model.checkin.diffAdded',
+  changed: 'model.checkin.diffChanged',
+  deleted: 'model.checkin.diffDeleted',
 }
 
 const KIND_BADGE_CLASS: Record<CheckInDiffRowKind, string> = {
-  added: 'bg-[#D1F5E7] text-[#1C7F59]',
-  changed: 'bg-[#FFF0C0] text-[#7A5800]',
-  deleted: 'bg-[#FAD9D7] text-[#B4483F]',
+  added: 'bg-success/20 text-success',
+  changed: 'bg-warning/20 text-warning',
+  deleted: 'bg-danger/20 text-danger',
 }
 
 const KIND_ROW_CLASS: Record<CheckInDiffRowKind, string> = {
-  added: 'bg-[#F0FFF7] hover:bg-[#F0FFF7]',
-  changed: 'bg-[#FFFDF0] hover:bg-[#FFFDF0]',
-  deleted: 'bg-[#FFF7F7] hover:bg-[#FFF7F7]',
+  added: 'bg-success/10 hover:bg-success/10',
+  changed: 'bg-warning/10 hover:bg-warning/10',
+  deleted: 'bg-danger/5 hover:bg-danger/5',
 }
 
 const normalizeSectionRows = (section: ModelDiffSection): NormalizedCheckInDiffRow[] => [
@@ -83,35 +85,36 @@ const normalizeSectionRows = (section: ModelDiffSection): NormalizedCheckInDiffR
  * section.columns 가 동적이라 다른 모달과 공유 불가 (Plan W-FAC1 = B inline 결정).
  */
 function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
+  const { t } = useI18n()
   const normalizedRows = useMemo(() => normalizeSectionRows(section), [section])
   const sectionColumns = section.columns
 
   const columns = useMemo<ColumnDef<NormalizedCheckInDiffRow>[]>(() => {
     const kindColumn: ColumnDef<NormalizedCheckInDiffRow> = {
       key: 'kind',
-      header: '구분',
+      header: t('model.checkin.diffKind'),
       width: '6rem',
-      accessor: (row) => KIND_BADGE_LABEL[row.kind],
+      accessor: (row) => t(KIND_BADGE_LABEL_KEYS[row.kind]),
       renderCell: (row) => (
         <span
           className={`rounded px-1.5 py-0.5 text-xs font-semibold ${KIND_BADGE_CLASS[row.kind]}`}
         >
-          {KIND_BADGE_LABEL[row.kind]}
+          {t(KIND_BADGE_LABEL_KEYS[row.kind])}
         </span>
       ),
     }
 
     const identityColumn: ColumnDef<NormalizedCheckInDiffRow> = {
       key: 'identity',
-      header: '식별자',
+      header: t('model.checkin.diffIdentity'),
       width: '10rem',
       accessor: (row) => row.identity,
       renderCell: (row) => (
         <span
           className={
             row.kind === 'deleted'
-              ? 'text-xs text-[#97A39C] line-through'
-              : 'text-xs text-[#22322B]'
+              ? 'text-xs text-muted-foreground line-through'
+              : 'text-xs text-foreground'
           }
         >
           {row.identity}
@@ -134,7 +137,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           if (row.kind === 'added') {
             const value = row.branchValues[columnIndex] ?? ''
             return (
-              <span className="text-xs text-[#22322B]">
+              <span className="text-xs text-foreground">
                 <DiffCellValue value={value} />
               </span>
             )
@@ -142,7 +145,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           if (row.kind === 'deleted') {
             const value = row.parentValues[columnIndex] ?? ''
             return (
-              <span className="text-xs text-[#97A39C] line-through">
+              <span className="text-xs text-muted-foreground line-through">
                 <DiffCellValue value={value} />
               </span>
             )
@@ -152,17 +155,17 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
           const isChanged = current !== previous
           if (!isChanged) {
             return (
-              <span className="text-xs text-[#22322B]">
+              <span className="text-xs text-foreground">
                 <DiffCellValue value={current} />
               </span>
             )
           }
           return (
             <div className="space-y-1 text-xs">
-              <div className="text-[#97A39C] line-through">
+              <div className="text-muted-foreground line-through">
                 <DiffCellValue value={previous} />
               </div>
-              <div className="text-[#1C7F59] font-medium">
+              <div className="text-success font-medium">
                 <DiffCellValue value={current} />
               </div>
             </div>
@@ -172,7 +175,7 @@ function CheckInDiffSectionTable({ section }: { section: ModelDiffSection }) {
     )
 
     return [kindColumn, identityColumn, ...valueColumns]
-  }, [sectionColumns])
+  }, [sectionColumns, t])
 
   const wrapRow = (
     row: NormalizedCheckInDiffRow,
@@ -216,6 +219,7 @@ export function ModelCheckInDiffModal({
   onCancel,
   onOk,
 }: ModelCheckInDiffModalProps) {
+  const { t } = useI18n()
   const hasDiff = diffSections.some(
     (section) => section.added.length > 0 || section.changed.length > 0 || section.deleted.length > 0,
   )
@@ -232,21 +236,21 @@ export function ModelCheckInDiffModal({
     >
       <DialogContent className="z-[60] max-w-4xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>변경사항 미리보기</DialogTitle>
+          <DialogTitle>{t('model.checkin.diffTitle')}</DialogTitle>
           <DialogDescription>
-            이전 버전과 현재 편집 내용의 차이입니다. 확인 후 OK를 누르면 버전 저장 단계로 이동합니다.
+            {t('model.checkin.diffDesc')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[60vh] overflow-y-auto space-y-4">
           {isPending ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-[#647169]">
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              이전 버전 데이터를 불러오는 중입니다.
+              {t('model.checkin.diffLoading')}
             </div>
           ) : !hasDiff ? (
-            <p className="py-10 text-center text-sm text-[#647169]">
-              이전 버전과 비교하여 변경된 내용이 없습니다.
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t('model.checkin.diffEmpty')}
             </p>
           ) : (
             diffSections.map((section) => {
@@ -262,11 +266,15 @@ export function ModelCheckInDiffModal({
                 section.detailNode
 
               return (
-                <div key={section.detailNode} className="rounded-2xl border border-[#E4EAE6] overflow-hidden">
-                  <div className="bg-[#F6F9F7] px-4 py-2.5">
-                    <span className="text-sm font-semibold text-[#1E3D33]">{nodeLabel}</span>
-                    <span className="ml-2 text-xs text-[#647169]">
-                      추가 {section.added.length} / 변경 {section.changed.length} / 삭제 {section.deleted.length}
+                <div key={section.detailNode} className="rounded-2xl border border-border overflow-hidden">
+                  <div className="bg-muted px-4 py-2.5">
+                    <span className="text-sm font-semibold text-foreground">{nodeLabel}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {t('model.checkin.diffCounts', {
+                        added: section.added.length,
+                        changed: section.changed.length,
+                        deleted: section.deleted.length,
+                      })}
                     </span>
                   </div>
 
@@ -283,7 +291,7 @@ export function ModelCheckInDiffModal({
           <Button
             type="button"
             variant="outline"
-            className="h-9 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+            className="h-9 rounded-full border-border px-4 text-xs font-semibold"
             onClick={onCancel}
             disabled={isPending}
           >
@@ -291,7 +299,7 @@ export function ModelCheckInDiffModal({
           </Button>
           <Button
             type="button"
-            className="h-9 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+            className="h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
             onClick={onOk}
             disabled={isPending}
           >
@@ -309,7 +317,7 @@ export function ModelCheckInDiffModal({
  */
 function DiffCellValue({ value }: { value: string }) {
   if (!value) {
-    return <span className="text-[#97A39C]">—</span>
+    return <span className="text-muted-foreground">—</span>
   }
   const MAX_LENGTH = 100
   if (value.length <= MAX_LENGTH) {
@@ -318,7 +326,7 @@ function DiffCellValue({ value }: { value: string }) {
   return (
     <span title={value}>
       {value.slice(0, MAX_LENGTH)}
-      <span className="text-[#97A39C]">…</span>
+      <span className="text-muted-foreground">…</span>
     </span>
   )
 }

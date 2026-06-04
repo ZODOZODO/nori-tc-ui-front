@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios'
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import {
   createEqpFailResponse,
-  DEFAULT_EQP_ERROR_MESSAGE,
+  defaultEqpErrorMessage,
   EqpApiError,
   type AsyncAcceptResponse,
   type AsyncResultData,
@@ -39,7 +40,8 @@ import {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-const EQP_LIST_FALLBACK_MESSAGE = '설비 목록을 조회하지 못했습니다.'
+// 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
+const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
 
 /**
  * document.cookie에서 특정 쿠키 값을 추출합니다.
@@ -76,7 +78,7 @@ const issueCsrfToken = async (): Promise<string> => {
         success: false,
         data: null,
         errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: 'CSRF 토큰을 확인할 수 없습니다. 페이지를 새로고침한 후 다시 시도해 주세요.',
+        errorMsg: i18n.t('error.eqp.csrf'),
       }),
     )
   }
@@ -89,7 +91,7 @@ const issueCsrfToken = async (): Promise<string> => {
  */
 const normalizeEqpError = (
   error: unknown,
-  fallbackMessage = DEFAULT_EQP_ERROR_MESSAGE,
+  fallbackMessage = defaultEqpErrorMessage(),
 ): EqpApiError => {
   if (error instanceof EqpApiError) {
     return error
@@ -172,9 +174,9 @@ const normalizeEqpListPayload = (
           success: false,
           data: null,
           errorCode: 'INVALID_RESPONSE',
-          errorMsg: EQP_LIST_FALLBACK_MESSAGE,
+          errorMsg: eqpListFallbackMessage(),
         },
-        EQP_LIST_FALLBACK_MESSAGE,
+        eqpListFallbackMessage(),
       ),
     )
   }
@@ -219,12 +221,12 @@ export const eqpApi = {
       const successPayload = resolveSuccessPayload<unknown>(
         response.data,
         response.status,
-        EQP_LIST_FALLBACK_MESSAGE,
+        eqpListFallbackMessage(),
       )
 
       return normalizeEqpListPayload(successPayload, offset, limit)
     } catch (error) {
-      throw normalizeEqpError(error, EQP_LIST_FALLBACK_MESSAGE)
+      throw normalizeEqpError(error, eqpListFallbackMessage())
     }
   },
 
@@ -240,10 +242,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpInfo>(
         response.data,
         response.status,
-        '설비 상세 정보를 조회하지 못했습니다.',
+        i18n.t('error.eqp.detail'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 상세 정보를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.detail'))
     }
   },
 
@@ -262,10 +264,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpManageDetail>(
         response.data,
         response.status,
-        '설비 관리 상세 정보를 조회하지 못했습니다.',
+        i18n.t('error.eqp.manageDetail'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 관리 상세 정보를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.manageDetail'))
     }
   },
 
@@ -296,10 +298,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpManageDetailBatch>(
         response.data,
         response.status,
-        '설비 관리 상세 정보를 일괄 조회하지 못했습니다.',
+        i18n.t('error.eqp.manageBatch'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 관리 상세 정보를 일괄 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.manageBatch'))
     }
   },
 
@@ -315,10 +317,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpManageOptions>(
         response.data,
         response.status,
-        '설비 관리 옵션을 조회하지 못했습니다.',
+        i18n.t('error.eqp.manageOptions'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 관리 옵션을 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.manageOptions'))
     }
   },
 
@@ -337,12 +339,12 @@ export const eqpApi = {
       const versions = resolveSuccessPayload<string[]>(
         response.data,
         response.status,
-        '설비 파라미터 버전 목록을 조회하지 못했습니다.',
+        i18n.t('error.eqp.paramVersions'),
       )
 
       return versions.filter((version) => typeof version === 'string' && version.trim().length > 0)
     } catch (error) {
-      throw normalizeEqpError(error, '설비 파라미터 버전 목록을 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.paramVersions'))
     }
   },
 
@@ -358,10 +360,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpModelInfo>(
         response.data,
         response.status,
-        '연결 모델 정보를 조회하지 못했습니다.',
+        i18n.t('error.eqp.modelInfo'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '연결 모델 정보를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.modelInfo'))
     }
   },
 
@@ -380,10 +382,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpRuntimeState>(
         response.data,
         response.status,
-        '설비 런타임 상태를 조회하지 못했습니다.',
+        i18n.t('error.eqp.runtimeState'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 런타임 상태를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.runtimeState'))
     }
   },
 
@@ -400,7 +402,7 @@ export const eqpApi = {
       const payload = resolveSuccessPayload<{ checkedOut: boolean; checkedOutBy: string | null }>(
         response.data,
         response.status,
-        '설비 체크아웃 상태를 조회하지 못했습니다.',
+        i18n.t('error.eqp.checkoutStatus'),
       )
 
       return {
@@ -408,7 +410,7 @@ export const eqpApi = {
         checkedOutBy: payload.checkedOutBy,
       }
     } catch (error) {
-      throw normalizeEqpError(error, '설비 체크아웃 상태를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.checkoutStatus'))
     }
   },
 
@@ -428,10 +430,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpParam[]>(
         response.data,
         response.status,
-        '설비 파라미터 목록을 조회하지 못했습니다.',
+        i18n.t('error.eqp.params'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 파라미터 목록을 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.params'))
     }
   },
 
@@ -456,10 +458,10 @@ export const eqpApi = {
       return resolveSuccessPayload<EqpParam[]>(
         response.data,
         response.status,
-        '설비 체크아웃에 실패했습니다.',
+        i18n.t('error.eqp.checkout'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '설비 체크아웃에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.checkout'))
     }
   },
 
@@ -480,9 +482,9 @@ export const eqpApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, 'EDIT 파라미터 저장에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.saveEditParams'), true)
     } catch (error) {
-      throw normalizeEqpError(error, 'EDIT 파라미터 저장에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.saveEditParams'))
     }
   },
 
@@ -505,11 +507,11 @@ export const eqpApi = {
       resolveSuccessPayload<null>(
         response.data,
         response.status,
-        '체크아웃 되돌리기에 실패했습니다.',
+        i18n.t('error.eqp.undoCheckout'),
         true,
       )
     } catch (error) {
-      throw normalizeEqpError(error, '체크아웃 되돌리기에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.undoCheckout'))
     }
   },
 
@@ -530,9 +532,9 @@ export const eqpApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '설비 체크인에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.checkin'), true)
     } catch (error) {
-      throw normalizeEqpError(error, '설비 체크인에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.checkin'))
     }
   },
 
@@ -551,9 +553,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '설비 등록에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.create'), true)
     } catch (error) {
-      throw normalizeEqpError(error, '설비 등록에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.create'))
     }
   },
 
@@ -572,9 +574,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '설비 수정에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.update'), true)
     } catch (error) {
-      throw normalizeEqpError(error, '설비 수정에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.update'))
     }
   },
 
@@ -593,9 +595,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, '설비 삭제에 실패했습니다.', true)
+      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.delete'), true)
     } catch (error) {
-      throw normalizeEqpError(error, '설비 삭제에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.delete'))
     }
   },
 
@@ -617,7 +619,7 @@ export const eqpApi = {
       const payload = resolveSuccessPayload<{ traceId: string }>(
         response.data,
         response.status,
-        '설비 시작 요청에 실패했습니다.',
+        i18n.t('error.eqp.startRequest'),
       )
 
       if (!payload.traceId) {
@@ -626,7 +628,7 @@ export const eqpApi = {
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
-            errorMsg: '설비 시작 응답에 traceId가 없습니다.',
+            errorMsg: i18n.t('error.eqp.startNoTraceId'),
           }),
           response.status,
         )
@@ -634,7 +636,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, '설비 시작 요청에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.startRequest'))
     }
   },
 
@@ -656,7 +658,7 @@ export const eqpApi = {
       const payload = resolveSuccessPayload<{ traceId: string }>(
         response.data,
         response.status,
-        '설비 종료 요청에 실패했습니다.',
+        i18n.t('error.eqp.endRequest'),
       )
 
       if (!payload.traceId) {
@@ -665,7 +667,7 @@ export const eqpApi = {
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
-            errorMsg: '설비 종료 응답에 traceId가 없습니다.',
+            errorMsg: i18n.t('error.eqp.endNoTraceId'),
           }),
           response.status,
         )
@@ -673,7 +675,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, '설비 종료 요청에 실패했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.endRequest'))
     }
   },
 
@@ -694,7 +696,7 @@ export const eqpApi = {
             success: false,
             data: null,
             errorCode: 'NOT_FOUND',
-            errorMsg: '요청한 비동기 작업을 찾을 수 없습니다.',
+            errorMsg: i18n.t('error.eqp.asyncNotFound'),
           }),
           404,
         )
@@ -703,10 +705,10 @@ export const eqpApi = {
       return resolveSuccessPayload<AsyncResultData>(
         response.data,
         response.status,
-        '비동기 작업 결과를 조회하지 못했습니다.',
+        i18n.t('error.eqp.asyncResult'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, '비동기 작업 결과를 조회하지 못했습니다.')
+      throw normalizeEqpError(error, i18n.t('error.eqp.asyncResult'))
     }
   },
 }

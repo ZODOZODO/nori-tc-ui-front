@@ -1,94 +1,54 @@
-import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/i18n/i18n-context'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
-import { LiveMapBoard } from './LiveMapBoard'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapHeader } from './LiveMapHeader'
-import { LiveMapToolbar } from './LiveMapToolbar'
+import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
 
 // 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
 const LiveMapDemoModal = lazy(() =>
   import('./LiveMapDemoModal').then((module) => ({ default: module.LiveMapDemoModal })),
 )
-import {
-  applyLiveMapClusterPositionDrafts,
-  applyLiveMapEquipmentPositionDrafts,
-} from '../lib/live-map-layout'
-import {
-  LIVE_MAP_CLUSTER_ITEMS,
-  LIVE_MAP_LINE_OPTIONS,
-  LIVE_MAP_STATE_OPTIONS,
-} from '../mocks/live-map.mock'
+import { LIVE_MAP_CLUSTER_ITEMS } from '../mocks/live-map.mock'
 import {
   filterLiveMapEquipmentNodes,
-  formatLiveMapSyncLabel,
-  resolveSelectedLiveMapEquipment,
   summarizeLiveMapEquipmentNodes,
-  summarizeLiveMapEquipmentNodesByCluster,
 } from '../lib/live-map-selectors'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
 
+/**
+ * live-map 페이지(Phase 2): 상단 KPI 헤더 + react-konva 2.5D 레이아웃 빌더 캔버스.
+ *
+ * <p>cluster polygon 캔버스(LiveMapBoard)는 폐기되고 {@link LiveMapLayoutCanvas} 가 캔버스를 담당한다.
+ * KPI 요약/데모 테스터는 보존한다(데모 테스터는 설비 그룹 입력으로 cluster 메타를 계속 사용).</p>
+ */
 export function LiveMapPage() {
+  const { t } = useI18n()
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
 
-  const searchKeyword = useLiveMapUiStore((state) => state.searchKeyword)
-  const selectedLine = useLiveMapUiStore((state) => state.selectedLine)
-  const selectedStatus = useLiveMapUiStore((state) => state.selectedStatus)
-  const selectedEqpId = useLiveMapUiStore((state) => state.selectedEqpId)
-  const isLayoutEditEnabled = useLiveMapUiStore((state) => state.isLayoutEditEnabled)
-  const clusterPositionDrafts = useLiveMapUiStore((state) => state.clusterPositionDrafts)
-  const equipmentPositionDrafts = useLiveMapUiStore((state) => state.equipmentPositionDrafts)
-  const zoomLevel = useLiveMapUiStore((state) => state.zoomLevel)
-  const lastSyncAt = useLiveMapUiStore((state) => state.lastSyncAt)
-  const [now, setNow] = useState(lastSyncAt)
-  const setSearchKeyword = useLiveMapUiStore((state) => state.setSearchKeyword)
-  const setSelectedLine = useLiveMapUiStore((state) => state.setSelectedLine)
-  const setSelectedStatus = useLiveMapUiStore((state) => state.setSelectedStatus)
-  const setSelectedEqpId = useLiveMapUiStore((state) => state.setSelectedEqpId)
-  const setLayoutEditEnabled = useLiveMapUiStore((state) => state.setLayoutEditEnabled)
-  const updateClusterLayout = useLiveMapUiStore((state) => state.updateClusterLayout)
-  const updateEquipmentPosition = useLiveMapUiStore((state) => state.updateEquipmentPosition)
-  const zoomIn = useLiveMapUiStore((state) => state.zoomIn)
-  const zoomOut = useLiveMapUiStore((state) => state.zoomOut)
-  const resetZoom = useLiveMapUiStore((state) => state.resetZoom)
+  const liveMapQuery = useLiveMap()
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
   const markSynced = useLiveMapUiStore((state) => state.markSynced)
   const reset = useLiveMapUiStore((state) => state.reset)
-  const liveMapQuery = useLiveMap()
-
-  const deferredSearchKeyword = useDeferredValue(searchKeyword)
-
-  const clusterItems = useMemo(
-    () =>
-      applyLiveMapClusterPositionDrafts(
-        LIVE_MAP_CLUSTER_ITEMS,
-        clusterPositionDrafts,
-      ),
-    [clusterPositionDrafts],
-  )
 
   const equipmentNodes = useMemo(
-    () =>
-      applyLiveMapEquipmentPositionDrafts(
-        buildLiveMapEquipmentNodes(
-          liveMapQuery.data?.equipmentItems ?? [],
-          clusterItems,
-        ),
-        equipmentPositionDrafts,
-      ),
-    [clusterItems, equipmentPositionDrafts, liveMapQuery.data?.equipmentItems],
+    () => buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? [], LIVE_MAP_CLUSTER_ITEMS),
+    [liveMapQuery.data?.equipmentItems],
   )
 
   const visibleEquipmentNodes = useMemo(
     () =>
       filterLiveMapEquipmentNodes(equipmentNodes, {
-        lineValue: selectedLine,
-        statusFilter: selectedStatus,
-        searchKeyword: deferredSearchKeyword,
+        statusFilter: 'ALL',
+        searchKeyword: '',
+        lineFilter: selectedLineValue,
       }),
-    [deferredSearchKeyword, equipmentNodes, selectedLine, selectedStatus],
+    [equipmentNodes, selectedLineValue],
   )
 
   const summary = useMemo(
@@ -96,52 +56,11 @@ export function LiveMapPage() {
     [visibleEquipmentNodes],
   )
 
-  const clusterSummaries = useMemo(
-    () => summarizeLiveMapEquipmentNodesByCluster(equipmentNodes),
-    [equipmentNodes],
-  )
-
-  const selectedEquipment = useMemo(
-    () =>
-      resolveSelectedLiveMapEquipment(
-        equipmentNodes,
-        visibleEquipmentNodes,
-        selectedEqpId,
-      ),
-    [equipmentNodes, selectedEqpId, visibleEquipmentNodes],
-  )
-
-  const visibleEquipmentIds = useMemo(
-    () => new Set(visibleEquipmentNodes.map((item) => item.eqpId)),
-    [visibleEquipmentNodes],
-  )
-
-  const syncLabel = useMemo(
-    () => formatLiveMapSyncLabel(lastSyncAt, now),
-    [lastSyncAt, now],
-  )
-
   useEffect(() => {
     return () => {
       reset()
     }
   }, [reset])
-
-  useEffect(() => {
-    if (selectedEquipment?.eqpId !== selectedEqpId) {
-      setSelectedEqpId(selectedEquipment?.eqpId ?? null)
-    }
-  }, [selectedEquipment?.eqpId, selectedEqpId, setSelectedEqpId])
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNow(Date.now())
-    }, 1000)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [])
 
   useEffect(() => {
     if (liveMapQuery.dataUpdatedAt > 0) {
@@ -161,49 +80,25 @@ export function LiveMapPage() {
       onOpenProfile={() => setIsProfileModalOpen(true)}
       onAfterLogout={handleAfterLogout}
     >
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="thin-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="flex w-full flex-col gap-4 px-6 py-6">
           <LiveMapHeader summary={summary} />
-          <LiveMapToolbar
-            searchKeyword={searchKeyword}
-            selectedLine={selectedLine}
-            selectedStatus={selectedStatus}
-            lineOptions={LIVE_MAP_LINE_OPTIONS}
-            stateOptions={LIVE_MAP_STATE_OPTIONS}
-            onSearchKeywordChange={setSearchKeyword}
-            onSelectedLineChange={setSelectedLine}
-            onSelectedStatusChange={setSelectedStatus}
-          />
           {liveMapQuery.isError ? (
-            <div className="rounded-[18px] border border-[#F1C0C0] bg-[#FFF5F5] px-4 py-3 text-sm font-semibold text-[#A63A3A]">
-              {liveMapQuery.error instanceof Error
-                ? liveMapQuery.error.message
-                : '라이브 맵 정보를 조회하지 못했습니다.'}
+            <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+              {liveMapQuery.error instanceof Error ? liveMapQuery.error.message : t('livemap.error')}
             </div>
           ) : null}
-          <LiveMapBoard
-            clusters={clusterItems}
-            equipmentNodes={equipmentNodes}
-            visibleEquipmentIds={visibleEquipmentIds}
-            selectedEquipment={selectedEquipment}
-            clusterSummaries={clusterSummaries}
-            zoomLevel={zoomLevel}
-            syncLabel={syncLabel}
-            isLayoutEditEnabled={isLayoutEditEnabled}
-            onSelectEquipment={setSelectedEqpId}
-            onOpenDemo={() => setIsDemoModalOpen(true)}
-            onLayoutEditEnabledChange={setLayoutEditEnabled}
-            onMoveClusterLayout={updateClusterLayout}
-            onMoveEquipment={updateEquipmentPosition}
-            onZoomIn={zoomIn}
-            onZoomOut={zoomOut}
-            onResetZoom={resetZoom}
-          />
-          {liveMapQuery.isLoading && equipmentNodes.length === 0 ? (
-            <div className="rounded-[18px] border border-[#D9E3DC] bg-white px-4 py-3 text-sm font-semibold text-[#51606A]">
-              라이브 맵 설비 정보를 불러오는 중입니다.
-            </div>
-          ) : null}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              data-testid="live-map-open-demo"
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold"
+              onClick={() => setIsDemoModalOpen(true)}
+            >
+              Demo Tester
+            </button>
+          </div>
+          <LiveMapLayoutCanvas />
         </div>
       </main>
 
@@ -213,7 +108,7 @@ export function LiveMapPage() {
           <LiveMapDemoModal
             open
             equipmentNodes={equipmentNodes}
-            clusterItems={clusterItems}
+            clusterItems={LIVE_MAP_CLUSTER_ITEMS}
             onClose={() => setIsDemoModalOpen(false)}
           />
         </Suspense>

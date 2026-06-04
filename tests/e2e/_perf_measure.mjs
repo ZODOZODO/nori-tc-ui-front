@@ -125,9 +125,9 @@ const results = {
 try {
   await page.goto(`${baseUrl}/login`)
   await page.waitForLoadState('networkidle')
-  await page.getByLabel('ID').fill(LOGIN_ID)
-  await page.getByLabel('Password').fill(LOGIN_PW)
-  await page.getByRole('button', { name: 'Log In' }).click()
+  await page.getByLabel('아이디', { exact: true }).fill(LOGIN_ID)
+  await page.getByLabel('비밀번호', { exact: true }).fill(LOGIN_PW)
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
   await page.waitForURL(/\/eqp$/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
 

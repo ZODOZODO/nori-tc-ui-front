@@ -26,6 +26,8 @@ import {
   resolveAllowedModelStatus,
 } from '../lib/eqp-management.util'
 import type { EqpJarOption, EqpManageDetail, EqpManageOptions, EqpUpdateRequest } from '../types/eqp.types'
+import { useI18n } from '@/i18n/i18n-context'
+import i18n from '@/i18n'
 
 interface EqpModelBindingModalProps {
   open: boolean
@@ -95,7 +97,7 @@ const resolveOptionalJarRef = (value: string): number | null => {
 
   const parsed = Number(normalized)
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error('Business Jar를 다시 선택해 주세요.')
+    throw new Error(i18n.t('eqp.binding.businessJarReselect'))
   }
 
   return parsed
@@ -116,6 +118,7 @@ export function EqpModelBindingModal({
   onOpenChange,
   onSubmit,
 }: EqpModelBindingModalProps) {
+  const { t } = useI18n()
   const [selectedModelName, setSelectedModelName] = useState('')
   const [selectedModelVersionKey, setSelectedModelVersionKey] = useState('')
   const [selectedBusinessJarRef, setSelectedBusinessJarRef] = useState(EQP_SELECT_NONE_VALUE)
@@ -213,12 +216,12 @@ export function EqpModelBindingModal({
       setLocalErrorMessage(null)
 
       if (!detail) {
-        throw new Error('설비 관리 상세 정보를 불러오지 못했습니다.')
+        throw new Error(t('eqp.page.manageDetailLoadError'))
       }
 
       const normalizedModelVersionKey = Number(selectedModelVersionKey)
       if (!Number.isInteger(normalizedModelVersionKey) || normalizedModelVersionKey <= 0) {
-        throw new Error('Model Version을 선택해 주세요.')
+        throw new Error(t('eqp.form.modelVersionPlaceholder'))
       }
 
       const request = buildEqpUpdateRequest(detail, {
@@ -228,7 +231,7 @@ export function EqpModelBindingModal({
 
       await onSubmit(request)
     } catch (error) {
-      setLocalErrorMessage(error instanceof Error ? error.message : '입력값을 다시 확인해 주세요.')
+      setLocalErrorMessage(error instanceof Error ? error.message : t('eqp.form.invalidInput'))
     }
   }
 
@@ -236,61 +239,61 @@ export function EqpModelBindingModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="z-[60] max-w-[720px] rounded-2xl p-0" showCloseButton={!isPending}>
         <div className="flex flex-col">
-          <DialogHeader className="border-b border-[#E4EAE6] px-6 py-5">
+          <DialogHeader className="border-b border-border px-6 py-5">
             <DialogTitle>Model Info Update</DialogTitle>
             <DialogDescription>
-              EQP에 연결된 Model Version과 Business Jar를 변경합니다.
+              {t('eqp.binding.desc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 px-6 py-5">
             {isLoading && !detail ? (
-              <div className="flex min-h-48 items-center justify-center text-sm text-[#65726B]">
+              <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                설비 관리 정보를 불러오는 중입니다.
+                {t('eqp.form.loading')}
               </div>
             ) : (
               <>
-                <section className="grid gap-4 rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4 md:grid-cols-2">
+                <section className="grid gap-4 rounded-2xl border border-border bg-muted/40 p-4 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-semibold text-[#1E3D33]">EQP ID</p>
-                    <div className="mt-1 flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                    <p className="text-xs font-semibold text-foreground">EQP ID</p>
+                    <div className="mt-1 flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                       {detail?.eqpId ?? '-'}
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-[#1E3D33]">허용 모델 상태</p>
-                    <div className="mt-1 flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                    <p className="text-xs font-semibold text-foreground">{t('eqp.form.allowedModelStatus')}</p>
+                    <div className="mt-1 flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                       {detail ? `${resolveAllowedModelStatus(detail.isDev)} / ${detail.commInterface}` : '-'}
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-[#1E3D33]">현재 Model</p>
-                    <div className="mt-1 flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                    <p className="text-xs font-semibold text-foreground">{t('eqp.binding.currentModel')}</p>
+                    <div className="mt-1 flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                       {detail?.modelBinding?.modelName ?? '-'}
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-[#1E3D33]">현재 Version</p>
-                    <div className="mt-1 flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                    <p className="text-xs font-semibold text-foreground">{t('eqp.binding.currentVersion')}</p>
+                    <div className="mt-1 flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                       {detail?.modelBinding?.modelVersion ?? '-'}
                     </div>
                   </div>
                 </section>
 
-                <section className="grid gap-4 rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] p-4 md:grid-cols-2">
+                <section className="grid gap-4 rounded-2xl border border-border bg-muted/40 p-4 md:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#1E3D33]">Model Name</label>
+                    <label className="text-xs font-semibold text-foreground">Model Name</label>
                     <Select
                       value={toSelectValue(selectedModelName)}
                       onValueChange={setSelectedModelName}
                       disabled={isPending || isOptionsLoading || modelNameOptions.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Model Name을 선택해 주세요." />
+                        <SelectValue placeholder={t('eqp.form.modelNamePlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {modelNameOptions.map((modelName) => (
@@ -300,22 +303,25 @@ export function EqpModelBindingModal({
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-[11px] text-[#738078]">
+                    <p className="text-[11px] text-muted-foreground">
                       {detail
-                        ? `is_dev=${detail.isDev ? 'true' : 'false'} 기준으로 ${resolveAllowedModelStatus(detail.isDev)} 모델만 표시됩니다.`
+                        ? t('eqp.binding.modelFilterHint', {
+                            isDev: detail.isDev ? 'true' : 'false',
+                            status: resolveAllowedModelStatus(detail.isDev),
+                          })
                         : ''}
                     </p>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#1E3D33]">Model Version</label>
+                    <label className="text-xs font-semibold text-foreground">Model Version</label>
                     <Select
                       value={toSelectValue(selectedModelVersionKey)}
                       onValueChange={setSelectedModelVersionKey}
                       disabled={isPending || isOptionsLoading || modelVersionOptions.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Model Version을 선택해 주세요." />
+                        <SelectValue placeholder={t('eqp.form.modelVersionPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {modelVersionOptions.map((option) => (
@@ -328,17 +334,17 @@ export function EqpModelBindingModal({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#1E3D33]">Business Jar</label>
+                    <label className="text-xs font-semibold text-foreground">Business Jar</label>
                     <Select
                       value={toSelectValue(selectedBusinessJarRef)}
                       onValueChange={setSelectedBusinessJarRef}
                       disabled={isPending || isOptionsLoading}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Business Jar를 선택해 주세요." />
+                        <SelectValue placeholder={t('eqp.form.businessJarPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={EQP_SELECT_NONE_VALUE}>미선택</SelectItem>
+                        <SelectItem value={EQP_SELECT_NONE_VALUE}>{t('eqp.form.noneSelected')}</SelectItem>
                         {businessJarOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -349,8 +355,8 @@ export function EqpModelBindingModal({
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-[#1E3D33]">선택 상태</p>
-                    <div className="mt-1 flex h-11 items-center rounded-xl border border-[#E4EAE6] bg-[#F4F7F5] px-3 text-sm text-[#51605A]">
+                    <p className="text-xs font-semibold text-foreground">{t('eqp.form.selectionStatus')}</p>
+                    <div className="mt-1 flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm text-muted-foreground">
                       {findEqpModelOptionByVersionKey(
                         modelVersionOptions,
                         Number(selectedModelVersionKey),
@@ -360,13 +366,13 @@ export function EqpModelBindingModal({
                 </section>
 
                 {modelNameOptions.length === 0 ? (
-                  <p className="rounded-xl border border-[#F0D9C7] bg-[#FFF7F1] px-3 py-2 text-sm text-[#A7662B]">
-                    현재 EQP 조건에 맞는 model/version 옵션이 없습니다.
+                  <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
+                    {t('eqp.binding.noModelOptions')}
                   </p>
                 ) : null}
 
                 {mergedErrorMessage ? (
-                  <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+                  <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                     {mergedErrorMessage}
                   </p>
                 ) : null}
@@ -374,11 +380,11 @@ export function EqpModelBindingModal({
             )}
           </div>
 
-          <DialogFooter className="border-t border-[#E4EAE6] px-6 py-4 sm:justify-end">
+          <DialogFooter className="border-t border-border px-6 py-4 sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="h-10 rounded-full border-[#D7E1DB] px-4 text-xs font-semibold"
+              className="h-10 rounded-full border-border px-4 text-xs font-semibold"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
@@ -386,7 +392,7 @@ export function EqpModelBindingModal({
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-full bg-[#1C7F59] px-4 text-xs font-semibold text-white hover:bg-[#166749]"
+              className="h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleSave()}
               disabled={isPending || isLoading || isOptionsLoading || !detail}
             >

@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import type {
   DeployEventType,
   DeployHistoryItem,
@@ -51,51 +52,53 @@ export const isTerminalDeployStatus = (status: DeployHistoryItem['deployStatus']
   status === 'FAILED' ||
   status === 'CANCELED'
 
-const REGISTER_SCENARIO_TASK_LABELS: Record<string, string> = {
-  REGISTER_MODEL_ONLY: '모델 변경',
-  REGISTER_BUSINESS_JAR_ONLY: 'Business JAR 변경',
-  REGISTER_EQP_PARAM_ONLY: 'EQP PARAM 변경',
-  REGISTER_MODEL_EQP_PARAM: '모델 + EQP PARAM 변경',
-  REGISTER_MODEL_BUSINESS_JAR: '모델 + Business JAR 변경',
-  REGISTER_MODEL_BUSINESS_JAR_EQP_PARAM: '모델 + Business JAR + EQP PARAM 변경',
+// 컴포넌트 밖 모듈 상수라 i18n 키만 담고, 렌더 시점에 호출부가 t(key) 로 번역한다.
+const REGISTER_SCENARIO_TASK_LABEL_KEYS: Record<string, string> = {
+  REGISTER_MODEL_ONLY: 'deploy.task.modelOnly',
+  REGISTER_BUSINESS_JAR_ONLY: 'deploy.task.businessJarOnly',
+  REGISTER_EQP_PARAM_ONLY: 'deploy.task.eqpParamOnly',
+  REGISTER_MODEL_EQP_PARAM: 'deploy.task.modelEqpParam',
+  REGISTER_MODEL_BUSINESS_JAR: 'deploy.task.modelBusinessJar',
+  REGISTER_MODEL_BUSINESS_JAR_EQP_PARAM: 'deploy.task.modelBusinessJarEqpParam',
 }
 
+/** Deploy 작업 유형의 i18n 키를 반환한다. 표시 시점에 호출부가 t(key) 로 번역한다. */
 export const resolveDeployTaskLabel = (
   resolvedScenarioCode?: string | null,
   eventType?: DeployEventType | string | null,
 ): string => {
   const normalizedScenarioCode = resolvedScenarioCode?.trim().toUpperCase()
-  if (normalizedScenarioCode && REGISTER_SCENARIO_TASK_LABELS[normalizedScenarioCode]) {
-    return REGISTER_SCENARIO_TASK_LABELS[normalizedScenarioCode]
+  if (normalizedScenarioCode && REGISTER_SCENARIO_TASK_LABEL_KEYS[normalizedScenarioCode]) {
+    return REGISTER_SCENARIO_TASK_LABEL_KEYS[normalizedScenarioCode]
   }
 
   switch (eventType?.trim().toUpperCase()) {
     case 'EQP_MODEL_UPDATE':
-      return '모델 변경'
+      return 'deploy.task.modelOnly'
     case 'EQP_PARAMETER_UPDATE':
-      return 'EQP PARAM 변경'
+      return 'deploy.task.eqpParamOnly'
     case 'EQP_BUSINESS_JARFILE_UPDATE':
-      return 'Business JAR 변경'
+      return 'deploy.task.businessJarOnly'
     case 'EQP_GATEWAY_JARFILE_UPDATE':
-      return 'Gateway JAR 변경'
+      return 'deploy.task.gatewayJar'
     case 'EQP_UPDATE':
-      return '설비 설정 변경'
+      return 'deploy.task.eqpConfig'
     case 'EQP_CREATE':
-      return '설비 등록'
+      return 'deploy.task.eqpCreate'
     case 'EQP_DELETE':
-      return '설비 삭제'
+      return 'deploy.task.eqpDelete'
     case 'EQP_RECONNECT':
-      return '설비 재연결'
+      return 'deploy.task.eqpReconnect'
     case 'EQP_START':
-      return '설비 시작'
+      return 'deploy.task.eqpStart'
     case 'EQP_END':
-      return '설비 종료'
+      return 'deploy.task.eqpEnd'
     case 'EQP_SEND_MESSAGE':
-      return '메시지 전송'
+      return 'deploy.task.eqpSendMessage'
     case 'EQP_REGISTER_DEPLOY':
       return 'Register Deploy'
     default:
-      return 'Deploy 작업'
+      return 'deploy.task.fallback'
   }
 }
 
@@ -103,5 +106,6 @@ export const createDeployName = (input: {
   resolvedScenarioCode?: string | null
   eventType?: DeployEventType | string | null
 }): string => {
-  return resolveDeployTaskLabel(input.resolvedScenarioCode, input.eventType)
+  // deployName 은 백엔드에 전송·저장되는 표시 문자열 — 생성 시점 UI 언어로 번역한다.
+  return i18n.t(resolveDeployTaskLabel(input.resolvedScenarioCode, input.eventType))
 }

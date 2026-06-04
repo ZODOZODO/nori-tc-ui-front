@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import type {
   BusinessDlqEntry,
@@ -49,23 +50,23 @@ export const dlqApi = {
    * Gateway DLQ 항목 전체 조회.
    */
   fetchGatewayDlq: (): Promise<GatewayDlqEntry[]> =>
-    fetchDlqList<GatewayDlqEntry>('/dlq/gateway', 'Gateway DLQ 목록을 조회하지 못했습니다.'),
+    fetchDlqList<GatewayDlqEntry>('/dlq/gateway', i18n.t('error.dlq.gateway')),
 
   /**
    * Business DLQ 항목 전체 조회.
    */
   fetchBusinessDlq: (): Promise<BusinessDlqEntry[]> =>
-    fetchDlqList<BusinessDlqEntry>('/dlq/business', 'Business DLQ 목록을 조회하지 못했습니다.'),
+    fetchDlqList<BusinessDlqEntry>('/dlq/business', i18n.t('error.dlq.business')),
 
   /**
    * 격리 설비 항목 전체 조회.
    */
   fetchQuarantine: (): Promise<QuarantineEntry[]> =>
-    fetchDlqList<QuarantineEntry>('/dlq/quarantine', '격리 설비 목록을 조회하지 못했습니다.'),
+    fetchDlqList<QuarantineEntry>('/dlq/quarantine', i18n.t('error.dlq.quarantine')),
 
   /**
    * Repair Task 항목 전체 조회.
    */
   fetchRepairTasks: (): Promise<RepairTaskEntry[]> =>
-    fetchDlqList<RepairTaskEntry>('/dlq/repair-task', 'Repair Task 목록을 조회하지 못했습니다.'),
+    fetchDlqList<RepairTaskEntry>('/dlq/repair-task', i18n.t('error.dlq.repairTask')),
 }

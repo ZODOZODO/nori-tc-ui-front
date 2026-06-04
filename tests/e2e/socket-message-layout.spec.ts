@@ -124,6 +124,15 @@ test('Socket Message 상세 테이블 레이아웃을 재현합니다.', async (
         return
       }
 
+      if (pathname === '/api/model/100') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createApiResponse(rootModel)),
+        })
+        return
+      }
+
       if (pathname === '/api/model/101') {
         await route.fulfill({
           status: 200,
@@ -194,6 +203,9 @@ test('Socket Message 상세 테이블 레이아웃을 재현합니다.', async (
   await page.waitForLoadState('networkidle')
   console.log(`[body] ${(await page.locator('body').innerText()).trim()}`)
 
+  // 사이드바 LNB 3단 아코디언(기본 접힘): Socket → DEMO_MAKER_MODEL_T01(root) → branch 펼침.
+  await page.getByRole('button', { name: 'Socket', exact: true }).click()
+  await page.getByRole('button', { name: 'DEMO_MAKER_MODEL_T01', exact: true }).click()
   await page.getByRole('button', { name: 'DEMO_MAKER_MODEL_T01_admin' }).click()
   const row = page.getByRole('row', { name: /DEMO_MAKER_MODEL_T01_admin EDIT/i })
   await row.dblclick()

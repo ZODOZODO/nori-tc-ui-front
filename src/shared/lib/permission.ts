@@ -16,6 +16,13 @@ export const USER_READ_PERMISSION = 'USER_READ'
 export const DLQ_READ_PERMISSION = 'DLQ_READ'
 
 /**
+ * Live Map 레이아웃(2.5D 캔버스) 편집 권한 코드입니다.
+ * DB seed 는 PREFIX `/api/live-map/layout`. Phase 1 은 상수/hasPermission 배선만,
+ * 실제 게이팅(그리기/편집/복제 admin 전용)은 Phase 2 에서 사용.
+ */
+export const LIVE_MAP_LAYOUT_WRITE_PERMISSION = 'LIVE_MAP_LAYOUT_WRITE'
+
+/**
  * 사용자가 특정 권한 코드를 보유하는지 확인합니다.
  */
 export const hasPermission = (

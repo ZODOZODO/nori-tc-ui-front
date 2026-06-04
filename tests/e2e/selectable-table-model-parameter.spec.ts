@@ -204,6 +204,9 @@ const openEditModelParameterNode = async (page: Page) => {
   })
   await page.goto('/model')
   await page.waitForLoadState('networkidle')
+  // 사이드바 LNB 3단 아코디언(기본 접힘): SECS → PARAM_DEMO_MODEL(root) → branch 펼침.
+  await page.getByRole('button', { name: 'SECS', exact: true }).click()
+  await page.getByRole('button', { name: 'PARAM_DEMO_MODEL', exact: true }).click()
   await page.getByRole('button', { name: 'PARAM_DEMO_MODEL_admin' }).click()
   const editRow = page.getByRole('row', { name: /PARAM_DEMO_MODEL_admin EDIT/i })
   await editRow.dblclick()

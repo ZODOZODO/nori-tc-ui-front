@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -45,14 +46,15 @@ interface EqpInfoTableProps {
  * 상태를 원형 네온 점 아이콘으로 렌더링합니다.
  */
 function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) {
+  const { t } = useI18n()
   if (status === 'offline') {
     return (
       <span
-        className="relative inline-flex size-4 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-300/80"
-        title="오프라인"
-        aria-label="오프라인"
+        className="relative inline-flex size-4 items-center justify-center rounded-full bg-muted ring-2 ring-border"
+        title={t('eqp.status.offline')}
+        aria-label={t('eqp.status.offline')}
       >
-        <span className="inline-flex size-2 rounded-full bg-slate-500" />
+        <span className="inline-flex size-2 rounded-full bg-muted-foreground" />
       </span>
     )
   }
@@ -85,8 +87,8 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
   return (
     <span
       className="relative inline-flex size-4 items-center justify-center rounded-full bg-amber-100/90 ring-2 ring-amber-300/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-      title="주의 상태"
-      aria-label="주의 상태"
+      title={t('eqp.status.warning')}
+      aria-label={t('eqp.status.warning')}
     >
       <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
       <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
@@ -156,6 +158,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   isLifecyclePending = false,
   onLifecycleAction,
 }: EqpInfoTableProps) {
+  const { t } = useI18n()
   const lifecycleCommandVisibility = eqp
     ? resolveLifecycleCommandVisibility(eqp, runtimeState)
     : { canStart: false, canEnd: false, canRestart: false }
@@ -170,16 +173,18 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   )
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-2xl border border-[#E4EAE6] bg-white p-4">
+    <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#213028]">설비 정보</h2>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {t('eqp.info.title')}
+        </h2>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading ? (
           <Table className="min-w-[1180px]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9F7]">
+              <TableRow className="bg-muted">
                 <TableHead>EQPID</TableHead>
                 <TableHead>Business App</TableHead>
                 <TableHead>Comm Interface</TableHead>
@@ -205,7 +210,9 @@ export const EqpInfoTable = memo(function EqpInfoTable({
             </TableBody>
           </Table>
         ) : !eqp ? (
-          <p className="py-10 text-center text-sm text-[#647169]">표시할 설비를 선택해 주세요.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {t('eqp.info.selectPrompt')}
+          </p>
         ) : (
           <SelectableTable<EqpInfoRow>
             testId="selectable-table-eqp-info"
@@ -216,7 +223,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
             wrapRow={(_row, _rowIdx, children) => (
               <ContextMenu>
                 <ContextMenuTrigger asChild>
-                  <TableRow data-state="selected">{children}</TableRow>
+                  <TableRow>{children}</TableRow>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-44">
                   <ContextMenuLabel>{eqp.eqpId}</ContextMenuLabel>
@@ -257,7 +264,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
       </div>
 
       {isFetching && !isLoading ? (
-        <p className="mt-2 text-xs text-[#7A8680]">선택된 설비 데이터를 동기화 중입니다.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t('eqp.info.syncing')}</p>
       ) : null}
     </section>
   )

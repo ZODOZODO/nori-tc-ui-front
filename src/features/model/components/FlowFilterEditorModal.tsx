@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/i18n-context'
 import {
   buildFlowFilterValue,
   createEmptyFlowFilterCondition,
@@ -97,6 +98,7 @@ function FlowFilterEditorModalBody({
   onClose,
   onSave,
 }: FlowFilterEditorModalBodyProps) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState<FlowFilterEditorDraft>(() =>
     parseFlowFilterEditor(value),
   )
@@ -153,25 +155,25 @@ function FlowFilterEditorModalBody({
       onOpenAutoFocus={(event) => event.preventDefault()}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <DialogHeader className="shrink-0 border-b border-[#EEF3F0] px-6 py-5">
-          <DialogTitle>{titleLabel || 'Flow 편집'}</DialogTitle>
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
+          <DialogTitle>{titleLabel || t('model.flowEditor.title')}</DialogTitle>
           <DialogDescription>
-            workflow_filter를 canonical group/condition 구조로 편집합니다.
+            {t('model.flowEditor.filterDesc')}
           </DialogDescription>
         </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
             <div className="flex h-full min-h-0 flex-col gap-3">
               {errorMessage ? (
-                <p className="rounded-xl border border-[#F0D2D0] bg-[#FFF7F7] px-3 py-2 text-sm text-[#B4483F]">
+                <p className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                   {errorMessage}
                 </p>
               ) : null}
 
               {draft.mode === 'raw' ? (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <p className="text-sm text-[#C5534B]">
-                    현재 값은 structured editor가 안전하게 해석할 수 없어 raw 모드로 유지합니다.
+                  <p className="text-sm text-danger">
+                    {t('model.flowEditor.rawModeNotice')}
                   </p>
                   <textarea
                     value={draft.rawValue}
@@ -181,18 +183,18 @@ function FlowFilterEditorModalBody({
                         rawValue: event.target.value,
                       }))
                     }
-                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-[#DCE5E0] bg-[#FAFCFB] p-3 font-mono text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+                    className="min-h-0 w-full flex-1 resize-none overflow-auto rounded-xl border border-border bg-muted p-3 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                     readOnly={readOnly}
                   />
                 </div>
               ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="rounded-2xl border border-[#E4EAE6] bg-[#FAFCFB] px-4 py-3">
-                    <p className="text-sm font-semibold text-[#1E3D33]">
-                      root group와 하위 condition을 조합해 `and` / `or` 식을 구성합니다.
+                  <div className="rounded-2xl border border-border bg-muted px-4 py-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {t('model.flowEditor.groupCompose')}
                     </p>
-                    <p className="mt-1 text-xs text-[#738078]">
-                      `expected`는 JSON literal 기준으로 입력하면 숫자, boolean, array까지 lossless 하게 저장됩니다.
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('model.flowEditor.expectedHint')}
                     </p>
                   </div>
 
@@ -212,11 +214,11 @@ function FlowFilterEditorModalBody({
             </div>
           </div>
 
-        <DialogFooter className="shrink-0 border-t border-[#EEF3F0] px-6 py-4">
+        <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={onClose}>
-            취소
+            {t('common.cancel')}
           </Button>
-          {!readOnly ? <Button onClick={handleSave}>저장</Button> : null}
+          {!readOnly ? <Button onClick={handleSave}>{t('common.save')}</Button> : null}
         </DialogFooter>
       </div>
     </DialogContent>
@@ -336,27 +338,28 @@ function FlowNodeEditor({
   onAddGroup,
   onRemoveNode,
 }: FlowNodeEditorProps) {
+  const { t } = useI18n()
   if (node.nodeType === 'condition') {
     return (
       <div
-        className="rounded-2xl border border-[#DCE5E0] bg-white p-4 shadow-[0_1px_2px_rgba(20,46,36,0.04)]"
+        className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(20,46,36,0.04)]"
         style={{ marginLeft: `${depth * 16}px` }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold text-[#1E3D33]">Condition</p>
-            <p className="text-[11px] text-[#738078]">
-              `from`, `path`, `comparison`, `expected`, `transforms`를 직접 편집합니다.
+            <p className="text-xs font-semibold text-foreground">Condition</p>
+            <p className="text-[11px] text-muted-foreground">
+              {t('model.flowEditor.conditionFields')}
             </p>
           </div>
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]"
+            className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
             onClick={() => onRemoveNode(node.id)}
             disabled={readOnly}
-            aria-label="조건 삭제"
+            aria-label={t('model.flowEditor.conditionDeleteAria')}
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </Button>
@@ -364,7 +367,7 @@ function FlowNodeEditor({
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">from</label>
+            <label className="text-xs font-semibold text-foreground">from</label>
             <select
               value={node.from}
               onChange={(event) =>
@@ -377,7 +380,7 @@ function FlowNodeEditor({
                     : targetNode,
                 )
               }
-              className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
               disabled={readOnly}
             >
               {LOOKUP_SOURCE_OPTIONS.map((source) => (
@@ -389,7 +392,7 @@ function FlowNodeEditor({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">path</label>
+            <label className="text-xs font-semibold text-foreground">path</label>
             <Input
               value={node.path}
               onChange={(event) =>
@@ -408,7 +411,7 @@ function FlowNodeEditor({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">comparison</label>
+            <label className="text-xs font-semibold text-foreground">comparison</label>
             <select
               value={node.comparison}
               onChange={(event) =>
@@ -421,7 +424,7 @@ function FlowNodeEditor({
                     : targetNode,
                 )
               }
-              className="h-9 w-full rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
               disabled={readOnly}
             >
               {FLOW_COMPARISON_OPTIONS.map((comparison) => (
@@ -433,7 +436,7 @@ function FlowNodeEditor({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#1E3D33]">expected</label>
+            <label className="text-xs font-semibold text-foreground">expected</label>
             <Input
               value={node.expectedText}
               onChange={(event) =>
@@ -446,18 +449,18 @@ function FlowNodeEditor({
                     : targetNode,
                 )
               }
-              placeholder='예: "PASS", 4, true, ["A", "B"]'
+              placeholder={t('common.example', { value: '"PASS", 4, true, ["A", "B"]' })}
               readOnly={readOnly}
             />
           </div>
         </div>
 
-        <div className="mt-4 space-y-2 rounded-xl border border-[#E7EEEA] bg-[#FAFCFB] p-3">
+        <div className="mt-4 space-y-2 rounded-xl border border-border bg-muted p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-[#1E3D33]">transforms</p>
-              <p className="text-[11px] text-[#738078]">
-                순차 적용할 transform을 한 줄씩 추가합니다.
+              <p className="text-xs font-semibold text-foreground">transforms</p>
+              <p className="text-[11px] text-muted-foreground">
+                {t('model.flowEditor.transformsHint')}
               </p>
             </div>
             <Button
@@ -477,12 +480,12 @@ function FlowNodeEditor({
               disabled={readOnly}
             >
               <Plus className="size-3.5" aria-hidden="true" />
-              transform 추가
+              {t('model.flowEditor.addTransform')}
             </Button>
           </div>
 
           {node.transforms.length === 0 ? (
-            <p className="text-[11px] text-[#97A39C]">transform이 없으면 원본 값을 그대로 비교합니다.</p>
+            <p className="text-[11px] text-muted-foreground">{t('model.flowEditor.transformsEmpty')}</p>
           ) : (
             <div className="space-y-2">
               {node.transforms.map((transform) => (
@@ -509,7 +512,7 @@ function FlowNodeEditor({
                     variant="ghost"
                     size="icon-sm"
                     className={cn(
-                      'size-8 rounded-lg text-[#6A7971] hover:bg-[#F3F7F5] hover:text-[#C5534B]',
+                      'size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger',
                       readOnly ? 'hidden' : null,
                     )}
                     onClick={() =>
@@ -525,7 +528,7 @@ function FlowNodeEditor({
                       )
                     }
                     disabled={readOnly}
-                    aria-label="transform 삭제"
+                    aria-label={t('model.flowEditor.transformDeleteAria')}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
@@ -540,14 +543,14 @@ function FlowNodeEditor({
 
   return (
     <div
-      className="rounded-2xl border border-[#D6E4DD] bg-[#F8FBF9] p-4"
+      className="rounded-2xl border border-border bg-muted p-4"
       style={{ marginLeft: `${depth * 16}px` }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-[#1E3D33]">Group</p>
-          <p className="text-[11px] text-[#738078]">
-            하위 조건을 `{node.groupType}` 기준으로 묶습니다.
+          <p className="text-xs font-semibold text-foreground">Group</p>
+          <p className="text-[11px] text-muted-foreground">
+            {t('model.flowEditor.groupCompose2', { groupType: node.groupType })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -563,7 +566,7 @@ function FlowNodeEditor({
                   : targetNode,
               )
             }
-            className="h-9 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+            className="h-9 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             disabled={readOnly}
           >
             <option value="and">and</option>
@@ -577,7 +580,7 @@ function FlowNodeEditor({
             disabled={readOnly}
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            조건 추가
+            {t('model.flowEditor.addCondition')}
           </Button>
           <Button
             type="button"
@@ -587,7 +590,7 @@ function FlowNodeEditor({
             disabled={readOnly}
           >
             <Plus className="size-3.5" aria-hidden="true" />
-            그룹 추가
+            {t('model.flowEditor.addGroup')}
           </Button>
           {depth > 0 ? (
             <Button

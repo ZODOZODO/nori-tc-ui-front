@@ -4,6 +4,7 @@
  */
 import { type ChangeEvent } from 'react'
 import { MoreHorizontal } from 'lucide-react'
+import i18n from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -122,8 +123,8 @@ export const createModelParameterColumns = ({
         return (
           <span
             className={cn(
-              'min-w-0 truncate text-sm text-[#22322B]',
-              rawValue ? null : 'text-[#8A8A8A]',
+              'min-w-0 truncate text-sm text-foreground',
+              rawValue ? null : 'text-muted-foreground',
             )}
             title={rawValue}
           >
@@ -220,13 +221,13 @@ export const createWorkflowColumns = ({
           )
           return (
             <div
-              className="group flex min-h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-[#DCE5E0] bg-white px-2 py-1.5"
+              className="group flex min-h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-border bg-card px-2 py-1.5"
               onDoubleClick={() => onOpenFlowTextEditor(row, rowIdx, columnIndex)}
             >
               <span
                 className={cn(
-                  'min-w-0 flex-1 text-sm text-[#22322B]',
-                  previewValue ? 'truncate' : 'text-[#8A8A8A]',
+                  'min-w-0 flex-1 text-sm text-foreground',
+                  previewValue ? 'truncate' : 'text-muted-foreground',
                 )}
                 title={previewValue || rawValue}
               >
@@ -235,8 +236,11 @@ export const createWorkflowColumns = ({
               <button
                 type="button"
                 onClick={() => onOpenFlowTextEditor(row, rowIdx, columnIndex)}
-                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[#5B6962] transition hover:border-[#DCE5E0] hover:bg-[#F3F7F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
-                aria-label={`${row.values[0] ?? 'flow'} ${columnName} 편집`}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+                aria-label={i18n.t('model.detail.editCellAria', {
+                  value: row.values[0] ?? 'flow',
+                  column: columnName,
+                })}
               >
                 <MoreHorizontal className="size-3.5" />
               </button>
@@ -249,8 +253,8 @@ export const createWorkflowColumns = ({
           return (
             <span
               className={cn(
-                'inline-block whitespace-nowrap text-sm text-[#22322B]',
-                rawValue ? null : 'text-[#8A8A8A]',
+                'inline-block whitespace-nowrap text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
               )}
               title={rawValue}
             >
@@ -268,9 +272,9 @@ export const createWorkflowColumns = ({
               onChange={(event) => onChangeDetailValue(row.id, columnIndex, event.target.value)}
               className={cn(
                 'h-8 w-full min-w-0',
-                isDuplicate ? 'border-[#C5534B] focus-visible:ring-[#C5534B]/30' : null,
+                isDuplicate ? 'border-danger focus-visible:ring-danger/30' : null,
               )}
-              title={isDuplicate ? '다른 행에 동일한 Flow Name이 있습니다.' : undefined}
+              title={isDuplicate ? i18n.t('model.detail.duplicateFlowName') : undefined}
             />
           )
         }
@@ -283,7 +287,7 @@ export const createWorkflowColumns = ({
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 onChangeDetailValue(row.id, columnIndex, event.target.value)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
               <option value="">—</option>
               {rawValue && !messageOptions.some((option) => option.value === rawValue) ? (
@@ -306,7 +310,7 @@ export const createWorkflowColumns = ({
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 onChangeDetailValue(row.id, columnIndex, event.target.value)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
               <option value="">—</option>
               {rawValue && !eventIdOptions.includes(rawValue) ? (
@@ -326,8 +330,8 @@ export const createWorkflowColumns = ({
           return (
             <span
               className={cn(
-                'min-w-0 truncate text-sm text-[#22322B]',
-                rawValue ? null : 'text-[#8A8A8A]',
+                'min-w-0 truncate text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
               )}
               title={rawValue}
             >
@@ -393,8 +397,8 @@ export const createDcopItemsColumns = ({
           return (
             <span
               className={cn(
-                'inline-block whitespace-nowrap text-sm text-[#22322B]',
-                rawValue ? null : 'text-[#8A8A8A]',
+                'inline-block whitespace-nowrap text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
               )}
               title={rawValue}
             >
@@ -410,7 +414,7 @@ export const createDcopItemsColumns = ({
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 onChangeDetailValue(row.id, columnIndex, event.target.value)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
               <option value="">—</option>
               {rawValue && !eventIdOptions.includes(rawValue) ? (
@@ -432,7 +436,7 @@ export const createDcopItemsColumns = ({
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 onChangeDetailValue(row.id, columnIndex, event.target.value)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-[#DCE5E0] bg-white px-2 text-sm text-[#22322B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1C7F59]/30"
+              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
               {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
                 <option key={rule} value={rule}>
@@ -447,8 +451,8 @@ export const createDcopItemsColumns = ({
           return (
             <span
               className={cn(
-                'min-w-0 truncate text-sm text-[#22322B]',
-                rawValue ? null : 'text-[#8A8A8A]',
+                'min-w-0 truncate text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
               )}
               title={rawValue}
             >
@@ -505,8 +509,8 @@ export const createGenericInputColumns = ({
         return (
           <span
             className={cn(
-              'min-w-0 truncate text-sm text-[#22322B]',
-              rawValue ? null : 'text-[#8A8A8A]',
+              'min-w-0 truncate text-sm text-foreground',
+              rawValue ? null : 'text-muted-foreground',
             )}
             title={rawValue}
           >

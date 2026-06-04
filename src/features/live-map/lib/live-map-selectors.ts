@@ -5,23 +5,28 @@ import type {
   LiveMapSummary,
 } from '../types/live-map.types'
 
+/** 라인 스코프 필터에서 전체 라인을 의미하는 값입니다. */
+export const LIVE_MAP_ALL_LINES = 'ALL'
+
 interface FilterLiveMapEquipmentNodesParams {
-  lineValue: string
   statusFilter: LiveMapStatusFilter
   searchKeyword: string
+  /** 선택된 라인 스코프(line_code). 'ALL' 이면 전체 라인. 미지정 시 전체. */
+  lineFilter?: string
 }
 
 /**
- * line / status / 검색어 기준으로 설비 노드를 필터링합니다.
+ * 라인 스코프 / status / 검색어 기준으로 설비 노드를 필터링합니다.
  */
 export const filterLiveMapEquipmentNodes = (
   equipmentNodes: readonly LiveMapEquipmentNode[],
   params: FilterLiveMapEquipmentNodesParams,
 ): LiveMapEquipmentNode[] => {
   const normalizedKeyword = params.searchKeyword.trim().toLowerCase()
+  const lineFilter = params.lineFilter ?? LIVE_MAP_ALL_LINES
 
   return equipmentNodes.filter((item) => {
-    const matchesLine = params.lineValue === 'ALL' || item.lineValue === params.lineValue
+    const matchesLine = lineFilter === LIVE_MAP_ALL_LINES || item.lineValue === lineFilter
     const matchesStatus = params.statusFilter === 'ALL' || item.status === params.statusFilter
     const matchesKeyword =
       normalizedKeyword.length === 0 ||
@@ -138,5 +143,5 @@ export const resolveSelectedLiveMapEquipment = (
  */
 export const formatLiveMapSyncLabel = (lastSyncAt: number, now: number): string => {
   const deltaMs = Math.max(0, now - lastSyncAt)
-  return `${(deltaMs / 1000).toFixed(1)}s live sync`
+  return `${(deltaMs / 1000).toFixed(1)}s`
 }
