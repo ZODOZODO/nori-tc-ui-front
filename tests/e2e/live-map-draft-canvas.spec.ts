@@ -180,3 +180,76 @@ test('admin: 추가한 draft 도형을 Save as Object 로 저장하면 POST shap
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
 })
+
+test('admin: 2.5D Equipment 프리셋이 등각 박스를 한 덩어리(Group) draft 로 추가하고 EQUIPMENT 객체로 저장한다 (console/pageerror 0)', async ({
+  page,
+}) => {
+  const state = newState()
+  await setupMocks(page, state)
+  const { consoleErrors, pageErrors } = attachConsoleGuards(page)
+
+  await page.goto('/eqp/live-map')
+  await page.getByTestId('live-map-mode-builder').click()
+  await expect(page.getByTestId('live-map-builder-toolbar')).toBeVisible()
+
+  // 프리셋 1회 → 등각 박스가 "한 덩어리(Group)" draft 1개로 추가 + 자동 선택.
+  await page.getByTestId('builder-add-equipment').click()
+  await expect(page.getByTestId('builder-draft-count')).toHaveText('1')
+  await expect(page.getByTestId('builder-selected-count')).toHaveText('1')
+
+  // 위치 잡은 뒤 한 개 EQUIPMENT 객체로 저장(kind 는 프리셋이 EQUIPMENT 로 맞춰둠).
+  await page.getByTestId('builder-save-object').click()
+  await expect(page.getByTestId('object-kind-select')).toHaveValue('EQUIPMENT')
+  await page.getByTestId('object-name-input').fill('Etcher-2.5D')
+  await page.getByTestId('object-save-confirm').click()
+
+  await expect.poll(() => state.objects.length).toBe(1)
+  const saved = state.objects[0]
+  expect(saved.objectKind).toBe('EQUIPMENT')
+  // 한 Group 으로 묶여 저장 — root.children=[Group], 그 안에 3 Line + 1 Text.
+  expect(saved.shapeJson.root.children).toHaveLength(1)
+  const group = saved.shapeJson.root.children[0] as { className: string; children?: { className: string }[] }
+  expect(group.className).toBe('Group')
+  const inner = (group.children ?? []).map((child) => child.className)
+  // 본체 3면 + 컨트롤 패널 + 포트들 → Line 다수, 라벨 Text 1.
+  expect(inner.filter((className) => className === 'Line').length).toBeGreaterThanOrEqual(4)
+  expect(inner).toContain('Text')
+
+  // 저장 후 draft 비워지고, 재사용 템플릿으로 팔레트에 등록된다.
+  await expect(page.getByTestId('builder-draft-count')).toHaveText('0')
+  await expect(page.getByTestId('palette-place-1')).toBeVisible()
+
+  expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+  expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
+})
+
+test('admin: 단일 draft 의 Fill 색 변경이 Save 시 shape_json 에 반영된다 (console/pageerror 0)', async ({
+  page,
+}) => {
+  const state = newState()
+  await setupMocks(page, state)
+  const { consoleErrors, pageErrors } = attachConsoleGuards(page)
+
+  await page.goto('/eqp/live-map')
+  await page.getByTestId('live-map-mode-builder').click()
+  await expect(page.getByTestId('live-map-builder-toolbar')).toBeVisible()
+
+  // Rect 추가(자동 선택) → 단일 draft 선택이라 색 컨트롤 노출.
+  await page.getByTestId('builder-add-rect').click()
+  await expect(page.getByTestId('builder-selected-count')).toHaveText('1')
+  await expect(page.getByTestId('draft-color-controls')).toBeVisible()
+
+  // Fill 색을 빨강으로 변경 → draft 노드 attrs.fill 갱신.
+  await page.getByTestId('draft-fill-color').fill('#ff0000')
+
+  await page.getByTestId('builder-save-object').click()
+  await page.getByTestId('object-name-input').fill('Red-Box')
+  await page.getByTestId('object-save-confirm').click()
+
+  await expect.poll(() => state.objects.length).toBe(1)
+  const rect = state.objects[0].shapeJson.root.children.find((child) => child.className === 'Rect')
+  expect((rect?.attrs as { fill?: string } | undefined)?.fill).toBe('#ff0000')
+
+  expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+  expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
+})

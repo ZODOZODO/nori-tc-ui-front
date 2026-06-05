@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Image as KonvaImage, Line, Rect, Text } from 'react-konva'
+import { Group, Image as KonvaImage, Line, Rect, Text } from 'react-konva'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
 import type { LineConfig } from 'konva/lib/shapes/Line'
 import type { TextConfig } from 'konva/lib/shapes/Text'
 import type { ImageConfig } from 'konva/lib/shapes/Image'
+import type { ContainerConfig } from 'konva/lib/Container'
 import type { KonvaEventObject, Node as KonvaNodeRef } from 'konva/lib/Node'
 import type { KonvaNode } from '../lib/live-map-layout.model'
 
@@ -65,6 +66,14 @@ export function KonvaPrimitive({ node }: { node: KonvaNode }) {
       return <Text {...(node.attrs as TextConfig)} />
     case 'Image':
       return <PrimitiveImage attrs={node.attrs} />
+    case 'Group':
+      return (
+        <Group {...(node.attrs as ContainerConfig)}>
+          {(node.children ?? []).map((child, index) => (
+            <KonvaPrimitive key={index} node={child} />
+          ))}
+        </Group>
+      )
     default:
       return null
   }

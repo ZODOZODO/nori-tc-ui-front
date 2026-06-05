@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
 import { Circle, Group, Layer, Line, Rect, Shape, Stage, Text, Transformer } from 'react-konva'
-import { Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
+import { Box, Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
 import type { LineConfig } from 'konva/lib/shapes/Line'
 import type { TextConfig } from 'konva/lib/shapes/Text'
+import type { ContainerConfig } from 'konva/lib/Container'
 import type { Transformer as KonvaTransformerNode } from 'konva/lib/shapes/Transformer'
 import type { KonvaEventObject, Node as KonvaNodeRef } from 'konva/lib/Node'
 import { useMe } from '@/features/profile/hooks/useProfile'
@@ -135,6 +136,62 @@ function createDraftPrimitive(className: PrimitiveClassName, index: number): Kon
       fill: '#e2e8f0',
       fontFamily: 'Inter, system-ui, sans-serif',
     },
+  }
+}
+
+const HEX6_PATTERN = /^#[0-9a-fA-F]{6}$/
+
+/** color attr 을 <input type="color"> 가 받는 #rrggbb 로 보정한다(rgba/이름색은 fallback). */
+const toColorInputValue = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && HEX6_PATTERN.test(value) ? value : fallback
+
+/**
+ * 2.5D 설비 프리셋 — 등각(isometric) 박스 3면(상단 밝음 / 좌 음영 / 우 짙은 음영) Line 폴리곤 + 라벨.
+ *
+ * <p>draft 로 주입한 뒤 "Save as Object"(EQUIPMENT)로 한 Group 에 묶는다. 실시간 상태 dot/포트는
+ * eqp 바인딩 시 렌더 단계에서 오버레이되므로 도형 자체에는 포함하지 않는다.</p>
+ */
+function createIsoEquipmentNodes(): KonvaNode[] {
+  const stroke = '#2b3340'
+  const nodes: KonvaNode[] = [
+    // 본체 3면 — 스틸/그레이 톤(상단 밝음 / 좌 중간 / 우 짙음). 파랑 아님.
+    { className: 'Line', attrs: { points: [0, 38, 70, 76, 70, 150, 0, 112], closed: true, fill: '#9aa7b8', stroke, strokeWidth: 1.5 } },
+    { className: 'Line', attrs: { points: [140, 38, 70, 76, 70, 150, 140, 112], closed: true, fill: '#6b7a8f', stroke, strokeWidth: 1.5 } },
+    { className: 'Line', attrs: { points: [70, 0, 140, 38, 70, 76, 0, 38], closed: true, fill: '#d8dee9', stroke, strokeWidth: 1.5 } },
+    // 상단 컨트롤 패널 + 스크린(시안 강조)
+    { className: 'Line', attrs: { points: [70, 12, 118, 38, 70, 64, 22, 38], closed: true, fill: '#1f2937', stroke: '#0b1220', strokeWidth: 1 } },
+    { className: 'Line', attrs: { points: [70, 23, 98, 38, 70, 53, 42, 38], closed: true, fill: '#155e75', stroke: '#22d3ee', strokeWidth: 1 } },
+  ]
+  // 우측(전면) 면에 포트 N개 — 면 basis(origin 70,76 / ax 70,-38 / ay 0,74)로 평행사변형 계산해 등각면에 맞춤.
+  // 데모용 상태색; R4 에서 뷰어가 바인딩된 실설비 portItems 로 대체 예정.
+  const port = (s: number, t: number): number[] => [70 + s * 70, 76 + s * -38 + t * 74]
+  const portFills = ['#22c55e', '#22c55e', '#eab308', '#64748b']
+  for (let i = 0; i < portFills.length; i += 1) {
+    const s = 0.1 + i * 0.21
+    const ds = 0.13
+    const t = 0.58
+    const dt = 0.2
+    nodes.push({
+      className: 'Line',
+      attrs: {
+        points: [...port(s, t), ...port(s + ds, t), ...port(s + ds, t + dt), ...port(s, t + dt)],
+        closed: true,
+        fill: portFills[i],
+        stroke: '#0b1220',
+        strokeWidth: 1,
+      },
+    })
+  }
+  nodes.push({ className: 'Text', attrs: { x: 54, y: 31, text: 'EQP', fontSize: 11, fontStyle: '700', fill: '#e2e8f0', fontFamily: 'Inter, system-ui, sans-serif' } })
+  return nodes
+}
+
+/** 등각 박스 도형들을 1개 Group 노드로 묶는다 — 빌더에서 한 덩어리로 이동/저장되는 단위. */
+function createIsoEquipmentGroupNode(): KonvaNode {
+  return {
+    className: 'Group',
+    attrs: { x: DEFAULT_PLACE_X, y: DEFAULT_PLACE_Y },
+    children: createIsoEquipmentNodes(),
   }
 }
 
@@ -289,13 +346,30 @@ export function LiveMapLayoutCanvas() {
     setSelectedIds([localId])
   }
 
+  // 2.5D Equipment 프리셋: 등각 박스를 "하나의 Group draft" 로 캔버스에 추가한다 — 통째로 드래그/리사이즈/회전
+  // 되는 한 덩어리. 곧장 선택해 Transformer 핸들이 붙고, 위치를 잡은 뒤 "Save as Object"(EQUIPMENT)로 저장한다.
+  const addIsoEquipmentPreset = () => {
+    setStatusMessage(null)
+    const localId = nextLocalId()
+    setDraft((previous) => [...previous, { localId, node: createIsoEquipmentGroupNode() }])
+    setSelectedIds([localId])
+    setObjectKind('EQUIPMENT')
+  }
+
   const handleConfirmSaveObject = () => {
     const trimmedName = objectName.trim()
     if (trimmedName.length === 0) {
       setStatusMessage('Object name is required.')
       return
     }
-    const shapeJson = buildShapeJson({ name: trimmedName }, draft.map((item) => item.node))
+    // 그룹 draft 는 배치 시 placement 가 위치를 제공하므로 그룹 자신의 x/y 오프셋을 0 으로 정규화한다
+    // (템플릿 원점 보존, placement+그룹 이중 오프셋 방지).
+    const nodes = draft.map((item) =>
+      item.node.className === 'Group'
+        ? { ...item.node, attrs: { ...item.node.attrs, x: 0, y: 0 } }
+        : item.node,
+    )
+    const shapeJson = buildShapeJson({ name: trimmedName }, nodes)
     createObject.mutate(
       { objectName: trimmedName, objectKind, shapeJson },
       {
@@ -499,6 +573,16 @@ export function LiveMapLayoutCanvas() {
   // working 배치 전용 액션(z-order/Scale±/eqp 바인딩)은 working 이 선택됐을 때만 노출 — draft 선택 시 무력 버튼 회피.
   const hasWorkingSelected = working.some((placement) => selectedIds.includes(placement.localId))
 
+  // 단일 draft 선택 시 색(fill/stroke) 편집 — working 배치는 저장된 객체라 색은 저작 단계(draft)에서만 바꾼다.
+  const singleSelectedDraft =
+    selectedIds.length === 1 ? draft.find((item) => item.localId === selectedIds[0]) ?? null : null
+  const draftClassName = singleSelectedDraft?.node.className
+  const draftSupportsFill =
+    draftClassName === 'Rect' || draftClassName === 'Text' || draftClassName === 'Line'
+  const draftSupportsStroke = draftClassName === 'Rect' || draftClassName === 'Line'
+  const draftFillValue = toColorInputValue(singleSelectedDraft?.node.attrs.fill, '#3b82f6')
+  const draftStrokeValue = toColorInputValue(singleSelectedDraft?.node.attrs.stroke, '#1e293b')
+
   if (lineKey === null) {
     return (
       <div
@@ -544,6 +628,14 @@ export function LiveMapLayoutCanvas() {
         return <Text key={item.localId} {...editProps} {...(attrs as TextConfig)} />
       case 'Image':
         return <PrimitiveImage key={item.localId} attrs={attrs} nodeProps={editProps} />
+      case 'Group':
+        return (
+          <Group key={item.localId} {...editProps} {...(attrs as ContainerConfig)}>
+            {(item.node.children ?? []).map((child, index) => (
+              <KonvaPrimitive key={`${item.localId}-${index}`} node={child} />
+            ))}
+          </Group>
+        )
       default:
         return null
     }
@@ -702,6 +794,16 @@ export function LiveMapLayoutCanvas() {
         </div>
         <button
           type="button"
+          data-testid="builder-add-equipment"
+          title="Add 2.5D Equipment"
+          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+          onClick={addIsoEquipmentPreset}
+        >
+          <Box className="size-4" aria-hidden="true" />
+          2.5D Equipment
+        </button>
+        <button
+          type="button"
           data-testid="builder-save-object"
           className="rounded-md border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"
           disabled={draft.length === 0}
@@ -828,6 +930,35 @@ export function LiveMapLayoutCanvas() {
               <button type="button" data-testid="selection-delete" className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger" onClick={deleteSelected}>
                 Delete
               </button>
+
+              {singleSelectedDraft ? (
+                <span data-testid="draft-color-controls" className="flex items-center gap-2 text-xs font-semibold">
+                  {draftSupportsFill ? (
+                    <label className="flex items-center gap-1">
+                      <span className="text-muted-foreground">Fill</span>
+                      <input
+                        type="color"
+                        data-testid="draft-fill-color"
+                        value={draftFillValue}
+                        onChange={(event) => updateDraftNode(singleSelectedDraft.localId, { fill: event.target.value })}
+                        className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent p-0"
+                      />
+                    </label>
+                  ) : null}
+                  {draftSupportsStroke ? (
+                    <label className="flex items-center gap-1">
+                      <span className="text-muted-foreground">Stroke</span>
+                      <input
+                        type="color"
+                        data-testid="draft-stroke-color"
+                        value={draftStrokeValue}
+                        onChange={(event) => updateDraftNode(singleSelectedDraft.localId, { stroke: event.target.value })}
+                        className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent p-0"
+                      />
+                    </label>
+                  ) : null}
+                </span>
+              ) : null}
 
               {isEquipmentSelected && singleSelected ? (
                 <span data-testid="placement-eqp-binding" className="flex items-center gap-2 text-xs font-semibold">
