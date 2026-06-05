@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from 'react'
 import { Circle, Group, Layer, Line, Rect, Shape, Stage, Text, Transformer } from 'react-konva'
 import { Image as ImageIcon, Minus, Square, Type } from 'lucide-react'
 import type { RectConfig } from 'konva/lib/shapes/Rect'
@@ -36,16 +36,16 @@ import {
   type LiveMapObjectKind,
   type TransformJson,
 } from '../lib/live-map-layout.model'
+import { LIVE_MAP_BOARD_HEIGHT, LIVE_MAP_BOARD_WIDTH } from '../mocks/live-map.mock'
 import {
   KonvaPrimitive,
-  LIVE_MAP_AUTHORING_HEIGHT,
-  LIVE_MAP_AUTHORING_WIDTH,
   PrimitiveImage,
   type KonvaPrimitiveEditProps,
 } from './LiveMapKonvaPrimitive'
 
-const STAGE_WIDTH = LIVE_MAP_AUTHORING_WIDTH
-const STAGE_HEIGHT = LIVE_MAP_AUTHORING_HEIGHT
+// 빌더 저작 좌표계 = 뷰어 board 좌표계(1350×710). 그린 위치가 뷰어 표시 위치와 1:1 로 일치한다.
+const STAGE_WIDTH = LIVE_MAP_BOARD_WIDTH
+const STAGE_HEIGHT = LIVE_MAP_BOARD_HEIGHT
 const DEFAULT_PLACE_X = 220
 const DEFAULT_PLACE_Y = 160
 const SCALE_STEP = 1.2
@@ -175,6 +175,7 @@ export function LiveMapLayoutCanvas() {
 
   const nodeRefs = useRef(new Map<string, KonvaNodeRef>())
   const transformerRef = useRef<KonvaTransformerNode | null>(null)
+  const fitObserverRef = useRef<ResizeObserver | null>(null)
 
   const [draft, setDraft] = useState<DraftItem[]>([])
   const [working, setWorking] = useState<WorkingPlacement[]>([])
@@ -185,6 +186,8 @@ export function LiveMapLayoutCanvas() {
   const [objectKind, setObjectKind] = useState<LiveMapObjectKind>('STRUCTURE')
   const [paletteSearch, setPaletteSearch] = useState('')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  // 캔버스(board 좌표 1350×710)를 래퍼 폭에 맞춰 자동 축소 — 뷰어 board 와 동일한 fit-to-width.
+  const [fitScale, setFitScale] = useState(1)
 
   // 서버 layout 이 바뀌면 작업 사본을 재시드(저장 후/라인 전환/새로고침 영속 반영).
   useEffect(() => {
@@ -205,6 +208,19 @@ export function LiveMapLayoutCanvas() {
     )
     // layoutQuery.data 식별자가 바뀔 때만 재시드.
   }, [layoutQuery.data])
+
+  // 캔버스 래퍼(권한/lineKey 에 따라 조건부 마운트)에 부착되는 콜백 ref — 마운트 시 폭을 관찰해
+  // fit-to-width 배율을 측정/갱신한다(언마운트 시 observer 정리). 뷰어 board 와 동일한 폭 맞춤.
+  const canvasWrapRef = useCallback((node: HTMLDivElement | null) => {
+    fitObserverRef.current?.disconnect()
+    if (!node) {
+      return
+    }
+    const measure = () => setFitScale(Math.max(0.3, (node.clientWidth - 2) / STAGE_WIDTH))
+    measure()
+    fitObserverRef.current = new ResizeObserver(measure)
+    fitObserverRef.current.observe(node)
+  }, [])
 
   const objectsByKey = useMemo(() => {
     const map = new Map<number, LiveMapObjectResponse>()
@@ -322,7 +338,7 @@ export function LiveMapLayoutCanvas() {
       return
     }
     const rect = event.currentTarget.getBoundingClientRect()
-    placeObject(object, event.clientX - rect.left, event.clientY - rect.top)
+    placeObject(object, (event.clientX - rect.left) / fitScale, (event.clientY - rect.top) / fitScale)
   }
 
   const duplicatePlacement = (localId: string) => {
@@ -534,8 +550,8 @@ export function LiveMapLayoutCanvas() {
   }
 
   const stage = (
-    <Stage width={STAGE_WIDTH} height={STAGE_HEIGHT}>
-      <Layer>
+    <Stage width={STAGE_WIDTH * fitScale} height={STAGE_HEIGHT * fitScale}>
+      <Layer scaleX={fitScale} scaleY={fitScale}>
         <Rect
           x={0}
           y={0}
@@ -640,7 +656,10 @@ export function LiveMapLayoutCanvas() {
 
   if (!canEdit) {
     return (
-      <section className="flex flex-col gap-3" data-testid="live-map-builder">
+      <section
+        className="flex flex-col gap-3 rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+        data-testid="live-map-builder"
+      >
         <div
           data-testid="live-map-builder-readonly"
           className="rounded-[12px] border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
@@ -648,6 +667,7 @@ export function LiveMapLayoutCanvas() {
           Read-only — layout editing requires the LIVE_MAP_LAYOUT_WRITE permission.
         </div>
         <div
+          ref={canvasWrapRef}
           data-testid="live-map-builder-canvas"
           className="overflow-auto rounded-[18px] border border-border bg-[#0e1422]"
         >
@@ -658,7 +678,10 @@ export function LiveMapLayoutCanvas() {
   }
 
   return (
-    <section className="flex flex-col gap-3" data-testid="live-map-builder">
+    <section
+      className="flex flex-col gap-3 rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+      data-testid="live-map-builder"
+    >
       <div
         data-testid="live-map-builder-toolbar"
         className="flex flex-wrap items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
@@ -696,10 +719,12 @@ export function LiveMapLayoutCanvas() {
         </span>
       </div>
 
-      <div className="flex gap-3">
+      <div className="relative">
+        {/* 팔레트는 캔버스를 board(뷰어)와 같은 전체 폭으로 두기 위해 떠 있는 오버레이로 띄운다(뷰어 줌레일과 동일 패턴).
+            우상단 배치 — 기본 배치 원점/저작 영역이 좌측이라 충돌을 피한다. */}
         <div
           data-testid="live-map-builder-palette"
-          className="flex w-56 shrink-0 flex-col gap-1.5 rounded-[18px] border border-border bg-card p-3"
+          className="absolute right-4 top-4 z-10 flex max-h-[calc(100%-2rem)] w-56 flex-col gap-1.5 overflow-auto rounded-[18px] border border-border bg-card/90 p-3 shadow-soft-md backdrop-blur-sm"
         >
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Object Palette</span>
           <input
@@ -742,10 +767,11 @@ export function LiveMapLayoutCanvas() {
           )}
         </div>
 
-        <div className="relative flex-1">
+        <div className="relative">
           <div
+            ref={canvasWrapRef}
             data-testid="live-map-builder-canvas"
-            className="relative h-full overflow-auto rounded-[18px] border border-border bg-[#0e1422]"
+            className="relative overflow-auto rounded-[18px] border border-border bg-[#0e1422]"
             onClick={() => setContextMenu(null)}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handlePaletteDrop}

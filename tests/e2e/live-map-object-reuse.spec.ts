@@ -217,7 +217,9 @@ test('admin: 합성 객체 저장 → 팔레트 배치 → 우클릭 복사 → 
   // 우클릭 복사 → placement 2.
   // 배치 그룹은 (220,160), 객체의 첫 Rect 는 로컬 (96,80,132x72) → 화면 중심 ≈ (382,276).
   const canvas = page.locator('[data-testid="live-map-builder-canvas"] canvas').first()
-  await canvas.click({ button: 'right', position: { x: 382, y: 276 } })
+  // 캔버스가 board 좌표(1350×710)를 컨테이너 폭에 fit-to-width 스케일하므로, board 좌표 클릭 위치를 같은 배율로 환산한다.
+  const scale = (await canvas.boundingBox())!.width / 1350
+  await canvas.click({ button: 'right', position: { x: 382 * scale, y: 276 * scale } })
   await expect(page.getByTestId('placement-context-menu')).toBeVisible()
   await page.getByTestId('context-copy').click()
   await expect(page.getByTestId('builder-placement-count')).toHaveText('2')

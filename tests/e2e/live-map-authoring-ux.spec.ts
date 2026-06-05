@@ -210,14 +210,16 @@ test('admin: 다중선택 + 배율 + z-order 가 PUT 페이로드에 반영된�
   await expect(page.getByTestId('builder-placement-count')).toHaveText('1')
 
   const canvas = page.locator('[data-testid="live-map-builder-canvas"] canvas').first()
-  await canvas.click({ button: 'right', position: { x: 292, y: 208 } })
+  // 캔버스가 board 좌표(1350×710)를 컨테이너 폭에 fit-to-width 스케일하므로, board 좌표 클릭 위치를 같은 배율로 환산한다.
+  const scale = (await canvas.boundingBox())!.width / 1350
+  await canvas.click({ button: 'right', position: { x: 292 * scale, y: 208 * scale } })
   await page.getByTestId('context-copy').click()
   await expect(page.getByTestId('builder-placement-count')).toHaveText('2')
 
   // 다중선택: 배치1(292,208) 클릭 → shift+배치2(320,236).
-  await canvas.click({ position: { x: 292, y: 208 } })
+  await canvas.click({ position: { x: 292 * scale, y: 208 * scale } })
   await expect(page.getByTestId('builder-selected-count')).toHaveText('1')
-  await canvas.click({ position: { x: 320, y: 236 }, modifiers: ['Shift'] })
+  await canvas.click({ position: { x: 320 * scale, y: 236 * scale }, modifiers: ['Shift'] })
   await expect(page.getByTestId('builder-selected-count')).toHaveText('2')
 
   // 배율 + 맨 앞으로.

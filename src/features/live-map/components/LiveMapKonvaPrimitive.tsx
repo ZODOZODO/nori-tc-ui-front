@@ -13,10 +13,6 @@ import type { KonvaNode } from '../lib/live-map-layout.model'
  * "편집 모습 ≠ 보이는 모습" 버그가 되므로 한 곳에서만 매핑한다.
  */
 
-/** 빌더 저작 캔버스(Stage) 기준 크기 — 뷰어 구조물 레이어가 board 크기로 스케일할 때의 원본 좌표계. */
-export const LIVE_MAP_AUTHORING_WIDTH = 1100
-export const LIVE_MAP_AUTHORING_HEIGHT = 560
-
 /** draft primitive 를 캔버스에서 직접 편집(드래그/리사이즈/회전)하기 위한 Konva 노드 props. */
 export interface KonvaPrimitiveEditProps {
   ref: (node: KonvaNodeRef | null) => void

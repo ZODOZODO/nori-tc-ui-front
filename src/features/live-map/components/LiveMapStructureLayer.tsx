@@ -4,11 +4,7 @@ import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useLayout } from '../hooks/useLayout'
 import { sortByDepth } from '../lib/live-map-layout.model'
 import { LIVE_MAP_BOARD_HEIGHT, LIVE_MAP_BOARD_WIDTH } from '../mocks/live-map.mock'
-import {
-  KonvaPrimitive,
-  LIVE_MAP_AUTHORING_HEIGHT,
-  LIVE_MAP_AUTHORING_WIDTH,
-} from './LiveMapKonvaPrimitive'
+import { KonvaPrimitive } from './LiveMapKonvaPrimitive'
 
 interface LiveMapStructureLayerProps {
   /** 선택 라인의 lineKey. null 이면(라인 미선택) 렌더하지 않는다. */
@@ -22,8 +18,8 @@ interface LiveMapStructureLayerProps {
  * 그린다. EQUIPMENT placement 는 뷰어의 공정 카드 그리드가 담당하므로 여기선 제외한다. board 위에
  * 깔리는 floor-plan 이라 hit-test 비활성(listening=false) + pointer-events:none 로 카드/팬 클릭을 통과시킨다.</p>
  *
- * <p>빌더 저작 좌표계(1100×560)를 board 좌표계(1350×710)로 Layer scale 해 채운다 — 카드와 픽셀정렬이 아닌
- * 공간 배경이라 종횡비 근사(1.96 vs 1.90) 스케일이면 충분하다.</p>
+ * <p>저작 좌표계가 board 좌표계(1350×710)와 동일하므로 placement transform 을 그대로 적용한다 —
+ * 빌더에서 그린 위치가 뷰어 표시 위치와 1:1 로 일치한다.</p>
  */
 export function LiveMapStructureLayer({ lineKey }: LiveMapStructureLayerProps) {
   const layoutQuery = useLayout(lineKey)
@@ -60,13 +56,10 @@ export function LiveMapStructureLayer({ lineKey }: LiveMapStructureLayerProps) {
     return null
   }
 
-  const scaleX = LIVE_MAP_BOARD_WIDTH / LIVE_MAP_AUTHORING_WIDTH
-  const scaleY = LIVE_MAP_BOARD_HEIGHT / LIVE_MAP_AUTHORING_HEIGHT
-
   return (
     <div data-testid="live-map-structure-layer" className="pointer-events-none absolute inset-0">
       <Stage width={LIVE_MAP_BOARD_WIDTH} height={LIVE_MAP_BOARD_HEIGHT} listening={false}>
-        <Layer scaleX={scaleX} scaleY={scaleY} listening={false}>
+        <Layer listening={false}>
           {structures.map((structure) => (
             <Group
               key={structure.placementKey}

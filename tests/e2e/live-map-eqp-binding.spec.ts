@@ -202,7 +202,9 @@ test('admin: EQUIPMENT 배치 → 라인 스코프 설비 eqpKey 바인딩 → �
 
   // 캔버스에서 배치를 선택 → EQUIPMENT 바인딩 패널 노출.
   const canvas = page.locator('[data-testid="live-map-builder-canvas"] canvas').first()
-  await canvas.click({ position: { x: 292, y: 208 } })
+  // 캔버스가 board 좌표(1350×710)를 컨테이너 폭에 fit-to-width 스케일하므로, board 좌표 클릭 위치를 같은 배율로 환산한다.
+  const scale = (await canvas.boundingBox())!.width / 1350
+  await canvas.click({ position: { x: 292 * scale, y: 208 * scale } })
   await expect(page.getByTestId('builder-selected-count')).toHaveText('1')
   await expect(page.getByTestId('placement-eqp-binding')).toBeVisible()
 

@@ -179,7 +179,12 @@ export function LiveMapPage() {
       onOpenProfile={() => setIsProfileModalOpen(true)}
       onAfterLogout={handleAfterLogout}
     >
-      <main className="thin-scroll min-h-0 flex-1 overflow-y-auto">
+      {/* scrollbarGutter:stable — 뷰어/빌더 콘텐츠 높이 차이로 세로 스크롤바가 모드마다 생겼다 사라지며
+          우측 정렬 KPI 그리드가 8px 씩 밀리는 것을 막는다(스크롤바 자리 상시 확보). */}
+      <main
+        className="thin-scroll min-h-0 flex-1 overflow-y-auto"
+        style={{ scrollbarGutter: 'stable' }}
+      >
         <div className="flex w-full flex-col gap-4 px-6 py-6">
           <LiveMapHeader summary={summary} />
           {liveMapQuery.isError ? (
