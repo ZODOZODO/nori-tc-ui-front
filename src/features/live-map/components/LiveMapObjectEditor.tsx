@@ -1,0 +1,296 @@
+import { useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import { Box, Cylinder, Square as PlaneIcon, Trash2 } from 'lucide-react'
+import type { ShapeJson, LiveMapObjectKind } from '../lib/live-map-layout.model'
+import type { LiveMapObjectResponse } from '../api/layout.api'
+import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
+import {
+  isLiveMap3DShape,
+  type LiveMap3DPrim,
+  type LiveMap3DPrimType,
+  type LiveMap3DShape,
+} from '../lib/live-map-3d.model'
+import { LiveMap3DObject } from './LiveMap3DObject'
+
+const PRIM_DEFAULT: Record<LiveMap3DPrimType, Omit<LiveMap3DPrim, 'id'>> = {
+  box: { type: 'box', size: { x: 2, y: 2, z: 2 }, position: { x: 0, y: 1, z: 0 }, rotationY: 0, color: '#9aa7b8' },
+  cylinder: { type: 'cylinder', size: { x: 2, y: 2, z: 2 }, position: { x: 0, y: 1, z: 0 }, rotationY: 0, color: '#6b7a8f' },
+  plane: { type: 'plane', size: { x: 4, y: 1, z: 4 }, position: { x: 0, y: 0, z: 0 }, rotationY: 0, color: '#334155' },
+}
+
+type Axis = 'x' | 'y' | 'z'
+
+interface NumberFieldProps {
+  label: string
+  value: number
+  onChange: (value: number) => void
+}
+
+function NumberField({ label, value, onChange }: NumberFieldProps) {
+  return (
+    <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-muted-foreground">
+      {label}
+      <input
+        type="number"
+        step={0.5}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-14 rounded border border-border bg-background px-1.5 py-1 text-xs text-foreground"
+      />
+    </label>
+  )
+}
+
+/**
+ * 구조물 편집 = 객체 라이브러리 CRUD (SPEC live-map-3d Phase 2).
+ *
+ * <p>뷰어가 쓸 3D 객체(shape_json v2)를 기본 도형(box/cylinder/plane) 조합으로 만들고/수정/삭제한다.
+ * 폼으로 도형의 크기/위치/색을 입력하고 우측 3D 미리보기로 실시간 확인. 배치(placement)는 뷰어 담당(Phase 3).</p>
+ */
+export function LiveMapObjectEditor() {
+  const objectsQuery = useLayoutObjects(true)
+  const createObject = useCreateObject()
+  const updateObject = useUpdateObject()
+  const deleteObject = useDeleteObject()
+
+  const idRef = useRef(0)
+  const nextPrimId = () => {
+    idRef.current += 1
+    return `p-${idRef.current}`
+  }
+
+  const [editingKey, setEditingKey] = useState<number | null>(null)
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<LiveMapObjectKind>('EQUIPMENT')
+  const [prims, setPrims] = useState<LiveMap3DPrim[]>([])
+  const [status, setStatus] = useState<string | null>(null)
+
+  const shape: LiveMap3DShape = { v: 2, prims }
+
+  const resetDraft = () => {
+    setEditingKey(null)
+    setName('')
+    setKind('EQUIPMENT')
+    setPrims([])
+    setStatus(null)
+  }
+
+  const addPrim = (type: LiveMap3DPrimType) => {
+    setStatus(null)
+    setPrims((previous) => [...previous, { id: nextPrimId(), ...PRIM_DEFAULT[type] }])
+  }
+
+  const updatePrimVec = (id: string, field: 'size' | 'position', axis: Axis, value: number) => {
+    setPrims((previous) =>
+      previous.map((prim) => (prim.id === id ? { ...prim, [field]: { ...prim[field], [axis]: value } } : prim)),
+    )
+  }
+
+  const updatePrimColor = (id: string, color: string) => {
+    setPrims((previous) => previous.map((prim) => (prim.id === id ? { ...prim, color } : prim)))
+  }
+
+  const removePrim = (id: string) => {
+    setPrims((previous) => previous.filter((prim) => prim.id !== id))
+  }
+
+  const loadObject = (object: LiveMapObjectResponse) => {
+    if (!isLiveMap3DShape(object.shapeJson)) {
+      setStatus('This object is not a 3D (v2) object — cannot edit here.')
+      return
+    }
+    setEditingKey(object.objectKey)
+    setName(object.objectName)
+    setKind(object.objectKind)
+    // 로드한 prim 에 편집용 localId 부여(저장 시 그대로 직렬화).
+    setPrims(object.shapeJson.prims.map((prim) => ({ ...prim, id: prim.id || nextPrimId() })))
+    setStatus(null)
+  }
+
+  const handleSave = () => {
+    const trimmedName = name.trim()
+    if (trimmedName.length === 0) {
+      setStatus('Object name is required.')
+      return
+    }
+    if (prims.length === 0) {
+      setStatus('Add at least one shape.')
+      return
+    }
+    // shape_json 컬럼은 opaque JSONB — v2 스펙을 ShapeJson 자리에 저장(백엔드 무변경).
+    const body = { objectName: trimmedName, objectKind: kind, shapeJson: shape as unknown as ShapeJson }
+    const onDone = (verb: string) => () => {
+      setStatus(`Object ${verb}.`)
+      resetDraft()
+    }
+    const onFail = (error: unknown) =>
+      setStatus(error instanceof Error ? error.message : 'Save failed.')
+
+    if (editingKey != null) {
+      updateObject.mutate({ objectKey: editingKey, body }, { onSuccess: onDone('updated'), onError: onFail })
+    } else {
+      createObject.mutate(body, { onSuccess: onDone('created'), onError: onFail })
+    }
+  }
+
+  const objects = objectsQuery.data ?? []
+
+  return (
+    <section
+      data-testid="live-map-object-editor"
+      className="flex gap-3 rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+    >
+      {/* 객체 리스트 */}
+      <div data-testid="object-editor-list" className="flex w-56 shrink-0 flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Objects</span>
+          <button
+            type="button"
+            data-testid="object-editor-new"
+            className="rounded-md border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
+            onClick={resetDraft}
+          >
+            + New
+          </button>
+        </div>
+        <div className="thin-scroll flex max-h-[560px] flex-col gap-1 overflow-auto">
+          {objects.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No objects yet.</span>
+          ) : (
+            objects.map((object) => (
+              <div
+                key={object.objectKey}
+                className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${
+                  editingKey === object.objectKey ? 'border-primary bg-brand-primary/5' : 'border-border'
+                }`}
+              >
+                <button
+                  type="button"
+                  data-testid={`object-list-item-${object.objectKey}`}
+                  className="flex min-w-0 flex-1 flex-col items-start text-left"
+                  onClick={() => loadObject(object)}
+                >
+                  <span className="w-full truncate text-xs font-semibold text-foreground">{object.objectName}</span>
+                  <span className="text-[10px] text-muted-foreground">{object.objectKind}</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid={`object-list-delete-${object.objectKey}`}
+                  className="text-danger"
+                  aria-label={`Delete ${object.objectName}`}
+                  onClick={() => deleteObject.mutate(object.objectKey)}
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 컴포저 */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs font-semibold">
+            Name
+            <input
+              data-testid="object-editor-name"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold">
+            Kind
+            <select
+              data-testid="object-editor-kind"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              value={kind}
+              onChange={(event) => setKind(event.target.value as LiveMapObjectKind)}
+            >
+              <option value="EQUIPMENT">EQUIPMENT</option>
+              <option value="STRUCTURE">STRUCTURE</option>
+            </select>
+          </label>
+          <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label="Add shape">
+            <button type="button" data-testid="object-editor-add-box" title="Add Box" aria-label="Add Box" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
+              <Box className="size-4" />
+            </button>
+            <button type="button" data-testid="object-editor-add-cylinder" title="Add Cylinder" aria-label="Add Cylinder" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
+              <Cylinder className="size-4" />
+            </button>
+            <button type="button" data-testid="object-editor-add-plane" title="Add Plane" aria-label="Add Plane" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('plane')}>
+              <PlaneIcon className="size-4" />
+            </button>
+          </div>
+          <button
+            type="button"
+            data-testid="object-editor-save"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            onClick={handleSave}
+          >
+            {editingKey != null ? 'Update' : 'Save'}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            shapes <span data-testid="object-editor-prim-count">{prims.length}</span>
+          </span>
+        </div>
+
+        <div className="thin-scroll flex max-h-[520px] flex-col gap-2 overflow-auto">
+          {prims.length === 0 ? (
+            <span className="text-xs text-muted-foreground">Add a shape (box/cylinder/plane) to start.</span>
+          ) : (
+            prims.map((prim) => (
+              <div key={prim.id} className="flex flex-wrap items-end gap-2 rounded-[12px] border border-border bg-background/40 px-3 py-2">
+                <span className="w-16 text-xs font-bold text-foreground">{prim.type}</span>
+                <NumberField label="W" value={prim.size.x} onChange={(value) => updatePrimVec(prim.id, 'size', 'x', value)} />
+                <NumberField label="H" value={prim.size.y} onChange={(value) => updatePrimVec(prim.id, 'size', 'y', value)} />
+                <NumberField label="D" value={prim.size.z} onChange={(value) => updatePrimVec(prim.id, 'size', 'z', value)} />
+                <NumberField label="X" value={prim.position.x} onChange={(value) => updatePrimVec(prim.id, 'position', 'x', value)} />
+                <NumberField label="Y" value={prim.position.y} onChange={(value) => updatePrimVec(prim.id, 'position', 'y', value)} />
+                <NumberField label="Z" value={prim.position.z} onChange={(value) => updatePrimVec(prim.id, 'position', 'z', value)} />
+                <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-muted-foreground">
+                  Color
+                  <input
+                    type="color"
+                    value={prim.color}
+                    onChange={(event) => updatePrimColor(prim.id, event.target.value)}
+                    className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <button type="button" className="ml-auto text-danger" aria-label="Remove shape" onClick={() => removePrim(prim.id)}>
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {status ? (
+          <div data-testid="object-editor-status" className="rounded-md border border-border bg-background/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+            {status}
+          </div>
+        ) : null}
+      </div>
+
+      {/* 3D 미리보기 */}
+      <div
+        data-testid="object-editor-preview"
+        className="h-[480px] w-[320px] shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
+      >
+        <Canvas frameloop="demand" shadows orthographic camera={{ position: [7, 7, 7], zoom: 42, near: -100, far: 100 }}>
+          <color attach="background" args={['#0e1422']} />
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[6, 10, 4]} intensity={1.1} castShadow />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+            <planeGeometry args={[30, 30]} />
+            <meshStandardMaterial color="#0b0f1a" />
+          </mesh>
+          <LiveMap3DObject shape={shape} />
+          <OrbitControls target={[0, 1, 0]} makeDefault />
+        </Canvas>
+      </div>
+    </section>
+  )
+}

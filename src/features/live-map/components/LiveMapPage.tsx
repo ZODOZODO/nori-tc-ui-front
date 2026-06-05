@@ -9,7 +9,7 @@ import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
-import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
+import { LiveMapObjectEditor } from './LiveMapObjectEditor'
 import { LiveMapStructureLayer } from './LiveMapStructureLayer'
 import { LiveMap3DScene } from './LiveMap3DScene'
 
@@ -36,8 +36,8 @@ type LiveMapViewMode = 'viewer' | 'builder' | 'scene3d'
 
 /**
  * live-map 페이지: 테마형 공정 플로우 뷰어({@link LiveMapBoard}) 가 기본 뷰이고,
- * LIVE_MAP_LAYOUT_WRITE 권한자는 "구조물 편집" 모드로 react-konva 빌더({@link LiveMapLayoutCanvas})
- * 에 진입해 라인 구조물/장애물을 저작한다.
+ * LIVE_MAP_LAYOUT_WRITE 권한자는 "구조물 편집" 모드로 객체 라이브러리 에디터({@link LiveMapObjectEditor})
+ * 에서 3D 객체를 CRUD 하고, "3D" 모드({@link LiveMap3DScene})로 등각 뷰어를 본다.
  *
  * <p>뷰어는 GET /live-map 의 실설비를 공정 카드 그리드에 배치하고(라인 스코프 필터), IN→OUT
  * 흐름·실시간 상태를 보여주며, 설비 선택 시 우측 상세 패널(속성/포트/통신로그)을 연다.</p>
@@ -243,7 +243,7 @@ export function LiveMapPage() {
           ) : null}
 
           {isBuilderMode ? (
-            <LiveMapLayoutCanvas />
+            <LiveMapObjectEditor />
           ) : isScene3dMode ? (
             <LiveMap3DScene lineKey={lineKey} />
           ) : (

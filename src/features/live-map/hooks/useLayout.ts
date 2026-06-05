@@ -57,6 +57,17 @@ export function useCreateObject() {
   })
 }
 
+export function useUpdateObject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { objectKey: number; body: LiveMapObjectSaveBody }) =>
+      layoutApi.updateObject(vars.objectKey, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: layoutQueryKeys.objects() })
+    },
+  })
+}
+
 export function useDeleteObject() {
   const queryClient = useQueryClient()
   return useMutation({

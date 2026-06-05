@@ -127,6 +127,8 @@ const attachConsoleGuards = (page: Page) => {
 test('admin: 3D 모드가 layout 의 v2 객체를 react-three-fiber <canvas> 로 렌더한다 (console/pageerror 0)', async ({
   page,
 }) => {
+  // r3f(three/drei) dev 첫 컴파일 + WebGL 초기화가 무거워 병렬 실행 시 기본 30s 초과 → 여유 부여.
+  test.setTimeout(90_000)
   await setupMocks(page)
   const { consoleErrors, pageErrors } = attachConsoleGuards(page)
 
