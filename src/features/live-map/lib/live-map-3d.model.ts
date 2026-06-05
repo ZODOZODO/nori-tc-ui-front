@@ -1,0 +1,51 @@
+/**
+ * live-map 3D(등각) 객체의 순수 모델입니다.
+ *
+ * <p>객체(shape_json v2)는 기본 도형(box/cylinder/plane) 조합으로 정의된다. 빌더(객체 라이브러리)가
+ * 이 스펙을 만들고, 뷰어 3D 씬이 three 메시로 렌더한다(SPEC: live-map-3d). React/three 비의존 — 순수 TS.</p>
+ */
+
+export type LiveMap3DPrimType = 'box' | 'cylinder' | 'plane'
+
+export interface Vec3 {
+  x: number
+  y: number
+  z: number
+}
+
+/** 기본 도형 1개 — 크기/위치(객체 로컬, world unit)/Y축 회전(rad)/색. */
+export interface LiveMap3DPrim {
+  id: string
+  type: LiveMap3DPrimType
+  size: Vec3
+  position: Vec3
+  rotationY: number
+  color: string
+}
+
+/** tc_live_map_object.shape_json v2 — 3D 도형 조합(JSONB, 스키마 변경 없이 기존 컬럼 재사용). */
+export interface LiveMap3DShape {
+  v: 2
+  prims: LiveMap3DPrim[]
+}
+
+/** shape_json 이 v2(3D) 스펙인지 — v1(Konva Group)과 구분한다. */
+export const isLiveMap3DShape = (json: unknown): json is LiveMap3DShape => {
+  if (typeof json !== 'object' || json === null) {
+    return false
+  }
+  const candidate = json as { v?: unknown; prims?: unknown }
+  return candidate.v === 2 && Array.isArray(candidate.prims)
+}
+
+/** 뷰어 board 좌표계(1350×710 px). placement.transform.x/y 가 이 평면 위 위치. */
+export const LIVE_MAP_BOARD_PX_WIDTH = 1350
+export const LIVE_MAP_BOARD_PX_HEIGHT = 710
+
+/** placement px 좌표를 3D world(중앙 원점)로 — y(px)→z(world). 1 world unit ≈ WORLD_SCALE px. */
+export const LIVE_MAP_WORLD_SCALE = 40
+
+export const placementToWorld = (xPx: number, yPx: number): [number, number] => [
+  (xPx - LIVE_MAP_BOARD_PX_WIDTH / 2) / LIVE_MAP_WORLD_SCALE,
+  (yPx - LIVE_MAP_BOARD_PX_HEIGHT / 2) / LIVE_MAP_WORLD_SCALE,
+]

@@ -11,6 +11,7 @@ import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
 import { LiveMapLayoutCanvas } from './LiveMapLayoutCanvas'
 import { LiveMapStructureLayer } from './LiveMapStructureLayer'
+import { LiveMap3DScene } from './LiveMap3DScene'
 
 // 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
 const LiveMapDemoModal = lazy(() =>
@@ -31,7 +32,7 @@ import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
 
-type LiveMapViewMode = 'viewer' | 'builder'
+type LiveMapViewMode = 'viewer' | 'builder' | 'scene3d'
 
 /**
  * live-map 페이지: 테마형 공정 플로우 뷰어({@link LiveMapBoard}) 가 기본 뷰이고,
@@ -172,6 +173,8 @@ export function LiveMapPage() {
   }
 
   const isBuilderMode = viewMode === 'builder' && canEdit
+  const isScene3dMode = viewMode === 'scene3d' && canEdit
+  const isViewerMode = !isBuilderMode && !isScene3dMode
 
   return (
     <AppPageShell
@@ -199,15 +202,28 @@ export function LiveMapPage() {
                 <button
                   type="button"
                   data-testid="live-map-mode-viewer"
-                  aria-pressed={!isBuilderMode}
+                  aria-pressed={isViewerMode}
                   onClick={() => setViewMode('viewer')}
                   className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
-                    isBuilderMode
-                      ? 'text-muted-foreground hover:text-foreground'
-                      : 'bg-brand-primary/10 text-brand-primary'
+                    isViewerMode
+                      ? 'bg-brand-primary/10 text-brand-primary'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {t('livemap.mode.viewer')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="live-map-mode-3d"
+                  aria-pressed={isScene3dMode}
+                  onClick={() => setViewMode('scene3d')}
+                  className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
+                    isScene3dMode
+                      ? 'bg-brand-primary/10 text-brand-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  3D
                 </button>
                 <button
                   type="button"
@@ -228,6 +244,8 @@ export function LiveMapPage() {
 
           {isBuilderMode ? (
             <LiveMapLayoutCanvas />
+          ) : isScene3dMode ? (
+            <LiveMap3DScene lineKey={lineKey} />
           ) : (
             <LiveMapBoard
               backgroundLayer={<LiveMapStructureLayer lineKey={lineKey} />}

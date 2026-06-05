@@ -717,7 +717,8 @@ export function LiveMapLayoutCanvas() {
                 setContextMenu({ x: event.evt.offsetX, y: event.evt.offsetY, localId: placement.localId })
               }}
             >
-              {(object.shapeJson.root.children ?? []).map((child, index) => (
+              {/* v1(Konva) 객체만 root.children 보유. v2(3D) 객체는 root 가 없어 옵셔널 체이닝으로 건너뛴다(크래시 방지). */}
+              {(object.shapeJson.root?.children ?? []).map((child, index) => (
                 <KonvaPrimitive key={`${placement.localId}-${index}`} node={child} />
               ))}
               {isEquipment && equipment ? (

@@ -37,7 +37,10 @@ export function LiveMapStructureLayer({ lineKey }: LiveMapStructureLayerProps) {
     const resolved = placements
       .map((placement) => {
         const object = objectsByKey.get(placement.objectKey)
-        if (!object || object.objectKind !== 'STRUCTURE') {
+        // 이 2D 레이어는 v1(Konva, shapeJson.root) STRUCTURE 만 렌더한다. v2(3D, {v:2,prims}) 객체는
+        // root 가 없어 건너뛴다(3D 씬이 담당) — 없으면 root.children 접근에서 크래시.
+        const hasKonvaRoot = (object?.shapeJson as { root?: unknown } | undefined)?.root != null
+        if (!object || object.objectKind !== 'STRUCTURE' || !hasKonvaRoot) {
           return null
         }
         return {
