@@ -16,7 +16,26 @@ const ME = {
   permissionCodes: ['LIVE_MAP_READ', 'LINE_READ', 'LIVE_MAP_LAYOUT_READ', 'LIVE_MAP_LAYOUT_WRITE'],
 }
 const LINES = [{ lineKey: 1, lineCode: 'A_LINE', lineName: 'A Line' }]
-const LIVE_MAP = { equipmentItems: [] }
+const LIVE_MAP = {
+  equipmentItems: [
+    {
+      eqpKey: 77,
+      eqpId: 'EQP-77',
+      eqpName: 'Etcher B1',
+      lineValue: 'A_LINE',
+      lineLabel: 'A Line',
+      clusterId: 'c1',
+      clusterName: 'C1',
+      equipmentModeLabel: 'Auto',
+      status: 'RUN',
+      statusLabel: 'Run',
+      portItems: [],
+      tooltipMeta: '',
+      tooltipStep: '',
+      alertMessage: null,
+    },
+  ],
+}
 
 const box = (color: string) => ({
   v: 2,
@@ -96,6 +115,10 @@ const setupMocks = async (page: Page, state: MockState) => {
       body: JSON.stringify(apiSuccess({ items: [], offset: 0, limit: 500, count: 0 })),
     })
   })
+  // comm-logs 는 배열 응답(CommLogEntry[]) — generic 뒤 등록으로 viewer 상세의 통신로그 크래시 방지.
+  await page.route(/.*\/api\/comm-logs(\/.*)?(\?.*)?$/, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
+  })
 }
 
 const attachConsoleGuards = (page: Page) => {
@@ -142,12 +165,15 @@ test('admin: 3D 편집모드에서 객체 추가 → 회전 → 템플릿 교체
   // 설비 객체 교체: Etcher A(1) → Etcher B(3) (같은 EQUIPMENT).
   await page.getByTestId('live-map-3d-assign-select').selectOption('3')
 
+  // 실설비 바인딩: 라인 스코프 설비(eqpKey 77).
+  await page.getByTestId('live-map-3d-eqp-select').selectOption('77')
+
   // 저장 → PUT /layout.
   await page.getByTestId('live-map-3d-save').click()
   await expect.poll(() => state.putCalls).toBe(1)
   expect(state.lastPlacements).toHaveLength(1)
   expect(state.lastPlacements[0].objectKey).toBe(3)
-  expect(state.lastPlacements[0].eqpKey).toBeNull()
+  expect(state.lastPlacements[0].eqpKey).toBe(77)
   expect(state.lastPlacements[0].transformJson.rotation).toBe(15)
   expect(state.lastPlacements[0].transformJson.x).toBe(675)
   expect(state.lastPlacements[0].transformJson.y).toBe(355)

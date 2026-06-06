@@ -144,7 +144,7 @@ test('admin: 구조물 편집에서 도형 조합 객체를 생성·수정·삭�
 
   await expect.poll(() => state.posts.length).toBe(1)
   expect(state.posts[0].objectName).toBe('Pump 3D')
-  expect(state.posts[0].objectKind).toBe('EQUIPMENT')
+  expect(state.posts[0].objectKind).toBe('STRUCTURE')
   expect(state.posts[0].shapeJson.v).toBe(2)
   expect(state.posts[0].shapeJson.prims?.[0]?.type).toBe('box')
 

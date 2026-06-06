@@ -43,10 +43,11 @@ function NumberField({ label, value, onChange }: NumberFieldProps) {
 }
 
 /**
- * 구조물 편집 = 객체 라이브러리 CRUD (SPEC live-map-3d Phase 2).
+ * 구조물 편집 = STRUCTURE 객체 라이브러리 CRUD (SPEC live-map-3d Phase 2).
  *
- * <p>뷰어가 쓸 3D 객체(shape_json v2)를 기본 도형(box/cylinder/plane) 조합으로 만들고/수정/삭제한다.
- * 폼으로 도형의 크기/위치/색을 입력하고 우측 3D 미리보기로 실시간 확인. 배치(placement)는 뷰어 담당(Phase 3).</p>
+ * <p>뷰어가 쓸 구조물(벽/바닥/고정물 등 STRUCTURE) 3D 객체(shape_json v2)를 기본 도형(box/cylinder/plane)
+ * 조합으로 만들고/수정/삭제한다. 설비(EQUIPMENT)는 실데이터 기반 빌트인 fab tool 로 자동 표시되므로 여기서
+ * 다루지 않는다. 폼으로 도형 크기/위치/색을 입력, 우측 3D 미리보기로 확인. 배치는 뷰어 담당(Phase 3).</p>
  */
 export function LiveMapObjectEditor() {
   const objectsQuery = useLayoutObjects(true)
@@ -62,7 +63,7 @@ export function LiveMapObjectEditor() {
 
   const [editingKey, setEditingKey] = useState<number | null>(null)
   const [name, setName] = useState('')
-  const [kind, setKind] = useState<LiveMapObjectKind>('EQUIPMENT')
+  const [kind, setKind] = useState<LiveMapObjectKind>('STRUCTURE')
   const [prims, setPrims] = useState<LiveMap3DPrim[]>([])
   const [status, setStatus] = useState<string | null>(null)
 
@@ -71,7 +72,7 @@ export function LiveMapObjectEditor() {
   const resetDraft = () => {
     setEditingKey(null)
     setName('')
-    setKind('EQUIPMENT')
+    setKind('STRUCTURE')
     setPrims([])
     setStatus(null)
   }
@@ -134,7 +135,8 @@ export function LiveMapObjectEditor() {
     }
   }
 
-  const objects = objectsQuery.data ?? []
+  // 설비(EQUIPMENT)는 빌트인 fab tool 자동 표시 — 빌더는 STRUCTURE 만 다룬다(FK용 '기본 설비' 등 EQUIPMENT 숨김).
+  const objects = (objectsQuery.data ?? []).filter((object) => object.objectKind === 'STRUCTURE')
 
   return (
     <section
@@ -201,18 +203,15 @@ export function LiveMapObjectEditor() {
               onChange={(event) => setName(event.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <div className="flex flex-col gap-1 text-xs font-semibold">
             Kind
-            <select
+            <span
               data-testid="object-editor-kind"
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-              value={kind}
-              onChange={(event) => setKind(event.target.value as LiveMapObjectKind)}
+              className="inline-flex h-[34px] items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-bold text-muted-foreground"
             >
-              <option value="EQUIPMENT">EQUIPMENT</option>
-              <option value="STRUCTURE">STRUCTURE</option>
-            </select>
-          </label>
+              STRUCTURE
+            </span>
+          </div>
           <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label="Add shape">
             <button type="button" data-testid="object-editor-add-box" title="Add Box" aria-label="Add Box" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
               <Box className="size-4" />

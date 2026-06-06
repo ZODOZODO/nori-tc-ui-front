@@ -1,7 +1,34 @@
 # live-map 3D 등각 뷰어 + 객체 라이브러리 편집
 
 ## Status
-Specify 완료 — 2026-06-05. 인터뷰 4문항 확정 반영. 다음 단계 Plan.
+Phase 1~4 구현 완료 — 2026-06-05. 검증: tsc 0 / eslint 0 errors / unit 116 pass / live-map e2e 8 passed.
+(커밋: c1a810a SPEC, e707a34 P1, 3006fce P2+P3, + P4. 구 Konva 빌더 LiveMapLayoutCanvas 삭제 완료.)
+
+### 후속 (2026-06-05~06, 미커밋)
+- **설비 3D 모델 = 반도체 클러스터 공정 장비**(`LiveMap3DEquipment`): 메인프레임(후방 본체) + 상단 챔버 클러스터(트랜스퍼 허브 + 프로세스 모듈 3) + EFEM(전면 모듈, 글래스 패널) + **로드 포트(전면 도크 + FOUP 캐리어)** + 시그널 타워(적/황/녹 안돈). EQUIPMENT placement 는 도형 대신 이 장비로 렌더.
+  - **port = 로드 포트 입구**(도메인 정정): `portItems`(PORT 1·2·3…)는 상태 LED 점이 아니라 웨이퍼가 들어가는 FOUP 도킹 입구로 그린다. 캐리어 도어 밴드 색 = 포트 상태(RUN/IDLE/DOWN). 설비 status 는 시그널 타워.
+- **실설비 자동 표시(R1)**: 저장 placement 가 0 이어도 선택 라인 실설비(`equipmentItems`)를 장비 그리드로 자동 표시(`autoGridPx`, objectKey 0 sentinel). admin 이 편집(드래그/회전)하면 working 으로 승격, 저장 시 object_key NOT NULL FK 충족 위해 백킹 EQUIPMENT 객체 1회 자동 생성(`ensureEquipmentObjectKey`) 후 PUT. 백엔드/스키마 변경 0.
+- **반응형 높이**: 씬 컨테이너 `h-[calc(100dvh-16rem)] min-h-[440px]` — 창 높이에 맞춰 늘고 줄며(최소 440 바닥), r3f Canvas 가 ResizeObserver 로 따라 리사이즈.
+- **선택 상세 = 뷰어와 동일**: 3D 상세를 뷰어의 `LiveMapTooltipCard`(process/line/wafer mode + 실시간 상태 + 포트 RUN수/목록 + 통신로그)로 교체. 선택 설비를 `buildLiveMapEquipmentNodes`로 노드 변환(eqpId 매칭)해 주입. CSS 토큰이라 테마 자동 대응.
+- **dark/light 테마**: 3D 캔버스(WebGL)는 CSS 토큰 불가 → `useThemeStore` 값으로 배경/그리드/조명/ContactShadows/뱃지 배경을 `SCENE_PALETTE[theme]`로 분기. 오버레이/상세는 토큰으로 자동.
+- **성능**: `dpr={[1,1.5]}`(레티나 과샘플 캡) + 그림자맵 2048→1024 + ContactShadows resolution 512 + 장비 작은 파트 castShadow 제거(메인프레임/EFEM만 캐스트) → 3D 진입/조작 렌더 부하↓.
+- 신규 e2e: `live-map-3d-auto.spec.ts`(저장 0 → 자동 표시 + 편집/저장 시 POST objects + PUT). 검증: tsc 0 / eslint 0 errors / live-map e2e 9 passed.
+
+### 후속 UX/버그 (2026-06-06, 미커밋)
+- **선택 상세 = 뷰어 동일**: `LiveMap3DScene` 상세 패널을 뷰어 `LiveMapTooltipCard`(process/line/wafer mode + 실시간 상태 + 포트 RUN수/목록 + 통신로그)로 교체. `buildLiveMapEquipmentNodes`로 eqpId 매칭. (status e2e 도 EQP-77/A Line/Auto + 카드 X 닫기로 갱신)
+- **dark/light 테마**: 캔버스 배경/그리드/조명/ContactShadows/뱃지를 `SCENE_PALETTE[theme]`(`useThemeStore`)로 분기. 상세/오버레이는 CSS 토큰 자동.
+- **성능**: `dpr={[1,1.5]}` + 그림자맵 1024 + ContactShadows resolution 512 + 장비 작은 파트 castShadow 제거.
+- **편집 UX**: 토글 라벨 `편집 종료`(명확화) + 모든 편집 컨트롤 hover 상태 + 아이콘 버튼 `title`.
+- **편집 드래그↔카메라 충돌 수정**: 편집 모드에서 `enableRotate={!editing}` — 설비 좌드래그 이동과 OrbitControls orbit 충돌 제거(pan/zoom 유지). (원인: r3f stopPropagation 은 OrbitControls 네이티브 리스너 미차단.)
+- **구조물 편집 = STRUCTURE 전용**: 설비는 빌트인 fab tool 자동 표시라 빌더는 구조물만 — Kind 고정(셀렉터 제거) + 리스트 STRUCTURE 필터(FK용 '기본 설비' EQUIPMENT 숨김). (object-editor e2e STRUCTURE 로 갱신)
+
+### 버그 감사 (2026-06-06, 미커밋)
+- **[수정·Critical] 자동 그리드 재배치 겹침**: 편집 모드에서 설비 1개 회전/이동(=working 승격) 시 나머지 자동 설비가 빈 자리로 당겨져 겹치던 버그. 원인: 자동 위치를 "미배치 부분집합"의 index/total 로 계산. 수정: `buildAutoEquipmentPlacements(eqpKeys, placed)` 순수 함수로 추출 — 전체 라인 설비의 고정 index 기반. 회귀 단위 테스트 `live-map-3d-model.test.ts`(일부 placed 여도 나머지 위치 불변) 추가.
+- **[수정] 저장 더블클릭 409**: pending 중 저장 버튼 비활성화(`saveLayout.isPending || createObject.isPending`) — `기본 설비` 중복 POST(name UNIQUE 위반) 방지.
+- **[관찰·무해] 순수-auto 설비 삭제 no-op**: 미승격 자동 설비에 삭제 클릭 시 working 에 없어 no-op(이동/구조물엔 정상 동작 — 이동 설비는 자동 위치로 복귀). 유지.
+- **[관찰·완화됨] 윈도우 포커스 refetch**: useLayout staleTime 0 이나 TanStack structuralSharing 으로 동일 데이터는 참조 보존 → 편집 중 reseed 클로버 없음.
+- **[수정·Critical] 저장 403 (CSRF 헤더 누락)**: `layout.api.ts` 의 쓰기(putLayout/createObject/updateObject/deleteObject)가 코드베이스 표준 CSRF 패턴(GET /auth/csrf → 쿠키 토큰을 `X-XSRF-TOKEN` 헤더로 수동 부착)을 안 따라, Spring Security(Double Submit Cookie)가 쓰기를 403 거부. 다른 feature API(user/deploy/eqp/model…)는 모두 부착하는데 layout 만 누락(axios 자동 XSRF 에만 의존). 4개 뮤테이션에 `issueCsrfToken()` + 헤더 부착 추가. e2e(auto)가 POST/PUT 의 X-XSRF-TOKEN 존재를 단언하도록 강화(기존 mock 은 헤더 미검사라 못 잡음).
+- 검증: tsc 0 / eslint 0 errors / unit 119 pass / live-map e2e 9 passed.
 
 ## Why
 live-map 을 `C:\workspace_nori\livemap_mokup.jpg`(2.5D 등각 데이터센터 스타일, HT 계열)처럼 만든다.
@@ -48,10 +75,10 @@ live-map 을 `C:\workspace_nori\livemap_mokup.jpg`(2.5D 등각 데이터센터 �
 - 공통: `npm run test:unit` 0 fail, `npx eslint` 0 error. (r3f `<canvas>` 픽셀은 e2e 단언 불가 → DOM 오버레이/카운터/console 로 검증.)
 
 ## Phases
-1. r3f 셋업(@react-three/fiber v9/three/drei) + 읽기전용 등각 뷰어 씬.
-2. 구조물 편집(객체 CRUD + 폼 컴포저 + 3D 미리보기) + useUpdateObject.
-3. 뷰어 admin 편집(바닥 드래그 배치 + 템플릿 지정 + PUT 영속).
-4. 선택 상세 패널 + 상태 뱃지 + mockup1 향한 폴리시(조명/그림자/바닥/벽).
+1. [x] r3f 셋업(@react-three/fiber v9/three/drei) + 읽기전용 등각 뷰어 씬.
+2. [x] 구조물 편집(객체 CRUD + 폼 컴포저 + 3D 미리보기) + useUpdateObject.
+3. [x] 뷰어 admin 편집(바닥 드래그 배치 + 템플릿 지정 + PUT 영속).
+4. [x] 선택 상세 패널 + 상태 뱃지 + 폴리시(hemisphere/contact shadows). mockup1 추가 폴리시(벽/바닥 디테일)는 시안 반복 여지.
 
 ## Out of Scope
 - GLTF 실사 모델, mockup2 같은 풀 원근 3D.
