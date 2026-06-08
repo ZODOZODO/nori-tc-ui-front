@@ -37,6 +37,8 @@ export interface TransformJson {
   skewY: number
   zIndex: number
   depth: number
+  /** 3D 뷰어 층(1~). 미지정 시 1층. 백엔드는 transform_json 을 opaque JSONB 로 보존(스키마 무변경). */
+  floor?: number
 }
 
 export interface GridConfig {
@@ -119,6 +121,7 @@ export const buildTransformJson = (overrides: Partial<Omit<TransformJson, 'v'>>)
   skewY: overrides.skewY ?? 0,
   zIndex: overrides.zIndex ?? 0,
   depth: overrides.depth ?? 0,
+  floor: overrides.floor ?? 1,
 })
 
 /**

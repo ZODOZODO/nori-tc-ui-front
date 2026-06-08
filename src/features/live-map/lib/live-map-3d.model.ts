@@ -53,6 +53,54 @@ export const isLiveMap3DShape = (json: unknown): json is LiveMap3DShape => {
   return candidate.v === 2 && Array.isArray(candidate.prims)
 }
 
+/**
+ * 빌트인(기성) 구조물 — DB row 없이 편집기/뷰어 목록에 항상 노출되는 기본 구조물(벽/파티션).
+ * 뷰어에 배치 후 저장 시 같은 이름의 STRUCTURE 객체를 1회 영속(지연저장)하고 placement 키를 치환한다.
+ * objectKey 는 음수 sentinel — 양수 DB 키 및 설비 자동표시(0)와 충돌하지 않는다. 길이축은 X 고정(세로벽은 배치에서 90° 회전).
+ */
+export interface LiveMapBuiltinStructure {
+  objectKey: number
+  slug: string
+  objectName: string
+  shapeJson: LiveMap3DShape
+}
+
+export const LIVE_MAP_BUILTIN_STRUCTURES: readonly LiveMapBuiltinStructure[] = [
+  {
+    objectKey: -1,
+    slug: 'wall',
+    objectName: '벽',
+    shapeJson: { v: 2, prims: [{ id: 'wall', type: 'box', size: { x: 10, y: 3, z: 0.3 }, position: { x: 0, y: 1.5, z: 0 }, rotationY: 0, color: '#94a3b8' }] },
+  },
+  {
+    objectKey: -2,
+    slug: 'partition',
+    objectName: '파티션',
+    shapeJson: { v: 2, prims: [{ id: 'partition', type: 'box', size: { x: 5, y: 1.6, z: 0.15 }, position: { x: 0, y: 0.8, z: 0 }, rotationY: 0, color: '#b8c2d0' }] },
+  },
+]
+
+/** 빌트인 구조물 키(음수 sentinel)인지 — 저장 시 실 STRUCTURE 객체 키로 치환 대상. */
+export const isBuiltinStructureKey = (objectKey: number): boolean => objectKey < 0
+
+/**
+ * 공정(클러스터)별 자동 표시 설비의 기본 층 — clusterId(소문자) 기준. 미지정 공정(metro/etc 등)은 1층.
+ * 저장된 placement 는 자체 floor 를 가지므로 이 매핑은 자동 표시에만 적용된다.
+ */
+export const PROCESS_FLOOR: Record<string, number> = {
+  photo: 1,
+  etch: 1,
+  cvd: 1,
+  cmp: 2,
+  diff: 2,
+  imp: 2,
+  wet: 3,
+  metal: 3,
+}
+
+export const floorForCluster = (clusterId: string | null | undefined): number =>
+  PROCESS_FLOOR[(clusterId ?? '').toLowerCase()] ?? 1
+
 /** 뷰어 board 좌표계(1350×710 px). placement.transform.x/y 가 이 평면 위 위치. */
 export const LIVE_MAP_BOARD_PX_WIDTH = 1350
 export const LIVE_MAP_BOARD_PX_HEIGHT = 710

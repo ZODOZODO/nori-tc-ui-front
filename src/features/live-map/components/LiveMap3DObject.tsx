@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { LiveMap3DPrim, LiveMap3DShape } from '../lib/live-map-3d.model'
 
 /**
@@ -21,7 +22,7 @@ function Prim({ prim }: { prim: LiveMap3DPrim }) {
   )
 }
 
-export function LiveMap3DObject({ shape }: { shape: LiveMap3DShape }) {
+export const LiveMap3DObject = memo(function LiveMap3DObject({ shape }: { shape: LiveMap3DShape }) {
   return (
     <>
       {shape.prims.map((prim) => (
@@ -29,4 +30,4 @@ export function LiveMap3DObject({ shape }: { shape: LiveMap3DShape }) {
       ))}
     </>
   )
-}
+})

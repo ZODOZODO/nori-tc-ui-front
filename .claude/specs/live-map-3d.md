@@ -22,6 +22,37 @@ Phase 1~4 구현 완료 — 2026-06-05. 검증: tsc 0 / eslint 0 errors / unit 1
 - **편집 드래그↔카메라 충돌 수정**: 편집 모드에서 `enableRotate={!editing}` — 설비 좌드래그 이동과 OrbitControls orbit 충돌 제거(pan/zoom 유지). (원인: r3f stopPropagation 은 OrbitControls 네이티브 리스너 미차단.)
 - **구조물 편집 = STRUCTURE 전용**: 설비는 빌트인 fab tool 자동 표시라 빌더는 구조물만 — Kind 고정(셀렉터 제거) + 리스트 STRUCTURE 필터(FK용 '기본 설비' EQUIPMENT 숨김). (object-editor e2e STRUCTURE 로 갱신)
 
+### 빌트인 구조물 + 조작 안내 (2026-06-06, 미커밋)
+- **빌트인 벽/파티션**: `LIVE_MAP_BUILTIN_STRUCTURES`(모델, 음수 sentinel 키 -1/-2)로 벽/파티션을 DB row 없이 편집기 목록(`object-builtin-item-{slug}`) + 뷰어 추가 드롭다운에 항상 노출. 뷰어 배치 후 저장 시 같은 이름의 STRUCTURE 객체를 1회 지연 생성(`ensureBuiltinStructureObjectKey`, `ensureEquipmentObjectKey` 와 동형) 후 placement 키 치환(`keyRemap`). 같은 이름 실 DB STRUCTURE 가 생기면 빌트인은 숨김(중복 방지). `objectsByKey`/`libraryObjects` 에 빌트인 병합, `handleAdd` 의 키 검증을 `<=0`→`===0`(음수 허용)로 완화. (설계 인터뷰: "기성 객체" 선택 — 설비 auto-display 빌트인과 일관. 직전 "프리셋 버튼" 시도는 목록 진입과 중복이라 제거.)
+- **조작 안내 힌트**: OrbitControls 기본 매핑(좌:회전 / 우:이동(pan) / 휠:줌, 두손가락:DOLLY_PAN — three `OrbitControls.js:271/358/371` 확인)이라 좌드래그만으론 화면 이동이 안 보임 → 좌하단 `live-map-3d-controls-hint` 오버레이(편집/뷰어 문구 분기) 추가. 기능 변경 없음(pan 은 원래 우드래그로 동작).
+- **표시/저장 카운트 설명**: `표시`=resolved.length(저장 배치 + 라인 실설비 자동표시), `저장`=working.length(DB 영속). 레이블에 `title` 툴팁 추가(혼동 완화).
+- e2e: `live-map-3d-structure.spec.ts`(빈 라이브러리→빌트인 벽 추가→저장 시 STRUCTURE 1회 POST + PUT 키 치환 + CSRF) 신설, `live-map-object-editor.spec.ts` 에 빌트인 목록 노출/로드/저장+중복숨김 테스트 추가. 검증: tsc 0 / eslint 0 errors / unit 3 pass / live-map e2e 5 passed.
+
+### 편집 고급 + 선택 가독성 + 렌더링 (2026-06-06, 미커밋)
+- **① 선택 가독성**: 얇은 단일 링 → 굵은 이중 링(내부 진한 + 외곽 글로우) + 선택 뱃지를 상태색으로 채우고 125% 확대. 여러 대 중 선택 설비가 멀리서·자세히 안 봐도 즉시 식별.
+- **② 키보드 미세 이동**: 편집모드 + 선택 있을 때 화살표로 선택 전체 nudge(`NUDGE_PX=8`, Shift=40). 입력/셀렉트 포커스 시 무시. `nudgeSelected`(useCallback) + window keydown effect.
+- **③ 다중 선택·그룹 조작**: 선택 모델 단일(`selectedId`)→다중(`selectedIds: string[]`, primary=마지막 선택). Shift/Ctrl+클릭 토글. 그룹 드래그(드래그 시작 시 위치 스냅샷 → delta 절대 적용, drift 없음) / 그룹 회전(`rotateSelected`) / 그룹 삭제 / 키보드 이동. 템플릿 교체·실설비 바인딩은 primary 단일 대상. 선택 패널에 `외 N개` 카운트.
+- **④ 층 1/2/3**: `transformJson.floor`(opaque JSONB, 백엔드 무변경 — `LiveMapLayoutService` 는 transform 의 top-level `v` 만 검증) + `buildTransformJson` 기본 floor 1. 좌측 전역 층 선택(`live-map-3d-floor-{n}`)=새 추가 기본 층(activeFloor), 선택 패널 층 버튼(`live-map-3d-set-floor-{n}`)=선택을 그 층으로 이동. 렌더는 각 placement Y=`(floor-1)*FLOOR_HEIGHT(4.5)`, 2층 이상 반투명 슬래브 적층. 자동 설비는 1층.
+- **⑤ 렌더링 속도**: vite `optimizeDeps.include: [three, @react-three/fiber, @react-three/drei]` — dev 첫 3D 진입의 콜드 변환(수백 모듈 on-demand) 제거(서버 기동 시 1회 사전 번들). 효과는 dev 서버 재시작 후 적용. 프로덕션 빌드는 원래 번들링돼 더 빠름.
+- e2e: `live-map-3d-edit-advanced.spec.ts`(다중선택+그룹회전+층이동 / 키보드 nudge+새추가 기본층) 2 테스트 신설. 검증: tsc 0 / eslint 0 errors / unit 119 pass / live-map e2e 8 passed.
+
+### 층 고도화 — 공정 매핑 + 뷰 필터 (2026-06-06, 미커밋)
+- **층고 상향**: `FLOOR_HEIGHT` 4.5→6 (설비/뱃지/시그널타워가 상층 슬래브에 안 겹치게).
+- **공정→층 자동 배치**: `floorForCluster(clusterId)`(모델) — 1F: photo/etch/cvd, 2F: cmp/diff/imp, 3F: wet/metal, 그 외(metro/etc 등) 1F. 자동 표시 설비의 floor 를 공정으로 결정. clusterId 출처: `live-map.mock.ts` 클러스터 + 실 API `LiveMapEquipmentResponse.clusterId`.
+- **층 뷰 필터**: 좌측 `1F/2F/3F/전체`(`live-map-3d-floor-{n}` + `live-map-3d-floor-all`). `floorView: number|'all'`(기본 'all'). 전체=층별 Y 적층, 단일층=그 층 placement 만 + 바닥(Y=0) 평탄화로 포커스. `CameraRig` 가 floorView 에 맞춰 카메라 줌/타깃 보정(전체 줌아웃+스택 중앙 / 단일 줌인+바닥) — Canvas 재마운트 없이 imperative(react-compiler immutability 오탐 1줄 disable). 새 추가는 보고 있는 층(전체면 1F)에 들어감.
+- e2e: `live-map-3d-floors.spec.ts`(공정별 1/2/3층 자동 배치 + 층 버튼 단일/전체 토글) 신설. 검증: tsc 0 / eslint 0 errors / unit 119 pass / live-map e2e 9 passed(floors+advanced 포함).
+
+### 런타임 렌더 성능 — memo + visible 토글 + 폴리 감소 (2026-06-06, 미커밋)
+- 원인: 설비 1대 = 메시 ~16개(RoundedBox smoothness 4 고폴리) + drei Html 뱃지 1개 → 실설비 ~54대면 ~860 메시. `LiveMap3DEquipment` 미-memo 라 모든 부모 리렌더(층전환/선택/카메라)마다 트리 재조정. 층 전환을 list 필터로 해 메시 언마운트/재마운트.
+- **memo**: `LiveMap3DEquipment`/`LiveMap3DObject` 를 `React.memo` — equipment/shape ref 가 안정(TanStack structuralSharing + 메모 Map)이라 층전환/선택 시 메시 트리 재조정 스킵.
+- **visible 토글**: 층 필터를 list 제거 → `<group visible={showFloor}>` 토글로(메시 1회 마운트 유지, 전환은 visible+위치만). 뱃지(drei Html)는 부모 invisible 로 안 숨겨져 `showFloor` 조건부 렌더로 게이팅. 단일층 보기는 안 보이는 층 draw call 도 스킵돼 더 가벼움.
+- **폴리 감소**: RoundedBox `smoothness` 4→2(메인프레임/EFEM), 3→2(FOUP) + 실린더 세그먼트 챔버 24→14·시그널타워 20→12/16→10 — 외형 차이 미미.
+- **번들 분리(진입 비용)**: prod `LiveMapPage` 청크가 1,308kB(three+drei 포함)였음 → vite manualChunks 에 `three-vendor` 추가로 분리(three-vendor 1,108kB gzip 308 / LiveMapPage 387kB gzip 119). 캐시 분리 + 병렬 다운로드.
+- **dev vs prod**: dev 최초 3D 진입은 StrictMode 2× 렌더 + Vite 소스 on-demand 변환 + React dev 오버헤드로 부풀려짐(실측 ~3s). prod 빌드는 단일 렌더 + 번들이라 실사용 진입은 훨씬 빠름 — 진입 체감은 `npm run preview` 로 측정해야 정확.
+- **공유 지오메트리/머티리얼(마운트 비용)**: 설비 N대가 동일 정적 부품(플린스/메인프레임/EFEM/챔버/글래스/타워폴)을 매번 새로 생성(~700 지오메트리/대량 GPU 업로드)하던 것을 모듈 1회 생성→공유(`SHARED_GEO`/`SHARED_MAT`, three-stdlib `RoundedBoxGeometry`)로. 공유 자원 메시는 `dispose={null}` 로 언마운트 시 폐기 방지(재진입 안전). status/port 의존 부분(액센트/타워세그/로드포트)만 per-instance. + 그림자맵 1024→512.
+- **남은 레버(미적용)**: 설비 메시 object 수(~864)·draw call·drei Html 뱃지 N개는 그대로 — 더 필요하면 InstancedMesh(정적 부품 1 draw call) + Html 단일 오버레이. 실측 후 결정.
+- 검증: tsc 0 / eslint 0 errors / prod build OK / live-map e2e 9 passed(직렬). 병렬 실행 시 3D WebGL 경합으로 간헐 타임아웃 가능(로직 무관).
+
 ### 버그 감사 (2026-06-06, 미커밋)
 - **[수정·Critical] 자동 그리드 재배치 겹침**: 편집 모드에서 설비 1개 회전/이동(=working 승격) 시 나머지 자동 설비가 빈 자리로 당겨져 겹치던 버그. 원인: 자동 위치를 "미배치 부분집합"의 index/total 로 계산. 수정: `buildAutoEquipmentPlacements(eqpKeys, placed)` 순수 함수로 추출 — 전체 라인 설비의 고정 index 기반. 회귀 단위 테스트 `live-map-3d-model.test.ts`(일부 placed 여도 나머지 위치 불변) 추가.
 - **[수정] 저장 더블클릭 409**: pending 중 저장 버튼 비활성화(`saveLayout.isPending || createObject.isPending`) — `기본 설비` 중복 POST(name UNIQUE 위반) 방지.

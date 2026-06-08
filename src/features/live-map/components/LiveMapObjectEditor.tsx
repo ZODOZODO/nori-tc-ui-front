@@ -7,9 +7,11 @@ import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
 import {
   isLiveMap3DShape,
+  LIVE_MAP_BUILTIN_STRUCTURES,
   type LiveMap3DPrim,
   type LiveMap3DPrimType,
   type LiveMap3DShape,
+  type LiveMapBuiltinStructure,
 } from '../lib/live-map-3d.model'
 import { LiveMap3DObject } from './LiveMap3DObject'
 
@@ -82,6 +84,15 @@ export function LiveMapObjectEditor() {
     setPrims((previous) => [...previous, { id: nextPrimId(), ...PRIM_DEFAULT[type] }])
   }
 
+  // 빌트인(벽/파티션) 선택 → 새 객체 초안으로 로드(이름/도형 채움). Save 하면 내 STRUCTURE 객체로 영속.
+  const loadBuiltin = (builtin: LiveMapBuiltinStructure) => {
+    setEditingKey(null)
+    setName(builtin.objectName)
+    setKind('STRUCTURE')
+    setPrims(builtin.shapeJson.prims.map((prim) => ({ ...prim, id: prim.id || nextPrimId() })))
+    setStatus(null)
+  }
+
   const updatePrimVec = (id: string, field: 'size' | 'position', axis: Axis, value: number) => {
     setPrims((previous) =>
       previous.map((prim) => (prim.id === id ? { ...prim, [field]: { ...prim[field], [axis]: value } } : prim)),
@@ -137,6 +148,9 @@ export function LiveMapObjectEditor() {
 
   // 설비(EQUIPMENT)는 빌트인 fab tool 자동 표시 — 빌더는 STRUCTURE 만 다룬다(FK용 '기본 설비' 등 EQUIPMENT 숨김).
   const objects = (objectsQuery.data ?? []).filter((object) => object.objectKind === 'STRUCTURE')
+  // 빌트인 벽/파티션은 항상 목록 상단에 노출 — 같은 이름의 내 STRUCTURE 객체가 이미 있으면 그쪽으로 갈음(중복 숨김).
+  const savedStructureNames = new Set(objects.map((object) => object.objectName))
+  const builtinStructures = LIVE_MAP_BUILTIN_STRUCTURES.filter((builtin) => !savedStructureNames.has(builtin.objectName))
 
   return (
     <section
@@ -157,8 +171,25 @@ export function LiveMapObjectEditor() {
           </button>
         </div>
         <div className="thin-scroll flex max-h-[560px] flex-col gap-1 overflow-auto">
+          {builtinStructures.map((builtin) => (
+            <div
+              key={builtin.objectKey}
+              className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border px-2 py-1.5"
+            >
+              <button
+                type="button"
+                data-testid={`object-builtin-item-${builtin.slug}`}
+                className="flex min-w-0 flex-1 flex-col items-start text-left"
+                title="기성 구조물 — 클릭해 불러온 뒤 Save 하면 내 객체로 저장"
+                onClick={() => loadBuiltin(builtin)}
+              >
+                <span className="w-full truncate text-xs font-semibold text-foreground">{builtin.objectName}</span>
+                <span className="text-[10px] text-muted-foreground">기성 · STRUCTURE</span>
+              </button>
+            </div>
+          ))}
           {objects.length === 0 ? (
-            <span className="text-xs text-muted-foreground">No objects yet.</span>
+            <span className="text-[10px] text-muted-foreground">저장된 사용자 객체 없음</span>
           ) : (
             objects.map((object) => (
               <div

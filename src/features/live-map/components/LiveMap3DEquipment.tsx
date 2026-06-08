@@ -1,4 +1,7 @@
+import { memo } from 'react'
 import { RoundedBox } from '@react-three/drei'
+import { RoundedBoxGeometry } from 'three-stdlib'
+import * as THREE from 'three'
 import type { LiveMapEquipmentResponse, LiveMapPortResponse } from '../api/live-map.api'
 import { LIVE_MAP_PORT_COLOR } from '../lib/live-map-3d.model'
 
@@ -9,6 +12,10 @@ import { LIVE_MAP_PORT_COLOR } from '../lib/live-map-3d.model'
  * + 로드 포트(전면 도크 + FOUP 캐리어) + 시그널 타워. 포트(`portItems`)는 상태 LED 가 아니라
  * <b>웨이퍼가 들어가는 로드 포트 입구</b>(FOUP 도킹)로 그린다 — 캐리어 도어 밴드 색이 포트 상태,
  * 설비 status 는 시그널 타워 안돈으로 표현한다.</p>
+ *
+ * <p>성능: 모든 설비가 동일한 정적 부품(플린스/메인프레임/EFEM/챔버/글래스/타워폴)은 지오메트리·머티리얼을
+ * 모듈 1회 생성해 공유(`SHARED_GEO`/`SHARED_MAT`) → 설비 N대여도 도형 생성·GPU 업로드는 1세트. 공유 자원을 쓰는
+ * 메시는 `dispose={null}` 로 언마운트 시 공유 자원이 폐기되지 않게 한다. 상태/포트로 달라지는 부분만 per-instance.</p>
  */
 
 const TOOL = { width: 2.0, mainframeH: 1.72, mainframeD: 1.05, efemH: 1.04, efemD: 0.66 }
@@ -35,6 +42,30 @@ const COLOR = {
   foupDoor: '#c4ccd6',
 }
 
+// 정적 부품 — 전 설비 공유(1회 생성). 치수가 status/port 에 의존하지 않는 것만.
+const SHARED_GEO = {
+  plinth: new THREE.BoxGeometry(TOOL.width + 0.12, PLINTH_H, TOTAL_D + 0.12),
+  mainframe: new RoundedBoxGeometry(TOOL.width, TOOL.mainframeH, TOOL.mainframeD, 2, 0.05),
+  panel: new THREE.BoxGeometry(TOOL.width * 0.72, TOOL.mainframeH * 0.6, 0.02),
+  hub: new THREE.CylinderGeometry(0.34, 0.36, 0.3, 6),
+  module: new THREE.CylinderGeometry(0.21, 0.22, 0.34, 14),
+  lid: new THREE.CylinderGeometry(0.16, 0.21, 0.06, 14),
+  efem: new RoundedBoxGeometry(TOOL.width, TOOL.efemH, TOOL.efemD, 2, 0.04),
+  glass: new THREE.BoxGeometry(TOOL.width * 0.84, 0.3, 0.03),
+  towerPole: new THREE.CylinderGeometry(0.035, 0.05, 0.16, 10),
+}
+const SHARED_MAT = {
+  plinth: new THREE.MeshStandardMaterial({ color: COLOR.trim, metalness: 0.4, roughness: 0.55 }),
+  body: new THREE.MeshStandardMaterial({ color: COLOR.body, metalness: 0.2, roughness: 0.42 }),
+  panel: new THREE.MeshStandardMaterial({ color: '#c0c6cd', metalness: 0.2, roughness: 0.5 }),
+  hub: new THREE.MeshStandardMaterial({ color: COLOR.hub, metalness: 0.5, roughness: 0.4 }),
+  chamber: new THREE.MeshStandardMaterial({ color: COLOR.chamber, metalness: 0.45, roughness: 0.4 }),
+  chamberLid: new THREE.MeshStandardMaterial({ color: COLOR.chamberLid, metalness: 0.55, roughness: 0.35 }),
+  efem: new THREE.MeshStandardMaterial({ color: COLOR.efem, metalness: 0.22, roughness: 0.44 }),
+  glass: new THREE.MeshStandardMaterial({ color: COLOR.glass, emissive: new THREE.Color('#1f7a8c'), emissiveIntensity: 0.4, toneMapped: false, metalness: 0.1, roughness: 0.3 }),
+  towerPole: new THREE.MeshStandardMaterial({ color: COLOR.trim, metalness: 0.6, roughness: 0.35 }),
+}
+
 /** 시그널 타워 점등(반도체 안돈): RUN→녹 / IDLE→황 / ERROR→적 / DOWN→소등. */
 const towerLit = (status: LiveMapEquipmentResponse['status']) => ({
   red: status === 'ERROR',
@@ -58,7 +89,7 @@ function placePorts(ports: LiveMapPortResponse[]): { slots: PortSlot[]; foupWidt
   return { slots: ports.map((port, index) => ({ port, x: startX + index * slotWidth })), foupWidth }
 }
 
-/** 상단 챔버 클러스터(트랜스퍼 허브 + 프로세스 모듈 3) — 클러스터 툴 실루엣. */
+/** 상단 챔버 클러스터(트랜스퍼 허브 + 프로세스 모듈 3) — 클러스터 툴 실루엣. 정적이라 공유 지오메트리/머티리얼. */
 function ChamberCluster() {
   const modules: Array<[number, number]> = [
     [0, -0.34],
@@ -67,21 +98,11 @@ function ChamberCluster() {
   ]
   return (
     <group position={[0, MAINFRAME_TOP_Y, MAINFRAME_Z]}>
-      {/* 트랜스퍼 허브 (작은 파트는 그림자 캐스트 생략 — 렌더 부하↓) */}
-      <mesh position={[0, 0.15, 0]}>
-        <cylinderGeometry args={[0.34, 0.36, 0.3, 6]} />
-        <meshStandardMaterial color={COLOR.hub} metalness={0.5} roughness={0.4} />
-      </mesh>
+      <mesh geometry={SHARED_GEO.hub} material={SHARED_MAT.hub} position={[0, 0.15, 0]} dispose={null} />
       {modules.map(([x, z], index) => (
         <group key={index} position={[x, 0, z]}>
-          <mesh position={[0, 0.17, 0]}>
-            <cylinderGeometry args={[0.21, 0.22, 0.34, 24]} />
-            <meshStandardMaterial color={COLOR.chamber} metalness={0.45} roughness={0.4} />
-          </mesh>
-          <mesh position={[0, 0.35, 0]}>
-            <cylinderGeometry args={[0.16, 0.21, 0.06, 24]} />
-            <meshStandardMaterial color={COLOR.chamberLid} metalness={0.55} roughness={0.35} />
-          </mesh>
+          <mesh geometry={SHARED_GEO.module} material={SHARED_MAT.chamber} position={[0, 0.17, 0]} dispose={null} />
+          <mesh geometry={SHARED_GEO.lid} material={SHARED_MAT.chamberLid} position={[0, 0.35, 0]} dispose={null} />
         </group>
       ))}
     </group>
@@ -98,13 +119,11 @@ function SignalTower({ status }: { status: LiveMapEquipmentResponse['status'] })
   const baseY = MAINFRAME_TOP_Y + 0.02
   return (
     <group position={[TOOL.width / 2 - 0.16, 0, MAINFRAME_Z + TOOL.mainframeD / 2 - 0.14]}>
-      <mesh position={[0, baseY + 0.08, 0]}>
-        <cylinderGeometry args={[0.035, 0.05, 0.16, 16]} />
-        <meshStandardMaterial color={COLOR.trim} metalness={0.6} roughness={0.35} />
-      </mesh>
+      <mesh geometry={SHARED_GEO.towerPole} material={SHARED_MAT.towerPole} position={[0, baseY + 0.08, 0]} dispose={null} />
+      {/* 안돈 점등 세그먼트 — status 로 색/발광 달라져 per-instance(작은 실린더 3개라 비용 미미). */}
       {segments.map((segment, index) => (
         <mesh key={segment.key} position={[0, baseY + 0.21 + index * 0.15, 0]}>
-          <cylinderGeometry args={[0.075, 0.075, 0.14, 20]} />
+          <cylinderGeometry args={[0.075, 0.075, 0.14, 12]} />
           <meshStandardMaterial
             color={segment.on ? segment.color : '#1b2026'}
             emissive={segment.color}
@@ -130,11 +149,11 @@ function LoadPort({ port, x, foupWidth }: { port: LiveMapPortResponse; x: number
         <meshStandardMaterial color={COLOR.dock} metalness={0.5} roughness={0.4} />
       </mesh>
       {/* FOUP 캐리어 본체 */}
-      <RoundedBox args={[foupWidth, FOUP.height, FOUP.depth]} radius={0.03} smoothness={3} position={[0, foupCenterY, foupZ]}>
+      <RoundedBox args={[foupWidth, FOUP.height, FOUP.depth]} radius={0.03} smoothness={2} position={[0, foupCenterY, foupZ]}>
         <meshStandardMaterial color={COLOR.foup} metalness={0.2} roughness={0.5} />
       </RoundedBox>
       {/* 전면 도어 패널(살짝 돌출) */}
-      <RoundedBox args={[foupWidth * 0.78, FOUP.height * 0.74, 0.04]} radius={0.02} smoothness={3} position={[0, foupCenterY - 0.02, foupZ + FOUP.depth / 2]}>
+      <RoundedBox args={[foupWidth * 0.78, FOUP.height * 0.74, 0.04]} radius={0.02} smoothness={2} position={[0, foupCenterY - 0.02, foupZ + FOUP.depth / 2]}>
         <meshStandardMaterial color={COLOR.foupDoor} metalness={0.25} roughness={0.45} />
       </RoundedBox>
       {/* 상단 핸들 */}
@@ -151,36 +170,23 @@ function LoadPort({ port, x, foupWidth }: { port: LiveMapPortResponse; x: number
   )
 }
 
-export function LiveMap3DEquipment({ equipment }: { equipment: LiveMapEquipmentResponse | null }) {
+// memo — 설비 1대가 메시 ~16개라, 층 전환/선택 등 부모 리렌더 시 equipment ref 가 같으면 트리 재조정을 건너뛴다.
+export const LiveMap3DEquipment = memo(function LiveMap3DEquipment({ equipment }: { equipment: LiveMapEquipmentResponse | null }) {
   const status = equipment?.status ?? 'DOWN'
   const { slots, foupWidth } = placePorts(equipment?.portItems ?? [])
 
   return (
     <group>
       {/* 베이스 플린스 */}
-      <mesh position={[0, PLINTH_H / 2, 0]} receiveShadow>
-        <boxGeometry args={[TOOL.width + 0.12, PLINTH_H, TOTAL_D + 0.12]} />
-        <meshStandardMaterial color={COLOR.trim} metalness={0.4} roughness={0.55} />
-      </mesh>
+      <mesh geometry={SHARED_GEO.plinth} material={SHARED_MAT.plinth} position={[0, PLINTH_H / 2, 0]} receiveShadow dispose={null} />
 
       {/* 메인프레임(후방 본체) */}
-      <RoundedBox
-        args={[TOOL.width, TOOL.mainframeH, TOOL.mainframeD]}
-        radius={0.05}
-        smoothness={4}
-        position={[0, PLINTH_H + TOOL.mainframeH / 2, MAINFRAME_Z]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={COLOR.body} metalness={0.2} roughness={0.42} />
-      </RoundedBox>
+      <mesh geometry={SHARED_GEO.mainframe} material={SHARED_MAT.body} position={[0, PLINTH_H + TOOL.mainframeH / 2, MAINFRAME_Z]} castShadow receiveShadow dispose={null} />
 
       {/* 메인프레임 전면 유지보수 패널(어두운 인셋) */}
-      <mesh position={[0, PLINTH_H + TOOL.mainframeH * 0.55, MAINFRAME_Z + TOOL.mainframeD / 2 + 0.005]}>
-        <boxGeometry args={[TOOL.width * 0.72, TOOL.mainframeH * 0.6, 0.02]} />
-        <meshStandardMaterial color="#c0c6cd" metalness={0.2} roughness={0.5} />
-      </mesh>
-      {/* 상태 액센트 스트립 */}
+      <mesh geometry={SHARED_GEO.panel} material={SHARED_MAT.panel} position={[0, PLINTH_H + TOOL.mainframeH * 0.55, MAINFRAME_Z + TOOL.mainframeD / 2 + 0.005]} dispose={null} />
+
+      {/* 상태 액센트 스트립 — status 의존이라 per-instance. */}
       <mesh position={[0, PLINTH_H + TOOL.mainframeH - 0.16, MAINFRAME_Z + TOOL.mainframeD / 2 + 0.02]}>
         <boxGeometry args={[TOOL.width * 0.72, 0.06, 0.02]} />
         <meshStandardMaterial color="#0a0e15" emissive={LIVE_MAP_PORT_COLOR.RUN} emissiveIntensity={status === 'RUN' ? 0.9 : 0.05} toneMapped={false} />
@@ -189,22 +195,10 @@ export function LiveMap3DEquipment({ equipment }: { equipment: LiveMapEquipmentR
       <ChamberCluster />
 
       {/* EFEM(전면 모듈) */}
-      <RoundedBox
-        args={[TOOL.width, TOOL.efemH, TOOL.efemD]}
-        radius={0.04}
-        smoothness={4}
-        position={[0, PLINTH_H + TOOL.efemH / 2, EFEM_Z]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={COLOR.efem} metalness={0.22} roughness={0.44} />
-      </RoundedBox>
+      <mesh geometry={SHARED_GEO.efem} material={SHARED_MAT.efem} position={[0, PLINTH_H + TOOL.efemH / 2, EFEM_Z]} castShadow receiveShadow dispose={null} />
 
       {/* EFEM 상단 글래스 패널(미니환경 윈도우) */}
-      <mesh position={[0, PLINTH_H + TOOL.efemH - 0.16, FRONT_Z + 0.005]}>
-        <boxGeometry args={[TOOL.width * 0.84, 0.3, 0.03]} />
-        <meshStandardMaterial color={COLOR.glass} emissive="#1f7a8c" emissiveIntensity={0.4} toneMapped={false} metalness={0.1} roughness={0.3} />
-      </mesh>
+      <mesh geometry={SHARED_GEO.glass} material={SHARED_MAT.glass} position={[0, PLINTH_H + TOOL.efemH - 0.16, FRONT_Z + 0.005]} dispose={null} />
 
       {/* 로드 포트(입구) */}
       {slots.map(({ port, x }) => (
@@ -214,4 +208,4 @@ export function LiveMap3DEquipment({ equipment }: { equipment: LiveMapEquipmentR
       <SignalTower status={status} />
     </group>
   )
-}
+})

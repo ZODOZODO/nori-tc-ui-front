@@ -169,3 +169,39 @@ test('admin: 구조물 편집에서 도형 조합 객체를 생성·수정·삭�
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
 })
+
+test('admin: 구조물 편집 목록에 빌트인 벽/파티션이 항상 뜨고, 클릭→Save 로 내 STRUCTURE 객체가 된다 (console/pageerror 0)', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  const state = newState()
+  await setupMocks(page, state)
+  const { consoleErrors, pageErrors } = attachConsoleGuards(page)
+
+  await page.goto('/eqp/live-map')
+  await page.getByTestId('live-map-mode-builder').click()
+  await expect(page.getByTestId('live-map-object-editor')).toBeVisible()
+
+  // 저장된 객체 0이어도 빌트인 벽/파티션은 목록에 노출(기성품).
+  await expect(page.getByTestId('object-builtin-item-wall')).toBeVisible()
+  await expect(page.getByTestId('object-builtin-item-partition')).toBeVisible()
+
+  // 벽 클릭 → 초안 로드(이름 '벽' + 도형 1).
+  await page.getByTestId('object-builtin-item-wall').click()
+  await expect(page.getByTestId('object-editor-name')).toHaveValue('벽')
+  await expect(page.getByTestId('object-editor-prim-count')).toHaveText('1')
+
+  // Save → POST STRUCTURE 벽(box).
+  await page.getByTestId('object-editor-save').click()
+  await expect.poll(() => state.posts.length).toBe(1)
+  expect(state.posts[0].objectName).toBe('벽')
+  expect(state.posts[0].objectKind).toBe('STRUCTURE')
+  expect(state.posts[0].shapeJson.prims?.[0]?.type).toBe('box')
+
+  // 저장 후엔 같은 이름의 실 객체가 생겨 빌트인 벽은 숨겨지고(중복 방지) 실 '벽'이 리스트에 뜬다.
+  await expect(page.getByTestId('object-list-item-1')).toBeVisible()
+  await expect(page.getByTestId('object-builtin-item-wall')).toHaveCount(0)
+
+  expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+  expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
+})
