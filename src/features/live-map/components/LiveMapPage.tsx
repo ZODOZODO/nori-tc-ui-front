@@ -9,13 +9,21 @@ import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapBoard } from './LiveMapBoard'
 import { LiveMapHeader } from './LiveMapHeader'
-import { LiveMapObjectEditor } from './LiveMapObjectEditor'
 import { LiveMapStructureLayer } from './LiveMapStructureLayer'
-import { LiveMap3DScene } from './LiveMap3DScene'
 
 // 사용자가 "데모" 버튼 누른 시점에만 mount. 568 LOC 모달이라 페이지 초기 청크에서 제외.
 const LiveMapDemoModal = lazy(() =>
   import('./LiveMapDemoModal').then((module) => ({ default: module.LiveMapDemoModal })),
+)
+
+// 3D / 구조물 편집(builder)은 three.js(번들 ~306KB gzip)에 의존한다. 기본 뷰어(2D)는 three 를 쓰지
+// 않으므로, 정적 import 로 묶으면 뷰어 첫 진입 청크가 three 로 부풀어 느려진다. 사용자가 3D / builder
+// 모드로 전환한 시점에만 lazy 로드해 뷰어 진입 청크에서 three 를 제외한다.
+const LiveMap3DScene = lazy(() =>
+  import('./LiveMap3DScene').then((module) => ({ default: module.LiveMap3DScene })),
+)
+const LiveMapObjectEditor = lazy(() =>
+  import('./LiveMapObjectEditor').then((module) => ({ default: module.LiveMapObjectEditor })),
 )
 import {
   applyLiveMapClusterPositionDrafts,
@@ -243,9 +251,25 @@ export function LiveMapPage() {
           ) : null}
 
           {isBuilderMode ? (
-            <LiveMapObjectEditor />
+            <Suspense
+              fallback={
+                <div className="rounded-[18px] border border-border bg-card px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
+                  {t('livemap.loading')}
+                </div>
+              }
+            >
+              <LiveMapObjectEditor />
+            </Suspense>
           ) : isScene3dMode ? (
-            <LiveMap3DScene lineKey={lineKey} />
+            <Suspense
+              fallback={
+                <div className="rounded-[18px] border border-border bg-card px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
+                  {t('livemap.loading')}
+                </div>
+              }
+            >
+              <LiveMap3DScene lineKey={lineKey} />
+            </Suspense>
           ) : (
             <LiveMapBoard
               backgroundLayer={<LiveMapStructureLayer lineKey={lineKey} />}
