@@ -14,15 +14,17 @@ import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { LIVE_MAP_CLUSTER_ITEMS } from '../mocks/live-map.mock'
 import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
 import {
-  buildAutoEquipmentPlacements,
-  floorForCluster,
+  buildBayEquipmentPlacements,
+  buildLineBays,
   isBuiltinStructureKey,
   isLiveMap3DShape,
   LIVE_MAP_BUILTIN_STRUCTURES,
   LIVE_MAP_STATUS_COLOR,
+  LIVE_MAP_WORLD_SCALE,
   placementToWorld,
   worldToPlacement,
   type LiveMap3DShape,
+  type LiveMapBay,
   type LiveMapBuiltinStructure,
 } from '../lib/live-map-3d.model'
 import { LiveMap3DEquipmentField, type FieldPlacement } from './LiveMap3DEquipmentField'
@@ -74,11 +76,27 @@ interface ScenePalette {
   hemi: number
   contactOpacity: number
   badgeBg: string
+  bayZone: string
+  bayWall: string
+  roomFloor: string
+  roomAisle: string
+  roomWall: string
 }
 const SCENE_PALETTE: Record<'light' | 'dark', ScenePalette> = {
-  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, contactOpacity: 0.45, badgeBg: 'rgba(11,16,32,0.92)' },
-  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, contactOpacity: 0.3, badgeBg: 'rgba(255,255,255,0.95)' },
+  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, contactOpacity: 0.45, badgeBg: 'rgba(11,16,32,0.92)', bayZone: '#22304b', bayWall: '#46556f', roomFloor: '#1a2740', roomAisle: '#27375a', roomWall: '#39496a' },
+  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, contactOpacity: 0.3, badgeBg: 'rgba(255,255,255,0.95)', bayZone: '#dbe5f1', bayWall: '#9aa9bf', roomFloor: '#e3ebf5', roomAisle: '#cfdbe9', roomWall: '#8c9cb4' },
 }
+
+/** 공정 bay 파티션(낮은 벽) — 등각 ortho 에서 설비(~4 높이)를 가리지 않게 낮게. 빌트인 '파티션'(1.6)과 동일. */
+const BAY_WALL_HEIGHT = 1.6
+const BAY_WALL_THICKNESS = 0.15
+
+/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 원거리 외벽 2면(-X/-Z) + 중앙 통로. mockup1(2.5D 등각 룸) 미감. */
+const ROOM_FLOOR_W = 34
+const ROOM_FLOOR_D = 18
+const ROOM_WALL_HEIGHT = 3.4
+const ROOM_WALL_THICKNESS = 0.3
+const ROOM_AISLE_W = 3.4
 
 /** objectKey 0 = 라이브러리 객체 없이 자동 표시되는 빌트인 설비. 저장 시 백킹 EQUIPMENT 객체 키로 치환. */
 const AUTO_OBJECT_KEY = 0
@@ -109,7 +127,7 @@ function CameraRig({ floorView }: { floorView: FloorView }) {
     const orthographic = camera as THREE.OrthographicCamera
     // r3f 카메라 제어는 인스턴스 직접 변형이 정식 API — react-compiler immutability 오탐.
     // eslint-disable-next-line react-hooks/immutability
-    orthographic.zoom = floorView === 'all' ? 32 : 48
+    orthographic.zoom = floorView === 'all' ? 24 : 38
     orthographic.updateProjectionMatrix()
     if (controls) {
       controls.target.set(0, floorView === 'all' ? STACK_CENTER_Y : 0, 0)
@@ -167,25 +185,134 @@ function BadgeProjector({
   return null
 }
 
+/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 중앙 통로 스트립 + 원거리 외벽 2면(-X/-Z). 등각 카메라(+X+Y+Z)라
+ *  -X/-Z 면은 뒤쪽 → 그 두 벽만 세워 내부가 보인다(near 벽 생략). 전체 보기에선 하층만 솔리드, 상층은 반투명(하층 투시). */
+function FloorRoom({ floorY, solid, palette }: { floorY: number; solid: boolean; palette: ScenePalette }) {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
+        <planeGeometry args={[ROOM_FLOOR_W, ROOM_FLOOR_D]} />
+        <meshStandardMaterial color={palette.roomFloor} transparent={!solid} opacity={solid ? 1 : 0.55} metalness={0.05} roughness={0.92} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY + 0.02, 0]}>
+        <planeGeometry args={[ROOM_FLOOR_W, ROOM_AISLE_W]} />
+        <meshStandardMaterial color={palette.roomAisle} transparent opacity={solid ? 0.92 : 0.4} metalness={0.05} roughness={0.88} />
+      </mesh>
+      <mesh position={[-ROOM_FLOOR_W / 2, floorY + ROOM_WALL_HEIGHT / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[ROOM_WALL_THICKNESS, ROOM_WALL_HEIGHT, ROOM_FLOOR_D]} />
+        <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
+      </mesh>
+      <mesh position={[0, floorY + ROOM_WALL_HEIGHT / 2, -ROOM_FLOOR_D / 2]} castShadow receiveShadow>
+        <boxGeometry args={[ROOM_FLOOR_W, ROOM_WALL_HEIGHT, ROOM_WALL_THICKNESS]} />
+        <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
+      </mesh>
+    </group>
+  )
+}
+
+/** 공정 bay 구조물 — bay 마다 바닥 존(반투명 슬래브) + 통로 반대쪽 3면 낮은 파티션 벽(통로 쪽은 열림). 라벨은 DOM 오버레이. */
+function BayStructures({
+  bays,
+  floorYOf,
+  palette,
+}: {
+  bays: LiveMapBay[]
+  floorYOf: (floor: number) => number
+  palette: ScenePalette
+}) {
+  return (
+    <>
+      {bays.map((bay) => {
+        const [worldX, worldZ] = placementToWorld(bay.centerXPx, bay.centerYPx)
+        const width = bay.widthPx / LIVE_MAP_WORLD_SCALE
+        const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
+        const floorY = floorYOf(bay.floor)
+        // 통로 반대쪽(top bay=-Z / bottom bay=+Z)에 뒷벽, 좌우 측벽. 통로 쪽은 열어 로드포트가 보이게.
+        const backZ = bay.row === 'top' ? worldZ - depth / 2 : worldZ + depth / 2
+        return (
+          <group key={`${bay.floor}-${bay.clusterId}`}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[worldX, floorY + 0.03, worldZ]} receiveShadow>
+              <planeGeometry args={[width, depth]} />
+              <meshStandardMaterial color={palette.bayZone} transparent opacity={0.5} metalness={0.05} roughness={0.95} />
+            </mesh>
+            <mesh position={[worldX, floorY + BAY_WALL_HEIGHT / 2, backZ]} castShadow receiveShadow>
+              <boxGeometry args={[width + BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, BAY_WALL_THICKNESS]} />
+              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            </mesh>
+            <mesh position={[worldX - width / 2, floorY + BAY_WALL_HEIGHT / 2, worldZ]} castShadow receiveShadow>
+              <boxGeometry args={[BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, depth]} />
+              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            </mesh>
+            <mesh position={[worldX + width / 2, floorY + BAY_WALL_HEIGHT / 2, worldZ]} castShadow receiveShadow>
+              <boxGeometry args={[BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, depth]} />
+              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            </mesh>
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
+/** bay 라벨(공정명) 좌표 투영 — 뒷벽 위 한 점을 화면 px 로 project 해 Canvas 밖 DOM 라벨 transform 갱신(뱃지와 동형).
+ *  imperative transform 이라 Tailwind scale·translate 유틸 동시 적용 금지(합성 어긋남) — 크기/색만 클래스로. */
+function BayLabelProjector({
+  bays,
+  floorYOf,
+  labelRefs,
+}: {
+  bays: LiveMapBay[]
+  floorYOf: (floor: number) => number
+  labelRefs: RefObject<Map<string, HTMLDivElement | null>>
+}) {
+  const camera = useThree((state) => state.camera)
+  const gl = useThree((state) => state.gl)
+  const vecRef = useRef(new THREE.Vector3())
+  useFrame(() => {
+    const width = gl.domElement.clientWidth
+    const height = gl.domElement.clientHeight
+    const vec = vecRef.current
+    for (const bay of bays) {
+      const el = labelRefs.current?.get(`${bay.floor}-${bay.clusterId}`)
+      if (!el) {
+        continue
+      }
+      const [worldX, worldZ] = placementToWorld(bay.centerXPx, bay.centerYPx)
+      const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
+      const backZ = bay.row === 'top' ? worldZ - depth / 2 : worldZ + depth / 2
+      vec.set(worldX, floorYOf(bay.floor) + BAY_WALL_HEIGHT + 0.35, backZ)
+      vec.project(camera)
+      const x = (vec.x * 0.5 + 0.5) * width
+      const y = (-vec.y * 0.5 + 0.5) * height
+      el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`
+    }
+  })
+  return null
+}
+
 /** Canvas 내부 — 다중 선택 + 그룹 바닥 드래그(수동 ray-plane + 포인터 캡처) + 층 슬래브. 뱃지는 Canvas 밖 단일 오버레이. */
 function SceneContent({
   placements,
+  bays,
   selectedIdSet,
   editing,
   palette,
   floorView,
   badgeRefs,
+  bayLabelRefs,
   onSelect,
   onDragStart,
   onDragMove,
   onDragEnd,
 }: {
   placements: ResolvedPlacement[]
+  bays: LiveMapBay[]
   selectedIdSet: ReadonlySet<string>
   editing: boolean
   palette: ScenePalette
   floorView: FloorView
   badgeRefs: RefObject<Map<string, HTMLButtonElement | null>>
+  bayLabelRefs: RefObject<Map<string, HTMLDivElement | null>>
   onSelect: (localId: string, additive: boolean) => void
   onDragStart: (localId: string) => void
   onDragMove: (localId: string, worldX: number, worldZ: number) => void
@@ -275,6 +402,9 @@ function SceneContent({
       }),
     [equipVisible, floorView],
   )
+  // 룸을 그릴 층 = 보이는 bay 가 있는 층. 전체 보기에선 최하층만 솔리드(하층 투시), 나머지 반투명.
+  const roomFloors = useMemo(() => [...new Set(bays.map((bay) => bay.floor))].sort((a, b) => a - b), [bays])
+  const lowestRoomFloor = roomFloors[0] ?? 1
 
   return (
     <>
@@ -290,15 +420,12 @@ function SceneContent({
       </mesh>
       <Grid args={[160, 160]} cellSize={1} cellColor={palette.gridCell} sectionSize={5} sectionColor={palette.gridSection} infiniteGrid fadeDistance={56} fadeStrength={1.3} />
       <ContactShadows position={[0, 0.01, 0]} opacity={palette.contactOpacity} scale={80} blur={2.2} far={22} resolution={512} />
-      {/* 상층 슬래브 — 전체 보기에서만 2층 이상 층 높이에 반투명 바닥을 깔아 층 구분이 보이게(단일 보기는 바닥 평탄화). */}
-      {floorView === 'all'
-        ? FLOOR_LEVELS.filter((floor) => floor > 1).map((floor) => (
-            <mesh key={floor} rotation={[-Math.PI / 2, 0, 0]} position={[0, (floor - 1) * FLOOR_HEIGHT - 0.02, 0]} receiveShadow>
-              <planeGeometry args={[70, 70]} />
-              <meshStandardMaterial color={palette.ground} transparent opacity={0.5} metalness={0.1} roughness={0.95} />
-            </mesh>
-          ))
-        : null}
+      {/* 층 룸 — 보이는 bay 가 있는 층마다 솔리드 바닥 + 중앙 통로 + 원거리 외벽(컷어웨이). 모든 구조물의 배경. */}
+      {roomFloors.map((floor) => (
+        <FloorRoom key={floor} floorY={floorYOf(floor)} solid={floorView !== 'all' || floor === lowestRoomFloor} palette={palette} />
+      ))}
+      {/* 공정 bay — 바닥 존 + 통로 반대쪽 3면 낮은 파티션(통로 쪽 열림). 설비보다 먼저 그려 배경처럼. */}
+      <BayStructures bays={bays} floorYOf={floorYOf} palette={palette} />
       {/* 설비 — InstancedMesh 일괄(부품 종류당 1 draw call). 선택/드래그는 본체 instance onPointerDown → beginInteract. */}
       <LiveMap3DEquipmentField placements={equipField} onPartPointerDown={beginInteract} />
 
@@ -329,6 +456,7 @@ function SceneContent({
           )
         })}
       <BadgeProjector equip={equipField} badgeRefs={badgeRefs} />
+      <BayLabelProjector bays={bays} floorYOf={floorYOf} labelRefs={bayLabelRefs} />
       {/* 편집 모드에선 카메라 회전(좌드래그)을 끈다 — 설비 좌드래그 이동과 orbit 충돌 방지. pan(우드래그)/zoom(휠)은 유지. */}
       <OrbitControls enableRotate={!editing} makeDefault />
       <CameraRig floorView={floorView} />
@@ -361,6 +489,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   }
   // 단일 뱃지 오버레이 — 버튼 DOM 을 localId 로 등록, Canvas 안 BadgeProjector 가 좌표를 일괄 갱신.
   const badgeRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map())
+  // bay 라벨 오버레이 — DOM 을 `${floor}-${clusterId}` 로 등록, Canvas 안 BayLabelProjector 가 좌표를 일괄 갱신.
+  const bayLabelRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
 
   const [editing, setEditing] = useState(false)
   const [working, setWorking] = useState<WorkingPlacement[]>([])
@@ -420,22 +550,32 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     [working],
   )
 
-  // 저장 placement 가 없는 라인 실설비를 캐비닛 그리드로 자동 표시(objectKey 0 = 빌트인, 저장 시 백킹 객체로 치환).
-  // 위치는 전체 라인 설비의 고정 index 기반(buildAutoEquipmentPlacements) — 일부 승격(편집)해도 나머지 위치 불변.
-  // 층은 공정(clusterId)별 자동 배치(floorForCluster) — 1F: photo/etch/cvd, 2F: cmp/diff/imp, 3F: wet/metal, 그 외 1층.
-  const autoPlacements = useMemo<WorkingPlacement[]>(() => {
-    const eqpKeys = lineEquipments.map((equipment) => equipment.eqpKey)
-    return buildAutoEquipmentPlacements(eqpKeys, placedEqpKeys).map(({ eqpKey, xPx, yPx }) => ({
-      localId: `auto-${eqpKey}`,
-      placementKey: null,
-      objectKey: AUTO_OBJECT_KEY,
-      eqpKey,
-      xPx,
-      yPx,
-      rotationDeg: 0,
-      floor: floorForCluster(equipmentByKey.get(eqpKey)?.clusterId),
-    }))
-  }, [lineEquipments, placedEqpKeys, equipmentByKey])
+  // 라인 실설비를 cluster 로 묶어 추출(bay 배치/구조물 공용 입력).
+  const bayEquipmentInput = useMemo(
+    () => lineEquipments.map((equipment) => ({ eqpKey: equipment.eqpKey, clusterId: equipment.clusterId, clusterName: equipment.clusterName })),
+    [lineEquipments],
+  )
+
+  // 공정 bay 목록 — 라인 전 설비 기준(placed 와 무관). 구조물(바닥존/벽)·라벨 렌더의 배경.
+  const bays = useMemo(() => buildLineBays(bayEquipmentInput), [bayEquipmentInput])
+
+  // 저장 placement 가 없는 라인 실설비를 공정 bay 에 자동 배치(objectKey 0 = 빌트인, 저장 시 백킹 객체로 치환).
+  // 위치는 cluster 그룹 내 고정 index 기반(buildBayEquipmentPlacements) — 일부 승격(편집)해도 나머지 위치 불변.
+  // 층/회전은 공정(clusterId)·bay 행으로 결정 — 1F: photo/etch/cvd, 2F: cmp/diff/imp, 3F: wet/metal, 그 외 1층.
+  const autoPlacements = useMemo<WorkingPlacement[]>(
+    () =>
+      buildBayEquipmentPlacements(bayEquipmentInput, placedEqpKeys).map(({ eqpKey, xPx, yPx, rotationDeg, floor }) => ({
+        localId: `auto-${eqpKey}`,
+        placementKey: null,
+        objectKey: AUTO_OBJECT_KEY,
+        eqpKey,
+        xPx,
+        yPx,
+        rotationDeg,
+        floor,
+      })),
+    [bayEquipmentInput, placedEqpKeys],
+  )
 
   const autoById = useMemo(() => new Map(autoPlacements.map((placement) => [placement.localId, placement])), [autoPlacements])
 
@@ -486,6 +626,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       ),
     [resolved, floorView],
   )
+  // bay 라벨 오버레이용 — 보이는 층의 bay 만. 좌표는 BayLabelProjector(Canvas 안)가 갱신.
+  const visibleBays = useMemo(() => bays.filter((bay) => floorView === 'all' || bay.floor === floorView), [bays, floorView])
   const primary = allPlacements.find((placement) => placement.localId === primaryId) ?? null
   const primaryObject = primary ? objectsByKey.get(primary.objectKey) ?? null : null
   const isEquipmentPrimary = primaryObject?.objectKind === 'EQUIPMENT'
@@ -779,17 +921,45 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       >
         <SceneContent
           placements={resolved}
+          bays={visibleBays}
           selectedIdSet={selectedIdSet}
           editing={editing}
           palette={palette}
           floorView={floorView}
           badgeRefs={badgeRefs}
+          bayLabelRefs={bayLabelRefs}
           onSelect={selectPlacement}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
         />
       </Canvas>
+
+      {/* 공정 bay 라벨 — DOM 오버레이(비상호작용). 위치는 BayLabelProjector 가 매 프레임 transform 으로 갱신.
+          뱃지(z-6)보다 뒤(z-5). imperative transform 이라 Tailwind scale·translate 유틸은 걸지 않는다. */}
+      <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden">
+        {visibleBays.map((bay) => {
+          const key = `${bay.floor}-${bay.clusterId}`
+          return (
+            <div
+              key={key}
+              ref={(element) => {
+                const map = bayLabelRefs.current
+                if (element) {
+                  map.set(key, element)
+                } else {
+                  map.delete(key)
+                }
+              }}
+              data-testid={`live-map-3d-bay-label-${bay.clusterId}`}
+              className="absolute left-0 top-0 whitespace-nowrap rounded-md border border-border bg-card/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground shadow-soft-md backdrop-blur"
+              style={{ transform: 'translate(-9999px, -9999px)' }}
+            >
+              {bay.clusterName}
+            </div>
+          )
+        })}
+      </div>
 
       {/* 상태 뱃지 — 단일 DOM 오버레이(plain 버튼 N개). 위치는 BadgeProjector 가 매 프레임 transform 으로 갱신.
           drei Html 포털 N개 제거 → 진입 비용↓. 항상표시 라벨·뱃지클릭 선택 유지. */}
@@ -812,7 +982,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               data-testid={`live-map-3d-badge-${badge.eqpKey}`}
               onClick={(event) => selectPlacement(badge.localId, event.shiftKey || event.ctrlKey || event.metaKey)}
               className={`pointer-events-auto absolute left-0 top-0 flex items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md transition-transform ${
-                isSelected ? 'z-[1] scale-125 border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
+                isSelected ? 'z-[1] border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
               }`}
               style={{
                 transform: 'translate(-9999px, -9999px)',

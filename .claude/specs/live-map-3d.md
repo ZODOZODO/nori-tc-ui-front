@@ -61,6 +61,15 @@ Phase 1~4 구현 완료 — 2026-06-05. 검증: tsc 0 / eslint 0 errors / unit 1
 - **[수정·Critical] 저장 403 (CSRF 헤더 누락)**: `layout.api.ts` 의 쓰기(putLayout/createObject/updateObject/deleteObject)가 코드베이스 표준 CSRF 패턴(GET /auth/csrf → 쿠키 토큰을 `X-XSRF-TOKEN` 헤더로 수동 부착)을 안 따라, Spring Security(Double Submit Cookie)가 쓰기를 403 거부. 다른 feature API(user/deploy/eqp/model…)는 모두 부착하는데 layout 만 누락(axios 자동 XSRF 에만 의존). 4개 뮤테이션에 `issueCsrfToken()` + 헤더 부착 추가. e2e(auto)가 POST/PUT 의 X-XSRF-TOKEN 존재를 단언하도록 강화(기존 mock 은 헤더 미검사라 못 잡음).
 - 검증: tsc 0 / eslint 0 errors / unit 119 pass / live-map e2e 9 passed.
 
+### 공정 bay 레이아웃 — 평면 그리드 → bay-and-chase (2026-06-08, 미커밋)
+- **문제**: 자동 표시 설비를 `autoGridPx`(6열 평면 격자)로 층별로 "쭉 나열" — 2D 보드(`LIVE_MAP_CLUSTER_ITEMS`)는 공정을 bay 로 묶는데 3D 는 그 구조를 버려 실제 라인 느낌이 없음. (웹 리서치: 실제 fab = bay-and-chase "핑거" 플랜 — 중앙 통로 양옆 bay, 설비는 통로 향해 정렬, 로드포트가 통로 쪽.)
+- **결정(사용자 인터뷰 2026-06-08)**: ① 기존 3층 유지(PROCESS_FLOOR + 1F/2F/3F 필터 보존) + 각 층을 공정 bay 로. ② bay 외형 = 낮은 파티션(1.6, 빌트인 '파티션'과 동일) + 바닥 존 + 공정명 라벨(통로 쪽 열림).
+- **모델(`live-map-3d.model.ts`)**: `autoGridPx`/`buildAutoEquipmentPlacements` 제거 → `buildBayEquipmentPlacements`(설비를 cluster 로 그룹화 → 층별 2행 bay(위 ceil(n/2)/아래 나머지, 각 행 중앙정렬) → bay 안 3열 격자, 앞줄=통로 쪽, 통로 향한 회전 0/180) + `buildLineBays`(구조물 렌더용 bay 목록). 좌표는 board px 그대로라 드래그/저장 파이프라인 무변경. 위치 안정성 불변식(일부 placed 여도 나머지 불변)은 cluster 그룹 내 고정 index 로 유지.
+- **씬(`LiveMap3DScene.tsx`)**: `BayStructures`(bay 마다 바닥 존 plane + 통로 반대쪽 3면 낮은 파티션 박스, 통로 쪽 열림) + `BayLabelProjector`(공정명 DOM 라벨을 뒷벽 위로 좌표 투영 — 뱃지와 동형, **imperative transform 이라 Tailwind scale·translate 유틸 금지**). 팔레트에 `bayZone`/`bayWall`(dark/light) 추가. 자동 placement 가 rotationDeg/floor 를 bay 행/공정에서 직접 받음.
+- **룸(컷어웨이) — 1차 결과가 "빈 그리드 위 floating 펜"이라 재설계**: 스크린샷(Playwright)으로 직접 확인 후, mockup1(`livemap_mokup.jpg` = 2.5D 등각 룸: 솔리드 바닥 + 외벽 + 설비 행) 미감에 맞춤. `FloorRoom`(층마다 솔리드 바닥 슬래브 + 중앙 통로 스트립 + 원거리 외벽 2면(-X/-Z, 등각 카메라 뒤쪽이라 near 벽 생략한 컷어웨이)). 전체 보기에선 최하층만 솔리드/상층 반투명(하층 투시) → 3층 fab 건물로 읽힘. bay 는 행 폭을 꽉 채우게 타일링(`layoutFloorBays` 중앙정렬→등분) + 설비를 bay 폭 기준 촘촘히 묶음(`equipmentSlot` 가변 열). 외벽이 화면에 들어오게 `CameraRig` zoom 32/48→24/38 하향. 팔레트에 `roomFloor/roomAisle/roomWall` 추가.
+- **테스트**: 단위 `live-map-3d-model.test.ts` 를 bay 빌더 불변식 + 공정→층 그룹화로 갱신. e2e 신설 `live-map-3d-bays.spec.ts`(공정 3종→bay 라벨 3개, photo 2대=bay 1개, 층 필터 따라 라벨 표시/숨김).
+- 검증: tsc 0 / eslint 0 errors(기존 경고 1) / unit 120 pass / live-map e2e(bays/floors/auto/edit-advanced) 5 passed + Playwright 스크린샷 육안 확인.
+
 ## Why
 live-map 을 `C:\workspace_nori\livemap_mokup.jpg`(2.5D 등각 데이터센터 스타일, HT 계열)처럼 만든다.
 뷰어는 구조물+설비를 입체로 보여주는 live map 이고, 구조물 편집은 뷰어가 쓸 객체를 관리하는 라이브러리다.

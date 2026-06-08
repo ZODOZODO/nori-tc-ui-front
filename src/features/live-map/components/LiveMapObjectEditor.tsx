@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Box, Cylinder, Square as PlaneIcon, Trash2 } from 'lucide-react'
+import { Box, Cylinder, Trash2 } from 'lucide-react'
 import type { ShapeJson, LiveMapObjectKind } from '../lib/live-map-layout.model'
 import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
@@ -99,6 +99,24 @@ export function LiveMapObjectEditor() {
     )
   }
 
+  // 높이(H) 변경 시 바닥을 고정한다 — box/cylinder geometry 는 원점 중심이라 H 만 키우면 도형이 위아래로
+  // 함께 자라 바닥(과 하층 천장)을 뚫는다. position.y 를 ΔH/2 만큼 올려 바닥(y − H/2)을 유지하고 위로만
+  // 자라게 한다. plane 은 수직 두께가 없어(planeGeometry 는 x/z 만 사용) 보정에서 제외.
+  const updatePrimHeight = (id: string, height: number) => {
+    setPrims((previous) =>
+      previous.map((prim) => {
+        if (prim.id !== id) {
+          return prim
+        }
+        if (prim.type === 'plane') {
+          return { ...prim, size: { ...prim.size, y: height } }
+        }
+        const deltaY = (height - prim.size.y) / 2
+        return { ...prim, size: { ...prim.size, y: height }, position: { ...prim.position, y: prim.position.y + deltaY } }
+      }),
+    )
+  }
+
   const updatePrimColor = (id: string, color: string) => {
     setPrims((previous) => previous.map((prim) => (prim.id === id ? { ...prim, color } : prim)))
   }
@@ -155,10 +173,10 @@ export function LiveMapObjectEditor() {
   return (
     <section
       data-testid="live-map-object-editor"
-      className="flex gap-3 rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+      className="flex h-[calc(100dvh-16rem)] min-h-[440px] gap-3 overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
     >
       {/* 객체 리스트 */}
-      <div data-testid="object-editor-list" className="flex w-56 shrink-0 flex-col gap-1.5">
+      <div data-testid="object-editor-list" className="flex w-56 min-h-0 shrink-0 flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Objects</span>
           <button
@@ -170,7 +188,7 @@ export function LiveMapObjectEditor() {
             + New
           </button>
         </div>
-        <div className="thin-scroll flex max-h-[560px] flex-col gap-1 overflow-auto">
+        <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-auto">
           {builtinStructures.map((builtin) => (
             <div
               key={builtin.objectKey}
@@ -223,7 +241,7 @@ export function LiveMapObjectEditor() {
       </div>
 
       {/* 컴포저 */}
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs font-semibold">
             Name
@@ -250,9 +268,6 @@ export function LiveMapObjectEditor() {
             <button type="button" data-testid="object-editor-add-cylinder" title="Add Cylinder" aria-label="Add Cylinder" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
               <Cylinder className="size-4" />
             </button>
-            <button type="button" data-testid="object-editor-add-plane" title="Add Plane" aria-label="Add Plane" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('plane')}>
-              <PlaneIcon className="size-4" />
-            </button>
           </div>
           <button
             type="button"
@@ -267,7 +282,7 @@ export function LiveMapObjectEditor() {
           </span>
         </div>
 
-        <div className="thin-scroll flex max-h-[520px] flex-col gap-2 overflow-auto">
+        <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
           {prims.length === 0 ? (
             <span className="text-xs text-muted-foreground">Add a shape (box/cylinder/plane) to start.</span>
           ) : (
@@ -275,7 +290,7 @@ export function LiveMapObjectEditor() {
               <div key={prim.id} className="flex flex-wrap items-end gap-2 rounded-[12px] border border-border bg-background/40 px-3 py-2">
                 <span className="w-16 text-xs font-bold text-foreground">{prim.type}</span>
                 <NumberField label="W" value={prim.size.x} onChange={(value) => updatePrimVec(prim.id, 'size', 'x', value)} />
-                <NumberField label="H" value={prim.size.y} onChange={(value) => updatePrimVec(prim.id, 'size', 'y', value)} />
+                <NumberField label="H" value={prim.size.y} onChange={(value) => updatePrimHeight(prim.id, value)} />
                 <NumberField label="D" value={prim.size.z} onChange={(value) => updatePrimVec(prim.id, 'size', 'z', value)} />
                 <NumberField label="X" value={prim.position.x} onChange={(value) => updatePrimVec(prim.id, 'position', 'x', value)} />
                 <NumberField label="Y" value={prim.position.y} onChange={(value) => updatePrimVec(prim.id, 'position', 'y', value)} />
@@ -307,7 +322,7 @@ export function LiveMapObjectEditor() {
       {/* 3D 미리보기 */}
       <div
         data-testid="object-editor-preview"
-        className="h-[480px] w-[320px] shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
+        className="h-full w-[320px] shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
       >
         <Canvas frameloop="demand" shadows orthographic camera={{ position: [7, 7, 7], zoom: 42, near: -100, far: 100 }}>
           <color attach="background" args={['#0e1422']} />

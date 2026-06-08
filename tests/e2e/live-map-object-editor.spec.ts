@@ -170,6 +170,31 @@ test('admin: 구조물 편집에서 도형 조합 객체를 생성·수정·삭�
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
 })
 
+test('admin: 구조물 편집에서 높이(H)를 키우면 바닥이 고정되고 위로만 자란다 — Y=H/2 유지 (console/pageerror 0)', async ({ page }) => {
+  test.setTimeout(90_000)
+  const state = newState()
+  await setupMocks(page, state)
+  const { consoleErrors, pageErrors } = attachConsoleGuards(page)
+
+  await page.goto('/eqp/live-map')
+  await page.getByTestId('live-map-mode-builder').click()
+  await expect(page.getByTestId('live-map-object-editor')).toBeVisible()
+
+  // 원통(기둥) 추가 → 기본 H=2, Y=1 이므로 바닥 = Y − H/2 = 0 (바닥에 붙음).
+  await page.getByTestId('object-editor-add-cylinder').click()
+  await expect(page.getByTestId('object-editor-prim-count')).toHaveText('1')
+  await expect(page.getByLabel('H', { exact: true })).toHaveValue('2')
+  await expect(page.getByLabel('Y', { exact: true })).toHaveValue('1')
+
+  // 기둥처럼 높이를 10으로 → 바닥(0)을 고정한 채 위로 자라므로 Y = 10/2 = 5 로 따라 올라간다.
+  // (보정 없으면 Y=1 그대로라 도형이 바닥 아래 -4 까지 뚫고 들어간다.)
+  await page.getByLabel('H', { exact: true }).fill('10')
+  await expect(page.getByLabel('Y', { exact: true })).toHaveValue('5')
+
+  expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+  expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])
+})
+
 test('admin: 구조물 편집 목록에 빌트인 벽/파티션이 항상 뜨고, 클릭→Save 로 내 STRUCTURE 객체가 된다 (console/pageerror 0)', async ({
   page,
 }) => {
