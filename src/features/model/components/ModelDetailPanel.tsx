@@ -381,6 +381,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
       return normalizedMessage
     }
 
+    // eslint-disable-next-line i18next/no-literal-string -- 백엔드 에러 메시지(`...행`)와 startsWith 매칭용. 번역 시 매칭이 깨지므로 비대상
     const rowPrefix = `workflow ${flowTextEditor.rowIndex + 1}행`
     return normalizedMessage.startsWith(rowPrefix) ? normalizedMessage : null
   }, [actionErrorMessage, flowTextEditor])

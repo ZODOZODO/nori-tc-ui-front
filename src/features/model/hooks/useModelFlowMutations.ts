@@ -26,6 +26,7 @@ export function useModelFlowMutations(modelVersionKey: number | null) {
   const createFlowMutation = useMutation({
     mutationFn: (request: ModelFlowCreateRequest) => {
       if (modelVersionKey === null) {
+        // eslint-disable-next-line i18next/no-literal-string -- 개발자용 불변식 가드(프로그래밍 에러), 사용자 비노출이라 번역 비대상
         throw new Error('modelVersionKey 가 지정되지 않았습니다.')
       }
       return modelFlowApi.create(modelVersionKey, request)
@@ -40,6 +41,7 @@ export function useModelFlowMutations(modelVersionKey: number | null) {
   const updateFlowMutation = useMutation({
     mutationFn: ({ flowId, request }: UpdateFlowVariables) => {
       if (modelVersionKey === null) {
+        // eslint-disable-next-line i18next/no-literal-string -- 개발자용 불변식 가드(프로그래밍 에러), 사용자 비노출이라 번역 비대상
         throw new Error('modelVersionKey 가 지정되지 않았습니다.')
       }
       return modelFlowApi.update(modelVersionKey, flowId, request)
@@ -54,6 +56,7 @@ export function useModelFlowMutations(modelVersionKey: number | null) {
   const deleteFlowMutation = useMutation({
     mutationFn: (flowId: number) => {
       if (modelVersionKey === null) {
+        // eslint-disable-next-line i18next/no-literal-string -- 개발자용 불변식 가드(프로그래밍 에러), 사용자 비노출이라 번역 비대상
         throw new Error('modelVersionKey 가 지정되지 않았습니다.')
       }
       return modelFlowApi.remove(modelVersionKey, flowId)

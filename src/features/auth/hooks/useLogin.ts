@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/i18n/i18n-context'
-import { apiClient } from '@/shared/lib/api-client'
 import { authApi } from '../api/auth.api'
 import { AuthApiError, type LoginRequest, type LoginSuccessResponse } from '../types/auth.types'
 
@@ -33,19 +32,9 @@ const buildLoginSchema = (t: (key: string) => string) =>
 export type LoginFormValues = z.infer<ReturnType<typeof buildLoginSchema>>
 
 /**
- * 로그인 성공 후 이동할 EqpInfo 기본 진입 경로입니다.
- * 기존 프로젝트 경로 체계를 기준으로 사용합니다.
+ * 로그인 성공 후 이동할 기본 진입 경로입니다 — live-map(설비 라이브맵)을 첫 화면으로 둡니다.
  */
-const EQP_INFO_ENTRY_ROUTE = '/eqp'
-
-/**
- * 로그인 직후 보호 API 호출로 쿠키 기반 인증 상태를 확인합니다.
- */
-const verifyEqpAccess = async () => {
-  await apiClient.get('/eqp', {
-    withCredentials: true,
-  })
-}
+const LOGIN_ENTRY_ROUTE = '/eqp/live-map'
 
 export function useLogin() {
   const navigate = useNavigate()
@@ -62,16 +51,12 @@ export function useLogin() {
   })
 
   const loginMutation = useMutation<LoginSuccessResponse, AuthApiError, LoginRequest>({
-    mutationFn: async (credentials) => {
-      const loginResult = await authApi.login(credentials)
-      await verifyEqpAccess()
-      return loginResult
-    },
+    mutationFn: (credentials) => authApi.login(credentials),
     onSuccess: (result) => {
       console.info('[useLogin] login flow completed', {
         userPk: result.data.userPk,
       })
-      navigate(EQP_INFO_ENTRY_ROUTE, { replace: true })
+      navigate(LOGIN_ENTRY_ROUTE, { replace: true })
     },
     onError: (error) => {
       console.error('[useLogin] login flow failed', {

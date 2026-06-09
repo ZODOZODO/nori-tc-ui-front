@@ -126,8 +126,11 @@ test('admin: Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT �
   await page.getByTestId('live-map-3d-save').click()
   await expect.poll(() => state.putCalls).toBe(1)
   expect(state.lastPlacements).toHaveLength(2)
+  const byEqp = new Map(state.lastPlacements.map((placement) => [placement.eqpKey, placement]))
+  // 77 = c1 index0(bay 좌 열, base 90°), 78 = index1(우 열, base 270°) → 그룹 CW 회전 +15.
+  expect(byEqp.get(77)?.transformJson.rotation).toBe(105)
+  expect(byEqp.get(78)?.transformJson.rotation).toBe(285)
   for (const placement of state.lastPlacements) {
-    expect(placement.transformJson.rotation).toBe(15)
     expect(placement.transformJson.floor).toBe(2)
   }
   expect(new Set(state.lastPlacements.map((placement) => placement.eqpKey))).toEqual(new Set([77, 78]))

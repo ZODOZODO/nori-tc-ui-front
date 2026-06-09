@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useI18n, type Lang } from './i18n-context'
+import { useI18n } from './i18n-context'
+import { LANGUAGES } from './languages'
 
-// 지원 언어 목록 — 라벨은 각 언어 고유 표기. 추가 언어는 이 배열 + 해당 locale JSON 으로 확장.
-// LoginPage 의 별도 토글이 같은 순환 순서를 공유하도록 export.
-export const LANGUAGES: readonly { code: Lang; label: string }[] = [
-  { code: 'ko', label: '한국어' },
-  { code: 'en', label: 'English' },
-  { code: 'vi', label: 'Tiếng Việt' },
-]
+interface LanguageToggleProps {
+  /** 메뉴 펼침 방향. 기본 'down'(하단). 화면 하단(예: 로그인 푸터)에서는 'up' 으로 위로 펼친다. */
+  placement?: 'down' | 'up'
+}
 
 /**
  * 다국어 선택 드롭다운입니다. 현재 언어를 표시하고, 펼쳐서 다른 언어를 선택합니다.
  */
-export function LanguageToggle() {
+export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
   const { lang, setLang, t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -53,7 +51,9 @@ export function LanguageToggle() {
       {isOpen ? (
         <ul
           role="listbox"
-          className="absolute right-0 top-[calc(100%+6px)] z-[var(--z-dropdown)] min-w-[148px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-lg"
+          className={`absolute right-0 z-[var(--z-dropdown)] min-w-[148px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-lg ${
+            placement === 'up' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]'
+          }`}
         >
           {LANGUAGES.map((item) => {
             const isActive = item.code === lang

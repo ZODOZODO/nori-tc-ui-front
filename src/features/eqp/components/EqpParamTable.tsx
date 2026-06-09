@@ -86,7 +86,7 @@ export const EqpParamTable = memo(function EqpParamTable({
       },
       {
         key: 'description',
-        header: 'Description',
+        header: t('eqp.param.colDesc'),
         accessor: (row) => row.description,
         renderCell: (row) =>
           isEditMode && row.rowId ? (
@@ -94,14 +94,14 @@ export const EqpParamTable = memo(function EqpParamTable({
               value={row.description}
               onChange={(event) => onChangeDescription(row.rowId as string, event.target.value)}
               className="h-8 rounded-lg border-input"
-              placeholder="Description"
+              placeholder={t('eqp.param.colDesc')}
             />
           ) : (
             <span className="min-w-[280px]">{row.description || '—'}</span>
           ),
       },
     ],
-    [isEditMode, onChangeParamName, onChangeValue, onChangeDescription],
+    [isEditMode, onChangeParamName, onChangeValue, onChangeDescription, t],
   )
 
   const actionColumn = useMemo<SelectableTableActionColumn<EqpParamTableRow> | undefined>(
@@ -157,7 +157,7 @@ export const EqpParamTable = memo(function EqpParamTable({
               <TableRow className="bg-muted">
                 <TableHead>Param Name</TableHead>
                 <TableHead>Param Value</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>{t('eqp.param.colDesc')}</TableHead>
                 {isEditMode ? <TableHead className="w-[92px]">{t('eqp.param.action')}</TableHead> : null}
               </TableRow>
             </TableHeader>

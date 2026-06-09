@@ -123,7 +123,8 @@ test('admin: 저장 placement 0 이어도 라인 실설비가 캐비닛으로 �
   expect(state.lastPlacements).toHaveLength(1)
   expect(state.lastPlacements[0].objectKey).toBe(9)
   expect(state.lastPlacements[0].eqpKey).toBe(77)
-  expect(state.lastPlacements[0].transformJson.rotation).toBe(15)
+  // 77 = c1 index0(bay 좌 열, base 90°) → CW 회전 +15 = 105.
+  expect(state.lastPlacements[0].transformJson.rotation).toBe(105)
   expect(state.lastPlacements[0].transformJson.x).toBeGreaterThan(0)
   expect(state.lastPlacements[0].transformJson.y).toBeGreaterThan(0)
 

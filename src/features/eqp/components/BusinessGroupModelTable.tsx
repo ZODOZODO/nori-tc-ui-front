@@ -125,10 +125,10 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
                 <TableRow className="bg-muted">
                   <TableHead>Model Name</TableHead>
                   <TableHead>Model Version</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>description</TableHead>
-                  <TableHead>updated_by</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead>{t('eqp.col.status')}</TableHead>
+                  <TableHead>{t('eqp.col.description')}</TableHead>
+                  <TableHead>{t('eqp.col.updatedBy')}</TableHead>
+                  <TableHead>{t('eqp.col.updatedAt')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

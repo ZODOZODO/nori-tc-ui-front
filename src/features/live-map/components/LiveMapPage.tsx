@@ -1,5 +1,7 @@
 import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { Beaker } from 'lucide-react'
 import { useI18n } from '@/i18n/i18n-context'
+import { Button } from '@/components/ui/button'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
@@ -204,8 +206,17 @@ export function LiveMapPage() {
             </div>
           ) : null}
 
-          {canEdit ? (
-            <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setIsDemoModalOpen(true)}
+              className="h-8 rounded-pill bg-primary px-4 text-[12px] font-bold text-primary-foreground hover:bg-primary/90"
+            >
+              <Beaker className="size-3.5" />
+              {t('livemap.board.demo')}
+            </Button>
+            {canEdit ? (
               <div className="inline-flex rounded-pill border border-border bg-card p-1 shadow-soft-sm">
                 <button
                   type="button"
@@ -247,8 +258,8 @@ export function LiveMapPage() {
                   {t('livemap.mode.builder')}
                 </button>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
           {isBuilderMode ? (
             <Suspense
@@ -287,7 +298,6 @@ export function LiveMapPage() {
               isLayoutEditEnabled={isLayoutEditEnabled}
               onSelectEquipment={handleSelectEquipment}
               onClearSelection={handleClearSelection}
-              onOpenDemo={() => setIsDemoModalOpen(true)}
               onLayoutEditEnabledChange={setLayoutEditEnabled}
               onMoveCluster={(clusterId, position) => updateClusterLayout(clusterId, position, {})}
               onZoomIn={zoomIn}

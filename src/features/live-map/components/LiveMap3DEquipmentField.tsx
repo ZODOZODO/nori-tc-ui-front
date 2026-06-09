@@ -15,67 +15,57 @@ import { LIVE_MAP_PORT_COLOR, LIVE_MAP_STATUS_COLOR } from '../lib/live-map-3d.m
  * 본체(mainframe) InstancedMesh 의 onPointerDown → `event.instanceId` 로 placement 매핑. 뱃지/선택링은 상위가 따로 그림.</p>
  */
 
-const TOOL = { width: 2.0, mainframeH: 1.72, mainframeD: 1.05, efemH: 1.04, efemD: 0.66 }
-const PLINTH_H = 0.1
+// 모던 클린 툴: 키 큰 흰색 본체(mainframe) + 키 큰 EFEM 전면 모듈 + 상단 FFU 캡 + 슬림 시그널타워.
+const TOOL = { width: 2.0, mainframeH: 2.45, mainframeD: 1.1, efemH: 2.1, efemD: 0.64 }
+const PLINTH_H = 0.08
 const TOTAL_D = TOOL.mainframeD + TOOL.efemD
 const FRONT_Z = TOTAL_D / 2
 const MAINFRAME_Z = FRONT_Z - TOOL.efemD - TOOL.mainframeD / 2
 const EFEM_Z = FRONT_Z - TOOL.efemD / 2
 const MAINFRAME_TOP_Y = PLINTH_H + TOOL.mainframeH
-const FOUP = { width: 0.4, height: 0.48, depth: 0.42 }
-const DOCK = { height: 0.08, protrude: 0.16 }
-const DOCK_Y = PLINTH_H + 0.3
+const FOUP = { width: 0.42, height: 0.5, depth: 0.42 }
+/** 로드포트(carrier 입구) 높이 — EFEM 전면 하부, OHT/작업자가 FOUP 을 적재하는 높이(바닥이 아님). */
+const PORT_Y = PLINTH_H + 0.98
+const DOCK = { height: 0.06, protrude: 0.2 }
 
 const COLOR = {
-  body: '#e3e7eb', efem: '#d2d7dd', trim: '#2a3340', glass: '#0c1622',
-  chamber: '#4a525f', chamberLid: '#69727f', hub: '#59626f', dock: '#39414e',
-  foup: '#aab3c0', panel: '#c0c6cd',
+  body: '#eef1f5', efem: '#e3e8ef', cap: '#f5f7fa', screen: '#1e2733',
+  port: '#b8c2cf', foup: '#cdd5df', plinth: '#3a4250',
 }
 
-// 부품 종류당 1회 생성 공유 지오메트리(설비 수와 무관). 포트는 단위 폭 1 → per-instance scale.x.
+// 부품 종류당 1회 생성 공유 지오메트리(설비 수와 무관). 포트(dock/foup/band)는 단위 폭 1 → per-instance scale.x.
 const GEO = {
-  plinth: new THREE.BoxGeometry(TOOL.width + 0.12, PLINTH_H, TOTAL_D + 0.12),
-  mainframe: new RoundedBoxGeometry(TOOL.width, TOOL.mainframeH, TOOL.mainframeD, 2, 0.05),
-  panel: new THREE.BoxGeometry(TOOL.width * 0.72, TOOL.mainframeH * 0.6, 0.02),
-  accent: new THREE.BoxGeometry(TOOL.width * 0.72, 0.06, 0.02),
-  hub: new THREE.CylinderGeometry(0.34, 0.36, 0.3, 6),
-  module: new THREE.CylinderGeometry(0.21, 0.22, 0.34, 14),
-  lid: new THREE.CylinderGeometry(0.16, 0.21, 0.06, 14),
-  efem: new RoundedBoxGeometry(TOOL.width, TOOL.efemH, TOOL.efemD, 2, 0.04),
-  glass: new THREE.BoxGeometry(TOOL.width * 0.84, 0.3, 0.03),
-  towerPole: new THREE.CylinderGeometry(0.035, 0.05, 0.16, 10),
-  towerSeg: new THREE.CylinderGeometry(0.075, 0.075, 0.14, 12),
-  dock: new THREE.BoxGeometry(1, DOCK.height, DOCK.protrude + 0.18),
-  foup: new RoundedBoxGeometry(1, FOUP.height, FOUP.depth, 2, 0.03),
-  band: new THREE.BoxGeometry(1, 0.07, 0.02),
+  plinth: new THREE.BoxGeometry(TOOL.width + 0.06, PLINTH_H, TOTAL_D + 0.06),
+  mainframe: new RoundedBoxGeometry(TOOL.width, TOOL.mainframeH, TOOL.mainframeD, 3, 0.06),
+  cap: new THREE.BoxGeometry(TOOL.width + 0.04, 0.16, TOOL.mainframeD + 0.04),
+  efem: new RoundedBoxGeometry(TOOL.width, TOOL.efemH, TOOL.efemD, 3, 0.05),
+  screen: new THREE.BoxGeometry(TOOL.width * 0.42, 0.6, 0.02),
+  accent: new THREE.BoxGeometry(TOOL.width * 0.9, 0.05, 0.02),
+  towerPole: new THREE.CylinderGeometry(0.03, 0.04, 0.22, 10),
+  towerSeg: new THREE.CylinderGeometry(0.07, 0.07, 0.12, 14),
+  dock: new THREE.BoxGeometry(1, DOCK.height, DOCK.protrude),
+  foup: new RoundedBoxGeometry(1, FOUP.height, FOUP.depth, 2, 0.04),
+  band: new THREE.BoxGeometry(1, 0.06, 0.02),
 }
 const fixedMat = (color: string, metalness: number, roughness: number) =>
   new THREE.MeshStandardMaterial({ color, metalness, roughness })
 const tintMat = (metalness: number, roughness: number) =>
   new THREE.MeshStandardMaterial({ color: '#ffffff', metalness, roughness })
 const MAT = {
-  plinth: fixedMat(COLOR.trim, 0.4, 0.55),
-  body: fixedMat(COLOR.body, 0.2, 0.42),
-  panel: fixedMat(COLOR.panel, 0.2, 0.5),
-  hub: fixedMat(COLOR.hub, 0.5, 0.4),
-  chamber: fixedMat(COLOR.chamber, 0.45, 0.4),
-  chamberLid: fixedMat(COLOR.chamberLid, 0.55, 0.35),
-  efem: fixedMat(COLOR.efem, 0.22, 0.44),
-  glass: new THREE.MeshStandardMaterial({ color: COLOR.glass, emissive: new THREE.Color('#1f7a8c'), emissiveIntensity: 0.4, toneMapped: false, metalness: 0.1, roughness: 0.3 }),
-  towerPole: fixedMat(COLOR.trim, 0.6, 0.35),
+  plinth: fixedMat(COLOR.plinth, 0.4, 0.5),
+  body: fixedMat(COLOR.body, 0.16, 0.36),
+  cap: fixedMat(COLOR.cap, 0.14, 0.4),
+  efem: fixedMat(COLOR.efem, 0.16, 0.38),
+  screen: new THREE.MeshStandardMaterial({ color: COLOR.screen, emissive: new THREE.Color('#0e3a4a'), emissiveIntensity: 0.32, toneMapped: false, metalness: 0.2, roughness: 0.3 }),
+  towerPole: fixedMat(COLOR.plinth, 0.5, 0.4),
   accent: tintMat(0.3, 0.5),
   tower: tintMat(0.4, 0.4),
-  dock: fixedMat(COLOR.dock, 0.5, 0.4),
-  foup: fixedMat(COLOR.foup, 0.2, 0.5),
+  dock: fixedMat(COLOR.port, 0.4, 0.45),
+  foup: fixedMat(COLOR.foup, 0.16, 0.5),
   band: tintMat(0.2, 0.5),
 }
 
-const MODULES: Array<[number, number]> = [
-  [0, -0.34],
-  [-0.5, 0.06],
-  [0.5, 0.06],
-]
-const ACCENT_OFF = '#11161d'
+const ACCENT_OFF = '#aeb6c0'
 const TOWER_OFF = '#1b2026'
 const TOWER_COLORS = ['#ef4444', '#f59e0b', '#22c55e'] as const
 const towerOn = (status: LiveMapEquipmentResponse['status']) => [status === 'ERROR', status === 'IDLE', status === 'RUN']
@@ -116,8 +106,8 @@ const portLayout = (ports: LiveMapPortResponse[]): { foupWidth: number; xs: numb
   const startX = -usableWidth / 2 + slotWidth / 2
   return { foupWidth, xs: ports.map((_, i) => startX + i * slotWidth) }
 }
-const FOUP_CENTER_Y = DOCK_Y + DOCK.height / 2 + FOUP.height / 2
-const FOUP_Z = FRONT_Z + DOCK.protrude - 0.04
+const FOUP_CENTER_Y = PORT_Y
+const FOUP_Z = FRONT_Z + FOUP.depth / 2 - 0.06
 
 // 행렬/색 합성 임시 객체(재사용 — per-instance alloc 회피).
 const TMP_M = new THREE.Matrix4()
@@ -199,44 +189,37 @@ export function LiveMap3DEquipmentField({
   const parts = useMemo(() => {
     const plinth = single(0, PLINTH_H / 2, 0)
     const mainframe = single(0, PLINTH_H + TOOL.mainframeH / 2, MAINFRAME_Z)
-    const panel = single(0, PLINTH_H + TOOL.mainframeH * 0.55, MAINFRAME_Z + TOOL.mainframeD / 2 + 0.005)
+    const cap = single(0, MAINFRAME_TOP_Y + 0.08, MAINFRAME_Z)
     const efem = single(0, PLINTH_H + TOOL.efemH / 2, EFEM_Z)
-    const glass = single(0, PLINTH_H + TOOL.efemH - 0.16, FRONT_Z + 0.005)
-    const hub = single(0, MAINFRAME_TOP_Y + 0.15, MAINFRAME_Z)
-    const towerPole = single(TOOL.width / 2 - 0.16, MAINFRAME_TOP_Y + 0.1, MAINFRAME_Z + TOOL.mainframeD / 2 - 0.14)
+    // EFEM 전면 상부 터치 스크린(운영 패널).
+    const screen = single(0, PLINTH_H + TOOL.efemH * 0.72, FRONT_Z + 0.012)
+    const towerPole = single(TOOL.width / 2 - 0.2, MAINFRAME_TOP_Y + 0.16, MAINFRAME_Z)
+    // 상태 LED 스트립 — EFEM 전면 상단(RUN 이면 녹색, 그 외 옅은 회색).
     const accent: PartInstance[] = placements.map((p) => {
-      const [px, py, pz] = place(p, 0, PLINTH_H + TOOL.mainframeH - 0.16, MAINFRAME_Z + TOOL.mainframeD / 2 + 0.02)
+      const [px, py, pz] = place(p, 0, PLINTH_H + TOOL.efemH - 0.14, FRONT_Z + 0.012)
       return { px, py, pz, ry: rad(p), color: p.status === 'RUN' ? LIVE_MAP_STATUS_COLOR.RUN : ACCENT_OFF }
     })
-    const module: PartInstance[] = []
-    const lid: PartInstance[] = []
     const towerSeg: PartInstance[] = []
     const dock: PartInstance[] = []
     const foup: PartInstance[] = []
     const band: PartInstance[] = []
     for (const p of placements) {
-      for (const [mx, mz] of MODULES) {
-        const [px, py, pz] = place(p, mx, MAINFRAME_TOP_Y + 0.17, MAINFRAME_Z + mz)
-        module.push({ px, py, pz, ry: rad(p) })
-        const [lx, ly, lz] = place(p, mx, MAINFRAME_TOP_Y + 0.35, MAINFRAME_Z + mz)
-        lid.push({ px: lx, py: ly, pz: lz, ry: rad(p) })
-      }
       const on = towerOn(p.status)
       for (let i = 0; i < 3; i += 1) {
-        const [px, py, pz] = place(p, TOOL.width / 2 - 0.16, MAINFRAME_TOP_Y + 0.23 + i * 0.15, MAINFRAME_Z + TOOL.mainframeD / 2 - 0.14)
+        const [px, py, pz] = place(p, TOOL.width / 2 - 0.2, MAINFRAME_TOP_Y + 0.34 + i * 0.12, MAINFRAME_Z)
         towerSeg.push({ px, py, pz, ry: rad(p), color: on[i] ? TOWER_COLORS[i] : TOWER_OFF })
       }
       const { foupWidth, xs } = portLayout(p.ports)
       xs.forEach((x, i) => {
-        const [dx, dy, dz] = place(p, x, DOCK_Y, FRONT_Z + DOCK.protrude / 2)
-        dock.push({ px: dx, py: dy, pz: dz, ry: rad(p), sx: foupWidth + 0.1 })
+        const [dx, dy, dz] = place(p, x, PORT_Y - FOUP.height / 2 - DOCK.height / 2, FRONT_Z + DOCK.protrude / 2)
+        dock.push({ px: dx, py: dy, pz: dz, ry: rad(p), sx: foupWidth + 0.12 })
         const [fx, fy, fz] = place(p, x, FOUP_CENTER_Y, FOUP_Z)
         foup.push({ px: fx, py: fy, pz: fz, ry: rad(p), sx: foupWidth })
-        const [bx, by, bz] = place(p, x, FOUP_CENTER_Y + FOUP.height * 0.22, FOUP_Z + FOUP.depth / 2 + 0.025)
-        band.push({ px: bx, py: by, pz: bz, ry: rad(p), sx: foupWidth * 0.62, color: LIVE_MAP_PORT_COLOR[p.ports[i].status] })
+        const [bx, by, bz] = place(p, x, FOUP_CENTER_Y + FOUP.height * 0.2, FOUP_Z + FOUP.depth / 2 + 0.02)
+        band.push({ px: bx, py: by, pz: bz, ry: rad(p), sx: foupWidth * 0.6, color: LIVE_MAP_PORT_COLOR[p.ports[i].status] })
       })
     }
-    return { plinth, mainframe, panel, efem, glass, hub, towerPole, accent, module, lid, towerSeg, dock, foup, band }
+    return { plinth, mainframe, cap, efem, screen, towerPole, accent, towerSeg, dock, foup, band }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placements])
 
@@ -256,17 +239,14 @@ export function LiveMap3DEquipmentField({
     <>
       <InstancedPart geometry={GEO.plinth} material={MAT.plinth} instances={parts.plinth} receiveShadow />
       <InstancedPart geometry={GEO.mainframe} material={MAT.body} instances={parts.mainframe} castShadow receiveShadow onPick={pickMainframe} />
-      <InstancedPart geometry={GEO.panel} material={MAT.panel} instances={parts.panel} />
+      <InstancedPart geometry={GEO.cap} material={MAT.cap} instances={parts.cap} castShadow />
       <InstancedPart geometry={GEO.efem} material={MAT.efem} instances={parts.efem} castShadow receiveShadow />
-      <InstancedPart geometry={GEO.glass} material={MAT.glass} instances={parts.glass} />
-      <InstancedPart geometry={GEO.hub} material={MAT.hub} instances={parts.hub} />
-      <InstancedPart geometry={GEO.module} material={MAT.chamber} instances={parts.module} />
-      <InstancedPart geometry={GEO.lid} material={MAT.chamberLid} instances={parts.lid} />
-      <InstancedPart geometry={GEO.towerPole} material={MAT.towerPole} instances={parts.towerPole} />
+      <InstancedPart geometry={GEO.screen} material={MAT.screen} instances={parts.screen} />
       <InstancedPart geometry={GEO.accent} material={MAT.accent} instances={parts.accent} />
+      <InstancedPart geometry={GEO.towerPole} material={MAT.towerPole} instances={parts.towerPole} />
       <InstancedPart geometry={GEO.towerSeg} material={MAT.tower} instances={parts.towerSeg} />
       <InstancedPart geometry={GEO.dock} material={MAT.dock} instances={parts.dock} receiveShadow />
-      <InstancedPart geometry={GEO.foup} material={MAT.foup} instances={parts.foup} />
+      <InstancedPart geometry={GEO.foup} material={MAT.foup} instances={parts.foup} castShadow />
       <InstancedPart geometry={GEO.band} material={MAT.band} instances={parts.band} />
     </>
   )

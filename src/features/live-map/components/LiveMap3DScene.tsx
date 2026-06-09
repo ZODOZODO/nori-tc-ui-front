@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Grid, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
+import { useI18n } from '@/i18n/i18n-context'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -14,6 +15,7 @@ import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { LIVE_MAP_CLUSTER_ITEMS } from '../mocks/live-map.mock'
 import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
 import {
+  LIVE_MAP_BAY_AISLE_PX,
   buildBayEquipmentPlacements,
   buildLineBays,
   isBuiltinStructureKey,
@@ -21,7 +23,9 @@ import {
   LIVE_MAP_BUILTIN_STRUCTURES,
   LIVE_MAP_STATUS_COLOR,
   LIVE_MAP_WORLD_SCALE,
+  liveMapRoomSizeWorld,
   placementToWorld,
+  snapToGrid,
   worldToPlacement,
   type LiveMap3DShape,
   type LiveMapBay,
@@ -56,9 +60,9 @@ const ROTATE_STEP = 15
 /** 키보드 화살표 미세 이동 단위(px). Shift 동반 시 거친 단위. */
 const NUDGE_PX = 8
 const NUDGE_COARSE_PX = 40
-/** 층 — 1~3층, 층간 높이(world unit). 설비(~4 높이) 위로 충분한 여유(뱃지/시그널타워 안 겹치게). */
-const FLOOR_LEVELS = [1, 2, 3] as const
-const FLOOR_HEIGHT = 6
+/** 층 — 1~2층, 층간 높이(world unit). 설비(~4 높이) 위로 충분한 여유(뱃지/시그널타워 안 겹치게) + 층 구분 강조. */
+const FLOOR_LEVELS = [1, 2] as const
+const FLOOR_HEIGHT = 9
 /** 전체 보기에서 카메라 타깃을 층 스택 중앙으로 — 3층까지 화면에 들어오게. */
 const STACK_CENTER_Y = (FLOOR_HEIGHT * (FLOOR_LEVELS.length - 1)) / 2
 /** 층 뷰 — 특정 층만 보기 or 전체 적층. */
@@ -87,13 +91,8 @@ const SCENE_PALETTE: Record<'light' | 'dark', ScenePalette> = {
   light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, contactOpacity: 0.3, badgeBg: 'rgba(255,255,255,0.95)', bayZone: '#dbe5f1', bayWall: '#9aa9bf', roomFloor: '#e3ebf5', roomAisle: '#cfdbe9', roomWall: '#8c9cb4' },
 }
 
-/** 공정 bay 파티션(낮은 벽) — 등각 ortho 에서 설비(~4 높이)를 가리지 않게 낮게. 빌트인 '파티션'(1.6)과 동일. */
-const BAY_WALL_HEIGHT = 1.6
-const BAY_WALL_THICKNESS = 0.15
-
-/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 원거리 외벽 2면(-X/-Z) + 중앙 통로. mockup1(2.5D 등각 룸) 미감. */
-const ROOM_FLOOR_W = 34
-const ROOM_FLOOR_D = 18
+/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 원거리 외벽 2면(-X/-Z) + 중앙 통로. mockup1(2.5D 등각 룸) 미감.
+ *  바닥 크기(W/D)는 고정이 아니라 liveMapRoomSizeWorld 로 bay 범위를 덮게 산출(깊은 bay 설비 floating 방지). */
 const ROOM_WALL_HEIGHT = 3.4
 const ROOM_WALL_THICKNESS = 0.3
 const ROOM_AISLE_W = 3.4
@@ -175,7 +174,7 @@ function BadgeProjector({
       if (!el) {
         continue
       }
-      vec.set(p.worldX, p.floorY + 3.1, p.worldZ)
+      vec.set(p.worldX, p.floorY + 3.7, p.worldZ)
       vec.project(camera)
       const x = (vec.x * 0.5 + 0.5) * width
       const y = (-vec.y * 0.5 + 0.5) * height
@@ -187,30 +186,31 @@ function BadgeProjector({
 
 /** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 중앙 통로 스트립 + 원거리 외벽 2면(-X/-Z). 등각 카메라(+X+Y+Z)라
  *  -X/-Z 면은 뒤쪽 → 그 두 벽만 세워 내부가 보인다(near 벽 생략). 전체 보기에선 하층만 솔리드, 상층은 반투명(하층 투시). */
-function FloorRoom({ floorY, solid, palette }: { floorY: number; solid: boolean; palette: ScenePalette }) {
+function FloorRoom({ floorY, solid, palette, width, depth }: { floorY: number; solid: boolean; palette: ScenePalette; width: number; depth: number }) {
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
-        <planeGeometry args={[ROOM_FLOOR_W, ROOM_FLOOR_D]} />
+        <planeGeometry args={[width, depth]} />
         <meshStandardMaterial color={palette.roomFloor} transparent={!solid} opacity={solid ? 1 : 0.55} metalness={0.05} roughness={0.92} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY + 0.02, 0]}>
-        <planeGeometry args={[ROOM_FLOOR_W, ROOM_AISLE_W]} />
+        <planeGeometry args={[width, ROOM_AISLE_W]} />
         <meshStandardMaterial color={palette.roomAisle} transparent opacity={solid ? 0.92 : 0.4} metalness={0.05} roughness={0.88} />
       </mesh>
-      <mesh position={[-ROOM_FLOOR_W / 2, floorY + ROOM_WALL_HEIGHT / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[ROOM_WALL_THICKNESS, ROOM_WALL_HEIGHT, ROOM_FLOOR_D]} />
+      <mesh position={[-width / 2, floorY + ROOM_WALL_HEIGHT / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[ROOM_WALL_THICKNESS, ROOM_WALL_HEIGHT, depth]} />
         <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
       </mesh>
-      <mesh position={[0, floorY + ROOM_WALL_HEIGHT / 2, -ROOM_FLOOR_D / 2]} castShadow receiveShadow>
-        <boxGeometry args={[ROOM_FLOOR_W, ROOM_WALL_HEIGHT, ROOM_WALL_THICKNESS]} />
+      <mesh position={[0, floorY + ROOM_WALL_HEIGHT / 2, -depth / 2]} castShadow receiveShadow>
+        <boxGeometry args={[width, ROOM_WALL_HEIGHT, ROOM_WALL_THICKNESS]} />
         <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
       </mesh>
     </group>
   )
 }
 
-/** 공정 bay 구조물 — bay 마다 바닥 존(반투명 슬래브) + 통로 반대쪽 3면 낮은 파티션 벽(통로 쪽은 열림). 라벨은 DOM 오버레이. */
+/** 공정 핑거 bay 구조물 — bay 마다 바닥 존 + 세로 내부 통로(스파인 연결) + 좌/우 설비 뒤쪽 벽(긴 변).
+ *  설비가 등지는 면(뒤쪽)만 벽으로 막고, 바깥 끝(옆)·스파인 쪽 입구는 열어 둔다. 천장(OHT/트레이)은 그리지 않는다. 라벨은 DOM 오버레이. */
 function BayStructures({
   bays,
   floorYOf,
@@ -220,6 +220,9 @@ function BayStructures({
   floorYOf: (floor: number) => number
   palette: ScenePalette
 }) {
+  const aisle = LIVE_MAP_BAY_AISLE_PX / LIVE_MAP_WORLD_SCALE
+  const partitionH = 1.6
+  const partitionT = 0.12
   return (
     <>
       {bays.map((bay) => {
@@ -227,25 +230,26 @@ function BayStructures({
         const width = bay.widthPx / LIVE_MAP_WORLD_SCALE
         const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
         const floorY = floorYOf(bay.floor)
-        // 통로 반대쪽(top bay=-Z / bottom bay=+Z)에 뒷벽, 좌우 측벽. 통로 쪽은 열어 로드포트가 보이게.
-        const backZ = bay.row === 'top' ? worldZ - depth / 2 : worldZ + depth / 2
         return (
           <group key={`${bay.floor}-${bay.clusterId}`}>
+            {/* bay 바닥존 */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[worldX, floorY + 0.03, worldZ]} receiveShadow>
               <planeGeometry args={[width, depth]} />
-              <meshStandardMaterial color={palette.bayZone} transparent opacity={0.5} metalness={0.05} roughness={0.95} />
+              <meshStandardMaterial color={palette.bayZone} transparent opacity={0.45} metalness={0.05} roughness={0.95} />
             </mesh>
-            <mesh position={[worldX, floorY + BAY_WALL_HEIGHT / 2, backZ]} castShadow receiveShadow>
-              <boxGeometry args={[width + BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, BAY_WALL_THICKNESS]} />
-              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            {/* 내부 통로(세로) — 좌/우 2열 사이를 스파인까지 잇는다. */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[worldX, floorY + 0.06, worldZ]} receiveShadow>
+              <planeGeometry args={[aisle, depth]} />
+              <meshStandardMaterial color={palette.roomAisle} transparent opacity={0.95} metalness={0.1} roughness={0.8} />
             </mesh>
-            <mesh position={[worldX - width / 2, floorY + BAY_WALL_HEIGHT / 2, worldZ]} castShadow receiveShadow>
-              <boxGeometry args={[BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, depth]} />
-              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            {/* 좌/우 설비 뒤쪽 벽(긴 변) — 좌/우 열 설비가 등지는 면. bay 길이만큼 세로로. */}
+            <mesh position={[worldX - width / 2, floorY + partitionH / 2, worldZ]} castShadow receiveShadow>
+              <boxGeometry args={[partitionT, partitionH, depth]} />
+              <meshStandardMaterial color={palette.bayWall} metalness={0.1} roughness={0.8} />
             </mesh>
-            <mesh position={[worldX + width / 2, floorY + BAY_WALL_HEIGHT / 2, worldZ]} castShadow receiveShadow>
-              <boxGeometry args={[BAY_WALL_THICKNESS, BAY_WALL_HEIGHT, depth]} />
-              <meshStandardMaterial color={palette.bayWall} metalness={0.2} roughness={0.7} />
+            <mesh position={[worldX + width / 2, floorY + partitionH / 2, worldZ]} castShadow receiveShadow>
+              <boxGeometry args={[partitionT, partitionH, depth]} />
+              <meshStandardMaterial color={palette.bayWall} metalness={0.1} roughness={0.8} />
             </mesh>
           </group>
         )
@@ -254,7 +258,7 @@ function BayStructures({
   )
 }
 
-/** bay 라벨(공정명) 좌표 투영 — 뒷벽 위 한 점을 화면 px 로 project 해 Canvas 밖 DOM 라벨 transform 갱신(뱃지와 동형).
+/** 공정 구간 라벨(공정명) 좌표 투영 — 구간 앞쪽 한 점을 화면 px 로 project 해 Canvas 밖 DOM 라벨 transform 갱신(뱃지와 동형).
  *  imperative transform 이라 Tailwind scale·translate 유틸 동시 적용 금지(합성 어긋남) — 크기/색만 클래스로. */
 function BayLabelProjector({
   bays,
@@ -279,8 +283,9 @@ function BayLabelProjector({
       }
       const [worldX, worldZ] = placementToWorld(bay.centerXPx, bay.centerYPx)
       const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
-      const backZ = bay.row === 'top' ? worldZ - depth / 2 : worldZ + depth / 2
-      vec.set(worldX, floorYOf(bay.floor) + BAY_WALL_HEIGHT + 0.35, backZ)
+      // bay 입구(스파인 쪽) 위에 라벨을 띄운다 — 라벨이 중앙 스파인을 따라 정렬된다.
+      const side = Math.sign(worldZ) || 1
+      vec.set(worldX, floorYOf(bay.floor) + 1.9, worldZ - (side * depth) / 2 - 0.2)
       vec.project(camera)
       const x = (vec.x * 0.5 + 0.5) * width
       const y = (-vec.y * 0.5 + 0.5) * height
@@ -294,6 +299,7 @@ function BayLabelProjector({
 function SceneContent({
   placements,
   bays,
+  roomSize,
   selectedIdSet,
   editing,
   palette,
@@ -307,6 +313,7 @@ function SceneContent({
 }: {
   placements: ResolvedPlacement[]
   bays: LiveMapBay[]
+  roomSize: { width: number; depth: number }
   selectedIdSet: ReadonlySet<string>
   editing: boolean
   palette: ScenePalette
@@ -422,7 +429,7 @@ function SceneContent({
       <ContactShadows position={[0, 0.01, 0]} opacity={palette.contactOpacity} scale={80} blur={2.2} far={22} resolution={512} />
       {/* 층 룸 — 보이는 bay 가 있는 층마다 솔리드 바닥 + 중앙 통로 + 원거리 외벽(컷어웨이). 모든 구조물의 배경. */}
       {roomFloors.map((floor) => (
-        <FloorRoom key={floor} floorY={floorYOf(floor)} solid={floorView !== 'all' || floor === lowestRoomFloor} palette={palette} />
+        <FloorRoom key={floor} floorY={floorYOf(floor)} solid={floorView !== 'all' || floor === lowestRoomFloor} palette={palette} width={roomSize.width} depth={roomSize.depth} />
       ))}
       {/* 공정 bay — 바닥 존 + 통로 반대쪽 3면 낮은 파티션(통로 쪽 열림). 설비보다 먼저 그려 배경처럼. */}
       <BayStructures bays={bays} floorYOf={floorYOf} palette={palette} />
@@ -471,6 +478,7 @@ function SceneContent({
  * 템플릿 교체 · 실설비(eqpKey) 바인딩 · 층(1~3) 배치 → PUT 영속. 뷰어: 실시간 상태 뱃지 + 선택 상세.</p>
  */
 export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
+  const { t } = useI18n()
   const layoutQuery = useLayout(lineKey)
   const liveMapQuery = useLiveMap()
   const meQuery = useMe()
@@ -558,6 +566,9 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
   // 공정 bay 목록 — 라인 전 설비 기준(placed 와 무관). 구조물(바닥존/벽)·라벨 렌더의 배경.
   const bays = useMemo(() => buildLineBays(bayEquipmentInput), [bayEquipmentInput])
+
+  // 룸 바닥/외벽 크기 — 전 층의 모든 bay 를 덮게(깊은 bay 설비가 바닥/벽 밖으로 floating 방지). 전 층 동일 크기로 적층 정합.
+  const roomSize = useMemo(() => liveMapRoomSizeWorld(bays), [bays])
 
   // 저장 placement 가 없는 라인 실설비를 공정 bay 에 자동 배치(objectKey 0 = 빌트인, 저장 시 백킹 객체로 치환).
   // 위치는 cluster 그룹 내 고정 index 기반(buildBayEquipmentPlacements) — 일부 승격(편집)해도 나머지 위치 불변.
@@ -773,11 +784,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const [hitXPx, hitYPx] = worldToPlacement(worldX, worldZ)
     const drag = dragStartRef.current
     if (!drag) {
-      patchWorking(localId, { xPx: hitXPx, yPx: hitYPx })
+      patchWorking(localId, { xPx: snapToGrid(hitXPx), yPx: snapToGrid(hitYPx) })
       return
     }
-    const dxPx = hitXPx - drag.anchorXPx
-    const dyPx = hitYPx - drag.anchorYPx
+    // 드래그 중인 객체(anchor)를 격자점에 스냅 → 그 변위를 선택 전체에 적용(상대 배치 유지).
+    const dxPx = snapToGrid(hitXPx) - drag.anchorXPx
+    const dyPx = snapToGrid(hitYPx) - drag.anchorYPx
     setWorking((previous) => {
       const present = new Set(previous.map((placement) => placement.localId))
       const next = previous.map((placement) => {
@@ -805,7 +817,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const objectKey = Number(addObjectKey)
     // 0 = 미선택 sentinel. 빌트인 구조물은 음수 키라 추가 허용(저장 시 실 객체로 치환).
     if (!Number.isInteger(objectKey) || objectKey === 0) {
-      setStatus('Pick an object to add.')
+      setStatus(t('livemap.viewer3d.statusPickObject'))
       return
     }
     const localId = nextLocalId()
@@ -901,9 +913,9 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           }),
         })),
       })
-      setStatus('Layout saved.')
+      setStatus(t('livemap.viewer3d.statusSaved'))
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Save layout failed.')
+      setStatus(error instanceof Error ? error.message : t('livemap.viewer3d.statusSaveFailed'))
     }
   }
 
@@ -922,6 +934,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         <SceneContent
           placements={resolved}
           bays={visibleBays}
+          roomSize={roomSize}
           selectedIdSet={selectedIdSet}
           editing={editing}
           palette={palette}
@@ -1001,10 +1014,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       {/* 상단 우측 — 편집 토글 + 저장 */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         <span
-          title="표시 = 화면에 그려진 전체(저장된 배치 + 라인 실설비 자동표시) · 저장 = DB에 영속된 배치 수"
+          title={t('livemap.viewer3d.countHint')}
           className="rounded-pill border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur"
         >
-          표시 <span data-testid="live-map-3d-visible-count">{resolved.length}</span> · 저장{' '}
+          {t('livemap.viewer3d.countVisible')} <span data-testid="live-map-3d-visible-count">{resolved.length}</span> · {t('livemap.viewer3d.countSaved')}{' '}
           <span data-testid="live-map-3d-placement-count">{working.length}</span>
         </span>
         {canEdit ? (
@@ -1017,12 +1030,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 setEditing((value) => !value)
                 setSelectedIds([])
               }}
-              title={editing ? '편집 모드 종료' : '배치 편집 시작'}
+              title={editing ? t('livemap.viewer3d.editToggleExit') : t('livemap.viewer3d.editToggleStart')}
               className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
                 editing ? 'bg-brand-primary text-white hover:bg-brand-primary/90' : 'border border-border bg-card/90 text-foreground backdrop-blur hover:bg-muted'
               }`}
             >
-              {editing ? '편집 종료' : '편집'}
+              {editing ? t('livemap.viewer3d.editExit') : t('livemap.viewer3d.edit')}
             </button>
             {editing ? (
               <button
@@ -1030,10 +1043,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 data-testid="live-map-3d-save"
                 onClick={handleSave}
                 disabled={saveLayout.isPending || createObject.isPending}
-                title="배치 저장"
+                title={t('livemap.viewer3d.saveTitle')}
                 className="rounded-pill bg-primary px-4 py-1.5 text-[12px] font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                저장
+                {t('livemap.viewer3d.save')}
               </button>
             ) : null}
           </>
@@ -1050,7 +1063,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             data-testid={`live-map-3d-floor-${floor}`}
             aria-pressed={floorView === floor}
             onClick={() => setFloorView(floor)}
-            title={`${floor}층만 보기`}
+            title={t('livemap.viewer3d.floorOnly', { floor })}
             className={`size-9 rounded-md text-xs font-bold transition-colors ${
               floorView === floor ? 'bg-brand-primary text-white' : 'text-foreground hover:bg-muted'
             }`}
@@ -1063,12 +1076,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           data-testid="live-map-3d-floor-all"
           aria-pressed={floorView === 'all'}
           onClick={() => setFloorView('all')}
-          title="전체 층 보기"
+          title={t('livemap.viewer3d.allFloors')}
           className={`flex h-9 items-center justify-center rounded-md px-1 text-[11px] font-bold transition-colors ${
             floorView === 'all' ? 'bg-brand-primary text-white' : 'text-foreground hover:bg-muted'
           }`}
         >
-          전체
+          {t('livemap.viewer3d.all')}
         </button>
       </div>
 
@@ -1081,15 +1094,15 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             value={addObjectKey}
             onChange={(event) => setAddObjectKey(event.target.value)}
           >
-            <option value="">— object —</option>
+            <option value="">{t('livemap.viewer3d.optObject')}</option>
             {libraryObjects.map((object) => (
               <option key={object.objectKey} value={object.objectKey}>
                 {object.objectName} ({object.objectKind})
               </option>
             ))}
           </select>
-          <button type="button" data-testid="live-map-3d-add" onClick={handleAdd} title={`${floorView === 'all' ? 1 : floorView}층에 선택 객체 추가`} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
-            추가
+          <button type="button" data-testid="live-map-3d-add" onClick={handleAdd} title={t('livemap.viewer3d.addToFloor', { floor: floorView === 'all' ? 1 : floorView })} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
+            {t('livemap.viewer3d.add')}
           </button>
         </div>
       ) : null}
@@ -1101,25 +1114,25 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             {primaryObject?.objectName ?? primaryEquipment?.eqpName ?? 'object'}
             {selectedIds.length > 1 ? (
               <span data-testid="live-map-3d-selected-count" className="ml-1 font-semibold text-muted-foreground">
-                외 {selectedIds.length - 1}개
+                {t('livemap.viewer3d.selectedMore', { count: selectedIds.length - 1 })}
               </span>
             ) : null}
           </span>
-          <button type="button" data-testid="live-map-3d-rotate-ccw" onClick={() => rotateSelected(-ROTATE_STEP)} title="반시계 15° 회전" aria-label="반시계 15° 회전" className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
+          <button type="button" data-testid="live-map-3d-rotate-ccw" onClick={() => rotateSelected(-ROTATE_STEP)} title={t('livemap.viewer3d.rotateCcw')} aria-label={t('livemap.viewer3d.rotateCcw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
             ⟲
           </button>
-          <button type="button" data-testid="live-map-3d-rotate-cw" onClick={() => rotateSelected(ROTATE_STEP)} title="시계 15° 회전" aria-label="시계 15° 회전" className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
+          <button type="button" data-testid="live-map-3d-rotate-cw" onClick={() => rotateSelected(ROTATE_STEP)} title={t('livemap.viewer3d.rotateCw')} aria-label={t('livemap.viewer3d.rotateCw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
             ⟳
           </button>
           {/* 선택을 다른 층으로 이동 */}
-          <div className="flex items-center gap-0.5" role="group" aria-label="층 이동">
+          <div className="flex items-center gap-0.5" role="group" aria-label={t('livemap.viewer3d.floorMove')}>
             {FLOOR_LEVELS.map((floor) => (
               <button
                 key={floor}
                 type="button"
                 data-testid={`live-map-3d-set-floor-${floor}`}
                 onClick={() => setFloorForSelected(floor)}
-                title={`${floor}층으로 이동`}
+                title={t('livemap.viewer3d.moveToFloor', { floor })}
                 className={`size-7 rounded-md border text-xs font-semibold transition-colors ${
                   primary.floor === floor ? 'border-primary bg-primary/15 text-primary' : 'border-border hover:bg-muted'
                 }`}
@@ -1131,7 +1144,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           {assignCandidates.length > 0 ? (
             <select
               data-testid="live-map-3d-assign-select"
-              title="객체 템플릿 교체"
+              title={t('livemap.viewer3d.replaceTemplate')}
               className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
               value={primary.objectKey}
               onChange={(event) => assignTemplateToPrimary(Number(event.target.value))}
@@ -1146,12 +1159,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           {isEquipmentPrimary ? (
             <select
               data-testid="live-map-3d-eqp-select"
-              title="실설비 바인딩"
+              title={t('livemap.viewer3d.bindEqp')}
               className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
               value={primary.eqpKey ?? ''}
               onChange={(event) => bindEqpToPrimary(event.target.value === '' ? null : Number(event.target.value))}
             >
-              <option value="">— equipment —</option>
+              <option value="">{t('livemap.viewer3d.optEquipment')}</option>
               {lineEquipments.map((equipment) => (
                 <option key={equipment.eqpKey} value={equipment.eqpKey}>
                   {equipment.eqpName}
@@ -1159,8 +1172,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               ))}
             </select>
           ) : null}
-          <button type="button" data-testid="live-map-3d-delete" onClick={deleteSelected} title="선택 배치 삭제" className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger transition-colors hover:bg-danger/10">
-            삭제
+          <button type="button" data-testid="live-map-3d-delete" onClick={deleteSelected} title={t('livemap.viewer3d.deleteTitle')} className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger transition-colors hover:bg-danger/10">
+            {t('livemap.viewer3d.delete')}
           </button>
         </div>
       ) : null}
@@ -1178,8 +1191,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-pill border border-border bg-card/80 px-3 py-1 text-[10px] font-semibold text-muted-foreground backdrop-blur"
       >
         {editing
-          ? 'Shift+클릭 다중 선택 · 드래그/화살표 이동 · 우드래그 화면 이동'
-          : '드래그 회전 · 우드래그·두손가락 화면 이동 · 휠 확대/축소'}
+          ? t('livemap.viewer3d.hintEdit')
+          : t('livemap.viewer3d.hintView')}
       </div>
 
       {status ? (

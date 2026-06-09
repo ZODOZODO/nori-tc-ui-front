@@ -192,7 +192,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
                 <TableHead>Route Partition</TableHead>
                 <TableHead>IP</TableHead>
                 <TableHead>Port</TableHead>
-                <TableHead>Enabled</TableHead>
+                <TableHead>{t('eqp.col.enabled')}</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>Model Version</TableHead>
                 <TableHead>Gateway Jarfile</TableHead>

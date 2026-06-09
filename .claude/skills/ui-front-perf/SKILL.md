@@ -6,6 +6,10 @@ allowed-tools: [AskUserQuestion, Read, Glob, Grep, Bash, Write, Edit]
 
 # nori-tc-ui-front Performance — Measurement-First
 
+> **두 측면을 모두 다룬다** (도구 2개):
+> 1. **런타임 성능** — 정상 사용 중 페이지별 `/api/*` 응답시간·`tbody tr` row 수·청크 크기·폴링/staleTime/prefetch ([_perf_measure.mjs](tests/e2e/_perf_measure.mjs)).
+> 2. **첫 로딩/진입 체감 시간** — "로그인/콜드 진입이 N초" 류를 백엔드 vs 프론트 모듈(dev=Vite 워터폴 / prod=번들 파싱·실행) vs 렌더로 분해, dev vs prod-preview 교차검증 ([_load_trace.mjs](tests/e2e/_load_trace.mjs), Step 1-4).
+
 ## WHY (이 skill 의 존재 이유)
 
 과거 버전은 "정적 검사 → 보고서 → 사용자가 별 세션에서 추정 기반 개선" 이었다. 그 결과:
@@ -80,6 +84,30 @@ OUTPUT_PATH=".claude/perf/measurements/baseline-${TS}.json" \
 - `vite.config.ts` 의 `manualChunks` 설정 여부
 
 정적 검사 결과는 보조 신호. **변경 트리거가 아님** — 런타임 측정이 우선.
+
+### 1-4. 첫 로딩 분해 (로그인·콜드 진입이 느릴 때만)
+
+"로그인이 N초 / 페이지 첫 로딩이 느림"이 주제일 때 추가로 실행. 체감 시간을 **백엔드 vs 프론트 모듈 vs 렌더**로 분해한다 — `_perf_measure.mjs` 는 `/api` 만 보므로 모듈 워터폴은 [_load_trace.mjs](tests/e2e/_load_trace.mjs) 로 잰다.
+
+- **cold** = 캐시·Vite 사전변환 빈 첫 진입(Ctrl+Shift+R) / **warm** = 채워진 재방문.
+- ROUTE_KEY: `EqpPage|ModelPage|DeployPage|DlqPage|LiveMapPage` (슬래시 경로는 git-bash 가 변환하므로 key 사용).
+
+```bash
+# dev
+OUTPUT_PATH=".claude/perf/measurements/loadtrace-dev-$(date -u +%Y-%m-%dT%H%M).json" \
+  BASE_URL=http://localhost:3000 ROUTE_KEY=LiveMapPage node tests/e2e/_load_trace.mjs 2>&1 | tail -16
+# prod-preview — "dev 전용 비용 vs 실제 프로덕션 문제" 판별의 핵심
+npm run build 2>&1 | tail -20
+(npm run preview > /tmp/preview.log 2>&1 &) ; sleep 4
+OUTPUT_PATH=".claude/perf/measurements/loadtrace-prod-$(date -u +%Y-%m-%dT%H%M).json" \
+  BASE_URL=http://localhost:4173 ROUTE_KEY=LiveMapPage node tests/e2e/_load_trace.mjs 2>&1 | tail -16
+```
+
+- `vite preview`(4173)는 `preview.proxy`([vite.config.ts](vite.config.ts))로 `/api` 프록시. `_load_trace.mjs` 로그인은 **요청(API) 기반**(csrf 쿠키→X-XSRF-TOKEN) — preview 의 CSRF origin 편차에 견고(UI 폼 로그인은 preview 에서 403 날 수 있음). 측정 후 preview 프로세스 종료.
+- 해석:
+  - dev 모듈 수·시간 ≫ prod (예 258→40건) → **Vite dev 워터폴 = dev 전용**. 실사용 영향 없음. (선택) `server.warmup` 로 무거운 라우트 사전 변환.
+  - prod 콜드 벽시계 ≫ 백엔드+모듈 합 → 큰 번들 **파싱·실행 + 렌더**(3D 등) = 실문제 → P1 청크 분할/진입 경량화.
+  - 백엔드 `/api` 한 건 > 500ms → backend SPEC (UI 수정 금지).
 
 ## Step 2 — 측정 결과 기반 후보 식별
 
@@ -211,8 +239,9 @@ baseline.json vs after.json 비교:
 - 빌드: `tsc -b && vite build` ([package.json:8](package.json#L8))
 - 라우트 lazy 분할: 이미 적용 ([src/app/Router.tsx:4-37](src/app/Router.tsx#L4-L37))
 - 전역 Query 정책: [src/app/providers/AppProvider.tsx](src/app/providers/AppProvider.tsx)
-- 측정 스크립트: [tests/e2e/_perf_measure.mjs](tests/e2e/_perf_measure.mjs)
-- 측정 환경변수: `BASE_URL` / `TEST_USER` / `TEST_PASS` / `OUTPUT_PATH` / `PAGES` / `HEADLESS`
+- 측정 스크립트: [tests/e2e/_perf_measure.mjs](tests/e2e/_perf_measure.mjs) (5페이지 런타임/API/row), [tests/e2e/_load_trace.mjs](tests/e2e/_load_trace.mjs) (첫 로딩 분해 — 모듈 워터폴/백엔드, dev↔prod)
+- 측정 환경변수: `BASE_URL` / `TEST_USER` / `TEST_PASS` / `OUTPUT_PATH` / `PAGES` / `HEADLESS` (_load_trace 는 `ROUTE_KEY` 추가)
+- prod-preview: `npm run preview` → :4173, `/api` → 백엔드(`preview.proxy`)
 
 ## 측정 가능 / 불가 매트릭스
 

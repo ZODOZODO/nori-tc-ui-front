@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { Beaker, Maximize2, Minus, Move, Plus, Radar, Search } from 'lucide-react'
+import { Maximize2, Minus, Move, Plus, Radar, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -39,7 +39,6 @@ interface LiveMapBoardProps {
   isLayoutEditEnabled: boolean
   onSelectEquipment: (eqpId: string) => void
   onClearSelection: () => void
-  onOpenDemo: () => void
   onLayoutEditEnabledChange: (isLayoutEditEnabled: boolean) => void
   onMoveCluster: (clusterId: string, clusterPosition: LiveMapPoint) => void
   onZoomIn: () => void
@@ -138,7 +137,6 @@ export function LiveMapBoard({
   isLayoutEditEnabled,
   onSelectEquipment,
   onClearSelection,
-  onOpenDemo,
   onLayoutEditEnabledChange,
   onMoveCluster,
   onZoomIn,
@@ -416,16 +414,6 @@ export function LiveMapBoard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={onOpenDemo}
-            className="h-8 rounded-pill bg-primary px-4 text-[12px] font-bold text-primary-foreground hover:bg-primary/90"
-          >
-            <Beaker className="size-3.5" />
-            {t('livemap.board.demo')}
-          </Button>
-
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input

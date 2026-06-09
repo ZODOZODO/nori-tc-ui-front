@@ -98,6 +98,7 @@ const createEquipmentNode = (
   const positionOffset = LIVE_MAP_PROCESS_NODE_OFFSETS[slotIndex]
 
   if (!cluster || !positionOffset) {
+    // eslint-disable-next-line i18next/no-literal-string -- mock(MSW) 전용 개발자 에러, 프로덕션 미사용이라 번역 비대상
     throw new Error(`LIVE_MAP_EQUIPMENT_NODES 위치 정보를 찾을 수 없습니다: ${clusterId}[${slotIndex}]`)
   }
 

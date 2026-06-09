@@ -22,7 +22,7 @@ const eqp = (eqpKey: number, clusterId: string, clusterName: string) => ({
   clusterId, clusterName, equipmentModeLabel: 'Auto', status: 'RUN' as const, statusLabel: 'Run',
   portItems: [], tooltipMeta: '', tooltipStep: '', alertMessage: null,
 })
-// photo→1F, cmp→2F, wet→3F. 같은 공정 2대(photo)는 한 bay 에 묶인다.
+// photo→1F, cmp→2F, wet→1F (2개 층). 같은 공정 2대(photo)는 한 bay 에 묶인다.
 const LIVE_MAP = {
   equipmentItems: [eqp(71, 'photo', 'PHOTO'), eqp(72, 'photo', 'PHOTO'), eqp(88, 'cmp', 'CMP'), eqp(99, 'wet', 'WET')],
 }
@@ -72,11 +72,11 @@ test('공정별 bay 라벨이 뜨고, 층 필터를 따른다 (console/pageerror
   await expect(page.getByTestId('live-map-3d-bay-label-wet')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-bay-label-photo')).toHaveText('PHOTO')
 
-  // 1F → photo bay 만, cmp/wet 숨김.
+  // 1F → photo·wet bay, cmp 숨김.
   await page.getByTestId('live-map-3d-floor-1').click()
   await expect(page.getByTestId('live-map-3d-bay-label-photo')).toBeVisible()
+  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-bay-label-cmp')).toHaveCount(0)
-  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toHaveCount(0)
 
   // 2F → cmp bay 만.
   await page.getByTestId('live-map-3d-floor-2').click()

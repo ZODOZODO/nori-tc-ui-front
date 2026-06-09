@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Box, Cylinder, Trash2 } from 'lucide-react'
+import { useI18n } from '@/i18n/i18n-context'
 import type { ShapeJson, LiveMapObjectKind } from '../lib/live-map-layout.model'
 import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
@@ -52,6 +53,7 @@ function NumberField({ label, value, onChange }: NumberFieldProps) {
  * 다루지 않는다. 폼으로 도형 크기/위치/색을 입력, 우측 3D 미리보기로 확인. 배치는 뷰어 담당(Phase 3).</p>
  */
 export function LiveMapObjectEditor() {
+  const { t } = useI18n()
   const objectsQuery = useLayoutObjects(true)
   const createObject = useCreateObject()
   const updateObject = useUpdateObject()
@@ -127,7 +129,7 @@ export function LiveMapObjectEditor() {
 
   const loadObject = (object: LiveMapObjectResponse) => {
     if (!isLiveMap3DShape(object.shapeJson)) {
-      setStatus('This object is not a 3D (v2) object — cannot edit here.')
+      setStatus(t('livemap.builder.notV2Object'))
       return
     }
     setEditingKey(object.objectKey)
@@ -141,26 +143,26 @@ export function LiveMapObjectEditor() {
   const handleSave = () => {
     const trimmedName = name.trim()
     if (trimmedName.length === 0) {
-      setStatus('Object name is required.')
+      setStatus(t('livemap.builder.errNameRequired'))
       return
     }
     if (prims.length === 0) {
-      setStatus('Add at least one shape.')
+      setStatus(t('livemap.builder.errNoShape'))
       return
     }
     // shape_json 컬럼은 opaque JSONB — v2 스펙을 ShapeJson 자리에 저장(백엔드 무변경).
     const body = { objectName: trimmedName, objectKind: kind, shapeJson: shape as unknown as ShapeJson }
-    const onDone = (verb: string) => () => {
-      setStatus(`Object ${verb}.`)
+    const onDone = (doneKey: string) => () => {
+      setStatus(t(doneKey))
       resetDraft()
     }
     const onFail = (error: unknown) =>
-      setStatus(error instanceof Error ? error.message : 'Save failed.')
+      setStatus(error instanceof Error ? error.message : t('livemap.builder.saveFailed'))
 
     if (editingKey != null) {
-      updateObject.mutate({ objectKey: editingKey, body }, { onSuccess: onDone('updated'), onError: onFail })
+      updateObject.mutate({ objectKey: editingKey, body }, { onSuccess: onDone('livemap.builder.objectUpdated'), onError: onFail })
     } else {
-      createObject.mutate(body, { onSuccess: onDone('created'), onError: onFail })
+      createObject.mutate(body, { onSuccess: onDone('livemap.builder.objectCreated'), onError: onFail })
     }
   }
 
@@ -178,14 +180,14 @@ export function LiveMapObjectEditor() {
       {/* 객체 리스트 */}
       <div data-testid="object-editor-list" className="flex w-56 min-h-0 shrink-0 flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Objects</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t('livemap.builder.objects')}</span>
           <button
             type="button"
             data-testid="object-editor-new"
             className="rounded-md border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
             onClick={resetDraft}
           >
-            + New
+            + {t('livemap.builder.new')}
           </button>
         </div>
         <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-auto">
@@ -198,16 +200,16 @@ export function LiveMapObjectEditor() {
                 type="button"
                 data-testid={`object-builtin-item-${builtin.slug}`}
                 className="flex min-w-0 flex-1 flex-col items-start text-left"
-                title="기성 구조물 — 클릭해 불러온 뒤 Save 하면 내 객체로 저장"
+                title={t('livemap.builder.builtinHint')}
                 onClick={() => loadBuiltin(builtin)}
               >
                 <span className="w-full truncate text-xs font-semibold text-foreground">{builtin.objectName}</span>
-                <span className="text-[10px] text-muted-foreground">기성 · STRUCTURE</span>
+                <span className="text-[10px] text-muted-foreground">{t('livemap.builder.builtinBadge')}</span>
               </button>
             </div>
           ))}
           {objects.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground">저장된 사용자 객체 없음</span>
+            <span className="text-[10px] text-muted-foreground">{t('livemap.builder.emptyObjects')}</span>
           ) : (
             objects.map((object) => (
               <div
@@ -229,7 +231,7 @@ export function LiveMapObjectEditor() {
                   type="button"
                   data-testid={`object-list-delete-${object.objectKey}`}
                   className="text-danger"
-                  aria-label={`Delete ${object.objectName}`}
+                  aria-label={t('livemap.builder.deleteObject', { name: object.objectName })}
                   onClick={() => deleteObject.mutate(object.objectKey)}
                 >
                   <Trash2 className="size-3.5" />
@@ -244,7 +246,7 @@ export function LiveMapObjectEditor() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs font-semibold">
-            Name
+            {t('livemap.builder.fieldName')}
             <input
               data-testid="object-editor-name"
               className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
@@ -253,7 +255,7 @@ export function LiveMapObjectEditor() {
             />
           </label>
           <div className="flex flex-col gap-1 text-xs font-semibold">
-            Kind
+            {t('livemap.builder.fieldKind')}
             <span
               data-testid="object-editor-kind"
               className="inline-flex h-[34px] items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-bold text-muted-foreground"
@@ -261,11 +263,11 @@ export function LiveMapObjectEditor() {
               STRUCTURE
             </span>
           </div>
-          <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label="Add shape">
-            <button type="button" data-testid="object-editor-add-box" title="Add Box" aria-label="Add Box" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
+          <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label={t('livemap.builder.addShape')}>
+            <button type="button" data-testid="object-editor-add-box" title={t('livemap.builder.addBox')} aria-label={t('livemap.builder.addBox')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
               <Box className="size-4" />
             </button>
-            <button type="button" data-testid="object-editor-add-cylinder" title="Add Cylinder" aria-label="Add Cylinder" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
+            <button type="button" data-testid="object-editor-add-cylinder" title={t('livemap.builder.addCylinder')} aria-label={t('livemap.builder.addCylinder')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
               <Cylinder className="size-4" />
             </button>
           </div>
@@ -275,16 +277,16 @@ export function LiveMapObjectEditor() {
             className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
             onClick={handleSave}
           >
-            {editingKey != null ? 'Update' : 'Save'}
+            {editingKey != null ? t('livemap.builder.update') : t('livemap.builder.save')}
           </button>
           <span className="text-xs text-muted-foreground">
-            shapes <span data-testid="object-editor-prim-count">{prims.length}</span>
+            {t('livemap.builder.shapesLabel')} <span data-testid="object-editor-prim-count">{prims.length}</span>
           </span>
         </div>
 
         <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
           {prims.length === 0 ? (
-            <span className="text-xs text-muted-foreground">Add a shape (box/cylinder/plane) to start.</span>
+            <span className="text-xs text-muted-foreground">{t('livemap.builder.emptyShapeHint')}</span>
           ) : (
             prims.map((prim) => (
               <div key={prim.id} className="flex flex-wrap items-end gap-2 rounded-[12px] border border-border bg-background/40 px-3 py-2">
@@ -296,7 +298,7 @@ export function LiveMapObjectEditor() {
                 <NumberField label="Y" value={prim.position.y} onChange={(value) => updatePrimVec(prim.id, 'position', 'y', value)} />
                 <NumberField label="Z" value={prim.position.z} onChange={(value) => updatePrimVec(prim.id, 'position', 'z', value)} />
                 <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-muted-foreground">
-                  Color
+                  {t('livemap.builder.color')}
                   <input
                     type="color"
                     value={prim.color}
@@ -304,7 +306,7 @@ export function LiveMapObjectEditor() {
                     className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent p-0"
                   />
                 </label>
-                <button type="button" className="ml-auto text-danger" aria-label="Remove shape" onClick={() => removePrim(prim.id)}>
+                <button type="button" className="ml-auto text-danger" aria-label={t('livemap.builder.removeShape')} onClick={() => removePrim(prim.id)}>
                   <Trash2 className="size-4" />
                 </button>
               </div>

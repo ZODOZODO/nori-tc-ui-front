@@ -3,8 +3,8 @@ import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 /**
  * SPEC live-map-3d — 공정별 자동 층 배치 + 층 뷰 필터(④) (admin/viewer).
  *
- * 자동 표시 설비는 clusterId(공정)로 층이 정해진다: photo/etch/cvd→1F, cmp/diff/imp→2F, wet/metal→3F.
- * 좌측 1F/2F/3F 는 그 층만, 전체는 모두 보여준다(읽기 전용에서도 동작). console/pageerror 0.
+ * 자동 표시 설비는 clusterId(공정)로 층이 정해진다(2개 층): photo/etch/cvd/wet→1F, cmp/diff/imp/metal→2F.
+ * 좌측 1F/2F 는 그 층만, 전체는 모두 보여준다(읽기 전용에서도 동작). console/pageerror 0.
  */
 
 const apiSuccess = <TData>(data: TData) => ({ success: true, data, errorCode: null, errorMsg: null })
@@ -22,7 +22,7 @@ const eqp = (eqpKey: number, clusterId: string, clusterName: string) => ({
   clusterId, clusterName, equipmentModeLabel: 'Auto', status: 'RUN' as const, statusLabel: 'Run',
   portItems: [], tooltipMeta: '', tooltipStep: '', alertMessage: null,
 })
-// photo→1F, cmp→2F, wet→3F.
+// photo→1F, cmp→2F, wet→1F (2개 층).
 const LIVE_MAP = { equipmentItems: [eqp(77, 'photo', 'PHOTO'), eqp(88, 'cmp', 'CMP'), eqp(99, 'wet', 'WET')] }
 const EMPTY_LAYOUT = { layoutKey: null, lineKey: 1, canvasJson: null, placements: [], objects: [] }
 
@@ -52,7 +52,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('admin: 공정별로 설비가 1/2/3층에 자동 배치되고, 층 버튼이 그 층만 / 전체가 모두 보여준다 (console/pageerror 0)', async ({
+test('admin: 공정별로 설비가 1/2층에 자동 배치되고, 층 버튼이 그 층만 / 전체가 모두 보여준다 (console/pageerror 0)', async ({
   page,
 }) => {
   test.setTimeout(90_000)
@@ -70,22 +70,17 @@ test('admin: 공정별로 설비가 1/2/3층에 자동 배치되고, 층 버튼�
   await expect(page.getByTestId('live-map-3d-badge-88')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-99')).toBeVisible()
 
-  // 1F → photo(77)만, cmp(88)/wet(99) 숨김.
+  // 1F → photo(77)·wet(99), cmp(88) 숨김.
   await page.getByTestId('live-map-3d-floor-1').click()
   await expect(page.getByTestId('live-map-3d-badge-77')).toBeVisible()
+  await expect(page.getByTestId('live-map-3d-badge-99')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-88')).toHaveCount(0)
-  await expect(page.getByTestId('live-map-3d-badge-99')).toHaveCount(0)
 
-  // 2F → cmp(88)만.
+  // 2F → cmp(88)만, photo(77)/wet(99) 숨김.
   await page.getByTestId('live-map-3d-floor-2').click()
   await expect(page.getByTestId('live-map-3d-badge-88')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-77')).toHaveCount(0)
   await expect(page.getByTestId('live-map-3d-badge-99')).toHaveCount(0)
-
-  // 3F → wet(99)만.
-  await page.getByTestId('live-map-3d-floor-3').click()
-  await expect(page.getByTestId('live-map-3d-badge-99')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-badge-88')).toHaveCount(0)
 
   // 전체 → 다시 3대 모두.
   await page.getByTestId('live-map-3d-floor-all').click()

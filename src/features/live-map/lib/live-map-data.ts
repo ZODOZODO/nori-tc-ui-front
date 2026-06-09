@@ -39,6 +39,7 @@ export const buildLiveMapEquipmentNodes = (
       const cluster = clusterIndex.get(resolvedClusterId)
 
       if (!cluster) {
+        // eslint-disable-next-line i18next/no-literal-string -- 개발자용 데이터 불변식 에러(콘솔/로그), 사용자 비노출이라 번역 비대상
         throw new Error(`LIVE_MAP_CLUSTER_ITEMS 위치 정보를 찾을 수 없습니다: ${resolvedClusterId}`)
       }
 

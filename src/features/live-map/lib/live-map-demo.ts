@@ -185,7 +185,9 @@ export const buildLiveMapDemoRunRows = (
 
     return {
       ...targetEquipment,
+      // eslint-disable-next-line i18next/no-literal-string -- 데모 시나리오 상태 텍스트: 제품 미렌더(테스트 전용), 사용자 비노출이라 번역 비대상
       statusText: progress === 100 ? '완료' : elapsedTicks === 0 ? '대기' : '진행 중',
+      // eslint-disable-next-line i18next/no-literal-string -- 위와 동일(데모 전용, 사용자 비노출)
       currentPhase: scenario.phaseLabels[phaseIndex] ?? scenario.phaseLabels[0] ?? '대기',
       progress,
       elapsedTicks,
