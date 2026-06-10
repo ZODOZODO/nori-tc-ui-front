@@ -111,10 +111,10 @@ test('admin: Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT �
   await expect(page.getByTestId('live-map-3d-scene')).toBeVisible()
   await page.getByTestId('live-map-3d-edit-toggle').click()
 
-  // ③ 단일 클릭 → Shift+클릭으로 두 번째 추가 = 2개 선택.
+  // ③ 단일 클릭 → Shift+클릭으로 두 번째 추가 = 2개 선택. (e2e 기본 locale = en → en 라벨 단언)
   await page.getByTestId('live-map-3d-badge-77').click()
   await page.getByTestId('live-map-3d-badge-78').click({ modifiers: ['Shift'] })
-  await expect(page.getByTestId('live-map-3d-selected-count')).toHaveText('외 1개')
+  await expect(page.getByTestId('live-map-3d-selected-count')).toHaveText('+1 more')
 
   // 그룹 회전 → 둘 다 승격(placement 2) + rotation 15.
   await page.getByTestId('live-map-3d-rotate-cw').click()

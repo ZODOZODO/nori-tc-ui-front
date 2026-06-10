@@ -9,7 +9,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // 로컬 기본(코어/2 = 6)으로는 WebGL(r3f) 스펙 다수 + Vite dev server 동시 구동이 부하 한계를 넘겨
+  // 3D 스펙이 간헐 타임아웃된다(직렬 실행은 전부 통과) → 로컬 워커 4 로 제한.
+  workers: process.env.CI ? 1 : 4,
+  // 병렬 워커가 Vite dev server 를 동시에 때리면 첫 페이지 로드/lazy 청크(three.js 등) 변환이
+  // 기본 5s 를 넘겨 첫 가시성 단언이 플레이크된다 → expect 타임아웃만 상향(테스트 타임아웃은 기본 유지).
+  expect: { timeout: 15_000 },
   reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:3000',

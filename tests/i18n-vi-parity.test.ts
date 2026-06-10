@@ -58,6 +58,11 @@ const TOKENS = [
   'Reference',
 ]
 
+// SPEC L48 FP 원칙의 키 단위 적용 — en 값이 해당 토큰을 jargon 이 아닌 일반 영어로 쓰는 자리.
+// 'Process Flow'(공정 흐름 탭/보드 제목)의 Flow 는 Message Flow 엔티티가 아닌 일반 영어 —
+// vi 는 livemap.board.subtitle 과 동일하게 'Luồng công đoạn' 으로 번역한다.
+const TOKEN_FP_EXCEPTIONS = new Set(['livemap.mode.viewer::Flow', 'livemap.board.title::Flow'])
+
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 test('AC1 — vi 와 en 의 키 집합이 동일하다 (parity)', () => {
@@ -90,7 +95,7 @@ test('AC3 — en[k] 에 Tier A 토큰이 있으면 vi[k] 에도 동일 토큰이
     for (const key of Object.keys(enMap)) {
       if (re.test(enMap[key])) {
         enHits += 1
-        if (!re.test(viMap[key])) {
+        if (!re.test(viMap[key]) && !TOKEN_FP_EXCEPTIONS.has(`${key}::${token}`)) {
           allViolations.push(`${key} [${token}]: vi="${viMap[key]}"`)
         }
       }

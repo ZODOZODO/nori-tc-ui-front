@@ -1,10 +1,5 @@
 import { create } from 'zustand'
-import type {
-  LiveMapClusterPositionDrafts,
-  LiveMapEquipmentPositionDrafts,
-  LiveMapPoint,
-  LiveMapStatusFilter,
-} from '../types/live-map.types'
+import type { LiveMapStatusFilter } from '../types/live-map.types'
 
 const MIN_ZOOM_LEVEL = 0.85
 const MAX_ZOOM_LEVEL = 1.35
@@ -18,20 +13,12 @@ interface LiveMapUiState {
   selectedStatus: LiveMapStatusFilter
   selectedEqpId: string | null
   isLayoutEditEnabled: boolean
-  clusterPositionDrafts: LiveMapClusterPositionDrafts
-  equipmentPositionDrafts: LiveMapEquipmentPositionDrafts
   zoomLevel: number
   lastSyncAt: number
   setSearchKeyword: (searchKeyword: string) => void
   setSelectedStatus: (selectedStatus: LiveMapStatusFilter) => void
   setSelectedEqpId: (selectedEqpId: string | null) => void
   setLayoutEditEnabled: (isLayoutEditEnabled: boolean) => void
-  updateClusterLayout: (
-    clusterId: string,
-    clusterPosition: LiveMapPoint,
-    equipmentPositions: LiveMapEquipmentPositionDrafts,
-  ) => void
-  updateEquipmentPosition: (eqpId: string, x: number, y: number) => void
   setZoomLevel: (zoomLevel: number) => void
   resetZoom: () => void
   zoomIn: () => void
@@ -45,14 +32,13 @@ const createInitialState = () => ({
   selectedStatus: 'ALL' as LiveMapStatusFilter,
   selectedEqpId: null,
   isLayoutEditEnabled: false,
-  clusterPositionDrafts: {},
-  equipmentPositionDrafts: {},
   zoomLevel: DEFAULT_ZOOM_LEVEL,
   lastSyncAt: Date.now(),
 })
 
 /**
  * Live Map 페이지의 클라이언트 선택 상태를 관리합니다.
+ * 그룹 배치는 useLiveMapFlow(canvas_json.flow 영속) 가 담당한다 — 여기는 휘발 UI 상태만.
  */
 export const useLiveMapUiStore = create<LiveMapUiState>()((set) => ({
   ...createInitialState(),
@@ -60,24 +46,6 @@ export const useLiveMapUiStore = create<LiveMapUiState>()((set) => ({
   setSelectedStatus: (selectedStatus) => set({ selectedStatus }),
   setSelectedEqpId: (selectedEqpId) => set({ selectedEqpId }),
   setLayoutEditEnabled: (isLayoutEditEnabled) => set({ isLayoutEditEnabled }),
-  updateClusterLayout: (clusterId, clusterPosition, equipmentPositions) =>
-    set((state) => ({
-      clusterPositionDrafts: {
-        ...state.clusterPositionDrafts,
-        [clusterId]: clusterPosition,
-      },
-      equipmentPositionDrafts: {
-        ...state.equipmentPositionDrafts,
-        ...equipmentPositions,
-      },
-    })),
-  updateEquipmentPosition: (eqpId, x, y) =>
-    set((state) => ({
-      equipmentPositionDrafts: {
-        ...state.equipmentPositionDrafts,
-        [eqpId]: { x, y },
-      },
-    })),
   setZoomLevel: (zoomLevel) => set({ zoomLevel: clampZoomLevel(zoomLevel) }),
   resetZoom: () => set({ zoomLevel: DEFAULT_ZOOM_LEVEL }),
   zoomIn: () => set((state) => ({ zoomLevel: clampZoomLevel(state.zoomLevel + 0.1) })),

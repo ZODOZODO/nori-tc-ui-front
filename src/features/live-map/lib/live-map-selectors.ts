@@ -1,5 +1,4 @@
 import type {
-  LiveMapClusterSummaryMap,
   LiveMapEquipmentNode,
   LiveMapStatusFilter,
   LiveMapSummary,
@@ -34,7 +33,6 @@ export const filterLiveMapEquipmentNodes = (
         item.eqpId,
         item.eqpName,
         item.lineLabel,
-        item.sectorName,
         item.clusterName,
       ].some((field) => field.toLowerCase().includes(normalizedKeyword))
 
@@ -77,42 +75,6 @@ export const summarizeLiveMapEquipmentNodes = (
       down: 0,
     },
   )
-
-/**
- * 공정 카드별 설비 상태 분포를 계산합니다.
- */
-export const summarizeLiveMapEquipmentNodesByCluster = (
-  equipmentNodes: readonly LiveMapEquipmentNode[],
-): LiveMapClusterSummaryMap =>
-  equipmentNodes.reduce<LiveMapClusterSummaryMap>((clusterSummaryMap, item) => {
-    const summary = clusterSummaryMap[item.clusterId] ?? {
-      total: 0,
-      run: 0,
-      idle: 0,
-      error: 0,
-      down: 0,
-    }
-
-    summary.total += 1
-
-    switch (item.status) {
-      case 'RUN':
-        summary.run += 1
-        break
-      case 'IDLE':
-        summary.idle += 1
-        break
-      case 'ERROR':
-        summary.error += 1
-        break
-      case 'DOWN':
-        summary.down += 1
-        break
-    }
-
-    clusterSummaryMap[item.clusterId] = summary
-    return clusterSummaryMap
-  }, {})
 
 /**
  * 현재 필터 기준에서 선택 설비를 안정적으로 복원합니다.

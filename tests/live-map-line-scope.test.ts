@@ -7,20 +7,16 @@ import {
 import type { LiveMapEquipmentNode } from '../src/features/live-map/types/live-map.types.ts'
 
 const node = (eqpId: string, lineValue: string, lineLabel: string): LiveMapEquipmentNode => ({
+  eqpKey: 0,
   eqpId,
   eqpName: eqpId,
   lineValue,
   lineLabel,
-  processingType: 'SINGLE',
   processingTypeLabel: 'Single',
   clusterId: 'cvd',
   clusterName: 'CVD',
-  sectorId: 'cvd',
-  sectorName: 'CVD',
   status: 'RUN',
   statusLabel: 'RUN',
-  x: 0,
-  y: 0,
   portItems: [],
   tooltipMeta: '',
   tooltipStep: '',

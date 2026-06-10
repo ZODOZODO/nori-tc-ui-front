@@ -37,11 +37,11 @@ export const LIVE_MAP_STATUS_COLOR: Record<'RUN' | 'IDLE' | 'ERROR' | 'DOWN', st
   DOWN: '#64748b',
 }
 
-/** 포트 상태 → 색(hex). 3D 포트 그리드 LED. */
+/** 포트 상태 → 색(hex). 3D 포트 도어 밴드 — 2D 뷰어 포트 색과 동일하게 설비 상태 색을 그대로 쓴다. */
 export const LIVE_MAP_PORT_COLOR: Record<'RUN' | 'IDLE' | 'DOWN', string> = {
-  RUN: '#22c55e',
-  IDLE: '#f59e0b',
-  DOWN: '#475569',
+  RUN: LIVE_MAP_STATUS_COLOR.RUN,
+  IDLE: LIVE_MAP_STATUS_COLOR.IDLE,
+  DOWN: LIVE_MAP_STATUS_COLOR.DOWN,
 }
 
 /** shape_json 이 v2(3D) 스펙인지 — v1(Konva Group)과 구분한다. */

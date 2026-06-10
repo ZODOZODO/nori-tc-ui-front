@@ -28,10 +28,20 @@ const LiveMapObjectEditor = lazy(() =>
   import('./LiveMapObjectEditor').then((module) => ({ default: module.LiveMapObjectEditor })),
 )
 import {
-  applyLiveMapClusterPositionDrafts,
-  applyLiveMapEquipmentPositionDrafts,
-} from '../lib/live-map-layout'
-import { LIVE_MAP_CLUSTER_ITEMS, LIVE_MAP_STATE_OPTIONS } from '../mocks/live-map.mock'
+  addLiveMapFlowArrow,
+  addLiveMapFlowGroup,
+  assignLiveMapFlowEquipment,
+  groupLiveMapFlowMembers,
+  LIVE_MAP_UNASSIGNED_GROUP_ID,
+  moveLiveMapFlowGroup,
+  removeLiveMapFlowArrow,
+  removeLiveMapFlowGroup,
+  resizeLiveMapFlowGroup,
+  updateLiveMapFlowArrow,
+  updateLiveMapFlowGroup,
+} from '../lib/live-map-flow.model'
+import { LIVE_MAP_BOARD_HEIGHT, LIVE_MAP_BOARD_WIDTH } from '../mocks/live-map.mock'
+import type { LiveMapStatusFilter } from '../types/live-map.types'
 import {
   filterLiveMapEquipmentNodes,
   formatLiveMapSyncLabel,
@@ -40,6 +50,7 @@ import {
 } from '../lib/live-map-selectors'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { useLiveMap } from '../hooks/useLiveMap'
+import { useLiveMapFlow } from '../hooks/useLiveMapFlow'
 import { useLiveMapUiStore } from '../stores/live-map-ui.store'
 
 type LiveMapViewMode = 'viewer' | 'builder' | 'scene3d'
@@ -68,8 +79,6 @@ export function LiveMapPage() {
   const selectedStatus = useLiveMapUiStore((state) => state.selectedStatus)
   const selectedEqpId = useLiveMapUiStore((state) => state.selectedEqpId)
   const isLayoutEditEnabled = useLiveMapUiStore((state) => state.isLayoutEditEnabled)
-  const clusterPositionDrafts = useLiveMapUiStore((state) => state.clusterPositionDrafts)
-  const equipmentPositionDrafts = useLiveMapUiStore((state) => state.equipmentPositionDrafts)
   const zoomLevel = useLiveMapUiStore((state) => state.zoomLevel)
   const lastSyncAt = useLiveMapUiStore((state) => state.lastSyncAt)
   const [now, setNow] = useState(lastSyncAt)
@@ -77,7 +86,6 @@ export function LiveMapPage() {
   const setSelectedStatus = useLiveMapUiStore((state) => state.setSelectedStatus)
   const setSelectedEqpId = useLiveMapUiStore((state) => state.setSelectedEqpId)
   const setLayoutEditEnabled = useLiveMapUiStore((state) => state.setLayoutEditEnabled)
-  const updateClusterLayout = useLiveMapUiStore((state) => state.updateClusterLayout)
   const zoomIn = useLiveMapUiStore((state) => state.zoomIn)
   const zoomOut = useLiveMapUiStore((state) => state.zoomOut)
   const resetZoom = useLiveMapUiStore((state) => state.resetZoom)
@@ -95,19 +103,34 @@ export function LiveMapPage() {
 
   const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
-  const clusterItems = useMemo(
-    () => applyLiveMapClusterPositionDrafts(LIVE_MAP_CLUSTER_ITEMS, clusterPositionDrafts),
-    [clusterPositionDrafts],
+  // 상태 필터 옵션 — 'ALL' 라벨만 번역 대상(RUN/IDLE/ERROR/DOWN 은 상태 코드 그대로 노출).
+  const stateOptions = useMemo<readonly { value: LiveMapStatusFilter; label: string }[]>(
+    () => [
+      { value: 'ALL', label: t('livemap.state.all') },
+      { value: 'RUN', label: 'RUN' },
+      { value: 'IDLE', label: 'IDLE' },
+      { value: 'ERROR', label: 'ERROR' },
+      { value: 'DOWN', label: 'DOWN' },
+    ],
+    [t],
   )
 
   const equipmentNodes = useMemo(
-    () =>
-      applyLiveMapEquipmentPositionDrafts(
-        buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? [], clusterItems),
-        equipmentPositionDrafts,
-      ),
-    [clusterItems, equipmentPositionDrafts, liveMapQuery.data?.equipmentItems],
+    () => buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? []),
+    [liveMapQuery.data?.equipmentItems],
   )
+
+  // 공정 흐름 그룹 배치 — 라인 layout(canvas_json.flow) 로드/편집(draft)/저장.
+  const { flow, isDirty, updateFlow, saveFlow, isSaving, saveError } = useLiveMapFlow(lineKey)
+
+  const groupCards = useMemo(() => {
+    const membersByGroup = groupLiveMapFlowMembers(flow, equipmentNodes)
+    return flow.groups.map((group) => ({
+      group,
+      isUnassigned: group.id === LIVE_MAP_UNASSIGNED_GROUP_ID,
+      nodes: membersByGroup.get(group.id) ?? [],
+    }))
+  }, [equipmentNodes, flow])
 
   const visibleEquipmentNodes = useMemo(
     () =>
@@ -284,22 +307,86 @@ export function LiveMapPage() {
           ) : (
             <LiveMapBoard
               backgroundLayer={<LiveMapStructureLayer lineKey={lineKey} />}
-              clusters={clusterItems}
+              groupCards={groupCards}
               syncLabel={syncLabel}
               searchKeyword={searchKeyword}
               selectedStatus={selectedStatus}
-              stateOptions={LIVE_MAP_STATE_OPTIONS}
+              stateOptions={stateOptions}
               onSearchKeywordChange={setSearchKeyword}
               onSelectedStatusChange={setSelectedStatus}
-              equipmentNodes={equipmentNodes}
               visibleEquipmentIds={visibleEquipmentIds}
               selectedEquipment={displayedEquipment}
               zoomLevel={zoomLevel}
+              canEdit={canEdit}
               isLayoutEditEnabled={isLayoutEditEnabled}
               onSelectEquipment={handleSelectEquipment}
               onClearSelection={handleClearSelection}
               onLayoutEditEnabledChange={setLayoutEditEnabled}
-              onMoveCluster={(clusterId, position) => updateClusterLayout(clusterId, position, {})}
+              onMoveGroup={(groupId, position) =>
+                updateFlow((current) =>
+                  moveLiveMapFlowGroup(
+                    current,
+                    groupId,
+                    position.x,
+                    position.y,
+                    LIVE_MAP_BOARD_WIDTH,
+                    LIVE_MAP_BOARD_HEIGHT,
+                  ),
+                )
+              }
+              onResizeGroup={(groupId, size) =>
+                updateFlow((current) =>
+                  resizeLiveMapFlowGroup(
+                    current,
+                    groupId,
+                    size.width,
+                    size.height,
+                    LIVE_MAP_BOARD_WIDTH,
+                    LIVE_MAP_BOARD_HEIGHT,
+                  ),
+                )
+              }
+              onAssignEquipment={(eqpKeys, groupId) =>
+                updateFlow((current) =>
+                  eqpKeys.reduce(
+                    (flowAcc, eqpKey) => assignLiveMapFlowEquipment(flowAcc, eqpKey, groupId),
+                    current,
+                  ),
+                )
+              }
+              onCreateGroup={() =>
+                updateFlow((current) =>
+                  addLiveMapFlowGroup(current, {
+                    id: crypto.randomUUID(),
+                    title: t('livemap.flow.newGroupTitle'),
+                  }),
+                )
+              }
+              onUpdateGroup={(groupId, patch) =>
+                updateFlow((current) => updateLiveMapFlowGroup(current, groupId, patch))
+              }
+              onDeleteGroup={(groupId) =>
+                updateFlow((current) => removeLiveMapFlowGroup(current, groupId))
+              }
+              arrows={flow.arrows}
+              onCreateArrow={(patch) =>
+                updateFlow((current) =>
+                  addLiveMapFlowArrow(current, { id: crypto.randomUUID(), ...patch }),
+                )
+              }
+              onUpdateArrow={(arrowId, patch) =>
+                updateFlow((current) => updateLiveMapFlowArrow(current, arrowId, patch))
+              }
+              onDeleteArrow={(arrowId) =>
+                updateFlow((current) => removeLiveMapFlowArrow(current, arrowId))
+              }
+              isDirty={isDirty}
+              isSaving={isSaving}
+              saveError={saveError ? saveError.message : null}
+              onSave={() => {
+                // 실패는 saveError 로 표면화 — unhandled rejection 만 차단.
+                void saveFlow().catch(() => undefined)
+              }}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
               onResetZoom={resetZoom}
@@ -320,7 +407,6 @@ export function LiveMapPage() {
           <LiveMapDemoModal
             open
             equipmentNodes={equipmentNodes}
-            clusterItems={clusterItems}
             onClose={() => setIsDemoModalOpen(false)}
           />
         </Suspense>

@@ -217,25 +217,28 @@
 
 /* Live Map 모니터링 캔버스 (D-LIVEMAP) — 점 그리드 배경 + 공정 흐름 애니메이션 커넥터.
    색은 토큰(var(--border)/--brand-primary)을 직접 참조해 light/dark 자동 반응. */
-/* 모니터링 캔버스 점 그리드 배경 (color 토큰 반응). */
+/* 모니터링 캔버스 점 그리드 배경 (color 토큰 반응).
+   점 간격은 공정 흐름 그룹 스냅 격자(LIVE_MAP_FLOW_SNAP_PX=20)와 1:1 — 드래그 1스텝 = 점 1칸. */
 .live-map-canvas {
   background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-size: 20px 20px;
 }
 
-@keyframes live-map-flow {
+/* 공정 흐름 화살표(파선/점선) 진행 애니메이션 — dash 패턴을 시작 그룹 → 도착 그룹 방향으로 흘린다.
+   1 사이클 이동량 = 패턴 1주기(--live-map-flow-dash-period, 굵기 비례 인라인 var)라서
+   어떤 굵기/스타일에서도 이음새 없이 반복된다. */
+@keyframes live-map-flow-arrow-dash {
   to {
-    stroke-dashoffset: -24;
+    stroke-dashoffset: calc(-1 * var(--live-map-flow-dash-period));
   }
 }
 
-.live-map-flow-edge {
-  stroke-dasharray: 5 7;
-  animation: live-map-flow 1.1s linear infinite;
+.live-map-flow-arrow-dash {
+  animation: live-map-flow-arrow-dash 0.9s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-map-flow-edge {
+  .live-map-flow-arrow-dash {
     animation: none;
   }
 }

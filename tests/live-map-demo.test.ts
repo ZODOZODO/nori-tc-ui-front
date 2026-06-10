@@ -10,13 +10,12 @@ import {
   mergeLiveMapDemoTargetEquipments,
 } from '../src/features/live-map/lib/live-map-demo.ts'
 import {
-  LIVE_MAP_CLUSTER_ITEMS,
   LIVE_MAP_DEMO_SCENARIO_OPTIONS,
   LIVE_MAP_EQUIPMENT_NODES,
 } from '../src/features/live-map/mocks/live-map.mock.ts'
 
 test('demo tree는 line 아래에 공정과 설비를 계층형으로 구성합니다', () => {
-  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES, LIVE_MAP_CLUSTER_ITEMS)
+  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES)
 
   assert.equal(demoTree.length, 1)
   assert.equal(demoTree[0]?.type, 'LINE')
@@ -58,7 +57,7 @@ test('대상 설비 병합은 기존 설비를 유지하면서 중복 설비를 
 })
 
 test('공정 노드는 하위 설비 eqpId 전체를 수집해 일괄 토글에 사용할 수 있습니다', () => {
-  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES, LIVE_MAP_CLUSTER_ITEMS)
+  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES)
   const metalProcessNode = demoTree[0]?.children.find(
     (childNode) => childNode.clusterId === 'metal',
   )
@@ -72,7 +71,7 @@ test('공정 노드는 하위 설비 eqpId 전체를 수집해 일괄 토글에 
 })
 
 test('검색 키워드는 매칭된 설비만 남기고 부모 공정/라인을 자동으로 유지합니다', () => {
-  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES, LIVE_MAP_CLUSTER_ITEMS)
+  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES)
   const filteredTree = filterLiveMapDemoTree(demoTree, 'A-EQ17')
 
   assert.equal(filteredTree.length, 1)
@@ -85,7 +84,7 @@ test('검색 키워드는 매칭된 설비만 남기고 부모 공정/라인을 
 })
 
 test('검색 키워드가 비어 있으면 모든 노드를 그대로 유지합니다', () => {
-  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES, LIVE_MAP_CLUSTER_ITEMS)
+  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES)
   const filteredTree = filterLiveMapDemoTree(demoTree, '   ')
 
   assert.equal(filteredTree.length, demoTree.length)
@@ -93,7 +92,7 @@ test('검색 키워드가 비어 있으면 모든 노드를 그대로 유지합�
 })
 
 test('펼침 가능한 노드 ID는 자식이 있는 LINE/PROCESS 노드만 포함합니다', () => {
-  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES, LIVE_MAP_CLUSTER_ITEMS)
+  const demoTree = buildLiveMapDemoTree(LIVE_MAP_EQUIPMENT_NODES)
   const expandableNodeIds = collectLiveMapDemoExpandableNodeIds(demoTree)
 
   assert.ok(expandableNodeIds.includes('line:A_LINE'))

@@ -67,7 +67,8 @@ const MAT = {
 
 const ACCENT_OFF = '#aeb6c0'
 const TOWER_OFF = '#1b2026'
-const TOWER_COLORS = ['#ef4444', '#f59e0b', '#22c55e'] as const
+// 점등 색은 뷰어(2D) 상태 색과 동일 — RUN 녹 / IDLE 청 / ERROR 적 (오해 방지 위해 안돈 황색 관례 대신 통일).
+const TOWER_COLORS = [LIVE_MAP_STATUS_COLOR.ERROR, LIVE_MAP_STATUS_COLOR.IDLE, LIVE_MAP_STATUS_COLOR.RUN] as const
 const towerOn = (status: LiveMapEquipmentResponse['status']) => [status === 'ERROR', status === 'IDLE', status === 'RUN']
 
 export interface FieldPlacement {

@@ -33,7 +33,6 @@ import {
   mergeLiveMapDemoTargetEquipments,
 } from '../lib/live-map-demo'
 import type {
-  LiveMapClusterItem,
   LiveMapDemoTargetEquipment,
   LiveMapDemoTestType,
   LiveMapDemoTreeNode,
@@ -43,7 +42,6 @@ import type {
 interface LiveMapDemoModalProps {
   open: boolean
   equipmentNodes: readonly LiveMapEquipmentNode[]
-  clusterItems: readonly LiveMapClusterItem[]
   onClose: () => void
 }
 
@@ -116,7 +114,6 @@ function TriStateCheckbox({ state, ariaLabel, onChange }: TriStateCheckboxProps)
 export function LiveMapDemoModal({
   open,
   equipmentNodes,
-  clusterItems,
   onClose,
 }: LiveMapDemoModalProps) {
   const { t } = useI18n()
@@ -142,10 +139,7 @@ export function LiveMapDemoModal({
   const createDemoJobsMutation = useCreateLiveMapDemoJobs()
   const cancelDemoJobMutation = useCancelLiveMapDemoJob()
 
-  const demoTree = useMemo(
-    () => buildLiveMapDemoTree(equipmentNodes, clusterItems),
-    [clusterItems, equipmentNodes],
-  )
+  const demoTree = useMemo(() => buildLiveMapDemoTree(equipmentNodes), [equipmentNodes])
 
   const visibleDemoTree = useMemo(
     () => filterLiveMapDemoTree(demoTree, searchKeyword),

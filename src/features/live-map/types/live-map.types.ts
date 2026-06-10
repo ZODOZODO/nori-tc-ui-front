@@ -9,39 +9,22 @@ export interface LiveMapPoint {
   y: number
 }
 
-export type LiveMapEquipmentPositionDrafts = Record<string, LiveMapPoint>
-export type LiveMapClusterPositionDrafts = Record<string, LiveMapPoint>
-
 export interface LiveMapLineOption {
   value: string
   label: string
 }
 
-export interface LiveMapClusterItem {
-  id: string
-  title: string
-  subtitle: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
 export interface LiveMapEquipmentNode {
+  eqpKey: number
   eqpId: string
   eqpName: string
   lineValue: string
   lineLabel: string
-  processingType: LiveMapEqpProcessingType
   processingTypeLabel: string
   clusterId: string
   clusterName: string
-  sectorId: string
-  sectorName: string
   status: LiveMapEqpStatus
   statusLabel: string
-  x: number
-  y: number
   portItems: LiveMapEquipmentPortItem[]
   tooltipMeta: string
   tooltipStep: string
@@ -101,4 +84,3 @@ export interface LiveMapSummary {
   down: number
 }
 
-export type LiveMapClusterSummaryMap = Record<string, LiveMapSummary>

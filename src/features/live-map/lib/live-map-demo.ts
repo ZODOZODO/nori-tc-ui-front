@@ -1,5 +1,4 @@
 import type {
-  LiveMapClusterItem,
   LiveMapDemoRunRow,
   LiveMapDemoScenarioOption,
   LiveMapDemoTargetEquipment,
@@ -21,9 +20,12 @@ const toDemoTargetEquipment = (
   statusLabel: equipmentNode.statusLabel,
 })
 
+/**
+ * 라인 → 공정(설비의 clusterId/clusterName) → 설비 계층 트리를 만듭니다.
+ * 공정 노드는 설비 데이터에서 직접 파생(첫 등장 순) — 별도 공정 카탈로그에 의존하지 않는다.
+ */
 export const buildLiveMapDemoTree = (
   equipmentNodes: readonly LiveMapEquipmentNode[],
-  clusterItems: readonly LiveMapClusterItem[],
 ): LiveMapDemoTreeNode[] => {
   const lineGroups = new Map<string, LiveMapEquipmentNode[]>()
 
@@ -40,39 +42,41 @@ export const buildLiveMapDemoTree = (
 
   return Array.from(lineGroups.entries()).map(([lineValue, lineEquipments]) => {
     const lineLabel = lineEquipments[0]?.lineLabel ?? lineValue
+    const clusterGroups = new Map<string, LiveMapEquipmentNode[]>()
+
+    lineEquipments.forEach((equipmentNode) => {
+      const existing = clusterGroups.get(equipmentNode.clusterId)
+
+      if (existing) {
+        existing.push(equipmentNode)
+        return
+      }
+
+      clusterGroups.set(equipmentNode.clusterId, [equipmentNode])
+    })
 
     return {
       id: `line:${lineValue}`,
       label: lineLabel,
       type: 'LINE',
       lineValue,
-      children: clusterItems
-        .filter((clusterItem) =>
-          lineEquipments.some((equipmentNode) => equipmentNode.clusterId === clusterItem.id),
-        )
-        .map((clusterItem) => {
-          const clusterEquipments = lineEquipments.filter(
-            (equipmentNode) => equipmentNode.clusterId === clusterItem.id,
-          )
-
-          return {
-            id: `process:${clusterItem.id}`,
-            label: clusterItem.title,
-            type: 'PROCESS',
-            lineValue,
-            clusterId: clusterItem.id,
-            children: clusterEquipments.map((equipmentNode) => ({
-              id: `equipment:${equipmentNode.eqpId}`,
-              label: equipmentNode.eqpId,
-              type: 'EQUIPMENT',
-              lineValue,
-              clusterId: equipmentNode.clusterId,
-              eqpId: equipmentNode.eqpId,
-              eqpName: equipmentNode.eqpName,
-              children: [],
-            })),
-          }
-        }),
+      children: Array.from(clusterGroups.entries()).map(([clusterId, clusterEquipments]) => ({
+        id: `process:${clusterId}`,
+        label: clusterEquipments[0]?.clusterName ?? clusterId,
+        type: 'PROCESS',
+        lineValue,
+        clusterId,
+        children: clusterEquipments.map((equipmentNode) => ({
+          id: `equipment:${equipmentNode.eqpId}`,
+          label: equipmentNode.eqpId,
+          type: 'EQUIPMENT',
+          lineValue,
+          clusterId: equipmentNode.clusterId,
+          eqpId: equipmentNode.eqpId,
+          eqpName: equipmentNode.eqpName,
+          children: [],
+        })),
+      })),
     }
   })
 }

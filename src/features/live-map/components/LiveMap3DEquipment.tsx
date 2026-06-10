@@ -3,7 +3,7 @@ import { RoundedBox } from '@react-three/drei'
 import { RoundedBoxGeometry } from 'three-stdlib'
 import * as THREE from 'three'
 import type { LiveMapEquipmentResponse, LiveMapPortResponse } from '../api/live-map.api'
-import { LIVE_MAP_PORT_COLOR } from '../lib/live-map-3d.model'
+import { LIVE_MAP_PORT_COLOR, LIVE_MAP_STATUS_COLOR } from '../lib/live-map-3d.model'
 
 /**
  * 3D 설비 모델 — 반도체 클러스터 공정 장비를 절차적으로 렌더한다.
@@ -66,11 +66,11 @@ const SHARED_MAT = {
   towerPole: new THREE.MeshStandardMaterial({ color: COLOR.trim, metalness: 0.6, roughness: 0.35 }),
 }
 
-/** 시그널 타워 점등(반도체 안돈): RUN→녹 / IDLE→황 / ERROR→적 / DOWN→소등. */
+/** 시그널 타워 점등 — 뷰어(2D) 상태 색과 동일: RUN→녹 / IDLE→청 / ERROR→적 / DOWN→소등. */
 const towerLit = (status: LiveMapEquipmentResponse['status']) => ({
-  red: status === 'ERROR',
-  amber: status === 'IDLE',
-  green: status === 'RUN',
+  error: status === 'ERROR',
+  idle: status === 'IDLE',
+  run: status === 'RUN',
 })
 
 interface PortSlot {
@@ -111,10 +111,10 @@ function ChamberCluster() {
 
 function SignalTower({ status }: { status: LiveMapEquipmentResponse['status'] }) {
   const lit = towerLit(status)
-  const segments: Array<{ key: 'red' | 'amber' | 'green'; color: string; on: boolean }> = [
-    { key: 'red', color: '#ef4444', on: lit.red },
-    { key: 'amber', color: '#f59e0b', on: lit.amber },
-    { key: 'green', color: '#22c55e', on: lit.green },
+  const segments: Array<{ key: 'error' | 'idle' | 'run'; color: string; on: boolean }> = [
+    { key: 'error', color: LIVE_MAP_STATUS_COLOR.ERROR, on: lit.error },
+    { key: 'idle', color: LIVE_MAP_STATUS_COLOR.IDLE, on: lit.idle },
+    { key: 'run', color: LIVE_MAP_STATUS_COLOR.RUN, on: lit.run },
   ]
   const baseY = MAINFRAME_TOP_Y + 0.02
   return (

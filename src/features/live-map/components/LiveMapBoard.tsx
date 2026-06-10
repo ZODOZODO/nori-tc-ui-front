@@ -1,7 +1,27 @@
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type {
+  CSSProperties,
+  DragEvent as ReactDragEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { Maximize2, Minus, Move, Plus, Radar, Search } from 'lucide-react'
+import {
+  ArrowRight,
+  FolderPlus,
+  Loader2,
+  Maximize2,
+  Minus,
+  Pencil,
+  Plus,
+  Radar,
+  Save,
+  Search,
+  SquarePen,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -13,65 +33,86 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import { LiveMapMachineNode } from './LiveMapMachineNode'
 import { LiveMapTooltipCard } from './LiveMapTooltipCard'
-import { clampLiveMapRectPosition } from '../lib/live-map-layout'
+import { LiveMapFlowGroupDialog, type LiveMapFlowGroupPatch } from './LiveMapFlowGroupDialog'
+import { LiveMapFlowArrowDialog } from './LiveMapFlowArrowDialog'
+import {
+  computeLiveMapFlowArrowLine,
+  type LiveMapFlowArrow,
+  type LiveMapFlowArrowPatch,
+  type LiveMapFlowGroup,
+} from '../lib/live-map-flow.model'
 import { LIVE_MAP_BOARD_HEIGHT, LIVE_MAP_BOARD_WIDTH } from '../mocks/live-map.mock'
 import type {
-  LiveMapClusterItem,
   LiveMapEquipmentNode,
   LiveMapPoint,
   LiveMapStatusFilter,
 } from '../types/live-map.types'
 
+/** 공정 흐름 그룹 카드 1장 — 그룹(저장 모델) + 소속 설비 노드(미배정 = 여집합). */
+export interface LiveMapFlowGroupCard {
+  group: LiveMapFlowGroup
+  isUnassigned: boolean
+  nodes: readonly LiveMapEquipmentNode[]
+}
+
 interface LiveMapBoardProps {
   /** board 캔버스 뒤에 깔리는 배경 레이어(구조물 floor-plan 등). 캔버스 스케일을 함께 받는다. */
   backgroundLayer?: ReactNode
-  clusters: readonly LiveMapClusterItem[]
+  groupCards: readonly LiveMapFlowGroupCard[]
   syncLabel: string
   searchKeyword: string
   selectedStatus: LiveMapStatusFilter
   stateOptions: readonly { value: LiveMapStatusFilter; label: string }[]
   onSearchKeywordChange: (searchKeyword: string) => void
   onSelectedStatusChange: (selectedStatus: LiveMapStatusFilter) => void
-  equipmentNodes: readonly LiveMapEquipmentNode[]
   visibleEquipmentIds: ReadonlySet<string>
   selectedEquipment: LiveMapEquipmentNode | null
   zoomLevel: number
+  /** LIVE_MAP_LAYOUT_WRITE 보유 여부 — false 면 편집 진입 자체가 불가(이동 토글/CRUD/저장 미노출). */
+  canEdit: boolean
   isLayoutEditEnabled: boolean
   onSelectEquipment: (eqpId: string) => void
   onClearSelection: () => void
   onLayoutEditEnabledChange: (isLayoutEditEnabled: boolean) => void
-  onMoveCluster: (clusterId: string, clusterPosition: LiveMapPoint) => void
+  onMoveGroup: (groupId: string, position: LiveMapPoint) => void
+  /** 그룹 카드 크기 조절(우하단 핸들 드래그) — 미배정 그룹 포함. */
+  onResizeGroup: (groupId: string, size: { width: number; height: number }) => void
+  /** 설비 노드 드래그&드롭 배정(Ctrl+클릭 다중 선택 일괄 포함) — 미배정 그룹으로 드롭 = 배정 해제. */
+  onAssignEquipment: (eqpKeys: readonly number[], groupId: string) => void
+  onCreateGroup: () => void
+  onUpdateGroup: (groupId: string, patch: LiveMapFlowGroupPatch) => void
+  onDeleteGroup: (groupId: string) => void
+  /** 그룹 간 흐름 화살표 — 개별 객체(끝점 + 스타일). */
+  arrows: readonly LiveMapFlowArrow[]
+  onCreateArrow: (patch: LiveMapFlowArrowPatch) => void
+  onUpdateArrow: (arrowId: string, patch: LiveMapFlowArrowPatch) => void
+  onDeleteArrow: (arrowId: string) => void
+  isDirty: boolean
+  isSaving: boolean
+  saveError: string | null
+  onSave: () => void
   onZoomIn: () => void
   onZoomOut: () => void
   onResetZoom: () => void
 }
 
-interface TerminalPoint {
-  cx: number
-  cy: number
+interface DragState {
+  groupId: string
+  pointerId: number
+  originX: number
+  originY: number
+  baseX: number
+  baseY: number
 }
 
-type DragState =
-  | {
-      kind: 'cluster'
-      clusterId: string
-      pointerId: number
-      originX: number
-      originY: number
-      baseX: number
-      baseY: number
-      width: number
-      height: number
-    }
-  | {
-      kind: 'terminal'
-      terminal: 'in' | 'out'
-      pointerId: number
-      originX: number
-      originY: number
-      baseCx: number
-      baseCy: number
-    }
+interface ResizeState {
+  groupId: string
+  pointerId: number
+  originX: number
+  originY: number
+  baseWidth: number
+  baseHeight: number
+}
 
 interface PanState {
   pointerId: number
@@ -80,11 +121,6 @@ interface PanState {
   scrollLeft: number
   scrollTop: number
 }
-
-const TERMINAL_RADIUS = 26
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value))
 
 interface RailButtonProps {
   icon: typeof Plus
@@ -113,7 +149,7 @@ function RailButton({ icon: Icon, label, onClick, active = false }: RailButtonPr
   )
 }
 
-// 클러스터별 상태 분포 세그먼트 바(모니터링 큐) — RUN/IDLE/ERROR/DOWN 비율을 한 줄로.
+// 그룹별 상태 분포 세그먼트 바(모니터링 큐) — RUN/IDLE/ERROR/DOWN 비율을 한 줄로.
 const STATUS_SEGMENTS: readonly { key: LiveMapEquipmentNode['status']; cls: string }[] = [
   { key: 'RUN', cls: 'bg-success' },
   { key: 'IDLE', cls: 'bg-sky-500' },
@@ -123,22 +159,35 @@ const STATUS_SEGMENTS: readonly { key: LiveMapEquipmentNode['status']; cls: stri
 
 export function LiveMapBoard({
   backgroundLayer,
-  clusters,
+  groupCards,
   syncLabel,
   searchKeyword,
   selectedStatus,
   stateOptions,
   onSearchKeywordChange,
   onSelectedStatusChange,
-  equipmentNodes,
   visibleEquipmentIds,
   selectedEquipment,
   zoomLevel,
+  canEdit,
   isLayoutEditEnabled,
   onSelectEquipment,
   onClearSelection,
   onLayoutEditEnabledChange,
-  onMoveCluster,
+  onMoveGroup,
+  onResizeGroup,
+  onAssignEquipment,
+  onCreateGroup,
+  onUpdateGroup,
+  onDeleteGroup,
+  arrows,
+  onCreateArrow,
+  onUpdateArrow,
+  onDeleteArrow,
+  isDirty,
+  isSaving,
+  saveError,
+  onSave,
   onZoomIn,
   onZoomOut,
   onResetZoom,
@@ -147,14 +196,34 @@ export function LiveMapBoard({
   const boardScrollerRef = useRef<HTMLDivElement>(null)
   const panRef = useRef<PanState | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null)
   const [isPanning, setIsPanning] = useState(false)
-  // IN/OUT 종단 위치 override — 사용자가 편집모드에서 끌면 설정, null 이면 첫/마지막 카드 기준 자동.
-  const [inOverride, setInOverride] = useState<TerminalPoint | null>(null)
-  const [outOverride, setOutOverride] = useState<TerminalPoint | null>(null)
+  const [editingGroup, setEditingGroup] = useState<LiveMapFlowGroup | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<LiveMapFlowGroup | null>(null)
+  // 화살표 다이얼로그 — { arrow: null } = 생성 모드, { arrow } = 편집(삭제 포함) 모드.
+  const [arrowDialog, setArrowDialog] = useState<{ arrow: LiveMapFlowArrow | null } | null>(null)
+  // 설비 노드 HTML5 드래그&드롭 배정 — dragover 에선 dataTransfer 를 못 읽으므로 ref 로 키를 든다.
+  // 다중 선택 노드를 끌면 선택 전체가 함께 이동하므로 배열로 든다.
+  const draggingEqpKeysRef = useRef<readonly number[] | null>(null)
+  const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null)
+  // Ctrl(⌘)+클릭 다중 선택(편집 모드) — 드래그 1번으로 일괄 배정하기 위한 설비 키 집합.
+  const [multiSelectedKeys, setMultiSelectedKeys] = useState<ReadonlySet<number>>(() => new Set())
+  // 선택된 노드에 Ctrl+pointerdown — 해제 후보(드래그로 승격되면 해제하지 않고 일괄 이동).
+  const pendingDeselectKeyRef = useRef<number | null>(null)
   // 보드(고정 px)를 스크롤러 폭에 맞춰 자동 축소 — 전체 공정 흐름을 가로 스크롤 없이 한눈에.
   // 사용자 zoom(store)은 이 위에 곱해지는 배율로 유지된다(effectiveScale).
   const [fitScale, setFitScale] = useState(1)
   const effectiveScale = fitScale * zoomLevel
+  const isEditing = canEdit && isLayoutEditEnabled
+
+  // 편집 모드 종료 시 다중 선택 해제 — 비편집 화면에 선택 링이 남지 않게(render 단계 보정).
+  const [wasEditing, setWasEditing] = useState(isEditing)
+  if (wasEditing !== isEditing) {
+    setWasEditing(isEditing)
+    if (!isEditing && multiSelectedKeys.size > 0) {
+      setMultiSelectedKeys(new Set())
+    }
+  }
 
   // 선택설비 패널 슬라이드 — 열림은 selectedEquipment 존재 여부로 결정.
   // 닫힐 때(우측 슬라이드아웃) 마지막 설비 내용을 유지해야 빈 카드가 비치지 않으므로,
@@ -165,56 +234,10 @@ export function LiveMapBoard({
   }
   const isPanelOpen = selectedEquipment !== null
 
-  const nodesByCluster = useMemo(() => {
-    const map = new Map<string, LiveMapEquipmentNode[]>()
-    for (const node of equipmentNodes) {
-      const bucket = map.get(node.clusterId)
-      if (bucket) {
-        bucket.push(node)
-      } else {
-        map.set(node.clusterId, [node])
-      }
-    }
-    return map
-  }, [equipmentNodes])
-
-  // 클러스터 간 커넥터 + IN/OUT 기본 위치(카드 rect 기준). 종단 override 는 별도 적용.
-  const flow = useMemo(() => {
-    if (clusters.length === 0) {
-      return null
-    }
-    const first = clusters[0]
-    const last = clusters[clusters.length - 1]
-    const interEdges: string[] = []
-    for (let i = 0; i < clusters.length - 1; i += 1) {
-      const a = clusters[i]
-      const b = clusters[i + 1]
-      const aRight = a.x + a.width
-      const aCy = a.y + a.height / 2
-      const bLeft = b.x
-      const bCy = b.y + b.height / 2
-      if (Math.abs(a.y - b.y) < 12) {
-        const midX = (aRight + bLeft) / 2
-        interEdges.push(`M ${aRight} ${aCy} H ${midX} V ${bCy} H ${bLeft}`)
-      } else {
-        const gapY = (a.y + a.height + b.y) / 2
-        const leftX = bLeft - 44
-        interEdges.push(`M ${a.x + a.width / 2} ${a.y + a.height} V ${gapY} H ${leftX} V ${bCy} H ${bLeft}`)
-      }
-    }
-    return {
-      interEdges,
-      firstX: first.x,
-      firstCy: first.y + first.height / 2,
-      lastRight: last.x + last.width,
-      lastCy: last.y + last.height / 2,
-      defaultIn: { cx: first.x - 56, cy: first.y + first.height / 2 },
-      defaultOut: { cx: last.x + last.width + 56, cy: last.y + last.height / 2 },
-    }
-  }, [clusters])
-
-  const inTerminal = inOverride ?? flow?.defaultIn ?? null
-  const outTerminal = outOverride ?? flow?.defaultOut ?? null
+  const groupIndex = useMemo(
+    () => new Map(groupCards.map((card) => [card.group.id, card])),
+    [groupCards],
+  )
 
   useEffect(() => {
     const scroller = boardScrollerRef.current
@@ -233,7 +256,7 @@ export function LiveMapBoard({
     return () => observer.disconnect()
   }, [])
 
-  // 카드 / IN-OUT 종단 드래그(편집 모드).
+  // 그룹 카드 드래그(편집 모드) — raw 좌표를 올리면 상위(flow 모델)가 20px(점 격자) 스냅 + 보드 clamp.
   useEffect(() => {
     if (!dragState) {
       return
@@ -243,39 +266,13 @@ export function LiveMapBoard({
       if (event.pointerId !== dragState.pointerId) {
         return
       }
-      if (dragState.kind === 'cluster') {
-        const nextPosition = clampLiveMapRectPosition(
-          {
-            x: dragState.baseX + (event.clientX - dragState.originX) / effectiveScale,
-            y: dragState.baseY + (event.clientY - dragState.originY) / effectiveScale,
-          },
-          dragState.width,
-          dragState.height,
-          LIVE_MAP_BOARD_WIDTH,
-          LIVE_MAP_BOARD_HEIGHT,
-        )
-        startTransition(() => {
-          onMoveCluster(dragState.clusterId, nextPosition)
-        })
-        return
+      const nextPosition: LiveMapPoint = {
+        x: dragState.baseX + (event.clientX - dragState.originX) / effectiveScale,
+        y: dragState.baseY + (event.clientY - dragState.originY) / effectiveScale,
       }
-      const nextPoint: TerminalPoint = {
-        cx: clamp(
-          dragState.baseCx + (event.clientX - dragState.originX) / effectiveScale,
-          TERMINAL_RADIUS,
-          LIVE_MAP_BOARD_WIDTH - TERMINAL_RADIUS,
-        ),
-        cy: clamp(
-          dragState.baseCy + (event.clientY - dragState.originY) / effectiveScale,
-          TERMINAL_RADIUS,
-          LIVE_MAP_BOARD_HEIGHT - TERMINAL_RADIUS,
-        ),
-      }
-      if (dragState.terminal === 'in') {
-        setInOverride(nextPoint)
-      } else {
-        setOutOverride(nextPoint)
-      }
+      startTransition(() => {
+        onMoveGroup(dragState.groupId, nextPosition)
+      })
     }
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -292,7 +289,42 @@ export function LiveMapBoard({
       window.removeEventListener('pointerup', handlePointerEnd)
       window.removeEventListener('pointercancel', handlePointerEnd)
     }
-  }, [dragState, onMoveCluster, effectiveScale])
+  }, [dragState, onMoveGroup, effectiveScale])
+
+  // 그룹 카드 리사이즈(편집 모드, 우하단 핸들) — raw 크기를 올리면 상위(flow 모델)가 스냅 + clamp.
+  useEffect(() => {
+    if (!resizeState) {
+      return
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== resizeState.pointerId) {
+        return
+      }
+      const nextSize = {
+        width: resizeState.baseWidth + (event.clientX - resizeState.originX) / effectiveScale,
+        height: resizeState.baseHeight + (event.clientY - resizeState.originY) / effectiveScale,
+      }
+      startTransition(() => {
+        onResizeGroup(resizeState.groupId, nextSize)
+      })
+    }
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (event.pointerId === resizeState.pointerId) {
+        setResizeState(null)
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerEnd)
+    window.addEventListener('pointercancel', handlePointerEnd)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerEnd)
+      window.removeEventListener('pointercancel', handlePointerEnd)
+    }
+  }, [resizeState, onResizeGroup, effectiveScale])
 
   // 빈 캔버스 드래그로 팬(스크롤) — 확대 상태에서 마우스로 끌어서 이동(비편집 모드).
   useEffect(() => {
@@ -324,51 +356,46 @@ export function LiveMapBoard({
     }
   }, [isPanning])
 
-  const handleClusterHandlePointerDown = (
-    cluster: LiveMapClusterItem,
+  const handleGroupHandlePointerDown = (
+    group: LiveMapFlowGroup,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (!isLayoutEditEnabled) {
+    if (!isEditing) {
       return
     }
     event.preventDefault()
     setDragState({
-      kind: 'cluster',
-      clusterId: cluster.id,
+      groupId: group.id,
       pointerId: event.pointerId,
       originX: event.clientX,
       originY: event.clientY,
-      baseX: cluster.x,
-      baseY: cluster.y,
-      width: cluster.width,
-      height: cluster.height,
+      baseX: group.x,
+      baseY: group.y,
     })
   }
 
-  const handleTerminalPointerDown = (
-    terminal: 'in' | 'out',
-    point: TerminalPoint,
+  const handleGroupResizePointerDown = (
+    group: LiveMapFlowGroup,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (!isLayoutEditEnabled) {
+    if (!isEditing) {
       return
     }
     event.preventDefault()
     event.stopPropagation()
-    setDragState({
-      kind: 'terminal',
-      terminal,
+    setResizeState({
+      groupId: group.id,
       pointerId: event.pointerId,
       originX: event.clientX,
       originY: event.clientY,
-      baseCx: point.cx,
-      baseCy: point.cy,
+      baseWidth: group.width,
+      baseHeight: group.height,
     })
   }
 
   const handleBoardPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    // 비편집 모드에서 빈 배경을 끌면 팬. 카드/종단/노드 위가 아닐 때만.
-    if (isLayoutEditEnabled || event.target !== event.currentTarget) {
+    // 비편집 모드에서 빈 배경을 끌면 팬. 카드/노드 위가 아닐 때만.
+    if (isEditing || event.target !== event.currentTarget) {
       return
     }
     const scroller = boardScrollerRef.current
@@ -385,14 +412,92 @@ export function LiveMapBoard({
     setIsPanning(true)
   }
 
-  const edges =
-    flow && inTerminal && outTerminal
-      ? [
-          `M ${inTerminal.cx} ${inTerminal.cy} L ${flow.firstX} ${flow.firstCy}`,
-          ...flow.interEdges,
-          `M ${flow.lastRight} ${flow.lastCy} L ${outTerminal.cx} ${outTerminal.cy}`,
-        ]
-      : []
+  // Ctrl(⌘)+pointerdown 즉시 선택(편집 모드) — 노드가 draggable 이라 클릭 중 마우스가 조금만
+  // 움직여도 click 이 드래그로 승격돼 발생하지 않는다. 선택 '등록'은 pointerdown 으로 앞당기고,
+  // 이미 선택된 노드는 일괄 드래그의 시작일 수 있으므로 '해제'만 click(드래그 미발생 확정 시점)
+  // 으로 유예한다 — 파일 탐색기와 동일한 규칙.
+  const handleNodePointerDown = (eqpKey: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isEditing || event.button !== 0 || !(event.ctrlKey || event.metaKey)) {
+      return
+    }
+    if (multiSelectedKeys.has(eqpKey)) {
+      pendingDeselectKeyRef.current = eqpKey
+      return
+    }
+    setMultiSelectedKeys((current) => new Set(current).add(eqpKey))
+  }
+
+  // Ctrl(⌘)+클릭(편집 모드) — 상세 선택 차단 + pointerdown 에서 유예한 해제를 확정(capture).
+  const handleNodeClickCapture = (eqpKey: number, event: ReactMouseEvent<HTMLDivElement>) => {
+    const pendingDeselectKey = pendingDeselectKeyRef.current
+    pendingDeselectKeyRef.current = null
+    if (!isEditing || !(event.ctrlKey || event.metaKey)) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    if (pendingDeselectKey === eqpKey) {
+      setMultiSelectedKeys((current) => {
+        const next = new Set(current)
+        next.delete(eqpKey)
+        return next
+      })
+    }
+  }
+
+  const handleNodeDragStart = (eqpKey: number, event: ReactDragEvent<HTMLDivElement>) => {
+    // 드래그로 승격 — pointerdown 의 해제 후보는 취소(선택 유지 + 일괄 이동).
+    pendingDeselectKeyRef.current = null
+    // 다중 선택에 포함된 노드를 끌면 선택 전체. Ctrl(⌘)을 누른 채 곧바로 끌기 시작한 노드는
+    // click 이 발생하지 않아 선택 집합에 없을 수 있으므로, 기존 선택과 합쳐 함께 이동시킨다.
+    const joinsSelection =
+      multiSelectedKeys.has(eqpKey) ||
+      ((event.ctrlKey || event.metaKey) && multiSelectedKeys.size > 0)
+    const eqpKeys = joinsSelection ? [...new Set([...multiSelectedKeys, eqpKey])] : [eqpKey]
+    draggingEqpKeysRef.current = eqpKeys
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', eqpKeys.join(','))
+  }
+
+  const handleNodeDragEnd = () => {
+    draggingEqpKeysRef.current = null
+    pendingDeselectKeyRef.current = null
+    setDropTargetGroupId(null)
+  }
+
+  const handleNodeDragOver = (card: LiveMapFlowGroupCard, event: ReactDragEvent<HTMLDivElement>) => {
+    if (!isEditing || draggingEqpKeysRef.current === null) {
+      return
+    }
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDropTargetGroupId(card.group.id)
+  }
+
+  const handleNodeDrop = (card: LiveMapFlowGroupCard, event: ReactDragEvent<HTMLDivElement>) => {
+    const eqpKeys = draggingEqpKeysRef.current
+    draggingEqpKeysRef.current = null
+    setDropTargetGroupId(null)
+    if (!isEditing || eqpKeys === null) {
+      return
+    }
+    event.preventDefault()
+    // 이미 카드 소속인 노드는 제외 — 같은 카드로의 드롭으로 불필요한 dirty 를 만들지 않는다.
+    const movingKeys = eqpKeys.filter((key) => !card.nodes.some((node) => node.eqpKey === key))
+    if (movingKeys.length > 0) {
+      onAssignEquipment(movingKeys, card.group.id)
+      // 일괄 이동 완료 — 다중 선택은 소비된 것으로 보고 비운다.
+      setMultiSelectedKeys((current) => (current.size === 0 ? current : new Set()))
+    }
+  }
+
+  const groupTitle = (card: LiveMapFlowGroupCard): string =>
+    card.isUnassigned ? t('livemap.flow.unassigned') : card.group.title
+
+  // 화살표 끝점 후보 — 미배정 라벨까지 해석된 표시명으로 다이얼로그에 전달(그룹명 순 정렬).
+  const groupOptions = groupCards
+    .map((card) => ({ id: card.group.id, title: groupTitle(card) }))
+    .sort((a, b) => a.title.localeCompare(b.title))
 
   return (
     <section
@@ -414,6 +519,52 @@ export function LiveMapBoard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isEditing ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onCreateGroup}
+                data-testid="live-map-flow-add-group"
+                className="h-8 rounded-[12px] text-[12px] font-bold"
+              >
+                <FolderPlus className="size-3.5" />
+                {t('livemap.flow.addGroup')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setArrowDialog({ arrow: null })}
+                disabled={groupCards.length < 2}
+                data-testid="live-map-flow-add-arrow"
+                className="h-8 rounded-[12px] text-[12px] font-bold"
+              >
+                <ArrowRight className="size-3.5" />
+                {t('livemap.flow.addArrow')}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onSave}
+                disabled={!isDirty || isSaving}
+                data-testid="live-map-flow-save"
+                className="h-8 rounded-[12px] text-[12px] font-bold"
+              >
+                {isSaving ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Save className="size-3.5" />
+                )}
+                {t('livemap.flow.save')}
+                {isDirty ? <span className="size-1.5 rounded-full bg-amber-400" /> : null}
+              </Button>
+              {saveError ? (
+                <span className="text-[11px] font-semibold text-danger">{saveError}</span>
+              ) : null}
+            </>
+          ) : null}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -459,7 +610,7 @@ export function LiveMapBoard({
               <div
                 onPointerDown={handleBoardPointerDown}
                 className={`live-map-canvas relative ${
-                  isLayoutEditEnabled ? '' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
+                  isEditing ? '' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
                 style={{
                   width: LIVE_MAP_BOARD_WIDTH,
@@ -469,143 +620,185 @@ export function LiveMapBoard({
                 }}
               >
                 {backgroundLayer}
-                {edges.length > 0 ? (
-                  <svg
-                    className="pointer-events-none absolute inset-0 text-brand-primary/45"
-                    width={LIVE_MAP_BOARD_WIDTH}
-                    height={LIVE_MAP_BOARD_HEIGHT}
-                    fill="none"
-                  >
-                    <defs>
+
+                {/* 그룹 간 흐름 화살표 — 카드 아래 SVG 레이어. 편집 모드에선 넓은 투명 히트 라인으로
+                    클릭 → 편집/삭제 다이얼로그. 좌표는 카드 rect 테두리 간 선분(모델 헬퍼). */}
+                <svg
+                  className="pointer-events-none absolute inset-0"
+                  width={LIVE_MAP_BOARD_WIDTH}
+                  height={LIVE_MAP_BOARD_HEIGHT}
+                >
+                  <defs>
+                    {arrows.map((arrow) => (
                       <marker
-                        id="live-map-arrow"
+                        key={arrow.id}
+                        id={`live-map-flow-arrow-head-${arrow.id}`}
                         viewBox="0 0 10 10"
-                        refX="8"
+                        refX="9"
                         refY="5"
-                        markerWidth="7"
-                        markerHeight="7"
-                        orient="auto-start-reverse"
+                        markerWidth="4"
+                        markerHeight="4"
+                        orient="auto"
                       >
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+                        <path d="M0,0 L10,5 L0,10 z" fill={arrow.color ?? 'var(--brand-primary)'} />
                       </marker>
-                    </defs>
-                    {edges.map((edge, index) => (
-                      <g key={index}>
-                        <path
-                          d={edge}
-                          stroke="currentColor"
-                          strokeOpacity={0.22}
-                          strokeWidth={2.5}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          markerEnd="url(#live-map-arrow)"
-                        />
-                        <path
-                          className="live-map-flow-edge"
-                          d={edge}
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </g>
                     ))}
-                  </svg>
-                ) : null}
+                  </defs>
+                  {arrows.map((arrow) => {
+                    const fromGroup = groupIndex.get(arrow.fromGroupId)?.group
+                    const toGroup = groupIndex.get(arrow.toGroupId)?.group
+                    if (!fromGroup || !toGroup) {
+                      return null
+                    }
+                    const line = computeLiveMapFlowArrowLine(fromGroup, toGroup)
+                    if (!line) {
+                      return null
+                    }
+                    const stroke = arrow.color ?? 'var(--brand-primary)'
+                    // 파선 = 선분+간격, 점선 = 점(0.1 + round cap)+간격. 패턴 합(주기)은
+                    // 흐름 애니메이션의 1 사이클 이동량이기도 하다(이음새 없는 반복 조건).
+                    const dashPattern =
+                      arrow.dash === 'dashed'
+                        ? [arrow.strokeWidth * 4, arrow.strokeWidth * 2.5]
+                        : arrow.dash === 'dotted'
+                          ? [0.1, arrow.strokeWidth * 2.5]
+                          : null
+                    return (
+                      <g key={arrow.id}>
+                        <line
+                          x1={line.x1}
+                          y1={line.y1}
+                          x2={line.x2}
+                          y2={line.y2}
+                          stroke={stroke}
+                          strokeWidth={arrow.strokeWidth}
+                          strokeDasharray={dashPattern?.join(' ')}
+                          strokeLinecap={arrow.dash === 'dotted' ? 'round' : undefined}
+                          markerEnd={`url(#live-map-flow-arrow-head-${arrow.id})`}
+                          opacity={0.9}
+                          className={dashPattern ? 'live-map-flow-arrow-dash' : undefined}
+                          style={
+                            dashPattern
+                              ? ({
+                                  '--live-map-flow-dash-period': `${dashPattern[0] + dashPattern[1]}px`,
+                                } as CSSProperties)
+                              : undefined
+                          }
+                        />
+                        {isEditing ? (
+                          <line
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="transparent"
+                            strokeWidth={Math.max(14, arrow.strokeWidth + 10)}
+                            className="pointer-events-auto cursor-pointer"
+                            data-testid={`live-map-flow-arrow-${arrow.id}`}
+                            onClick={() => setArrowDialog({ arrow })}
+                          />
+                        ) : null}
+                      </g>
+                    )
+                  })}
+                </svg>
 
-                {inTerminal ? (
-                  <div
-                    onPointerDown={(event) => handleTerminalPointerDown('in', inTerminal, event)}
-                    className={`absolute flex items-center justify-center rounded-full border border-border bg-card text-[12px] font-extrabold tracking-wide text-muted-foreground shadow-soft-sm ${
-                      isLayoutEditEnabled
-                        ? 'cursor-grab hover:border-brand-primary/50'
-                        : ''
-                    }`}
-                    style={{
-                      left: inTerminal.cx - TERMINAL_RADIUS,
-                      top: inTerminal.cy - TERMINAL_RADIUS,
-                      width: TERMINAL_RADIUS * 2,
-                      height: TERMINAL_RADIUS * 2,
-                    }}
-                  >
-                    IN
-                  </div>
-                ) : null}
-                {outTerminal ? (
-                  <div
-                    onPointerDown={(event) => handleTerminalPointerDown('out', outTerminal, event)}
-                    className={`absolute flex items-center justify-center rounded-full border border-brand-primary/40 bg-brand-primary/10 text-[12px] font-extrabold tracking-wide text-brand-primary shadow-soft-sm ${
-                      isLayoutEditEnabled ? 'cursor-grab hover:border-brand-primary' : ''
-                    }`}
-                    style={{
-                      left: outTerminal.cx - TERMINAL_RADIUS,
-                      top: outTerminal.cy - TERMINAL_RADIUS,
-                      width: TERMINAL_RADIUS * 2,
-                      height: TERMINAL_RADIUS * 2,
-                    }}
-                  >
-                    OUT
-                  </div>
-                ) : null}
-
-                {clusters.map((cluster) => {
-                  const clusterNodes = nodesByCluster.get(cluster.id) ?? []
-                  const containsSelected = selectedEquipment?.clusterId === cluster.id
-                  const isDragging = dragState?.kind === 'cluster' && dragState.clusterId === cluster.id
-                  const hasError = clusterNodes.some((node) => node.status === 'ERROR')
-                  const total = clusterNodes.length || 1
+                {groupCards.map((card) => {
+                  const { group } = card
+                  const containsSelected = selectedEquipment
+                    ? card.nodes.some((node) => node.eqpId === selectedEquipment.eqpId)
+                    : false
+                  const isDragging = dragState?.groupId === group.id
+                  const isDropTarget = dropTargetGroupId === group.id
+                  const hasError = card.nodes.some((node) => node.status === 'ERROR')
+                  const total = card.nodes.length || 1
 
                   return (
                     <div
-                      key={cluster.id}
+                      key={group.id}
+                      data-testid={`live-map-flow-group-${group.id}`}
+                      onDragOver={(event) => handleNodeDragOver(card, event)}
+                      onDrop={(event) => handleNodeDrop(card, event)}
                       className={`absolute flex flex-col overflow-hidden rounded-[18px] border bg-card/95 shadow-soft-sm backdrop-blur-sm ${
-                        containsSelected
-                          ? 'border-brand-primary/50 ring-1 ring-brand-primary/30'
-                          : hasError
-                            ? 'border-danger/50 ring-1 ring-danger/25'
-                            : 'border-border'
+                        isDropTarget
+                          ? 'border-brand-primary/60 ring-2 ring-brand-primary/40'
+                          : containsSelected
+                            ? 'border-brand-primary/50 ring-1 ring-brand-primary/30'
+                            : hasError
+                              ? 'border-danger/50 ring-1 ring-danger/25'
+                              : 'border-border'
                       } ${isDragging ? 'z-10 ring-2 ring-brand-primary/40' : ''}`}
                       style={{
-                        left: cluster.x,
-                        top: cluster.y,
-                        width: cluster.width,
-                        height: cluster.height,
+                        left: group.x,
+                        top: group.y,
+                        width: group.width,
+                        height: group.height,
+                        // 사용자 색 테두리 — 선택/에러 상태 시각(우선)과 겹치지 않을 때만.
+                        ...(group.color && !containsSelected && !hasError
+                          ? { borderColor: `${group.color}66` }
+                          : {}),
                       }}
                     >
                       <div
                         className={`flex items-start justify-between gap-2 px-4 pt-3 ${
-                          isLayoutEditEnabled
-                            ? isDragging
-                              ? 'cursor-grabbing'
-                              : 'cursor-grab'
-                            : 'cursor-default'
+                          isEditing ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
                         }`}
-                        onPointerDown={(event) => handleClusterHandlePointerDown(cluster, event)}
+                        onPointerDown={(event) => handleGroupHandlePointerDown(group, event)}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="h-3.5 w-[3px] rounded-sm bg-brand-primary" />
+                            <span
+                              className="h-3.5 w-[3px] rounded-sm bg-brand-primary"
+                              style={group.color ? { backgroundColor: group.color } : undefined}
+                            />
                             <span className="truncate text-[15px] font-extrabold text-foreground">
-                              {cluster.title}
+                              {groupTitle(card)}
                             </span>
                           </div>
-                          <div className="mt-0.5 pl-[11px] text-[10px] font-semibold text-muted-foreground">
-                            {cluster.subtitle}
-                          </div>
+                          {group.subtitle ? (
+                            <div className="mt-0.5 pl-[11px] text-[10px] font-semibold text-muted-foreground">
+                              {group.subtitle}
+                            </div>
+                          ) : null}
                         </div>
                         <span className="flex shrink-0 items-center gap-1.5">
                           {hasError ? (
                             <span className="size-1.5 animate-pulse rounded-full bg-danger [box-shadow:0_0_8px_var(--danger)]" />
                           ) : null}
+                          {isEditing && !card.isUnassigned ? (
+                            <span
+                              className="flex items-center gap-1"
+                              onPointerDown={(event) => event.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setEditingGroup(group)}
+                                aria-label={t('livemap.flow.editGroup')}
+                                data-testid={`live-map-flow-group-edit-${group.id}`}
+                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                <Pencil className="size-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingGroup(group)}
+                                aria-label={t('livemap.flow.deleteGroup')}
+                                data-testid={`live-map-flow-group-delete-${group.id}`}
+                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </span>
+                          ) : null}
                           <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                            {clusterNodes.length}
+                            {card.nodes.length}
                           </span>
                         </span>
                       </div>
 
                       <div className="mx-3 mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
                         {STATUS_SEGMENTS.map((segment) => {
-                          const count = clusterNodes.filter((node) => node.status === segment.key).length
+                          const count = card.nodes.filter((node) => node.status === segment.key).length
                           if (count === 0) {
                             return null
                           }
@@ -621,19 +814,57 @@ export function LiveMapBoard({
 
                       <div className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto px-3 pb-3">
                         <div className="flex flex-col gap-1">
-                          {clusterNodes.map((node) => (
-                            <LiveMapMachineNode
-                              key={node.eqpId}
-                              eqpId={node.eqpId}
-                              status={node.status}
-                              portItems={node.portItems}
-                              selected={node.eqpId === selectedEquipment?.eqpId}
-                              dimmed={!visibleEquipmentIds.has(node.eqpId)}
-                              onSelect={onSelectEquipment}
-                            />
-                          ))}
+                          {card.nodes.map((node) => {
+                            const isMultiSelected = isEditing && multiSelectedKeys.has(node.eqpKey)
+                            return (
+                              // 편집 모드에서 노드를 HTML5 드래그 소스로 — 카드 간 드롭 = 그룹 배정.
+                              // Ctrl(⌘)+클릭 = 다중 선택 토글(선택된 노드 드래그 = 일괄 이동).
+                              <div
+                                key={node.eqpId}
+                                draggable={isEditing}
+                                onPointerDown={(event) => handleNodePointerDown(node.eqpKey, event)}
+                                onClickCapture={(event) => handleNodeClickCapture(node.eqpKey, event)}
+                                onDragStart={(event) => handleNodeDragStart(node.eqpKey, event)}
+                                onDragEnd={handleNodeDragEnd}
+                                data-multi-selected={isMultiSelected || undefined}
+                                className={
+                                  `${isEditing ? 'cursor-grab' : ''} ${
+                                    isMultiSelected ? 'rounded-[7px] ring-2 ring-brand-primary/60' : ''
+                                  }`.trim() || undefined
+                                }
+                              >
+                                <LiveMapMachineNode
+                                  eqpId={node.eqpId}
+                                  status={node.status}
+                                  portItems={node.portItems}
+                                  selected={node.eqpId === selectedEquipment?.eqpId}
+                                  dimmed={!visibleEquipmentIds.has(node.eqpId)}
+                                  onSelect={onSelectEquipment}
+                                />
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
+
+                      {/* 우하단 리사이즈 핸들(편집 모드) — 미배정 그룹 포함 모든 카드. */}
+                      {isEditing ? (
+                        <div
+                          data-testid={`live-map-flow-group-resize-${group.id}`}
+                          onPointerDown={(event) => handleGroupResizePointerDown(group, event)}
+                          className="absolute bottom-0 right-0 z-10 flex size-5 cursor-nwse-resize touch-none items-end justify-end p-0.75 text-muted-foreground hover:text-foreground"
+                        >
+                          <svg viewBox="0 0 10 10" className="size-full" aria-hidden="true">
+                            <path
+                              d="M9 1 L1 9 M9 5.5 L5.5 9"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              fill="none"
+                            />
+                          </svg>
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}
@@ -642,16 +873,20 @@ export function LiveMapBoard({
           </div>
 
           <div className="absolute left-4 top-4 inline-flex flex-col items-center gap-1.5 rounded-[16px] border border-border bg-card/80 px-1.5 py-2 shadow-soft-md backdrop-blur-sm">
+            {canEdit ? (
+              <>
+                <RailButton
+                  icon={SquarePen}
+                  label={t('livemap.tool.move')}
+                  active={isLayoutEditEnabled}
+                  onClick={() => onLayoutEditEnabledChange(!isLayoutEditEnabled)}
+                />
+                <span className="my-0.5 h-px w-5 bg-border" />
+              </>
+            ) : null}
             <RailButton icon={Plus} label={t('livemap.zoom.in')} onClick={onZoomIn} />
             <RailButton icon={Minus} label={t('livemap.zoom.out')} onClick={onZoomOut} />
             <RailButton icon={Maximize2} label={t('livemap.zoom.reset')} onClick={onResetZoom} />
-            <span className="my-0.5 h-px w-5 bg-border" />
-            <RailButton
-              icon={Move}
-              label={t('livemap.tool.move')}
-              active={isLayoutEditEnabled}
-              onClick={() => onLayoutEditEnabledChange(!isLayoutEditEnabled)}
-            />
           </div>
         </div>
 
@@ -669,6 +904,61 @@ export function LiveMapBoard({
           </div>
         </div>
       </div>
+
+      {editingGroup ? (
+        <LiveMapFlowGroupDialog
+          key={editingGroup.id}
+          group={groupIndex.get(editingGroup.id)?.group ?? editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onSubmit={(patch) => {
+            onUpdateGroup(editingGroup.id, patch)
+            setEditingGroup(null)
+          }}
+        />
+      ) : null}
+
+      {arrowDialog ? (
+        <LiveMapFlowArrowDialog
+          key={arrowDialog.arrow?.id ?? 'create'}
+          arrow={arrowDialog.arrow}
+          groupOptions={groupOptions}
+          onClose={() => setArrowDialog(null)}
+          onSubmit={(patch) => {
+            if (arrowDialog.arrow) {
+              onUpdateArrow(arrowDialog.arrow.id, patch)
+            } else {
+              onCreateArrow(patch)
+            }
+            setArrowDialog(null)
+          }}
+          onDelete={
+            arrowDialog.arrow
+              ? () => {
+                  if (arrowDialog.arrow) {
+                    onDeleteArrow(arrowDialog.arrow.id)
+                  }
+                  setArrowDialog(null)
+                }
+              : undefined
+          }
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={deletingGroup !== null}
+        onOpenChange={(open) => (open ? undefined : setDeletingGroup(null))}
+        title={t('livemap.flow.deleteGroup')}
+        description={
+          deletingGroup ? t('livemap.flow.deleteConfirm', { title: deletingGroup.title }) : null
+        }
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (deletingGroup) {
+            onDeleteGroup(deletingGroup.id)
+          }
+          setDeletingGroup(null)
+        }}
+      />
     </section>
   )
 }

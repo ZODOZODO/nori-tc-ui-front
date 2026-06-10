@@ -12,7 +12,6 @@ import type { LiveMapEquipmentResponse as LiveMapEquipment } from '../api/live-m
 import { useCreateObject, useLayout, useLayoutObjects, useSaveLayout } from '../hooks/useLayout'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
-import { LIVE_MAP_CLUSTER_ITEMS } from '../mocks/live-map.mock'
 import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
 import {
   LIVE_MAP_BAY_AISLE_PX,
@@ -645,7 +644,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   const primaryEquipment = primary?.eqpKey != null ? equipmentByKey.get(primary.eqpKey) ?? null : null
   // 뷰어와 동일한 상세(LiveMapTooltipCard)를 쓰기 위해 선택 설비를 보드 노드로 변환(eqpId 매칭).
   const equipmentNodes = useMemo(
-    () => buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? [], LIVE_MAP_CLUSTER_ITEMS),
+    () => buildLiveMapEquipmentNodes(liveMapQuery.data?.equipmentItems ?? []),
     [liveMapQuery.data?.equipmentItems],
   )
   const selectedNode = useMemo(
