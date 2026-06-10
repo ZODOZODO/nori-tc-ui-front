@@ -502,10 +502,10 @@ export function LiveMapBoard({
   return (
     <section
       data-testid="live-map-viewer-board"
-      className="relative overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+      className="relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-soft-lg"
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-[620px]">
+        <div className="max-w-155">
           <div className="flex items-center gap-2.5">
             <h2 className="text-[17px] font-extrabold text-foreground">
               {t('livemap.board.title')}
@@ -571,7 +571,7 @@ export function LiveMapBoard({
               value={searchKeyword}
               onChange={(event) => onSearchKeywordChange(event.target.value)}
               placeholder={t('livemap.search.placeholder')}
-              className="h-8 w-[220px] rounded-[12px] pl-9 text-sm"
+              className="h-8 w-55 rounded-[12px] pl-9 text-sm"
             />
           </div>
 
@@ -579,7 +579,7 @@ export function LiveMapBoard({
             value={selectedStatus}
             onValueChange={(value) => onSelectedStatusChange(value as LiveMapStatusFilter)}
           >
-            <SelectTrigger className="h-8 w-[140px] rounded-[12px] text-sm">
+            <SelectTrigger className="h-8 w-35 rounded-[12px] text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -748,7 +748,7 @@ export function LiveMapBoard({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span
-                              className="h-3.5 w-[3px] rounded-sm bg-brand-primary"
+                              className="h-3.5 w-0.75 rounded-sm bg-brand-primary"
                               style={group.color ? { backgroundColor: group.color } : undefined}
                             />
                             <span className="truncate text-[15px] font-extrabold text-foreground">
@@ -756,7 +756,7 @@ export function LiveMapBoard({
                             </span>
                           </div>
                           {group.subtitle ? (
-                            <div className="mt-0.5 pl-[11px] text-[10px] font-semibold text-muted-foreground">
+                            <div className="mt-0.5 pl-2.75 text-[10px] font-semibold text-muted-foreground">
                               {group.subtitle}
                             </div>
                           ) : null}
@@ -872,7 +872,7 @@ export function LiveMapBoard({
             </div>
           </div>
 
-          <div className="absolute left-4 top-4 inline-flex flex-col items-center gap-1.5 rounded-[16px] border border-border bg-card/80 px-1.5 py-2 shadow-soft-md backdrop-blur-sm">
+          <div className="absolute left-4 top-4 inline-flex flex-col items-center gap-1.5 rounded-2xl border border-border bg-card/80 px-1.5 py-2 shadow-soft-md backdrop-blur-sm">
             {canEdit ? (
               <>
                 <RailButton
@@ -892,11 +892,11 @@ export function LiveMapBoard({
 
         <div
           className={`shrink-0 overflow-hidden transition-[width,margin] duration-300 ease-out ${
-            isPanelOpen ? 'ml-4 w-[340px] 2xl:w-[360px]' : 'ml-0 w-0'
+            isPanelOpen ? 'ml-4 w-85 2xl:w-90' : 'ml-0 w-0'
           }`}
         >
           <div
-            className={`h-full w-[340px] 2xl:w-[360px] transition-transform duration-300 ease-out ${
+            className={`h-full w-85 2xl:w-90 transition-transform duration-300 ease-out ${
               isPanelOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
           >

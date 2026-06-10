@@ -55,7 +55,7 @@ export function LiveMapMachineNode({
         </span>
       </span>
       {portItems.length > 0 ? (
-        <span className="flex flex-wrap items-center gap-[3px] pl-3.5">
+        <span className="flex flex-wrap items-center gap-0.75 pl-3.5">
           {portItems.map((portItem) => (
             <span
               key={portItem.id}
