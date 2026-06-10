@@ -9,9 +9,10 @@ export interface ModelTreeNode {
 export interface ModelTreeGroups {
   secsRoots: ModelTreeNode[]
   socketRoots: ModelTreeNode[]
+  plcRoots: ModelTreeNode[]
 }
 
-type InterfaceGroup = 'SECS' | 'Socket'
+type InterfaceGroup = 'SECS' | 'Socket' | 'PLC'
 
 /**
  * Model 이름을 숫자 인식 오름차순으로 비교합니다.
@@ -36,7 +37,13 @@ const compareUpdatedAtDesc = (firstItem: ModelInfo, secondItem: ModelInfo): numb
  */
 const resolveInterfaceGroup = (commInterface: ProtocolType): InterfaceGroup => {
   const normalizedInterface = commInterface.toUpperCase()
-  return normalizedInterface === 'SOCKET' ? 'Socket' : 'SECS'
+  if (normalizedInterface === 'SOCKET') {
+    return 'Socket'
+  }
+  if (normalizedInterface === 'PLC') {
+    return 'PLC'
+  }
+  return 'SECS'
 }
 
 /**
@@ -152,5 +159,6 @@ export const buildModelTreeGroups = (
   return {
     secsRoots: buildInterfaceRoots(representativeMap, 'SECS', normalizedKeyword),
     socketRoots: buildInterfaceRoots(representativeMap, 'Socket', normalizedKeyword),
+    plcRoots: buildInterfaceRoots(representativeMap, 'PLC', normalizedKeyword),
   }
 }

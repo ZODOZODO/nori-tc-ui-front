@@ -6,6 +6,7 @@ import {
   createEmptyFlowDraft,
   draftToFlow,
   serializeFlowDraft,
+  shouldRenderTriggerSection,
 } from '../src/features/model/lib/model-flow-editor.ts'
 import type { ModelFlow } from '../src/features/model/types/model.types.ts'
 
@@ -270,4 +271,11 @@ test('draftToFlow: SECS Flow 의 dcopItems 가 있을 때 dcopItemKeys 가 그 P
 test('DRAFT_FLOW_ID_SENTINEL: backend가 발급하지 않는 음수 값으로 충돌을 회피합니다', () => {
   // backend PK 는 양수 — 음수 sentinel 로 draft 와 real flow 구분.
   assert.ok(DRAFT_FLOW_ID_SENTINEL < 0)
+})
+
+test('shouldRenderTriggerSection: SECS 만 Trigger 섹션을 렌더하고 Socket/PLC 는 숨긴다', () => {
+  // EventId/TransactionId 는 SECS 전용 — Socket 에 더해 PLC 도 Trigger 미렌더(plc-gateway L1348).
+  assert.equal(shouldRenderTriggerSection('SECS'), true)
+  assert.equal(shouldRenderTriggerSection('SOCKET'), false)
+  assert.equal(shouldRenderTriggerSection('PLC'), false)
 })

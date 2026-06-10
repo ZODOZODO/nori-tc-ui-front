@@ -155,6 +155,8 @@ export type ModelDetailNode =
   | 'reportides'
   | 'eventides'
   | 'socket-message'
+  | 'plc-group'
+  | 'plc-register'
   | 'workflow'
   | 'mdf'
   | 'dcop-itemes'
@@ -271,6 +273,24 @@ export const SOCKET_DETAIL_NODES: ModelDetailNode[] = [
 ]
 
 /**
+ * PLC 계열 상세 노드 순서입니다.
+ *
+ * PoC 는 PLC 그룹/레지스터 스펙의 편집/조회 백엔드가 없으므로(별 SPEC) 좌측 트리에
+ * 라벨만 렌더하고, 클릭 시 내용 조회 호출은 하지 않습니다(빈 상태). 트리 분류·노드
+ * 라벨 표시가 본 PoC 의 PLC 모델 화면 범위입니다.
+ */
+export const PLC_DETAIL_NODES: ModelDetailNode[] = ['plc-group', 'plc-register']
+
+/**
+ * 백엔드 조회/저장 핸들러가 아직 없는 PLC 전용 placeholder 노드입니다.
+ * 이 노드 선택 시 내용 조회 호출을 막아 dead 요청을 방지합니다(붙일 API 없음).
+ */
+export const PLC_PLACEHOLDER_DETAIL_NODES: ReadonlySet<ModelDetailNode> = new Set([
+  'plc-group',
+  'plc-register',
+])
+
+/**
  * 상세 노드별 라벨 매핑입니다.
  */
 export const MODEL_DETAIL_NODE_LABELS: Record<ModelDetailNode, string> = {
@@ -281,6 +301,8 @@ export const MODEL_DETAIL_NODE_LABELS: Record<ModelDetailNode, string> = {
   reportides: 'ReportIdes',
   eventides: 'EventIdes',
   'socket-message': 'Socket Message',
+  'plc-group': 'PLC Group',
+  'plc-register': 'PLC Register',
   workflow: 'Flow',
   mdf: 'MDF',
   'dcop-itemes': 'Dcop Itemes',

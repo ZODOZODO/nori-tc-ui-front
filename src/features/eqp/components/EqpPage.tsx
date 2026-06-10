@@ -12,6 +12,7 @@ import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
 import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
 import { EqpInfoTable } from './EqpInfoTable'
+import { EqpPollingGroupControl } from './EqpPollingGroupControl'
 import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
 import { EqpLifecycleResultDialog } from './EqpLifecycleResultDialog'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
@@ -374,6 +375,8 @@ export function EqpPage() {
     deleteEqpMutation,
     startEqpMutation,
     endEqpMutation,
+    startPollingGroupMutation,
+    endPollingGroupMutation,
   } = useEqpMutations()
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
@@ -920,6 +923,25 @@ export function EqpPage() {
 
   const isLifecyclePending = startEqpMutation.isPending || endEqpMutation.isPending
 
+  const isPollingGroupPending =
+    startPollingGroupMutation.isPending || endPollingGroupMutation.isPending
+
+  const handleStartPollingGroup = useCallback(
+    async (eqpId: string, groupMessageName: string) => {
+      const traceId = await startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
+      await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupStartTimeout'))
+    },
+    [startPollingGroupMutation, waitForEqpAsyncCompletion, t],
+  )
+
+  const handleEndPollingGroup = useCallback(
+    async (eqpId: string, groupMessageName: string) => {
+      const traceId = await endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
+      await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupEndTimeout'))
+    },
+    [endPollingGroupMutation, waitForEqpAsyncCompletion, t],
+  )
+
   /**
    * ResizableDivider 드래그 처리.
    * deltaY(px)를 컨테이너 높이 기준 비율로 변환해 상단 패널 높이를 조절합니다.
@@ -1337,6 +1359,16 @@ export function EqpPage() {
                     isLifecyclePending={isLifecyclePending}
                     onLifecycleAction={openLifecycleDialog}
                   />
+
+                  {eqpDetailQuery.data?.commInterface?.toUpperCase() === 'PLC' ? (
+                    <EqpPollingGroupControl
+                      key={`${selectedEqpId ?? 'eqp'}-polling-group`}
+                      eqpId={eqpDetailQuery.data.eqpId}
+                      isPending={isPollingGroupPending}
+                      onStartGroup={handleStartPollingGroup}
+                      onEndGroup={handleEndPollingGroup}
+                    />
+                  ) : null}
                 </div>
 
                 {/* 드래그 핸들: 위아래 패널 크기 조절 (15% ~ 85%) */}

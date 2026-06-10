@@ -108,7 +108,7 @@ export const ModelSidebar = memo(function ModelSidebar({
   )
   const selectedModelName = selectedModel?.modelName ?? null
 
-  const { secsRoots, socketRoots } = useMemo(
+  const { secsRoots, socketRoots, plcRoots } = useMemo(
     () => buildModelTreeGroups(modelItems, deferredSearchKeyword),
     [modelItems, deferredSearchKeyword],
   )
@@ -123,16 +123,25 @@ export const ModelSidebar = memo(function ModelSidebar({
       selectedInterfaceGroup === 'SOCKET' ||
       findOwningRootName(socketRoots, selectedModelVersionKey) !== null,
   )
+  const [plcOpen, setPlcOpen] = useState(
+    () =>
+      selectedInterfaceGroup === 'PLC' ||
+      findOwningRootName(plcRoots, selectedModelVersionKey) !== null,
+  )
   // root 별 하위 branch 펼침/접힘 (2단계 아코디언). root 클릭으로 토글.
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => {
     const initial = new Set<string>()
     const secsOwner = findOwningRootName(secsRoots, selectedModelVersionKey)
     const socketOwner = findOwningRootName(socketRoots, selectedModelVersionKey)
+    const plcOwner = findOwningRootName(plcRoots, selectedModelVersionKey)
     if (secsOwner) {
       initial.add(secsOwner)
     }
     if (socketOwner) {
       initial.add(socketOwner)
+    }
+    if (plcOwner) {
+      initial.add(plcOwner)
     }
     return initial
   })
@@ -282,7 +291,7 @@ export const ModelSidebar = memo(function ModelSidebar({
         <ContextMenuLabel>{title}</ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => onOpenRootCreate(interfaceType)}>
-          {title === 'SECS' ? 'SECS Model Create' : 'Socket Model Create'}
+          {`${title} Model Create`}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -351,6 +360,9 @@ export const ModelSidebar = memo(function ModelSidebar({
               {renderSection('Socket', 'SOCKET', socketRoots, socketOpen, () =>
                 setSocketOpen((open) => !open),
               )}
+            </div>
+            <div className="mt-2 flex flex-col gap-0.5">
+              {renderSection('PLC', 'PLC', plcRoots, plcOpen, () => setPlcOpen((open) => !open))}
             </div>
 
             {isLoading ? (

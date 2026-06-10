@@ -78,7 +78,7 @@ interface FlowCardProps {
    * 모델 통신 인터페이스 — F1 dev-report 권장에 따라 flow 의 3 필드 null 검사가
    * 아니라 부모가 명시적으로 주입 (Plan 위험표 관련).
    */
-  protocol: 'SECS' | 'SOCKET'
+  protocol: 'SECS' | 'SOCKET' | 'PLC'
   /**
    * 모델이 읽기 전용인지 (= `!isEditMode || isLockedByOtherUser`). 부모
    * (ModelDetailPanel) 의 `isReadOnly` 와 동일한 의미 — true 면 카드 내부의 모든

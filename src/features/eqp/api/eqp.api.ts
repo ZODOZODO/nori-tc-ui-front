@@ -680,6 +680,93 @@ export const eqpApi = {
   },
 
   /**
+   * PLC 폴링 그룹 시작 명령(EQP_PLC_GROUP_START)을 요청하고 polling traceId를 반환합니다.
+   * 백엔드는 PathVariable(eqpId/groupMessageName)만 받고 body가 없으므로 빈 body로 POST합니다.
+   */
+  startPollingGroup: async (eqpId: string, groupMessageName: string): Promise<string> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post<AsyncAcceptResponse>(
+          `/eqp/${encodeURIComponent(eqpId)}/polling-group/${encodeURIComponent(groupMessageName)}/start`,
+          null,
+          {
+            withCredentials: true,
+            headers: {
+              [CSRF_HEADER_NAME]: csrfToken,
+            },
+            validateStatus: (status) => status >= 200 && status < 600,
+          },
+        ),
+      )
+
+      const payload = resolveSuccessPayload<{ traceId: string }>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.startPollingGroup'),
+      )
+
+      if (!payload.traceId) {
+        throw new EqpApiError(
+          createEqpFailResponse({
+            success: false,
+            data: null,
+            errorCode: 'INVALID_RESPONSE',
+            errorMsg: i18n.t('error.eqp.pollingGroupNoTraceId'),
+          }),
+          response.status,
+        )
+      }
+
+      return payload.traceId
+    } catch (error) {
+      throw normalizeEqpError(error, i18n.t('error.eqp.startPollingGroup'))
+    }
+  },
+
+  /**
+   * PLC 폴링 그룹 중단 명령(EQP_PLC_GROUP_END)을 요청하고 polling traceId를 반환합니다.
+   */
+  endPollingGroup: async (eqpId: string, groupMessageName: string): Promise<string> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post<AsyncAcceptResponse>(
+          `/eqp/${encodeURIComponent(eqpId)}/polling-group/${encodeURIComponent(groupMessageName)}/end`,
+          null,
+          {
+            withCredentials: true,
+            headers: {
+              [CSRF_HEADER_NAME]: csrfToken,
+            },
+            validateStatus: (status) => status >= 200 && status < 600,
+          },
+        ),
+      )
+
+      const payload = resolveSuccessPayload<{ traceId: string }>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.endPollingGroup'),
+      )
+
+      if (!payload.traceId) {
+        throw new EqpApiError(
+          createEqpFailResponse({
+            success: false,
+            data: null,
+            errorCode: 'INVALID_RESPONSE',
+            errorMsg: i18n.t('error.eqp.pollingGroupNoTraceId'),
+          }),
+          response.status,
+        )
+      }
+
+      return payload.traceId
+    } catch (error) {
+      throw normalizeEqpError(error, i18n.t('error.eqp.endPollingGroup'))
+    }
+  },
+
+  /**
    * 비동기 작업 결과를 조회합니다.
    * 202(PENDING), 200(PASS/FAIL), 408(TIMEOUT)을 모두 payload로 반환합니다.
    */

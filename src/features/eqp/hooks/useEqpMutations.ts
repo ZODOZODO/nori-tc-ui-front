@@ -17,6 +17,11 @@ interface LifecycleVariables {
   request: EqpLifecycleRequest
 }
 
+interface PollingGroupVariables {
+  eqpId: string
+  groupMessageName: string
+}
+
 /**
  * EQP 관련 mutation 훅 모음입니다.
  * 성공 시 목록 캐시를 무효화하여 사이드바 목록/상세를 최신 상태로 맞춥니다.
@@ -60,11 +65,23 @@ export function useEqpMutations() {
     },
   })
 
+  const startPollingGroupMutation = useMutation({
+    mutationFn: ({ eqpId, groupMessageName }: PollingGroupVariables) =>
+      eqpApi.startPollingGroup(eqpId, groupMessageName),
+  })
+
+  const endPollingGroupMutation = useMutation({
+    mutationFn: ({ eqpId, groupMessageName }: PollingGroupVariables) =>
+      eqpApi.endPollingGroup(eqpId, groupMessageName),
+  })
+
   return {
     createEqpMutation,
     updateEqpMutation,
     deleteEqpMutation,
     startEqpMutation,
     endEqpMutation,
+    startPollingGroupMutation,
+    endPollingGroupMutation,
   }
 }
