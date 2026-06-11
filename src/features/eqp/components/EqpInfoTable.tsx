@@ -182,7 +182,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
 
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading ? (
-          <Table className="min-w-[1180px]">
+          <Table className="min-w-295">
             <TableHeader>
               <TableRow className="bg-muted">
                 <TableHead>EQPID</TableHead>
@@ -219,7 +219,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
             columns={EQP_INFO_COLUMNS}
             rows={tableRows}
             rowKey={(row) => row.eqp.eqpId}
-            tableClassName="min-w-[1180px]"
+            tableClassName="min-w-295"
             wrapRow={(_row, _rowIdx, children) => (
               <ContextMenu>
                 <ContextMenuTrigger asChild>

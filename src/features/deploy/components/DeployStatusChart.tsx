@@ -47,7 +47,7 @@ export function DeployStatusChart({ aggregate }: { aggregate: DeployStatusAggreg
 
   if (segments.length === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-45 items-center justify-center text-sm text-muted-foreground">
         {t('deploy.chart.empty')}
       </div>
     )
@@ -55,7 +55,7 @@ export function DeployStatusChart({ aggregate }: { aggregate: DeployStatusAggreg
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div className="relative h-[180px] w-[180px] shrink-0">
+      <div className="relative h-45 w-45 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

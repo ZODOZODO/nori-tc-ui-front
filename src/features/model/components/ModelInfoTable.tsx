@@ -127,8 +127,8 @@ export const ModelInfoTable = memo(function ModelInfoTable({
       <TableSectionHeader title={t('model.infoTable.title')} className="mb-3" />
 
       {isLoading ? (
-        <div className={cn('overflow-auto', compactHeight ? 'max-h-[300px]' : 'flex-1')}>
-          <Table className="min-w-[980px]">
+        <div className={cn('overflow-auto', compactHeight ? 'max-h-75' : 'flex-1')}>
+          <Table className="min-w-245">
             <TableHeader>
               <TableRow className="bg-muted">
                 <TableHead>Model Name</TableHead>
@@ -159,8 +159,8 @@ export const ModelInfoTable = memo(function ModelInfoTable({
           rowKey={(row) => row.modelVersionKey}
           features={{ rangeCopy: true }}
           testId="selectable-table-model-info"
-          containerClassName={cn(compactHeight ? 'max-h-[300px]' : 'flex-1')}
-          tableClassName="min-w-[980px]"
+          containerClassName={cn(compactHeight ? 'max-h-75' : 'flex-1')}
+          tableClassName="min-w-245"
           emptyState={t('model.infoTable.empty')}
           wrapRow={(model, _rowIdx, children) => (
             <TableRow

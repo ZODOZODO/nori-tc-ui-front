@@ -33,7 +33,7 @@ export function LiveMapHeader({ summary }: LiveMapHeaderProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <div className="flex min-w-[88px] flex-col justify-center rounded-2xl border border-border bg-card px-3 py-2.5 shadow-soft-sm">
+        <div className="flex min-w-22 flex-col justify-center rounded-2xl border border-border bg-card px-3 py-2.5 shadow-soft-sm">
           <span className="text-[10px] font-bold tracking-[0.16em] text-muted-foreground">
             {t('livemap.kpi.total')}
           </span>
@@ -45,7 +45,7 @@ export function LiveMapHeader({ summary }: LiveMapHeaderProps) {
         {KPI_TILES.map((tile) => (
           <div
             key={tile.key}
-            className={`flex min-w-[88px] flex-col justify-center rounded-2xl border px-3 py-2.5 shadow-soft-sm ${tile.variant.chip}`}
+            className={`flex min-w-22 flex-col justify-center rounded-2xl border px-3 py-2.5 shadow-soft-sm ${tile.variant.chip}`}
           >
             <span className="text-[10px] font-bold tracking-[0.16em] opacity-80">{tile.label}</span>
             <span className="text-2xl font-extrabold">

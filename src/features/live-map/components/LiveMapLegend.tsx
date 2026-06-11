@@ -13,7 +13,7 @@ export function LiveMapLegend() {
       {LEGEND_ITEMS.map((item) => (
         <div
           key={item.label}
-          className={`inline-flex h-[26px] items-center gap-2 rounded-pill border px-3 text-[11px] font-bold ${item.variant.chip}`}
+          className={`inline-flex h-6.5 items-center gap-2 rounded-pill border px-3 text-[11px] font-bold ${item.variant.chip}`}
         >
           <span className={`size-2 rounded-full ${item.variant.dot}`} />
           {item.label}

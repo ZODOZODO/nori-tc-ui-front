@@ -446,7 +446,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
         }
       >
         <div className="rounded-xl border border-border">
-          <Table className="min-w-[640px]">
+          <Table className="min-w-160">
             <TableHeader>
               <TableRow className="bg-muted">
                 <TableHead>DCOP Item Name</TableHead>

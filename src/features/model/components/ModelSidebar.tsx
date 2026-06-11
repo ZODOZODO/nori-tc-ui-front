@@ -303,7 +303,7 @@ export const ModelSidebar = memo(function ModelSidebar({
         className="flex flex-col self-stretch border-r border-border bg-card"
         style={{ width: `${sidebarWidth}px` }}
       >
-        <div className="flex h-[52px] items-center justify-center border-b border-border">
+        <div className="flex h-13 items-center justify-center border-b border-border">
           <button
             type="button"
             onClick={onToggleSidebar}
@@ -327,7 +327,7 @@ export const ModelSidebar = memo(function ModelSidebar({
     >
       <div className="flex min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-[52px] items-center justify-between border-b border-border px-3">
+          <div className="flex h-13 items-center justify-between border-b border-border px-3">
             <span className="truncate text-sm font-semibold text-foreground">{t('model.sidebar.title')}</span>
             <button
               type="button"

@@ -163,14 +163,14 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 px-4">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-profile-modal-title"
-        className="w-full max-w-[640px] rounded-[24px] border border-border bg-card p-[26px] text-foreground shadow-soft-lg"
+        className="w-full max-w-160 rounded-3xl border border-border bg-card p-6.5 text-foreground shadow-soft-lg"
       >
-        <div className="flex flex-col gap-[18px]">
+        <div className="flex flex-col gap-4.5">
           <header className="flex items-start gap-3">
             <div className="flex size-11 items-center justify-center rounded-full bg-brand-primary/10">
               <UserRound className="size-5 text-brand-primary" />
@@ -199,7 +199,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                     id="profile-company"
                     value={resolvedFormState.company}
                     onChange={(event) => handleFieldChange('company', event.target.value)}
-                    className="h-[46px] rounded-xl"
+                    className="h-11.5 rounded-xl"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -210,7 +210,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                     id="profile-user-name"
                     value={resolvedFormState.userName}
                     onChange={(event) => handleFieldChange('userName', event.target.value)}
-                    className="h-[46px] rounded-xl"
+                    className="h-11.5 rounded-xl"
                   />
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                   id="profile-user-id"
                   value={resolvedFormState.userId}
                   readOnly
-                  className="h-[46px] rounded-xl bg-muted text-muted-foreground"
+                  className="h-11.5 rounded-xl bg-muted text-muted-foreground"
                 />
                 <p className="text-[10px] text-muted-foreground">{t('profile.userIdReadonly')}</p>
               </div>
@@ -240,12 +240,12 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                     onChange={(event) => setNewPassword(event.target.value)}
                     disabled={!showPasswordEditor}
                     placeholder={showPasswordEditor ? t('profile.pwPlaceholder') : '••••••••'}
-                    className="h-[46px] rounded-xl"
+                    className="h-11.5 rounded-xl"
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-[46px] rounded-[19px] px-4 text-xs font-semibold"
+                    className="h-11.5 rounded-[19px] px-4 text-xs font-semibold"
                     onClick={() => {
                       if (showPasswordEditor) {
                         void handleResetPassword()
@@ -273,7 +273,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
                   type="email"
                   value={resolvedFormState.email}
                   onChange={(event) => handleFieldChange('email', event.target.value)}
-                  className="h-[46px] rounded-xl"
+                  className="h-11.5 rounded-xl"
                 />
               </div>
 

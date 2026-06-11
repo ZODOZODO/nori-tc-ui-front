@@ -45,7 +45,7 @@ function ConfirmDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="confirm-dialog-content"
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border bg-popover p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-120 -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border bg-popover p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out',
           className,
         )}
         {...props}

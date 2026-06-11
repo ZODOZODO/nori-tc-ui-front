@@ -278,7 +278,7 @@ function ActionDataIndexEditorModalBody({
 
                     <div className="space-y-2.5">
                       <label className="text-xs font-semibold text-foreground">{t('model.actionEditor.xmlPreviewLabel')}</label>
-                      <div className="min-h-[124px] max-h-[180px] overflow-auto rounded-xl border border-border bg-card px-3 py-2.5">
+                      <div className="min-h-31 max-h-45 overflow-auto rounded-xl border border-border bg-card px-3 py-2.5">
                         {selectedMdfMessage?.xmlSnippet ? (
                           <pre className="whitespace-pre-wrap break-all font-mono text-xs text-foreground">
                             {selectedMdfMessage.xmlSnippet}
@@ -326,12 +326,12 @@ function ActionDataIndexEditorModalBody({
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-muted">
                         <TableRow className="bg-muted">
-                          <TableHead className="w-[112px]">{t('model.actionEditor.colOrder')}</TableHead>
+                          <TableHead className="w-28">{t('model.actionEditor.colOrder')}</TableHead>
                           <TableHead>Field</TableHead>
                           <TableHead>from</TableHead>
                           <TableHead>path</TableHead>
                           <TableHead>transforms</TableHead>
-                          <TableHead className="w-[72px]">{t('common.table.action')}</TableHead>
+                          <TableHead className="w-18">{t('common.table.action')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

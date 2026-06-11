@@ -171,7 +171,7 @@ export function DcopItemPickerModal({
         }
       }}
     >
-      <DialogContent className="max-w-[960px]">
+      <DialogContent className="max-w-240">
         <DialogHeader>
           <DialogTitle>{t('model.dcop.title')}</DialogTitle>
           <DialogDescription>
@@ -181,7 +181,7 @@ export function DcopItemPickerModal({
 
         <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.2fr)_88px_minmax(0,1.45fr)]">
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
+            className="flex h-105 min-h-105 flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-left"
           >
             <div className="flex items-center justify-between gap-3">
@@ -262,7 +262,7 @@ export function DcopItemPickerModal({
             </div>
           </section>
 
-          <div className="flex h-[420px] items-center justify-center">
+          <div className="flex h-105 items-center justify-center">
             <Button
               type="button"
               onClick={handleClickMove}
@@ -276,7 +276,7 @@ export function DcopItemPickerModal({
           </div>
 
           <section
-            className="flex h-[420px] min-h-[420px] flex-col rounded-[18px] border border-border bg-card p-4"
+            className="flex h-105 min-h-105 flex-col rounded-[18px] border border-border bg-card p-4"
             data-testid="dcop-picker-right"
           >
             <div className="flex items-center justify-between gap-3">
@@ -304,12 +304,12 @@ export function DcopItemPickerModal({
 
             <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-border">
               <div className="h-full overflow-auto">
-                <Table className="min-w-[360px]">
+                <Table className="min-w-90">
                   <TableHeader>
                     <TableRow className="bg-muted hover:bg-muted">
                       <TableHead>DCOP Item Name</TableHead>
                       <TableHead>Variable Id</TableHead>
-                      <TableHead className="w-[70px] text-center">{t('common.delete')}</TableHead>
+                      <TableHead className="w-17.5 text-center">{t('common.delete')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

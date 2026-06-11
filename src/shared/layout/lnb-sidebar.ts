@@ -21,7 +21,7 @@ export const lnbGroupClass = (selected: boolean) =>
     'flex w-full items-center gap-2.5 rounded-lg py-2.5 text-left text-[13px] font-bold transition-colors',
     LNB_FOCUS_RING,
     selected
-      ? 'border-l-2 border-brand-primary bg-muted pl-[10px] pr-3 text-foreground'
+      ? 'border-l-2 border-brand-primary bg-muted pl-2.5 pr-3 text-foreground'
       : 'px-3 text-foreground hover:bg-muted hover:text-foreground',
   )
 
@@ -31,7 +31,7 @@ export const lnbSubLinkClass = (selected: boolean) =>
     'block w-full rounded-md py-1.5 pr-3 text-left text-xs font-medium transition-colors',
     LNB_FOCUS_RING,
     selected
-      ? 'border-l-2 border-brand-primary bg-muted pl-[30px] font-semibold text-foreground'
+      ? 'border-l-2 border-brand-primary bg-muted pl-7.5 font-semibold text-foreground'
       : 'pl-8 text-muted-foreground hover:bg-muted hover:text-foreground',
   )
 
@@ -41,7 +41,7 @@ export const lnbLeafClass = (selected: boolean) =>
     'flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left text-xs transition-colors',
     LNB_FOCUS_RING,
     selected
-      ? 'border-l-2 border-brand-primary bg-muted pl-[42px] font-semibold text-foreground'
+      ? 'border-l-2 border-brand-primary bg-muted pl-10.5 font-semibold text-foreground'
       : 'pl-11 text-muted-foreground hover:bg-muted hover:text-foreground',
   )
 
@@ -58,6 +58,6 @@ export const lnbFlatNavClass = (selected: boolean) =>
   cn(
     'h-9 justify-start rounded-md text-sm font-medium transition-colors',
     selected
-      ? 'border-l-2 border-brand-primary bg-muted pl-[14px] font-semibold text-foreground hover:bg-muted hover:text-foreground'
+      ? 'border-l-2 border-brand-primary bg-muted pl-3.5 font-semibold text-foreground hover:bg-muted hover:text-foreground'
       : 'pl-4 text-muted-foreground hover:bg-muted hover:text-foreground',
   )

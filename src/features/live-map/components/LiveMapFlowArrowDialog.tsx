@@ -102,7 +102,7 @@ export function LiveMapFlowArrowDialog({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent className="max-w-[420px]">
+      <DialogContent className="max-w-105">
         <DialogHeader>
           <DialogTitle>
             {arrow ? t('livemap.flow.editArrow') : t('livemap.flow.addArrow')}

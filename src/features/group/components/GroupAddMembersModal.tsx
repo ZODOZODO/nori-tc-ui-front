@@ -163,7 +163,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : null)}>
-      <DialogContent className="max-w-[640px]">
+      <DialogContent className="max-w-160">
         <DialogHeader>
           <DialogTitle>{t('group.members.title')}</DialogTitle>
           <DialogDescription>
@@ -183,7 +183,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
           />
 
           <div
-            className="flex max-h-[320px] flex-col gap-1 overflow-y-auto rounded-md border border-border p-2"
+            className="flex max-h-80 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2"
             data-testid="group-add-members-list"
           >
             {isLoading ? (

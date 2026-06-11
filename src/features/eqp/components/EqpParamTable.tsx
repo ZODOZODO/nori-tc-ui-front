@@ -65,7 +65,7 @@ export const EqpParamTable = memo(function EqpParamTable({
               placeholder="Param Name"
             />
           ) : (
-            <span className="min-w-[240px]">{row.paramName}</span>
+            <span className="min-w-60">{row.paramName}</span>
           ),
       },
       {
@@ -97,7 +97,7 @@ export const EqpParamTable = memo(function EqpParamTable({
               placeholder={t('eqp.param.colDesc')}
             />
           ) : (
-            <span className="min-w-[280px]">{row.description || '—'}</span>
+            <span className="min-w-70">{row.description || '—'}</span>
           ),
       },
     ],
@@ -152,13 +152,13 @@ export const EqpParamTable = memo(function EqpParamTable({
 
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading ? (
-          <Table className="min-w-[960px]">
+          <Table className="min-w-240">
             <TableHeader>
               <TableRow className="bg-muted">
                 <TableHead>Param Name</TableHead>
                 <TableHead>Param Value</TableHead>
                 <TableHead>{t('eqp.param.colDesc')}</TableHead>
-                {isEditMode ? <TableHead className="w-[92px]">{t('eqp.param.action')}</TableHead> : null}
+                {isEditMode ? <TableHead className="w-23">{t('eqp.param.action')}</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -185,7 +185,7 @@ export const EqpParamTable = memo(function EqpParamTable({
             rows={rows}
             rowKey={(row) => row.rowId ?? row.paramName}
             actionColumn={actionColumn}
-            tableClassName="min-w-[960px]"
+            tableClassName="min-w-240"
           />
         )}
       </div>

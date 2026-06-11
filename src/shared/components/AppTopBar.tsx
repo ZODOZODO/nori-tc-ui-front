@@ -29,7 +29,7 @@ interface AppTopBarProps {
 }
 
 const LOGIN_ROUTE = '/login'
-export const APP_TOP_BAR_OFFSET_CLASS = 'pt-[53px]'
+export const APP_TOP_BAR_OFFSET_CLASS = 'pt-13.25'
 
 /**
  * 메뉴 hover 시 해당 페이지가 첫 mount 에서 자동 호출하는 query 를 미리 fetch.
@@ -141,7 +141,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 grid h-[53px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
+    <header className="fixed inset-x-0 top-0 z-40 grid h-13.25 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
       <div className="flex items-center">
         <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-10 w-auto" />
       </div>
@@ -162,16 +162,16 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
                 onFocus={
                   isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
                 }
-                className={`group relative inline-flex h-[38px] items-center px-2 text-[15px] font-medium tracking-[0.01em] transition-colors ${
+                className={`group relative inline-flex h-9.5 items-center px-2 text-[15px] font-medium -tracking-tight transition-colors ${
                   isCurrentMenu ? 'text-foreground' : 'text-muted-foreground hover:text-accent-foreground'
                 }`}
               >
                 <span>{menuItem.label}</span>
                 <span
-                  className={`pointer-events-none absolute -bottom-px left-0 right-0 h-[2px] rounded-full transition-opacity ${
+                  className={`pointer-events-none absolute -bottom-px left-0 right-0 h-0.5 rounded-full transition-opacity ${
                     isCurrentMenu
-                      ? 'bg-[var(--color-brand-accent)] opacity-100'
-                      : 'bg-[var(--color-brand-accent)] opacity-0 group-hover:opacity-35'
+                      ? 'bg-(--color-brand-accent) opacity-100'
+                      : 'bg-(--color-brand-accent) opacity-0 group-hover:opacity-35'
                   }`}
                 />
               </button>
@@ -188,7 +188,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
         <Button
           type="button"
           variant="outline"
-          className="h-[38px] rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
+          className="h-9.5 rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
           onClick={() => void handleLogout()}
           disabled={isLogoutPending}
           aria-label={t('topbar.logout')}
@@ -204,12 +204,12 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
         <Button
           type="button"
           variant="ghost"
-          className="size-[38px] rounded-full border border-border text-muted-foreground"
+          className="size-9.5 rounded-full border border-border text-muted-foreground"
           onClick={onOpenProfile}
           aria-label={t('topbar.openProfile')}
           disabled={isLogoutPending}
         >
-          <CircleUserRound className="size-[18px]" />
+          <CircleUserRound className="size-4.5" />
         </Button>
       </div>
     </header>

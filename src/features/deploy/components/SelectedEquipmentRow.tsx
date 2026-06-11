@@ -76,7 +76,7 @@ export function SelectedEquipmentRow({
             }
           }}
         >
-          <SelectTrigger className="h-9 min-w-[160px]">
+          <SelectTrigger className="h-9 min-w-40">
             <SelectValue placeholder={t('deploy.register.paramVersionPlaceholder')} />
           </SelectTrigger>
           <SelectContent>

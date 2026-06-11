@@ -234,7 +234,7 @@ export function ModelCheckInDiffModal({
         onOpenChange(nextOpen)
       }}
     >
-      <DialogContent className="z-[60] max-w-4xl rounded-2xl">
+      <DialogContent className="z-60 max-w-4xl rounded-2xl">
         <DialogHeader>
           <DialogTitle>{t('model.checkin.diffTitle')}</DialogTitle>
           <DialogDescription>

@@ -50,7 +50,7 @@ export function LiveMapFlowGroupDialog({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent className="max-w-[420px]">
+      <DialogContent className="max-w-105">
         <DialogHeader>
           <DialogTitle>{t('livemap.flow.editGroup')}</DialogTitle>
         </DialogHeader>

@@ -91,7 +91,7 @@ function ModelCheckInModalBody({
   }
 
   return (
-    <DialogContent className="z-[60] max-w-[500px] rounded-2xl" showCloseButton={!isPending}>
+    <DialogContent className="z-60 max-w-125 rounded-2xl" showCloseButton={!isPending}>
       <DialogHeader>
         <DialogTitle>Save your changes?</DialogTitle>
         <DialogDescription>Save changes and return to Check Out mode?</DialogDescription>

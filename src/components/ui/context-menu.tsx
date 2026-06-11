@@ -59,7 +59,7 @@ function ContextMenuSubContent({
     <ContextMenuPrimitive.SubContent
       data-slot="context-menu-sub-content"
       className={cn(
-        'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
+        'z-50 min-w-40 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
         className,
       )}
       {...props}
@@ -76,7 +76,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
+          'z-50 min-w-40 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
           className,
         )}
         {...props}
@@ -99,7 +99,7 @@ function ContextMenuItem({
       data-slot="context-menu-item"
       data-variant={variant}
       className={cn(
-        'relative flex cursor-default items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'relative flex cursor-default items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50',
         inset && 'pl-8',
         variant === 'destructive'
           ? 'text-destructive focus:bg-destructive/10 focus:text-destructive'
@@ -121,7 +121,7 @@ function ContextMenuCheckboxItem({
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
       className={cn(
-        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-brand-accent',
+        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 focus:bg-accent focus:text-brand-accent',
         className,
       )}
       checked={checked}
@@ -146,7 +146,7 @@ function ContextMenuRadioItem({
     <ContextMenuPrimitive.RadioItem
       data-slot="context-menu-radio-item"
       className={cn(
-        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-brand-accent',
+        'relative flex cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 focus:bg-accent focus:text-brand-accent',
         className,
       )}
       {...props}

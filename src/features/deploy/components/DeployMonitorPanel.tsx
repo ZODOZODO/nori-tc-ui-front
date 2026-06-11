@@ -930,7 +930,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         }}
       >
         {commentHistoryItem ? (
-          <DialogContent className="max-h-[85vh] max-w-[920px] overflow-hidden rounded-2xl p-0">
+          <DialogContent className="max-h-[85vh] max-w-230 overflow-hidden rounded-2xl p-0">
             <div className="flex max-h-[85vh] flex-col">
               <DialogHeader className="border-b border-border px-6 py-5">
                 <DialogTitle className="flex flex-wrap items-center gap-2 text-foreground">
@@ -985,7 +985,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                             <TableRow key={target.deployTargetKey}>
                               <TableCell className="font-medium text-foreground">{target.eqpId}</TableCell>
                               <TableCell>
-                                <div className="min-w-[180px]">
+                                <div className="min-w-45">
                                   <p className="font-medium text-foreground">{t(commentTaskTypeLabelKey)}</p>
                                   <p className="text-xs text-muted-foreground">
                                     {commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}
@@ -1010,7 +1010,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                                   '-'
                                 )}
                               </TableCell>
-                              <TableCell className="max-w-[280px] whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                              <TableCell className="max-w-70 whitespace-pre-wrap break-words text-xs text-muted-foreground">
                                 {target.lastErrorMessage || target.lastErrorCode || '-'}
                               </TableCell>
                               <TableCell className="text-right text-xs text-muted-foreground">

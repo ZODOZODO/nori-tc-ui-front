@@ -80,7 +80,7 @@ export function EqpPollingGroupControl({
           onChange={(event) => setGroupMessageName(event.target.value)}
           disabled={isPending}
           placeholder={t('eqp.pollingGroup.inputPlaceholder')}
-          className="h-10 w-full max-w-[280px]"
+          className="h-10 w-full max-w-70"
           data-testid="eqp-polling-group-input"
         />
         <Button

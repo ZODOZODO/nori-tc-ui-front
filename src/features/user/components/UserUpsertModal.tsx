@@ -183,7 +183,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : null)}>
-      <DialogContent className="max-w-[560px]">
+      <DialogContent className="max-w-140">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? t('user.create') : t('user.upsert.titleEdit')}</DialogTitle>
           <DialogDescription>

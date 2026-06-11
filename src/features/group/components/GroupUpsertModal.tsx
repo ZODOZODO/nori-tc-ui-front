@@ -128,7 +128,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : null)}>
-      <DialogContent className="max-w-[520px]">
+      <DialogContent className="max-w-130">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? t('group.create') : t('group.upsert.titleEdit')}</DialogTitle>
           <DialogDescription>

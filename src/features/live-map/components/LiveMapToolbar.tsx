@@ -41,12 +41,12 @@ export function LiveMapToolbar({
           value={searchKeyword}
           onChange={(event) => onSearchKeywordChange(event.target.value)}
           placeholder={t('livemap.search.placeholder')}
-          className="h-[42px] rounded-[14px] pl-11 text-sm"
+          className="h-10.5 rounded-[14px] pl-11 text-sm"
         />
       </div>
 
       <Select value={selectedLine} onValueChange={onSelectedLineChange}>
-        <SelectTrigger className="h-[38px] w-full rounded-[14px] px-3 text-sm lg:w-[150px]">
+        <SelectTrigger className="h-9.5 w-full rounded-[14px] px-3 text-sm lg:w-37.5">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -59,7 +59,7 @@ export function LiveMapToolbar({
       </Select>
 
       <Select value={selectedStatus} onValueChange={(value) => onSelectedStatusChange(value as LiveMapStatusFilter)}>
-        <SelectTrigger className="h-[38px] w-full rounded-[14px] px-3 text-sm lg:w-[150px]">
+        <SelectTrigger className="h-9.5 w-full rounded-[14px] px-3 text-sm lg:w-37.5">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

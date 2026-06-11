@@ -55,7 +55,7 @@ export function EqpLifecycleActionDialog({
         }
       }}
     >
-      <DialogContent className="max-w-[480px]" showCloseButton={!isPending}>
+      <DialogContent className="max-w-120" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle>{ACTION_LABELS[action]}</DialogTitle>
           <DialogDescription>

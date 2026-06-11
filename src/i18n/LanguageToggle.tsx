@@ -37,7 +37,7 @@ export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
       <Button
         type="button"
         variant="outline"
-        className="h-[38px] gap-1.5 rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
+        className="h-9.5 gap-1.5 rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -51,7 +51,7 @@ export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
       {isOpen ? (
         <ul
           role="listbox"
-          className={`absolute right-0 z-[var(--z-dropdown)] min-w-[148px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-lg ${
+          className={`absolute right-0 z-(--z-dropdown) min-w-37 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-lg ${
             placement === 'up' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]'
           }`}
         >

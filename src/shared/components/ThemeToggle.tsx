@@ -17,11 +17,11 @@ export function ThemeToggle() {
     <Button
       type="button"
       variant="ghost"
-      className="size-[38px] rounded-full border border-border text-muted-foreground"
+      className="size-9.5 rounded-full border border-border text-muted-foreground"
       onClick={toggleTheme}
       aria-label={isDark ? t('theme.toLight') : t('theme.toDark')}
     >
-      {isDark ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
+      {isDark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
     </Button>
   )
 }

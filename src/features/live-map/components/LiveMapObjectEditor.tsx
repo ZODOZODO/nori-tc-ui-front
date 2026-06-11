@@ -175,7 +175,7 @@ export function LiveMapObjectEditor() {
   return (
     <section
       data-testid="live-map-object-editor"
-      className="flex h-[calc(100dvh-16rem)] min-h-[440px] gap-3 overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-soft-lg"
+      className="flex h-[calc(100dvh-16rem)] min-h-110 gap-3 overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-soft-lg"
     >
       {/* 객체 리스트 */}
       <div data-testid="object-editor-list" className="flex w-56 min-h-0 shrink-0 flex-col gap-1.5">
@@ -258,7 +258,7 @@ export function LiveMapObjectEditor() {
             {t('livemap.builder.fieldKind')}
             <span
               data-testid="object-editor-kind"
-              className="inline-flex h-[34px] items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-bold text-muted-foreground"
+              className="inline-flex h-8.5 items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-bold text-muted-foreground"
             >
               STRUCTURE
             </span>
@@ -324,7 +324,7 @@ export function LiveMapObjectEditor() {
       {/* 3D 미리보기 */}
       <div
         data-testid="object-editor-preview"
-        className="h-full w-[320px] shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
+        className="h-full w-80 shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
       >
         <Canvas frameloop="demand" shadows orthographic camera={{ position: [7, 7, 7], zoom: 42, near: -100, far: 100 }}>
           <color attach="background" args={['#0e1422']} />

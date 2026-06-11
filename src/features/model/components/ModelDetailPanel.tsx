@@ -819,7 +819,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         ) : null}
 
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
-          <aside className="flex w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-muted p-2">
+          <aside className="flex w-65 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-muted p-2">
             <ModelFlowSidebar
               summaries={messageFlowSummaries}
               selectedFlowId={selectedFlowId}

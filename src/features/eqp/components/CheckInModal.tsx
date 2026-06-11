@@ -71,7 +71,7 @@ export function CheckInModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="z-[60] max-w-4xl rounded-2xl" showCloseButton={!isPending}>
+      <DialogContent className="z-60 max-w-4xl rounded-2xl" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle>Check In</DialogTitle>
           <DialogDescription>
@@ -92,7 +92,7 @@ export function CheckInModal({
 
             {isDiffLoading ? (
               <div className="overflow-x-auto">
-                <Table className="min-w-[760px]">
+                <Table className="min-w-190">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead className="w-24">{t('eqp.checkin.diffKind')}</TableHead>
@@ -125,7 +125,7 @@ export function CheckInModal({
                 rows={diffRows}
                 rowKey={(row) => `${row.status}-${row.paramName}`}
                 features={{ rangeCopy: true }}
-                tableClassName="min-w-[760px]"
+                tableClassName="min-w-190"
                 wrapRow={renderDiffRow}
               />
             )}

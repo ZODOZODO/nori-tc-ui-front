@@ -59,7 +59,7 @@ export function EqpLifecycleResultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[480px]">
+      <DialogContent className="max-w-120">
         <DialogHeader>
           <div className="flex items-center gap-2">
             {isSuccess ? (

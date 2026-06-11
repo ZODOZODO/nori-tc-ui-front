@@ -128,7 +128,7 @@ export function BranchModelCreateModal({
         }
       }}
     >
-      <DialogContent className="max-w-[560px]">
+      <DialogContent className="max-w-140">
         <DialogHeader>
           <DialogTitle>Branch Model Create</DialogTitle>
           <DialogDescription>

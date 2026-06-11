@@ -41,7 +41,7 @@ export function EqpDeleteConfirmDialog({
         }
       }}
     >
-      <DialogContent className="max-w-[480px]" showCloseButton={!isPending}>
+      <DialogContent className="max-w-120" showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle>Eqp Delete</DialogTitle>
           <DialogDescription>

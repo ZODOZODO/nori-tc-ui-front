@@ -63,15 +63,15 @@ function ClickableLogRow({
       onClick={() => onSelect(entry)}
       className="flex w-full cursor-pointer gap-3 border-b border-border px-4 py-2 text-left text-[12px] transition hover:bg-muted focus:bg-muted focus:outline-none"
     >
-      <span className="w-[96px] shrink-0 font-mono text-muted-foreground">
+      <span className="w-24 shrink-0 font-mono text-muted-foreground">
         {formatTime(entry.timestampMs)}
       </span>
-      <span className={['w-[44px] shrink-0 font-bold', directionTextClass(isRecv)].join(' ')}>
+      <span className={['w-11 shrink-0 font-bold', directionTextClass(isRecv)].join(' ')}>
         {entry.direction}
       </span>
-      <span className="w-[48px] shrink-0 font-semibold text-muted-foreground">{entry.source}</span>
+      <span className="w-12 shrink-0 font-semibold text-muted-foreground">{entry.source}</span>
       <span
-        className="w-[220px] shrink-0 truncate font-semibold text-foreground"
+        className="w-55 shrink-0 truncate font-semibold text-foreground"
         title={entry.messageName ?? undefined}
       >
         {entry.messageName ?? '-'}
@@ -144,7 +144,7 @@ function CommLogDetailModal({
   const isRecv = entry?.direction === 'RECV'
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="flex max-h-[85vh] max-w-[960px] flex-col gap-0 overflow-hidden bg-card p-0 text-foreground">
+      <DialogContent className="flex max-h-[85vh] max-w-240 flex-col gap-0 overflow-hidden bg-card p-0 text-foreground">
         {entry ? (
           <>
             <DialogHeader className="border-b border-border px-5 py-4">
@@ -221,7 +221,7 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
 
       <div className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto rounded-[12px] border border-border bg-muted/40 p-1.5">
         {recentLogs.length === 0 ? (
-          <div className="flex h-full min-h-[80px] items-center justify-center text-[10px] text-muted-foreground">
+          <div className="flex h-full min-h-20 items-center justify-center text-[10px] text-muted-foreground">
             {t('livemap.commlog.empty')}
           </div>
         ) : (
@@ -236,7 +236,7 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted focus:bg-muted focus:outline-none"
                   >
                     <span className={`size-1.5 shrink-0 rounded-full ${directionDotClass(isRecv)}`} />
-                    <span className="w-[40px] shrink-0 font-mono text-[10px] text-muted-foreground">
+                    <span className="w-10 shrink-0 font-mono text-[10px] text-muted-foreground">
                       {formatClock(entry.timestampMs)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">

@@ -209,7 +209,7 @@ function DiffTable({ title, mode, columns, items, hiddenColumns = [] }: DiffTabl
           rows={tableRows}
           rowKey={(_row, rowIndex) => `${title}-${rowIndex}`}
           features={{ rangeCopy: true }}
-          tableClassName="min-w-[720px]"
+          tableClassName="min-w-180"
           wrapRow={(_row, rowIdx, children) => (
             <TableRow
               data-testid={`parent-commit-diff-row-${mode}-${rowIdx}`}
@@ -320,7 +320,7 @@ export function ParentModelCommitModal({
                 </p>
               </div>
 
-              <div className="max-w-[320px]">
+              <div className="max-w-80">
                 <Input
                   value={newParentVersion}
                   onChange={(event) => setNewParentVersion(event.target.value)}

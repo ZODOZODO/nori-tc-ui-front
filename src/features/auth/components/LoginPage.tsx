@@ -43,7 +43,7 @@ function RecoveryModal({ type, onClose }: RecoveryModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${type}-title`}
-        className="w-full max-w-[440px] rounded-2xl border border-border bg-card p-7 shadow-soft-lg"
+        className="w-full max-w-110 rounded-2xl border border-border bg-card p-7 shadow-soft-lg"
       >
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
@@ -162,7 +162,7 @@ export function LoginPage() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,color-mix(in_oklch,var(--color-brand-primary)7%,transparent),transparent_45%),radial-gradient(circle_at_85%_85%,color-mix(in_oklch,var(--color-brand-primary)4%,transparent),transparent_45%)]"
       />
 
-      <section className="relative w-full max-w-[500px] rounded-[20px] border border-border bg-card px-12 pb-12 pt-14 shadow-soft-lg">
+      <section className="relative w-full max-w-125 rounded-[20px] border border-border bg-card px-12 pb-12 pt-14 shadow-soft-lg">
         <div className="mb-8">
           <BrandMark />
         </div>
@@ -178,7 +178,7 @@ export function LoginPage() {
             </label>
             <div className="relative">
               <User
-                className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground/70"
+                className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground/70"
                 aria-hidden="true"
               />
               <input
@@ -187,7 +187,7 @@ export function LoginPage() {
                 autoComplete="username"
                 placeholder={t('login.idPlaceholder')}
                 aria-invalid={Boolean(errors.userId)}
-                className="h-[52px] w-full rounded-[10px] border border-border bg-card pl-11 pr-3.5 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/60 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-primary/15 aria-[invalid=true]:border-danger"
+                className="h-13 w-full rounded-[10px] border border-border bg-card pl-11 pr-3.5 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/60 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-primary/15 aria-invalid:border-danger"
                 {...userIdField}
               />
             </div>
@@ -204,7 +204,7 @@ export function LoginPage() {
             </label>
             <div className="relative">
               <Lock
-                className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground/70"
+                className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground/70"
                 aria-hidden="true"
               />
               <input
@@ -213,16 +213,16 @@ export function LoginPage() {
                 autoComplete="current-password"
                 placeholder={t('login.pwPlaceholder')}
                 aria-invalid={Boolean(errors.password)}
-                className="h-[52px] w-full rounded-[10px] border border-border bg-card pl-11 pr-12 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/60 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-primary/15 aria-[invalid=true]:border-danger"
+                className="h-13 w-full rounded-[10px] border border-border bg-card pl-11 pr-12 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/60 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-primary/15 aria-invalid:border-danger"
                 {...passwordField}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? t('login.pwHide') : t('login.pwShow')}
-                className="absolute right-2 top-1/2 flex size-[30px] -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="absolute right-2 top-1/2 flex size-7.5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+                {showPassword ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
               </button>
             </div>
             {errors.password && (
@@ -262,12 +262,12 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
+            className="flex h-13 w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isPending ? (
-              <Loader2 className="size-[18px] animate-spin" aria-hidden="true" />
+              <Loader2 className="size-4.5 animate-spin" aria-hidden="true" />
             ) : (
-              <LogIn className="size-[18px]" aria-hidden="true" />
+              <LogIn className="size-4.5" aria-hidden="true" />
             )}
             <span>{t('login.submit')}</span>
           </button>

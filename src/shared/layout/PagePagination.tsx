@@ -142,7 +142,7 @@ export function PagePagination({
         value={String(pageSize)}
         onValueChange={(value) => onPageSizeChange(Number(value))}
       >
-        <SelectTrigger className="h-8 w-[5.5rem]" aria-label="page size">
+        <SelectTrigger className="h-8 w-22" aria-label="page size">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

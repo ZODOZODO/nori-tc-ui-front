@@ -120,7 +120,7 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
         <div className="min-h-0 flex-1 overflow-auto">
           {isLoading ? (
-            <Table className="min-w-[980px]">
+            <Table className="min-w-245">
               <TableHeader>
                 <TableRow className="bg-muted">
                   <TableHead>Model Name</TableHead>
@@ -153,7 +153,7 @@ export const BusinessGroupModelTable = memo(function BusinessGroupModelTable({
               columns={BUSINESS_GROUP_MODEL_COLUMNS}
               rows={pagedModels}
               rowKey={(row) => row.modelVersionKey}
-              tableClassName="min-w-[980px]"
+              tableClassName="min-w-245"
             />
           )}
         </div>
