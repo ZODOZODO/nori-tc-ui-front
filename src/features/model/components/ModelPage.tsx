@@ -16,6 +16,8 @@ import { useModelMutations } from '../hooks/useModelMutations'
 import { useModelUiStore } from '../stores/model-ui.store'
 import {
   ModelApiError,
+  PLC_DETAIL_NODES,
+  PLC_PLACEHOLDER_DETAIL_NODES,
   SECS_DETAIL_NODES,
   SOCKET_DETAIL_NODES,
   type ModelDetailNode,
@@ -132,7 +134,13 @@ const computeNodeDiff = (
  */
 const resolveDetailNodesByInterface = (commInterface: ProtocolType): ModelDetailNode[] => {
   const normalizedInterface = commInterface.toUpperCase()
-  return normalizedInterface === 'SOCKET' ? SOCKET_DETAIL_NODES : SECS_DETAIL_NODES
+  if (normalizedInterface === 'SOCKET') {
+    return SOCKET_DETAIL_NODES
+  }
+  if (normalizedInterface === 'PLC') {
+    return PLC_DETAIL_NODES
+  }
+  return SECS_DETAIL_NODES
 }
 
 /**
@@ -374,7 +382,14 @@ export function ModelPage() {
     return modelItems.find((item) => item.modelVersionKey === activeTab) ?? null
   }, [activeTab, modelItems])
 
-  const detailNodeQuery = useModelNodeDetail(activeTabModel?.modelVersionKey ?? null, detailNode)
+  // PLC group/register 노드는 조회 백엔드가 없으므로(별 SPEC) 내용 fetch 를 막아 dead 요청을 방지한다.
+  // 좌측 트리에 라벨만 렌더하고, 선택 시 패널은 빈 상태로 표시한다.
+  const isPlcPlaceholderNode =
+    detailNode !== null && PLC_PLACEHOLDER_DETAIL_NODES.has(detailNode)
+  const detailNodeQuery = useModelNodeDetail(
+    activeTabModel?.modelVersionKey ?? null,
+    isPlcPlaceholderNode ? null : detailNode,
+  )
   const flowMdfQuery = useModelNodeDetail(
     activeTabModel?.modelVersionKey ?? null,
     activeTabModel && detailNode !== 'mdf' ? 'mdf' : null,

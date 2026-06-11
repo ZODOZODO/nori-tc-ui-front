@@ -177,6 +177,19 @@ export interface EqpSocketSettings {
 }
 
 /**
+ * EQP 관리 화면 PLC 전용 설정 요청/응답 공통 모델입니다.
+ * 백엔드 UiEqpPlc(plcProtocol/transport/unitId/pollTimeoutMs/reconnectMaxRetries) 미러입니다.
+ * plcProtocol/transport 는 socketProtocolType 선례처럼 String 으로 운반합니다(PoC=MODBUS_TCP/TCP).
+ */
+export interface EqpPlcSettings {
+  plcProtocol: string | null
+  transport: string | null
+  unitId: number | null
+  pollTimeoutMs: number | null
+  reconnectMaxRetries: number | null
+}
+
+/**
  * EQP 관리 화면 jar 바인딩 응답 모델입니다.
  */
 export interface EqpJarBinding {
@@ -247,6 +260,7 @@ export interface EqpManageDetail {
   modelBinding: EqpModelBinding | null
   hsmsSettings: EqpHsmsSettings | null
   socketSettings: EqpSocketSettings | null
+  plcSettings: EqpPlcSettings | null
   appliedParamVersion: string | null
   appliedParamDescription: string | null
   paramVersions: EqpParamVersionOption[]
@@ -322,6 +336,7 @@ export interface EqpCreateRequest {
   logSettings?: EqpLogSettings | null
   hsmsSettings?: EqpHsmsSettings | null
   socketSettings?: EqpSocketSettings | null
+  plcSettings?: EqpPlcSettings | null
 }
 
 /**
@@ -341,6 +356,7 @@ export interface EqpUpdateRequest {
   logSettings?: EqpLogSettings | null
   hsmsSettings?: EqpHsmsSettings | null
   socketSettings?: EqpSocketSettings | null
+  plcSettings?: EqpPlcSettings | null
 }
 
 /**

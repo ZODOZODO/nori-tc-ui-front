@@ -4,6 +4,7 @@ import type {
   EqpManageDetail,
   EqpManageOptions,
   EqpModelOption,
+  EqpPlcSettings,
   EqpSocketSettings,
   EqpUpdateRequest,
   ModelStatus,
@@ -41,6 +42,15 @@ export const DEFAULT_SOCKET_SETTINGS: EqpSocketSettings = {
   writeTimeout: 0,
   maxFrameSizeBytes: 8192,
   keepAliveEnabled: true,
+}
+
+// PoC 는 Modbus TCP / TCP transport 만 — plcProtocol/transport 는 백엔드 검증 상수와 일치.
+export const DEFAULT_PLC_SETTINGS: EqpPlcSettings = {
+  plcProtocol: 'MODBUS_TCP',
+  transport: 'TCP',
+  unitId: 1,
+  pollTimeoutMs: 3000,
+  reconnectMaxRetries: 3,
 }
 
 const cloneLogSettings = (logSettings: EqpManageDetail['logPolicy']): EqpLogSettings | null =>
@@ -83,6 +93,17 @@ const cloneSocketSettings = (
       }
     : null
 
+const clonePlcSettings = (plcSettings: EqpManageDetail['plcSettings']): EqpPlcSettings | null =>
+  plcSettings
+    ? {
+        plcProtocol: plcSettings.plcProtocol,
+        transport: plcSettings.transport,
+        unitId: plcSettings.unitId,
+        pollTimeoutMs: plcSettings.pollTimeoutMs,
+        reconnectMaxRetries: plcSettings.reconnectMaxRetries,
+      }
+    : null
+
 /**
  * 현재 EQP 상세를 기준으로 update 요청 DTO를 안전하게 조립합니다.
  * 모달별 변경 필드만 override 하고, 나머지는 최신 관리 상세 값을 그대로 유지합니다.
@@ -116,6 +137,8 @@ export const buildEqpUpdateRequest = (
     override.socketSettings !== undefined
       ? override.socketSettings
       : cloneSocketSettings(detail.socketSettings),
+  plcSettings:
+    override.plcSettings !== undefined ? override.plcSettings : clonePlcSettings(detail.plcSettings),
 })
 
 /**

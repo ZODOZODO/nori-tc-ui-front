@@ -264,7 +264,7 @@ export const EqpSidebar = memo(function EqpSidebar({
               </div>
             ) : null}
 
-            {/* Gateway 그룹 (우클릭 ContextMenu = SECS/Socket Eqp Create) */}
+            {/* Gateway 그룹 (우클릭 ContextMenu = SECS/Socket/PLC Eqp Create) */}
             <ContextMenu>
               <div className="mt-2 flex flex-col gap-0.5">
                 <ContextMenuTrigger asChild>
@@ -309,6 +309,7 @@ export const EqpSidebar = memo(function EqpSidebar({
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => onOpenEqpCreate('SECS')}>SECS Eqp Create</ContextMenuItem>
                 <ContextMenuItem onSelect={() => onOpenEqpCreate('SOCKET')}>Socket Eqp Create</ContextMenuItem>
+                <ContextMenuItem onSelect={() => onOpenEqpCreate('PLC')}>PLC Eqp Create</ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
 

@@ -158,14 +158,14 @@ export const summarizeFlowActionDataIndex = (
 /**
  * FlowCard 가 Trigger 섹션 (EventId + TransactionId) 을 렌더할지 결정합니다.
  *
- * SPEC line 80-83: Socket 모델은 Trigger 섹션 자체 미렌더 — EventId / TransactionId
+ * SPEC line 80-83: Socket / PLC 모델은 Trigger 섹션 자체 미렌더 — EventId / TransactionId
  * 가 SECS 전용이기 때문. workflow_filter 는 protocol 무관 모든 Flow 에서 편집
  * 가능하므로 Filter 섹션이 따로 분리되어 항상 렌더 (F8.1 root cause fix).
  *
  * F1 dev-report 권장에 따라 model 의 commInterface 값으로 명시 분기
  * (flow 의 3 필드 null 검사 X).
  */
-export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET'): boolean => {
+export const shouldRenderTriggerSection = (protocol: 'SECS' | 'SOCKET' | 'PLC'): boolean => {
   return protocol === 'SECS'
 }
 

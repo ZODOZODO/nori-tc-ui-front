@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import {
   buildEqpUpdateRequest,
   DEFAULT_EQP_LOG_SETTINGS,
+  DEFAULT_PLC_SETTINGS,
   DEFAULT_SECS_SETTINGS,
   DEFAULT_SOCKET_SETTINGS,
   EQP_COMM_MODE_OPTIONS,
@@ -92,6 +93,11 @@ interface EqpManageFormState {
   writeTimeout: string
   maxFrameSizeBytes: string
   keepAliveEnabled: boolean
+  plcProtocol: string
+  plcTransport: string
+  unitId: string
+  pollTimeoutMs: string
+  reconnectMaxRetries: string
 }
 
 interface SectionProps {
@@ -332,6 +338,11 @@ const createInitialFormState = (
       writeTimeout: toFieldString(DEFAULT_SOCKET_SETTINGS.writeTimeout),
       maxFrameSizeBytes: toFieldString(DEFAULT_SOCKET_SETTINGS.maxFrameSizeBytes),
       keepAliveEnabled: DEFAULT_SOCKET_SETTINGS.keepAliveEnabled ?? false,
+      plcProtocol: DEFAULT_PLC_SETTINGS.plcProtocol ?? '',
+      plcTransport: DEFAULT_PLC_SETTINGS.transport ?? '',
+      unitId: toFieldString(DEFAULT_PLC_SETTINGS.unitId),
+      pollTimeoutMs: toFieldString(DEFAULT_PLC_SETTINGS.pollTimeoutMs),
+      reconnectMaxRetries: toFieldString(DEFAULT_PLC_SETTINGS.reconnectMaxRetries),
     }
   }
 
@@ -367,6 +378,11 @@ const createInitialFormState = (
     writeTimeout: toFieldString(detail?.socketSettings?.writeTimeout),
     maxFrameSizeBytes: toFieldString(detail?.socketSettings?.maxFrameSizeBytes),
     keepAliveEnabled: detail?.socketSettings?.keepAliveEnabled ?? false,
+    plcProtocol: detail?.plcSettings?.plcProtocol ?? DEFAULT_PLC_SETTINGS.plcProtocol ?? '',
+    plcTransport: detail?.plcSettings?.transport ?? DEFAULT_PLC_SETTINGS.transport ?? '',
+    unitId: toFieldString(detail?.plcSettings?.unitId),
+    pollTimeoutMs: toFieldString(detail?.plcSettings?.pollTimeoutMs),
+    reconnectMaxRetries: toFieldString(detail?.plcSettings?.reconnectMaxRetries),
   }
 }
 
@@ -468,7 +484,10 @@ export function EqpManageFormModal({
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
 
   const resolvedInterfaceType = mode === 'create' ? interfaceType : detail?.commInterface ?? interfaceType
-  const isSecsMode = resolvedInterfaceType === 'SECS'
+  const normalizedInterfaceType = resolvedInterfaceType.toUpperCase()
+  const isSecsMode = normalizedInterfaceType === 'SECS'
+  const isSocketMode = normalizedInterfaceType === 'SOCKET'
+  const isPlcMode = normalizedInterfaceType === 'PLC'
   const filteredModelOptions = useMemo(
     () =>
       mode === 'create'
@@ -677,7 +696,7 @@ export function EqpManageFormModal({
                 maxMsgBytes: parseOptionalLong(formState.maxMsgBytes, 'Max Message Bytes', { min: 0 }),
               }
             : null,
-          socketSettings: !isSecsMode
+          socketSettings: isSocketMode
             ? {
                 socketProtocolType: resolveOptionalText(formState.socketProtocolType),
                 charset: resolveOptionalText(formState.charset),
@@ -691,6 +710,19 @@ export function EqpManageFormModal({
                   min: 0,
                 }),
                 keepAliveEnabled: formState.keepAliveEnabled,
+              }
+            : null,
+          plcSettings: isPlcMode
+            ? {
+                plcProtocol: resolveOptionalText(formState.plcProtocol),
+                transport: resolveOptionalText(formState.plcTransport),
+                unitId: parseOptionalInteger(formState.unitId, 'Unit ID', { min: 0 }),
+                pollTimeoutMs: parseOptionalInteger(formState.pollTimeoutMs, 'Poll Timeout', { min: 1 }),
+                reconnectMaxRetries: parseOptionalInteger(
+                  formState.reconnectMaxRetries,
+                  'Reconnect Max Retries',
+                  { min: 1 },
+                ),
               }
             : null,
         }
@@ -748,7 +780,7 @@ export function EqpManageFormModal({
               maxMsgBytes: parseOptionalLong(formState.maxMsgBytes, 'Max Message Bytes', { min: 0 }),
             }
           : null,
-        socketSettings: !isSecsMode
+        socketSettings: isSocketMode
           ? {
               socketProtocolType: resolveOptionalText(formState.socketProtocolType),
               charset: resolveOptionalText(formState.charset),
@@ -762,6 +794,19 @@ export function EqpManageFormModal({
                 min: 0,
               }),
               keepAliveEnabled: formState.keepAliveEnabled,
+            }
+          : null,
+        plcSettings: isPlcMode
+          ? {
+              plcProtocol: resolveOptionalText(formState.plcProtocol),
+              transport: resolveOptionalText(formState.plcTransport),
+              unitId: parseOptionalInteger(formState.unitId, 'Unit ID', { min: 0 }),
+              pollTimeoutMs: parseOptionalInteger(formState.pollTimeoutMs, 'Poll Timeout', { min: 1 }),
+              reconnectMaxRetries: parseOptionalInteger(
+                formState.reconnectMaxRetries,
+                'Reconnect Max Retries',
+                { min: 1 },
+              ),
             }
           : null,
       }, {
@@ -842,7 +887,7 @@ export function EqpManageFormModal({
                         onValueChange={handleSelectChange('commMode')}
                         disabled={isPending}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="eqp-form-comm-mode-select">
                           <SelectValue placeholder={t('eqp.form.commModeRequired')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -1170,6 +1215,55 @@ export function EqpManageFormModal({
                           }))
                         }
                       />
+                    </div>
+                  </FormSection>
+                ) : isPlcMode ? (
+                  <FormSection
+                    title="PLC Settings"
+                    description={t('eqp.form.sectionPlcDesc')}
+                  >
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <ReadOnlyField
+                        label="PLC Protocol"
+                        value={formState.plcProtocol}
+                        hint={t('eqp.form.plcProtocolHint')}
+                      />
+
+                      <ReadOnlyField label="Transport" value={formState.plcTransport} />
+
+                      <Field label="Unit ID">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={255}
+                          value={formState.unitId}
+                          onChange={handleInputChange('unitId')}
+                          disabled={isPending}
+                          className="h-11"
+                        />
+                      </Field>
+
+                      <Field label="Poll Timeout (ms)">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={formState.pollTimeoutMs}
+                          onChange={handleInputChange('pollTimeoutMs')}
+                          disabled={isPending}
+                          className="h-11"
+                        />
+                      </Field>
+
+                      <Field label="Reconnect Max Retries">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={formState.reconnectMaxRetries}
+                          onChange={handleInputChange('reconnectMaxRetries')}
+                          disabled={isPending}
+                          className="h-11"
+                        />
+                      </Field>
                     </div>
                   </FormSection>
                 ) : (

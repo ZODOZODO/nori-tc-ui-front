@@ -22,6 +22,7 @@ import {
 } from '../lib/model-detail-editor'
 import {
   MODEL_DETAIL_NODE_LABELS,
+  PLC_DETAIL_NODES,
   SECS_DETAIL_NODES,
   SOCKET_DETAIL_NODES,
   type ModelDcopItem,
@@ -114,7 +115,13 @@ const resolveDetailNodes = (model: ModelInfo | null): ModelDetailNode[] => {
   }
 
   const normalizedInterface = model.commInterface.toUpperCase()
-  return normalizedInterface === 'SOCKET' ? SOCKET_DETAIL_NODES : SECS_DETAIL_NODES
+  if (normalizedInterface === 'SOCKET') {
+    return SOCKET_DETAIL_NODES
+  }
+  if (normalizedInterface === 'PLC') {
+    return PLC_DETAIL_NODES
+  }
+  return SECS_DETAIL_NODES
 }
 
 /**
@@ -223,6 +230,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
 
   // SOCKET 모델 여부 판단
   const isSocketModel = activeModel?.commInterface?.toUpperCase() === 'SOCKET'
+  const isPlcModel = activeModel?.commInterface?.toUpperCase() === 'PLC'
 
   // FlowCard 의 Identity Message dropdown 도 같은 메시지 목록을 사용합니다 —
   // Flow 선택 (selectedFlowId !== null) 또는 draft Flow 입력 모드일 때도 활성화.
@@ -531,7 +539,11 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     flowCardRef.current?.setDcopItems(nextItems)
     setDcopPickerFlowId(null)
   }
-  const flowProtocol: 'SECS' | 'SOCKET' = isSocketModel ? 'SOCKET' : 'SECS'
+  const flowProtocol: 'SECS' | 'SOCKET' | 'PLC' = isPlcModel
+    ? 'PLC'
+    : isSocketModel
+      ? 'SOCKET'
+      : 'SECS'
   const isDraftMode = draftFlow !== null
 
   // FlowCard Identity Message dropdown 옵션 — protocol 별 합쳐서 (SECS+MES) / (Socket+MES).
