@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -442,7 +442,7 @@ function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldPr
           <span
             className={cn(
               'inline-block size-5 rounded-full bg-white transition-transform',
-              checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+              checked ? 'translate-x-5.5' : 'translate-x-0.5',
             )}
           />
         </span>
@@ -535,58 +535,59 @@ export function EqpManageFormModal({
     ],
   )
 
-  useEffect(() => {
-    if (!open) {
-      return
+  // 열림/대상 변경 시 폼 state 초기화 — effect 대신 render 중 prev 비교로 조정한다
+  // (react.dev "adjusting state when a prop changes"). set-state-in-effect 의
+  // cascading render 를 만들지 않고 같은 commit 안에서 초기화가 끝난다.
+  const [prevFormDeps, setPrevFormDeps] = useState<{
+    open: boolean
+    mode: EqpManageFormMode
+    interfaceType: ProtocolType
+    detail: EqpManageDetail | null
+  }>({ open, mode, interfaceType, detail })
+  if (
+    prevFormDeps.open !== open ||
+    prevFormDeps.mode !== mode ||
+    prevFormDeps.interfaceType !== interfaceType ||
+    prevFormDeps.detail !== detail
+  ) {
+    setPrevFormDeps({ open, mode, interfaceType, detail })
+    if (open) {
+      setFormState(createInitialFormState(mode, interfaceType, detail))
+      setFormErrorMessage(null)
     }
+  } else if (open && mode === 'create') {
+    // 모델명/버전 선택 불변식 유지 — 옵션 목록이 바뀌면 유효하지 않은 선택을 정리한다.
+    // 변경이 있을 때만 setState 하므로 수렴이 보장된다.
+    let nextModelName = formState.modelName
+    let nextModelVersionKey = formState.modelVersionKey
 
-    setFormState(createInitialFormState(mode, interfaceType, detail))
-    setFormErrorMessage(null)
-  }, [open, mode, interfaceType, detail])
-
-  useEffect(() => {
-    if (!open || mode !== 'create') {
-      return
-    }
-
-    setFormState((previous) => {
-      if (modelNameOptions.length === 0) {
-        if (!previous.modelName && !previous.modelVersionKey) {
-          return previous
-        }
-
-        return {
-          ...previous,
-          modelName: '',
-          modelVersionKey: '',
-        }
-      }
-
-      const nextModelName = modelNameOptions.includes(previous.modelName)
-        ? previous.modelName
+    if (modelNameOptions.length === 0) {
+      nextModelName = ''
+      nextModelVersionKey = ''
+    } else {
+      nextModelName = modelNameOptions.includes(formState.modelName)
+        ? formState.modelName
         : modelNameOptions[0]
       const nextVersionOptions = getModelVersionOptions(filteredModelOptions, nextModelName)
       const hasSelectedVersion = nextVersionOptions.some(
-        (option) => String(option.modelVersionKey) === previous.modelVersionKey,
+        (option) => String(option.modelVersionKey) === formState.modelVersionKey,
       )
-      const nextModelVersionKey = hasSelectedVersion
-        ? previous.modelVersionKey
+      nextModelVersionKey = hasSelectedVersion
+        ? formState.modelVersionKey
         : toFieldString(nextVersionOptions[0]?.modelVersionKey)
+    }
 
-      if (
-        previous.modelName === nextModelName &&
-        previous.modelVersionKey === nextModelVersionKey
-      ) {
-        return previous
-      }
-
-      return {
-        ...previous,
+    if (
+      nextModelName !== formState.modelName ||
+      nextModelVersionKey !== formState.modelVersionKey
+    ) {
+      setFormState({
+        ...formState,
         modelName: nextModelName,
         modelVersionKey: nextModelVersionKey,
-      }
-    })
-  }, [open, mode, modelNameOptions, filteredModelOptions])
+      })
+    }
+  }
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!isPending) {
@@ -822,7 +823,7 @@ export function EqpManageFormModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="z-[60] flex max-h-[90dvh] max-w-[920px] flex-col overflow-hidden rounded-2xl p-0"
+        className="z-60 flex max-h-[90dvh] max-w-230 flex-col overflow-hidden rounded-2xl p-0"
         showCloseButton={!isPending}
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

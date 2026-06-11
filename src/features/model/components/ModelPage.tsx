@@ -469,68 +469,49 @@ export function ModelPage() {
 
   /**
    * 활성 컨텍스트(탭 + 노드)에 대한 상세 데이터를 API 응답으로 초기화합니다.
+   * effect 대신 render 중 조건부 조정 — contextKey 가 채워지면 조건이 풀려 수렴합니다.
    */
-  useEffect(() => {
-    if (!activeTabModel || !detailNode || !detailNodeQuery.data) {
-      return
+  if (activeTabModel && detailNode && detailNodeQuery.data) {
+    const contextKey = `${activeTabModel.modelVersionKey}:${detailNode}`
+    const queryData = detailNodeQuery.data
+
+    if (!detailColumnsByContext[contextKey]) {
+      setDetailColumnsByContext((previousColumnsByContext) => ({
+        ...previousColumnsByContext,
+        [contextKey]: queryData.columns,
+      }))
     }
 
-    const contextKey = `${activeTabModel.modelVersionKey}:${detailNode}`
-    setDetailColumnsByContext((previousColumnsByContext) => {
-      if (previousColumnsByContext[contextKey]) {
-        return previousColumnsByContext
-      }
-
-      return {
-        ...previousColumnsByContext,
-        [contextKey]: detailNodeQuery.data.columns,
-      }
-    })
-
-    setDetailRowsByContext((previousRowsByContext) => {
-      if (previousRowsByContext[contextKey]) {
-        return previousRowsByContext
-      }
-
-      return {
+    if (!detailRowsByContext[contextKey]) {
+      setDetailRowsByContext((previousRowsByContext) => ({
         ...previousRowsByContext,
-        [contextKey]: sortDetailRowsByFirstColumn(detailNodeQuery.data.rows),
-      }
-    })
+        [contextKey]: sortDetailRowsByFirstColumn(queryData.rows),
+      }))
+    }
 
-    setDetailMdfByContext((previousMdfByContext) => {
-      if (previousMdfByContext[contextKey]) {
-        return previousMdfByContext
-      }
-
-      return {
+    if (!detailMdfByContext[contextKey]) {
+      setDetailMdfByContext((previousMdfByContext) => ({
         ...previousMdfByContext,
-        [contextKey]: detailNodeQuery.data.mdfContents,
-      }
-    })
-  }, [activeTabModel, detailNode, detailNodeQuery.data])
+        [contextKey]: queryData.mdfContents,
+      }))
+    }
+  }
 
   /**
    * flow editor의 MDF template select가 현재 model의 MDF 목록을 항상 사용할 수 있도록
-   * 별도 MDF detail 응답도 캐시에 적재합니다.
+   * 별도 MDF detail 응답도 캐시에 적재합니다. (render 중 조건부 조정 — 위와 동일한 수렴 구조)
    */
-  useEffect(() => {
-    if (!activeTabModel || !flowMdfQuery.data) {
-      return
-    }
-
+  if (activeTabModel && flowMdfQuery.data) {
     const mdfContextKey = `${activeTabModel.modelVersionKey}:mdf`
-    setDetailMdfByContext((previousMdfByContext) => {
-      if (previousMdfByContext[mdfContextKey]) {
-        return previousMdfByContext
-      }
+    const flowMdfContents = flowMdfQuery.data.mdfContents
 
-      return {
+    if (!detailMdfByContext[mdfContextKey]) {
+      setDetailMdfByContext((previousMdfByContext) => ({
         ...previousMdfByContext,
-        [mdfContextKey]: flowMdfQuery.data.mdfContents,
-      }
-    })
-  }, [activeTabModel, flowMdfQuery.data])
+        [mdfContextKey]: flowMdfContents,
+      }))
+    }
+  }
 
   /**
    * 활성 탭이 EDIT 모델인지/소유자인지에 따라 편집 모드를 동기화합니다.
@@ -565,12 +546,9 @@ export function ModelPage() {
 
   /**
    * 체크아웃 상태로 기억한 EDIT 버전이 사라졌으면 편집 세션도 함께 정리합니다.
+   * render 중 조건부 조정 — null 로 정리되면 조건이 풀려 수렴합니다.
    */
-  useEffect(() => {
-    if (explicitCheckoutModelVersionKey === null) {
-      return
-    }
-
+  if (explicitCheckoutModelVersionKey !== null) {
     const checkedOutModel = modelItems.find(
       (item) => item.modelVersionKey === explicitCheckoutModelVersionKey,
     )
@@ -582,24 +560,20 @@ export function ModelPage() {
     ) {
       setExplicitCheckoutModelVersionKey(null)
     }
-  }, [explicitCheckoutModelVersionKey, modelItems])
-
-  /**
-   * 새로고침 또는 백엔드 재연결 후 EDIT 버전이 현재 사용자 소유면 explicitCheckoutModelVersionKey를 복원합니다.
-   * canEdit 조건에 explicitCheckoutModelVersionKey 일치 여부가 포함되어 있어,
-   * 이 값이 null로 초기화된 상태에서는 isEditMode가 false가 되어 Check Out 버튼이 다시 나타나게 됩니다.
-   */
-  useEffect(() => {
-    if (explicitCheckoutModelVersionKey !== null || !activeTabModel || !currentUserId) {
-      return
-    }
+  } else if (activeTabModel && currentUserId) {
+    /*
+     * 새로고침 또는 백엔드 재연결 후 EDIT 버전이 현재 사용자 소유면 explicitCheckoutModelVersionKey를 복원합니다.
+     * canEdit 조건에 explicitCheckoutModelVersionKey 일치 여부가 포함되어 있어,
+     * 이 값이 null로 초기화된 상태에서는 isEditMode가 false가 되어 Check Out 버튼이 다시 나타나게 됩니다.
+     * (복원되면 explicitCheckoutModelVersionKey !== null 이 되어 이 분기를 다시 타지 않습니다.)
+     */
     const isEditVersion = activeTabModel.modelVersion.trim().toUpperCase() === 'EDIT'
     const isBranchVersion = Boolean(activeTabModel.parentModel?.trim())
 
     if (isEditVersion && isBranchVersion && lockOwner && lockOwner === currentUserId) {
       setExplicitCheckoutModelVersionKey(activeTabModel.modelVersionKey)
     }
-  }, [activeTabModel, currentUserId, explicitCheckoutModelVersionKey, lockOwner])
+  }
 
   /**
    * ResizableDivider 드래그 처리.

@@ -506,12 +506,21 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   const [floorView, setFloorView] = useState<FloorView>('all')
   const [status, setStatus] = useState<string | null>(null)
 
-  useEffect(() => {
+  // 레이아웃 응답이 바뀌면 working 사본을 다시 만든다 — effect 대신 render 중 prev 비교로 조정
+  // (react.dev "adjusting state when a prop changes"). 서버 placement 는 placementKey 가 있어
+  // 결정적 localId(wp-saved-*)를 쓰고, 편집 중 새로 추가되는 항목만 ref 카운터(wp-*)를 쓴다 —
+  // prefix 가 달라 충돌하지 않고, render 중 ref 변이도 일어나지 않는다.
+  const [prevLayoutData, setPrevLayoutData] = useState<typeof layoutQuery.data>(undefined)
+  if (prevLayoutData !== layoutQuery.data) {
+    setPrevLayoutData(layoutQuery.data)
     const placements = layoutQuery.data?.placements ?? []
     setSelectedIds([])
     setWorking(
-      placements.map((placement) => ({
-        localId: nextLocalId(),
+      placements.map((placement, placementIndex) => ({
+        localId:
+          placement.placementKey !== null
+            ? `wp-saved-${placement.placementKey}`
+            : `wp-loaded-${placementIndex}`,
         placementKey: placement.placementKey,
         objectKey: placement.objectKey,
         eqpKey: placement.eqpKey,
@@ -521,7 +530,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         floor: placement.transformJson.floor ?? 1,
       })),
     )
-  }, [layoutQuery.data])
+  }
 
   const objectsByKey = useMemo(() => {
     const map = new Map<number, LiveMapObjectResponse>()
@@ -919,7 +928,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   }
 
   return (
-    <section data-testid="live-map-3d-scene" className="relative h-[calc(100dvh-16rem)] min-h-[440px] overflow-hidden rounded-[24px] border border-border bg-card shadow-soft-lg">
+    <section data-testid="live-map-3d-scene" className="relative h-[calc(100dvh-16rem)] min-h-110 overflow-hidden rounded-3xl border border-border bg-card shadow-soft-lg">
       {/* frameloop=demand — 연속 rAF 루프 대신 상호작용/상태변화 시에만 렌더(병렬 e2e teardown 안정 + 부하↓).
           dpr 캡(레티나 과샘플 방지) + 그림자맵 1024 로 3D 진입/조작 렌더 부하를 낮춘다. */}
       <Canvas
@@ -949,7 +958,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 공정 bay 라벨 — DOM 오버레이(비상호작용). 위치는 BayLabelProjector 가 매 프레임 transform 으로 갱신.
           뱃지(z-6)보다 뒤(z-5). imperative transform 이라 Tailwind scale·translate 유틸은 걸지 않는다. */}
-      <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 z-5 overflow-hidden">
         {visibleBays.map((bay) => {
           const key = `${bay.floor}-${bay.clusterId}`
           return (
@@ -975,7 +984,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 상태 뱃지 — 단일 DOM 오버레이(plain 버튼 N개). 위치는 BadgeProjector 가 매 프레임 transform 으로 갱신.
           drei Html 포털 N개 제거 → 진입 비용↓. 항상표시 라벨·뱃지클릭 선택 유지. */}
-      <div className="pointer-events-none absolute inset-0 z-[6] overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 z-6 overflow-hidden">
         {visibleEquipForBadge.map((badge) => {
           const isSelected = selectedIdSet.has(badge.localId)
           const color = LIVE_MAP_STATUS_COLOR[badge.status]
@@ -994,7 +1003,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               data-testid={`live-map-3d-badge-${badge.eqpKey}`}
               onClick={(event) => selectPlacement(badge.localId, event.shiftKey || event.ctrlKey || event.metaKey)}
               className={`pointer-events-auto absolute left-0 top-0 flex items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md transition-transform ${
-                isSelected ? 'z-[1] border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
+                isSelected ? 'z-1 border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
               }`}
               style={{
                 transform: 'translate(-9999px, -9999px)',
@@ -1108,7 +1117,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 편집 — 선택 객체 패널 */}
       {editing && primary ? (
-        <div data-testid="live-map-3d-selected" className="absolute bottom-4 left-1/2 z-10 flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-[16px] border border-primary/40 bg-card/95 px-3 py-2 shadow-soft-lg backdrop-blur">
+        <div data-testid="live-map-3d-selected" className="absolute bottom-4 left-1/2 z-10 flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-primary/40 bg-card/95 px-3 py-2 shadow-soft-lg backdrop-blur">
           <span className="text-xs font-bold text-foreground">
             {primaryObject?.objectName ?? primaryEquipment?.eqpName ?? 'object'}
             {selectedIds.length > 1 ? (
@@ -1179,7 +1188,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 선택 설비 상세(R5) — 뷰어와 동일한 LiveMapTooltipCard(속성/포트/통신로그). top-16~bottom-4 로 통신로그 flex 높이 확보. */}
       {selectedNode ? (
-        <div data-testid="live-map-3d-detail" className="absolute right-4 top-16 bottom-4 z-10 w-[330px]">
+        <div data-testid="live-map-3d-detail" className="absolute right-4 top-16 bottom-4 z-10 w-82.5">
           <LiveMapTooltipCard equipment={selectedNode} onClose={() => setSelectedIds([])} />
         </div>
       ) : null}

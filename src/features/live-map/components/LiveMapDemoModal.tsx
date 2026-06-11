@@ -124,18 +124,20 @@ export function LiveMapDemoModal({
   const [selectedScenarioId, setSelectedScenarioId] = useState('')
   const [startMessage, setStartMessage] = useState<string | null>(null)
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
   const {
     data: scenarioOptions = [],
     isLoading: isScenarioLoading,
+    isFetching: isScenarioFetching,
     refetch: refetchScenarios,
   } = useLiveMapDemoScenarios(selectedTestType, open)
   const {
     data: demoJobs = [],
     isLoading: isJobsLoading,
+    isFetching: isJobsFetching,
     refetch: refetchJobs,
   } = useLiveMapDemoJobs(open, ACTIVE_DEMO_JOB_STATES, 100)
+  // 수동 플래그 대신 쿼리 fetching 상태에서 파생 — effect 안 sync setState 를 없앤다.
+  const isRefreshing = isScenarioFetching || isJobsFetching
   const createDemoJobsMutation = useCreateLiveMapDemoJobs()
   const cancelDemoJobMutation = useCancelLiveMapDemoJob()
 
@@ -180,28 +182,23 @@ export function LiveMapDemoModal({
     [equipmentNodes, selectedEqpIds],
   )
 
-  const refreshDemoData = useCallback(async () => {
-    setIsRefreshing(true)
-    setStartMessage(null)
+  /**
+   * 시나리오/작업 목록을 다시 불러오고 실패 메시지를 반환합니다 (성공 시 null).
+   * setState 를 직접 하지 않아 effect/handler 어디서든 호출 가능하고, 호출자가
+   * 콜백에서 메시지를 반영합니다.
+   */
+  const refreshDemoData = useCallback(async (): Promise<string | null> => {
+    const [scenarioResult, jobsResult] = await Promise.allSettled([refetchScenarios(), refetchJobs()])
 
-    try {
-      const [scenarioResult, jobsResult] = await Promise.allSettled([refetchScenarios(), refetchJobs()])
+    const failure =
+      (scenarioResult.status === 'rejected' && scenarioResult.reason) ||
+      (jobsResult.status === 'rejected' && jobsResult.reason)
 
-      const failure =
-        (scenarioResult.status === 'rejected' && scenarioResult.reason) ||
-        (jobsResult.status === 'rejected' && jobsResult.reason)
-
-      if (failure instanceof Error) {
-        setStartMessage(failure.message)
-        return
-      }
-
-      if (failure) {
-        setStartMessage(t('livemap.demo.refreshFailed'))
-      }
-    } finally {
-      setIsRefreshing(false)
+    if (failure instanceof Error) {
+      return failure.message
     }
+
+    return failure ? t('livemap.demo.refreshFailed') : null
   }, [refetchJobs, refetchScenarios, t])
 
   useEffect(() => {
@@ -209,7 +206,16 @@ export function LiveMapDemoModal({
       return
     }
 
-    void refreshDemoData()
+    let cancelled = false
+    void refreshDemoData().then((failureMessage) => {
+      if (!cancelled && failureMessage) {
+        setStartMessage(failureMessage)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [open, refreshDemoData])
 
   const handleClose = () => {
@@ -439,7 +445,7 @@ export function LiveMapDemoModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
-      <DialogContent className="flex max-h-[92vh] max-w-[1360px] flex-col gap-0 overflow-hidden border-border bg-background p-0">
+      <DialogContent className="flex max-h-[92vh] max-w-340 flex-col gap-0 overflow-hidden border-border bg-background p-0">
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="flex items-center gap-2 text-[20px] font-bold text-foreground">
             <Beaker className="size-5 text-brand-primary" />
@@ -450,7 +456,7 @@ export function LiveMapDemoModal({
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid items-stretch gap-4 p-6 xl:grid-cols-[minmax(0,1.2fr)_88px_minmax(0,1.45fr)]">
-            <section className="flex h-full min-h-[400px] max-h-[430px] flex-col rounded-[22px] border border-border bg-card p-5 shadow-soft-md">
+            <section className="flex h-full min-h-100 max-h-107.5 flex-col rounded-[22px] border border-border bg-card p-5 shadow-soft-md">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-foreground">
@@ -488,7 +494,7 @@ export function LiveMapDemoModal({
               </div>
             </section>
 
-            <div className="flex h-full min-h-[400px] max-h-[430px] items-center justify-center">
+            <div className="flex h-full min-h-100 max-h-107.5 items-center justify-center">
               <Button
                 type="button"
                 onClick={handleAddTargetEquipments}
@@ -500,7 +506,7 @@ export function LiveMapDemoModal({
               </Button>
             </div>
 
-            <section className="flex h-full min-h-[400px] max-h-[430px] flex-col rounded-[22px] border border-border bg-card p-5 shadow-soft-md">
+            <section className="flex h-full min-h-100 max-h-107.5 flex-col rounded-[22px] border border-border bg-card p-5 shadow-soft-md">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-foreground">
@@ -515,14 +521,14 @@ export function LiveMapDemoModal({
 
               <div className="mt-4 flex-1 overflow-hidden rounded-[18px] border border-border">
                 <div className="h-full overflow-auto">
-                  <Table className="min-w-[520px]">
+                  <Table className="min-w-130">
                     <TableHeader>
                       <TableRow className="bg-muted hover:bg-muted">
                         <TableHead>{t('livemap.demo.colEqp')}</TableHead>
                         <TableHead>{t('livemap.demo.colProcess')}</TableHead>
                         <TableHead>{t('livemap.demo.colWaferMode')}</TableHead>
                         <TableHead>{t('livemap.demo.colStatus')}</TableHead>
-                        <TableHead className="w-[70px] text-center">
+                        <TableHead className="w-17.5 text-center">
                           {t('livemap.demo.colDelete')}
                         </TableHead>
                       </TableRow>
@@ -575,7 +581,7 @@ export function LiveMapDemoModal({
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:min-w-[420px]">
+                <div className="flex flex-col gap-2 sm:min-w-105">
                   <div className="flex flex-wrap items-center gap-2">
                     {DEMO_TEST_TYPES.map((testType) => (
                       <button
@@ -600,7 +606,7 @@ export function LiveMapDemoModal({
                     <select
                       value={effectiveSelectedScenarioId}
                       onChange={(event) => setSelectedScenarioId(event.target.value)}
-                      className="h-10 min-w-[260px] rounded-[14px] border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-brand-primary"
+                      className="h-10 min-w-65 rounded-[14px] border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-brand-primary"
                       disabled={isScenarioLoading || scenarioOptions.length === 0}
                     >
                       {scenarioOptions.length === 0 ? (
@@ -619,7 +625,9 @@ export function LiveMapDemoModal({
                     <button
                       type="button"
                       onClick={() => {
-                        void refreshDemoData()
+                        // 새로고침 시작 시 이전 메시지를 정리하고, 완료 시 실패 메시지를 반영한다.
+                        setStartMessage(null)
+                        void refreshDemoData().then(setStartMessage)
                       }}
                       disabled={isRefreshing}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-card text-muted-foreground transition hover:border-brand-primary/40 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
@@ -656,8 +664,8 @@ export function LiveMapDemoModal({
               </div>
 
               <div className="mt-4 overflow-hidden rounded-[18px] border border-border">
-                <div className="max-h-[360px] overflow-auto">
-                  <Table className="min-w-[1180px]">
+                <div className="max-h-90 overflow-auto">
+                  <Table className="min-w-295">
                     <TableHeader>
                       <TableRow className="bg-muted hover:bg-muted">
                         <TableHead>{t('livemap.demo.colEqp')}</TableHead>
@@ -666,8 +674,8 @@ export function LiveMapDemoModal({
                         <TableHead>{t('livemap.demo.colTestType')}</TableHead>
                         <TableHead>{t('livemap.demo.colStage')}</TableHead>
                         <TableHead>{t('livemap.demo.colStatus')}</TableHead>
-                        <TableHead className="min-w-[220px]">{t('livemap.demo.colProgress')}</TableHead>
-                        <TableHead className="w-[96px] text-center">{t('livemap.demo.colEnd')}</TableHead>
+                        <TableHead className="min-w-55">{t('livemap.demo.colProgress')}</TableHead>
+                        <TableHead className="w-24 text-center">{t('livemap.demo.colEnd')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -708,7 +716,7 @@ export function LiveMapDemoModal({
                                     style={{ width: `${job.progressPercent}%` }}
                                   />
                                 </div>
-                                <span className="min-w-[44px] text-right text-xs font-semibold text-muted-foreground">
+                                <span className="min-w-11 text-right text-xs font-semibold text-muted-foreground">
                                   {job.progressPercent}%
                                 </span>
                               </div>

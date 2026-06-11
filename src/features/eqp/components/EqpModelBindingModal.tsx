@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -149,59 +149,49 @@ export function EqpModelBindingModal({
     [options?.businessJarOptions, detail?.jars?.businessJarRef, detail?.jars?.businessJarFileName],
   )
 
-  useEffect(() => {
-    if (!open) {
-      return
+  // 열림/대상 변경 시 폼 state 초기화 — effect 대신 render 중 prev 비교로 조정한다
+  // (react.dev "adjusting state when a prop changes"). effect 경유보다 한 프레임 빠르고
+  // set-state-in-effect 의 cascading render 를 만들지 않는다.
+  const [prevResetDeps, setPrevResetDeps] = useState<{
+    open: boolean
+    detail: EqpManageDetail | null
+  }>({ open: false, detail: null })
+  if (prevResetDeps.open !== open || prevResetDeps.detail !== detail) {
+    setPrevResetDeps({ open, detail })
+    if (open) {
+      setSelectedModelName('')
+      setSelectedModelVersionKey('')
+      setSelectedBusinessJarRef(
+        detail?.jars?.businessJarRef ? String(detail.jars.businessJarRef) : EQP_SELECT_NONE_VALUE,
+      )
+      setLocalErrorMessage(null)
     }
-
-    setSelectedModelName('')
-    setSelectedModelVersionKey('')
-    setSelectedBusinessJarRef(
-      detail?.jars?.businessJarRef ? String(detail.jars.businessJarRef) : EQP_SELECT_NONE_VALUE,
-    )
-    setLocalErrorMessage(null)
-  }, [open, detail])
-
-  useEffect(() => {
-    if (!open || !detail) {
-      return
-    }
-
+  } else if (open && detail) {
+    // 모델명/버전 선택 불변식 유지 — 옵션 목록이 바뀌면 유효하지 않은 선택을 정리한다.
+    // 조건부 setState 라 값이 이미 일치하면 재렌더 없이 통과한다(수렴 보장).
     if (modelNameOptions.length === 0 || !selectedModelName) {
       if (selectedModelVersionKey) {
         setSelectedModelVersionKey('')
       }
-      return
-    }
-
-    if (!modelNameOptions.includes(selectedModelName)) {
+    } else if (!modelNameOptions.includes(selectedModelName)) {
       setSelectedModelName('')
       if (selectedModelVersionKey) {
         setSelectedModelVersionKey('')
       }
-      return
-    }
+    } else {
+      const nextVersionOptions = getModelVersionOptions(filteredModelOptions, selectedModelName)
+      const hasSelectedVersion = nextVersionOptions.some(
+        (option) => String(option.modelVersionKey) === selectedModelVersionKey,
+      )
+      const nextModelVersionKey = hasSelectedVersion
+        ? selectedModelVersionKey
+        : String(nextVersionOptions[0]?.modelVersionKey ?? '')
 
-    const nextModelName = selectedModelName
-    const nextVersionOptions = getModelVersionOptions(filteredModelOptions, nextModelName)
-    const hasSelectedVersion = nextVersionOptions.some(
-      (option) => String(option.modelVersionKey) === selectedModelVersionKey,
-    )
-    const nextModelVersionKey = hasSelectedVersion
-      ? selectedModelVersionKey
-      : String(nextVersionOptions[0]?.modelVersionKey ?? '')
-
-    if (nextModelVersionKey !== selectedModelVersionKey) {
-      setSelectedModelVersionKey(nextModelVersionKey)
+      if (nextModelVersionKey !== selectedModelVersionKey) {
+        setSelectedModelVersionKey(nextModelVersionKey)
+      }
     }
-  }, [
-    open,
-    detail,
-    filteredModelOptions,
-    modelNameOptions,
-    selectedModelName,
-    selectedModelVersionKey,
-  ])
+  }
 
   const mergedErrorMessage = localErrorMessage ?? errorMessage
 
@@ -237,7 +227,7 @@ export function EqpModelBindingModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="z-[60] max-w-[720px] rounded-2xl p-0" showCloseButton={!isPending}>
+      <DialogContent className="z-60 max-w-180 rounded-2xl p-0" showCloseButton={!isPending}>
         <div className="flex flex-col">
           <DialogHeader className="border-b border-border px-6 py-5">
             <DialogTitle>Model Info Update</DialogTitle>
