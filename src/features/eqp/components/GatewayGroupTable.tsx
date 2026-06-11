@@ -46,6 +46,8 @@ interface GatewayGroupTableProps {
   eqpItems: EqpInfo[]
   /** 그룹명 (예: gateway_app1) */
   groupName: string
+  /** 해당 shard group의 lease를 어느 gateway도 점유하지 않은 상태 (헤더에 미점유 뱃지 표시) */
+  isUnleased?: boolean
   isLifecyclePending?: boolean
   onLifecycleAction?: (eqp: EqpInfo, action: EqpLifecycleAction) => void
 }
@@ -76,7 +78,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
         aria-label="RUN"
       >
         <span className="absolute inline-flex size-4 rounded-full bg-emerald-300/35 motion-safe:animate-ping" />
-        <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500" />
+        <span className="relative inline-flex size-2 rounded-full bg-linear-to-br from-emerald-400 to-teal-500" />
       </span>
     )
   }
@@ -88,7 +90,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
         title="IDLE"
         aria-label="IDLE"
       >
-        <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-sky-400 to-blue-500" />
+        <span className="relative inline-flex size-2 rounded-full bg-linear-to-br from-sky-400 to-blue-500" />
       </span>
     )
   }
@@ -100,7 +102,7 @@ function EquipmentStatusIndicator({ status }: { status: EquipmentVisualState }) 
       aria-label={t('eqp.status.warning')}
     >
       <span className="absolute inline-flex size-4 rounded-full bg-amber-300/30 motion-safe:animate-ping" />
-      <span className="relative inline-flex size-2 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
+      <span className="relative inline-flex size-2 rounded-full bg-linear-to-br from-amber-400 to-orange-500" />
     </span>
   )
 }
@@ -196,6 +198,7 @@ const buildGatewayGroupColumns = (
 export const GatewayGroupTable = memo(function GatewayGroupTable({
   eqpItems,
   groupName,
+  isUnleased = false,
   isLifecyclePending = false,
   onLifecycleAction,
 }: GatewayGroupTableProps) {
@@ -277,7 +280,17 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <TableSectionHeader title={groupName} count={sortedEqpItems.length} />
+      <TableSectionHeader
+        title={groupName}
+        count={sortedEqpItems.length}
+        actions={
+          isUnleased ? (
+            <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
+              {t('eqp.gateway.unleasedBadge')}
+            </Badge>
+          ) : null
+        }
+      />
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-4">
         {/* SelectableTable 이 단일 스크롤러가 되도록 redundant overflow 래퍼를 두지 않는다.
@@ -289,7 +302,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
             </p>
           ) : isInitialLoading ? (
             <div className="min-h-0 flex-1 overflow-auto">
-            <Table className="min-w-[1280px]">
+            <Table className="min-w-7xl">
               <TableHeader>
                 <TableRow className="bg-muted">
                   <TableHead>EQPID</TableHead>
@@ -329,7 +342,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
               columns={columns}
               rows={tableRows}
               rowKey={(row) => row.eqp.eqpId}
-              tableClassName="min-w-[1280px]"
+              tableClassName="min-w-7xl"
               wrapRow={(row, _rowIdx, children) => {
                 const eqp = row.eqp
                 const runtimeState = row.detail?.runtimeState ?? null

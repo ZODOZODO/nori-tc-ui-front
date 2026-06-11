@@ -8,6 +8,7 @@ export const deployQueryKeys = {
   all: ['deploy'] as const,
   registerTargets: (
     filters: DeployRegisterFilters,
+    lineKey: number | null,
     searchRevision: number,
     offset = 0,
     limit = 500,
@@ -18,6 +19,7 @@ export const deployQueryKeys = {
       filters.modelName,
       filters.modelVersionKey,
       filters.eqpId,
+      lineKey,
       searchRevision,
       offset,
       limit,

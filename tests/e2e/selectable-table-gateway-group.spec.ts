@@ -33,6 +33,7 @@ const PERMISSIONED_ME = {
 
 interface MockEqp {
   eqpId: string
+  lineKey: number
   routePartition: number
   commInterface: 'SECS' | 'SOCKET'
   commMode: string
@@ -42,6 +43,7 @@ interface MockEqp {
 
 const buildEqp = (overrides: Partial<MockEqp> & { eqpId: string }): MockEqp => ({
   eqpId: overrides.eqpId,
+  lineKey: overrides.lineKey ?? 1,
   routePartition: overrides.routePartition ?? 0,
   commInterface: overrides.commInterface ?? 'SECS',
   commMode: overrides.commMode ?? 'PASSIVE',
@@ -101,6 +103,30 @@ const setupMocks = async (page: Page, state: EqpMockState) => {
               limit: 500,
               count: state.eqpItems.length,
             }),
+          ),
+        })
+        return
+      }
+
+      if (pathname === '/api/line') {
+        // 라인 1개 — LineScopeSelector 가 자동 시드하여 lineKey=1 스코프로 설비가 표시된다.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            apiSuccess([{ lineKey: 1, lineCode: 'LINE_A', lineName: 'Line A' }]),
+          ),
+        })
+        return
+      }
+
+      if (pathname === '/api/eqp/gateway-shard-leases') {
+        // gateway 그룹 분류 기준 shard lease — partition 0,1 보유 group-1 → gateway_app1.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            apiSuccess([{ groupId: 'group-1', ownedPartitions: [0, 1], ownerInstanceId: 'gw-e2e-1' }]),
           ),
         })
         return
@@ -175,6 +201,8 @@ test('Selectable-Table-R2-AC-3: GatewayGroupTable 2x2 영역 Ctrl+C → 클립�
     eqpItems: [
       buildEqp({ eqpId: 'EQ001', routePartition: 0, eqpIp: '10.0.0.1' }),
       buildEqp({ eqpId: 'EQ002', routePartition: 1, eqpIp: '10.0.0.2' }),
+      // 타 라인(lineKey=2) 설비 — 선택 라인(LINE_A=1) 스코프에서 목록/테이블에 보이지 않아야 한다.
+      buildEqp({ eqpId: 'EQ_OTHER_LINE', lineKey: 2, routePartition: 0, eqpIp: '10.0.0.9' }),
     ],
   }
   await setupMocks(page, state)
@@ -188,6 +216,9 @@ test('Selectable-Table-R2-AC-3: GatewayGroupTable 2x2 영역 Ctrl+C → 클립�
 
   const container = page.getByTestId('selectable-table-gateway-group')
   await expect(container).toBeVisible()
+
+  // 라인 스코프 — 타 라인 설비는 gateway 그룹 테이블에 렌더되지 않는다.
+  await expect(container.getByText('EQ_OTHER_LINE')).toHaveCount(0)
 
   // col 0 = EQPID, col 1 = Business App. 두 행 모두 fixture 의 partition 이 같은 gateway app
   // 이므로 routePartition 기반 business app name 도 동일. EQPID 만 다름.

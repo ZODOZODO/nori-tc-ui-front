@@ -16,6 +16,8 @@ export type EqpInterfaceType = ProtocolType
 export interface EqpInfo {
   eqpKey: number
   eqpId: string
+  /** 설비 소속 라인 키 (tc_eqp.line_key) — 상단 라인 선택 스코프 필터 기준 */
+  lineKey: number
   commInterface: EqpInterfaceType
   commMode: string
   isDev: boolean
@@ -82,14 +84,28 @@ export type EqpSelection =
 // =========================================================================
 
 /**
+ * Redis shard lease 점유 현황 단건입니다.
+ * shard-group 정의(groupId/ownedPartitions)는 Gateway와 공유하는 설정에서,
+ * ownerInstanceId는 해당 group의 lease를 보유한 gateway 인스턴스에서 옵니다.
+ */
+export interface GatewayShardLease {
+  groupId: string
+  ownedPartitions: number[]
+  /** lease를 보유한 gateway 인스턴스 식별자. 미점유면 null. */
+  ownerInstanceId: string | null
+}
+
+/**
  * gateway_app 그룹 모델입니다.
- * route_partition을 2개씩 묶어 그룹화합니다.
- * 예: [0,1] → gateway_app1, [2,3] → gateway_app2
+ * shard lease의 ownedPartitions 기준으로 그룹화하며, 그룹 순서는 shard-group 정의 순서를 따릅니다.
+ * 예: group-1(ownedPartitions [0,1]) → gateway_app1, group-2([2,3]) → gateway_app2
  */
 export interface GatewayAppGroup {
   appIndex: number
   appName: string
   items: EqpInfo[]
+  /** 해당 shard group의 lease를 어느 gateway도 점유하지 않은 상태. 단일 인스턴스 모드면 false. */
+  isUnleased: boolean
 }
 
 /**
@@ -117,6 +133,11 @@ export interface EqpInfoPage {
  * EQP 목록 조회 응답 타입입니다.
  */
 export type EqpInfoListResponse = ApiResponse<EqpInfoPage>
+
+/**
+ * Gateway shard lease 점유 현황 조회 응답 타입입니다.
+ */
+export type GatewayShardLeaseListResponse = ApiResponse<GatewayShardLease[]>
 
 /**
  * EQP 단건 조회 응답 타입입니다.

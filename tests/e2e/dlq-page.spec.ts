@@ -164,6 +164,15 @@ const setupMocks = async (page: Page, state: DlqApiMockState) => {
     })
   })
 
+  // DLQ 패널 라인 스코프 해석용 — 설비 목록이 비어 있으므로 모든 항목이 매핑 불가로 표시 유지된다.
+  await page.route(/.*\/api\/line(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(apiSuccess([{ lineKey: 1, lineCode: 'LINE_A', lineName: 'Line A' }])),
+    })
+  })
+
   await page.route('**/api/auth/csrf', async (route) => {
     await route.fulfill({
       status: 200,

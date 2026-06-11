@@ -634,6 +634,7 @@ const normalizeDeployRegisterScenarioPreview = (
 export const deployApi = {
   getRegisterTargets: async (
     filters: DeployRegisterFilters,
+    lineKey: number | null,
     offset = 0,
     limit = 500,
   ): Promise<DeployRegisterTargetPage> => {
@@ -645,6 +646,7 @@ export const deployApi = {
           ...(filters.modelName ? { modelName: filters.modelName } : {}),
           ...(filters.modelVersionKey !== null ? { modelVersionKey: filters.modelVersionKey } : {}),
           ...(filters.eqpId ? { eqpId: filters.eqpId } : {}),
+          ...(lineKey !== null ? { lineKey } : {}),
         },
         withCredentials: true,
       })

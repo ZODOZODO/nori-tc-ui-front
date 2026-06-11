@@ -4,7 +4,9 @@ import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
+import { useDlqLineScope } from '../hooks/useDlqLineScope'
 import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
+import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 import type { BusinessDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
@@ -42,6 +44,7 @@ const buildBusinessDlqColumns = (
 export function BusinessDlqPanel() {
   const { t } = useI18n()
   const query = useBusinessDlq()
+  const lineScope = useDlqLineScope()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
@@ -49,9 +52,9 @@ export function BusinessDlqPanel() {
   const columns = useMemo(() => buildBusinessDlqColumns(t), [t])
 
   const sortedEntries = useMemo<BusinessDlqEntry[]>(() => {
-    const items = query.data ?? []
-    return [...items].sort((left, right) => right.occurredAt - left.occurredAt)
-  }, [query.data])
+    const items = filterDlqEntriesByLine(query.data ?? [], (row) => row.eqpId, lineScope.scope)
+    return items.sort((left, right) => right.occurredAt - left.occurredAt)
+  }, [query.data, lineScope.scope])
 
   const filteredEntries = useMemo(
     () => filterDlqRows(sortedEntries, columns, searchKeyword),
@@ -65,7 +68,8 @@ export function BusinessDlqPanel() {
 
   const lastUpdatedAt =
     query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null
-  const errorMessage = query.error instanceof Error ? query.error.message : null
+  const errorMessage =
+    query.error instanceof Error ? query.error.message : lineScope.errorMessage
   const emptyMessage =
     searchKeyword.trim() === '' ? t('dlq.table.empty') : t('dlq.table.searchNoResult')
 
@@ -74,9 +78,9 @@ export function BusinessDlqPanel() {
       title={t('dlq.panel.business')}
       testId="dlq-panel-business"
       totalCount={totalCount}
-      isLoading={query.isPending}
+      isLoading={query.isPending || lineScope.isPending}
       isFetching={query.isFetching}
-      isError={query.isError}
+      isError={query.isError || lineScope.isError}
       errorMessage={errorMessage}
       onRefresh={() => {
         void query.refetch()

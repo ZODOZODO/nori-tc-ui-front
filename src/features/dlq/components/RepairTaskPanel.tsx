@@ -3,8 +3,10 @@ import { TableRow } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
+import { useDlqLineScope } from '../hooks/useDlqLineScope'
 import { useRepairTasks } from '../hooks/useRepairTasks'
 import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
+import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 import type { RepairTaskEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
@@ -29,6 +31,7 @@ const buildRepairTaskColumns = (
 export function RepairTaskPanel() {
   const { t } = useI18n()
   const query = useRepairTasks()
+  const lineScope = useDlqLineScope()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
@@ -36,13 +39,13 @@ export function RepairTaskPanel() {
   const columns = useMemo(() => buildRepairTaskColumns(t), [t])
 
   const sortedEntries = useMemo<RepairTaskEntry[]>(() => {
-    const items = query.data ?? []
-    return [...items].sort((left, right) => {
+    const items = filterDlqEntriesByLine(query.data ?? [], (row) => row.eqpId, lineScope.scope)
+    return items.sort((left, right) => {
       const rightTime = Date.parse(right.createdAt)
       const leftTime = Date.parse(left.createdAt)
       return rightTime - leftTime
     })
-  }, [query.data])
+  }, [query.data, lineScope.scope])
 
   const filteredEntries = useMemo(
     () => filterDlqRows(sortedEntries, columns, searchKeyword),
@@ -56,7 +59,8 @@ export function RepairTaskPanel() {
 
   const lastUpdatedAt =
     query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null
-  const errorMessage = query.error instanceof Error ? query.error.message : null
+  const errorMessage =
+    query.error instanceof Error ? query.error.message : lineScope.errorMessage
   const emptyMessage =
     searchKeyword.trim() === '' ? t('dlq.table.empty') : t('dlq.table.searchNoResult')
 
@@ -65,9 +69,9 @@ export function RepairTaskPanel() {
       title={t('dlq.panel.repairTask')}
       testId="dlq-panel-repair-task"
       totalCount={totalCount}
-      isLoading={query.isPending}
+      isLoading={query.isPending || lineScope.isPending}
       isFetching={query.isFetching}
-      isError={query.isError}
+      isError={query.isError || lineScope.isError}
       errorMessage={errorMessage}
       onRefresh={() => {
         void query.refetch()

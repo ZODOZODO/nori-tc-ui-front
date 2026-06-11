@@ -17,6 +17,8 @@ import {
   type EqpInfo,
   type EqpInfoDetailResponse,
   type EqpInfoListResponse,
+  type GatewayShardLease,
+  type GatewayShardLeaseListResponse,
   type EqpManageDetail,
   type EqpManageDetailBatch,
   type EqpManageDetailBatchApiResponse,
@@ -227,6 +229,46 @@ export const eqpApi = {
       return normalizeEqpListPayload(successPayload, offset, limit)
     } catch (error) {
       throw normalizeEqpError(error, eqpListFallbackMessage())
+    }
+  },
+
+  /**
+   * Gateway shard lease 점유 현황을 조회합니다.
+   * EQP 목록을 gateway 단위 그룹으로 분류하는 기준 데이터입니다.
+   */
+  getGatewayShardLeases: async (): Promise<GatewayShardLease[]> => {
+    try {
+      const response = await apiClient.get<GatewayShardLeaseListResponse>(
+        '/eqp/gateway-shard-leases',
+        {
+          withCredentials: true,
+        },
+      )
+
+      const payload = resolveSuccessPayload<unknown>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.shardLeases'),
+      )
+
+      if (!Array.isArray(payload)) {
+        throw new EqpApiError(
+          createEqpFailResponse(
+            {
+              success: false,
+              data: null,
+              errorCode: 'INVALID_RESPONSE',
+              errorMsg: i18n.t('error.eqp.shardLeases'),
+            },
+            i18n.t('error.eqp.shardLeases'),
+          ),
+          response.status,
+        )
+      }
+
+      return payload as GatewayShardLease[]
+    } catch (error) {
+      throw normalizeEqpError(error, i18n.t('error.eqp.shardLeases'))
     }
   },
 

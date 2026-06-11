@@ -3,8 +3,10 @@ import { TableRow } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
+import { useDlqLineScope } from '../hooks/useDlqLineScope'
 import { useQuarantine } from '../hooks/useQuarantine'
 import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
+import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 import type { QuarantineEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
@@ -31,6 +33,7 @@ const buildQuarantineColumns = (
 export function QuarantinePanel() {
   const { t } = useI18n()
   const query = useQuarantine()
+  const lineScope = useDlqLineScope()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
@@ -38,13 +41,13 @@ export function QuarantinePanel() {
   const columns = useMemo(() => buildQuarantineColumns(t), [t])
 
   const sortedEntries = useMemo<QuarantineEntry[]>(() => {
-    const items = query.data ?? []
-    return [...items].sort((left, right) => {
+    const items = filterDlqEntriesByLine(query.data ?? [], (row) => row.equipmentId, lineScope.scope)
+    return items.sort((left, right) => {
       const rightTime = Date.parse(right.quarantinedAt)
       const leftTime = Date.parse(left.quarantinedAt)
       return rightTime - leftTime
     })
-  }, [query.data])
+  }, [query.data, lineScope.scope])
 
   const filteredEntries = useMemo(
     () => filterDlqRows(sortedEntries, columns, searchKeyword),
@@ -58,7 +61,8 @@ export function QuarantinePanel() {
 
   const lastUpdatedAt =
     query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null
-  const errorMessage = query.error instanceof Error ? query.error.message : null
+  const errorMessage =
+    query.error instanceof Error ? query.error.message : lineScope.errorMessage
   const emptyMessage =
     searchKeyword.trim() === '' ? t('dlq.table.empty') : t('dlq.table.searchNoResult')
 
@@ -67,9 +71,9 @@ export function QuarantinePanel() {
       title={t('dlq.panel.quarantine')}
       testId="dlq-panel-quarantine"
       totalCount={totalCount}
-      isLoading={query.isPending}
+      isLoading={query.isPending || lineScope.isPending}
       isFetching={query.isFetching}
-      isError={query.isError}
+      isError={query.isError || lineScope.isError}
       errorMessage={errorMessage}
       onRefresh={() => {
         void query.refetch()

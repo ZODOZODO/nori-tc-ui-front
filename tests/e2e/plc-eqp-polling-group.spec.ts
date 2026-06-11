@@ -20,6 +20,7 @@ const ME = { userPk: 100, userId: 'admin', permissionCodes: ['EQP_READ', 'EQP_WR
 const PLC_EQP = {
   eqpKey: 1,
   eqpId: EQP_ID,
+  lineKey: 1,
   commInterface: 'PLC',
   commMode: 'ACTIVE',
   isDev: false,
@@ -69,7 +70,12 @@ const setupMocks = async (page: Page, state: MockState) => {
     },
   )
   await page.route(/.*\/api\/line(\?.*)?$/, async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
+    // 라인 1개 — 자동 시드로 lineKey=1 스코프가 적용되어 PLC_EQP 가 표시된다.
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(apiSuccess([{ lineKey: 1, lineCode: 'LINE_A', lineName: 'Line A' }])),
+    })
   })
   await page.route(/.*\/api\/eqp\/options(\?.*)?$/, async (route) => {
     await route.fulfill({
@@ -173,6 +179,16 @@ const setupMocks = async (page: Page, state: MockState) => {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(apiSuccess({ items: [PLC_EQP], offset: 0, limit: 500, count: 1 })),
+    })
+  })
+  // gateway 그룹 분류 기준 shard lease — partition 0 보유 group-1 → gateway_app1.
+  await page.route(/.*\/api\/eqp\/gateway-shard-leases$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiSuccess([{ groupId: 'group-1', ownedPartitions: [0, 1], ownerInstanceId: 'gw-e2e-1' }]),
+      ),
     })
   })
   await page.route(/.*\/api\/model\/\d+(\?.*)?$/, async (route) => {

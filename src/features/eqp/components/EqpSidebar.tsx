@@ -19,11 +19,14 @@ import {
   lnbSubLinkClass,
 } from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
-import type { EqpInfo, ProtocolType } from '../types/eqp.types'
+import { Badge } from '@/components/ui/badge'
+import type { EqpInfo, GatewayShardLease, ProtocolType } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
 
 interface EqpSidebarProps {
   eqpItems: EqpInfo[]
+  /** gateway 그룹 분류 기준이 되는 shard lease 점유 현황 (조회 전이면 undefined) */
+  shardLeases: GatewayShardLease[] | undefined
   selectedEqpId: string | null
   isGatewaySelected: boolean
   isBusinessSelected: boolean
@@ -54,6 +57,7 @@ interface EqpSidebarProps {
  */
 export const EqpSidebar = memo(function EqpSidebar({
   eqpItems,
+  shardLeases,
   selectedEqpId,
   isGatewaySelected,
   isBusinessSelected,
@@ -92,11 +96,11 @@ export const EqpSidebar = memo(function EqpSidebar({
 
   /**
    * 검색 필터 후 groupEqpItems 유틸로 그룹화합니다.
-   * 검색 결과 기준으로 그룹이 재계산됩니다.
+   * 검색 결과 기준으로 그룹이 재계산되며, gateway 그룹은 shard lease 기준입니다.
    */
   const { gatewayGroups, businessGroups } = useMemo(
-    () => groupEqpItems(filteredEqpItems),
-    [filteredEqpItems],
+    () => groupEqpItems(filteredEqpItems, shardLeases),
+    [filteredEqpItems, shardLeases],
   )
 
   // 그룹 펼침/접힘 (nori-client sidebar__top 아코디언). 헤더 클릭으로 토글.
@@ -178,7 +182,7 @@ export const EqpSidebar = memo(function EqpSidebar({
         className="flex flex-col self-stretch border-r border-border bg-card"
         style={{ width: `${sidebarWidth}px` }}
       >
-        <div className="flex h-[52px] items-center justify-center border-b border-border">
+        <div className="flex h-13 items-center justify-center border-b border-border">
           <button
             type="button"
             onClick={onToggleSidebar}
@@ -202,7 +206,7 @@ export const EqpSidebar = memo(function EqpSidebar({
     >
       <div className="flex min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-[52px] items-center justify-between border-b border-border px-3">
+          <div className="flex h-13 items-center justify-between border-b border-border px-3">
             <span className="truncate text-sm font-semibold text-foreground">
               {t('eqp.sidebar.title')}
             </span>
@@ -285,14 +289,25 @@ export const EqpSidebar = memo(function EqpSidebar({
                       {t('eqp.sidebar.noGatewayGroups')}
                     </p>
                   ) : (
-                    gatewayGroups.map((group) => (
+                    gatewayGroups
+                      // 검색 중에는 결과가 없는 그룹을 숨겨 검색 노이즈를 줄인다 (빈 그룹은 평시에만 노출).
+                      .filter((group) => !hasSearch || group.items.length > 0)
+                      .map((group) => (
                       <div key={group.appName} className="flex flex-col gap-0.5">
                         <button
                           type="button"
                           onClick={() => toggleGatewayGroup(group.appIndex)}
-                          className={lnbSubLinkClass(selectedGroupIndex === group.appIndex)}
+                          className={cn(
+                            lnbSubLinkClass(selectedGroupIndex === group.appIndex),
+                            'flex items-center gap-1.5',
+                          )}
                         >
-                          {group.appName}
+                          <span className="truncate">{group.appName}</span>
+                          {group.isUnleased ? (
+                            <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
+                              {t('eqp.gateway.unleasedBadge')}
+                            </Badge>
+                          ) : null}
                         </button>
                         {expandedGatewayGroups.has(group.appIndex) || hasSearch
                           ? group.items.map((eqp) =>

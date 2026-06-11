@@ -62,7 +62,33 @@ const buildBusiness = (overrides: Partial<MockBusinessDlq>): MockBusinessDlq => 
   ttlSeconds: overrides.ttlSeconds ?? 86400,
 })
 
+// DLQ 패널 라인 스코프 기준 — eqp 목록의 lineKey 매핑으로 분류 (dlq-line-scope.ts).
+const LINES = [{ lineKey: 1, lineCode: 'LINE_A', lineName: 'Line A' }]
+const EQP_ITEMS = [
+  { eqpKey: 1, eqpId: 'EQ001', lineKey: 1 },
+  { eqpKey: 2, eqpId: 'EQ002', lineKey: 1 },
+  { eqpKey: 3, eqpId: 'EQ_OTHER_LINE', lineKey: 2 },
+]
+
 const setupMocks = async (page: Page, business: MockBusinessDlq[]) => {
+  await page.route(/.*\/api\/line(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(apiSuccess(LINES)),
+    })
+  })
+
+  await page.route(/.*\/api\/eqp(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiSuccess({ items: EQP_ITEMS, offset: 0, limit: 500, count: EQP_ITEMS.length }),
+      ),
+    })
+  })
+
   await page.route('**/api/auth/csrf', async (route) => {
     await route.fulfill({
       status: 200,
@@ -188,7 +214,11 @@ test('Selectable-Table-R2-AC-1 회귀: BusinessDlqPanel row testId / pagination 
   page,
 }) => {
   const consoleBucket = attachConsoleErrorListeners(page)
-  const business = [buildBusiness({ dlqId: 'BZ-001', eqpId: 'EQ001' })]
+  const business = [
+    buildBusiness({ dlqId: 'BZ-001', eqpId: 'EQ001' }),
+    // 타 라인(lineKey=2) 설비 항목 — 선택 라인(LINE_A) 스코프에서 숨겨져야 한다.
+    buildBusiness({ dlqId: 'BZ-OTHER', eqpId: 'EQ_OTHER_LINE' }),
+  ]
   await setupMocks(page, business)
 
   await page.goto('/dlq')
@@ -196,6 +226,8 @@ test('Selectable-Table-R2-AC-1 회귀: BusinessDlqPanel row testId / pagination 
 
   // row data-testid 패턴 보존 (기존 dlq-page e2e 의 dlq-row-business-${id})
   await expect(page.getByTestId('dlq-row-business-BZ-001')).toBeVisible()
+  // 라인 스코프 — 타 라인 설비의 DLQ 항목은 표시되지 않는다.
+  await expect(page.getByTestId('dlq-row-business-BZ-OTHER')).toHaveCount(0)
   await expect(page.getByTestId('dlq-row-business-BZ-001')).toContainText('tc.business.in')
 
   // DlqTableShell 의 pagination(PagePagination) / refresh 컨트롤이 그대로 노출.

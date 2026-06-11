@@ -49,6 +49,8 @@ import { useDeployRegisterScenarioPreview } from '../hooks/useDeployRegisterScen
 import { useDeployRegisterTargets } from '../hooks/useDeployRegisterTargets'
 import { useDeployUiStore } from '../stores/deploy-ui.store'
 import { useEqpList } from '@/features/eqp/hooks/useEqpList'
+import { useLineList } from '@/shared/hooks/useLineList'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import type {
   DeployCreateRequest,
   DeploySummary,
@@ -125,9 +127,18 @@ export function DeployRegisterPanel() {
     preview: null,
   })
 
+  // 상단 라인 선택(lineCode)을 lineKey 로 해석 — register 대상 조회는 선택 라인 소속 설비로 한정한다.
+  const lineListQuery = useLineList()
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+  const selectedLineKey = useMemo(
+    () => lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null,
+    [lineListQuery.data, selectedLineValue],
+  )
+
   const registerTargetsQuery = useDeployRegisterTargets(
     registerFilters,
-    hasSubmittedRegisterSearch,
+    selectedLineKey,
+    hasSubmittedRegisterSearch && selectedLineKey !== null,
     registerSearchRevision,
   )
   const registerOptionsQuery = useDeployRegisterOptions()
@@ -154,9 +165,10 @@ export function DeployRegisterPanel() {
     }
     const allItems = eqpListQuery.data?.items ?? []
     return allItems
+      .filter((item) => selectedLineKey !== null && item.lineKey === selectedLineKey)
       .filter((item) => item.eqpId.toLowerCase().includes(keyword.toLowerCase()))
       .slice(0, 30)
-  }, [eqpListQuery.data?.items, draftEqpId])
+  }, [eqpListQuery.data?.items, draftEqpId, selectedLineKey])
 
   const mergedModelVersionOptions = useMemo(
     () =>
@@ -815,7 +827,7 @@ export function DeployRegisterPanel() {
         }}
       >
         {deployDialogState ? (
-          <DialogContent className="max-w-[460px]">
+          <DialogContent className="max-w-115">
             <DialogHeader>
               <DialogTitle>{deployDialogState.title}</DialogTitle>
               <DialogDescription
@@ -869,7 +881,7 @@ export function DeployRegisterPanel() {
           }
         }}
       >
-        <DialogContent className="max-w-[920px] rounded-2xl p-0">
+        <DialogContent className="max-w-230 rounded-2xl p-0">
           <div className="border-b border-border px-6 py-5">
             <DialogHeader className="p-0">
               <DialogTitle>{t('deploy.register.scenarioDialogTitle')}</DialogTitle>
@@ -1123,7 +1135,7 @@ export function DeployRegisterPanel() {
               {t('deploy.register.searchEmpty')}
             </p>
           ) : (
-          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
+          <div className="max-h-100 overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow className="bg-muted hover:bg-muted">
@@ -1249,7 +1261,7 @@ export function DeployRegisterPanel() {
         ) : null}
 
         <div className="px-6 py-5">
-          <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
+          <div className="max-h-100 overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow className="bg-muted hover:bg-muted">
@@ -1258,7 +1270,7 @@ export function DeployRegisterPanel() {
                   <TableHead>Selected Version</TableHead>
                   <TableHead>Business Jar File</TableHead>
                   <TableHead>Interface</TableHead>
-                  <TableHead className="min-w-[180px]">Eqp Param Version</TableHead>
+                  <TableHead className="min-w-45">Eqp Param Version</TableHead>
                   <TableHead className="w-16 text-center">Remove</TableHead>
                 </TableRow>
               </TableHeader>

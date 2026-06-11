@@ -7,6 +7,7 @@ import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
 import { cn } from '@/lib/utils'
 import { useBusinessDlq } from '../hooks/useBusinessDlq'
+import { useDlqLineScope } from '../hooks/useDlqLineScope'
 import { useGatewayDlq } from '../hooks/useGatewayDlq'
 import { useQuarantine } from '../hooks/useQuarantine'
 import { useRepairTasks } from '../hooks/useRepairTasks'
@@ -16,6 +17,7 @@ import {
   type DashboardFeedItem,
 } from '../lib/dlq-feed'
 import { formatDlqTime } from '../lib/dlq-format'
+import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 
 interface CategoryStyle {
   // 카테고리 라벨은 기존 dlq.panel.* 키를 재사용한다(렌더 시점 t(labelKey)).
@@ -167,14 +169,34 @@ export function DashboardPanel() {
   const businessQuery = useBusinessDlq()
   const quarantineQuery = useQuarantine()
   const repairQuery = useRepairTasks()
+  const lineScope = useDlqLineScope()
 
   const feedColumns = useMemo(() => buildFeedColumns(t), [t])
+
+  // KPI/피드 모두 선택 라인 스코프 항목 기준으로 계산한다.
+  const scopedGatewayEntries = useMemo(
+    () => filterDlqEntriesByLine(gatewayQuery.data ?? [], (row) => row.equipmentId, lineScope.scope),
+    [gatewayQuery.data, lineScope.scope],
+  )
+  const scopedBusinessEntries = useMemo(
+    () => filterDlqEntriesByLine(businessQuery.data ?? [], (row) => row.eqpId, lineScope.scope),
+    [businessQuery.data, lineScope.scope],
+  )
+  const scopedQuarantineEntries = useMemo(
+    () => filterDlqEntriesByLine(quarantineQuery.data ?? [], (row) => row.equipmentId, lineScope.scope),
+    [quarantineQuery.data, lineScope.scope],
+  )
+  const scopedRepairEntries = useMemo(
+    () => filterDlqEntriesByLine(repairQuery.data ?? [], (row) => row.eqpId, lineScope.scope),
+    [repairQuery.data, lineScope.scope],
+  )
 
   const allSettled =
     !gatewayQuery.isPending &&
     !businessQuery.isPending &&
     !quarantineQuery.isPending &&
-    !repairQuery.isPending
+    !repairQuery.isPending &&
+    !lineScope.isPending
 
   const anyFetching =
     gatewayQuery.isFetching ||
@@ -187,17 +209,17 @@ export function DashboardPanel() {
       return []
     }
     return buildDashboardFeed(
-      gatewayQuery.data ?? [],
-      businessQuery.data ?? [],
-      quarantineQuery.data ?? [],
-      repairQuery.data ?? [],
+      scopedGatewayEntries,
+      scopedBusinessEntries,
+      scopedQuarantineEntries,
+      scopedRepairEntries,
     )
   }, [
     allSettled,
-    gatewayQuery.data,
-    businessQuery.data,
-    quarantineQuery.data,
-    repairQuery.data,
+    scopedGatewayEntries,
+    scopedBusinessEntries,
+    scopedQuarantineEntries,
+    scopedRepairEntries,
   ])
 
   const handleRefresh = () => {
@@ -240,27 +262,27 @@ export function DashboardPanel() {
         <div className="grid grid-cols-2 gap-4 px-6 py-5 lg:grid-cols-4">
           <KpiCard
             category="gateway"
-            count={gatewayQuery.data?.length ?? 0}
-            isPending={gatewayQuery.isPending}
-            isError={gatewayQuery.isError}
+            count={scopedGatewayEntries.length}
+            isPending={gatewayQuery.isPending || lineScope.isPending}
+            isError={gatewayQuery.isError || lineScope.isError}
           />
           <KpiCard
             category="business"
-            count={businessQuery.data?.length ?? 0}
-            isPending={businessQuery.isPending}
-            isError={businessQuery.isError}
+            count={scopedBusinessEntries.length}
+            isPending={businessQuery.isPending || lineScope.isPending}
+            isError={businessQuery.isError || lineScope.isError}
           />
           <KpiCard
             category="quarantine"
-            count={quarantineQuery.data?.length ?? 0}
-            isPending={quarantineQuery.isPending}
-            isError={quarantineQuery.isError}
+            count={scopedQuarantineEntries.length}
+            isPending={quarantineQuery.isPending || lineScope.isPending}
+            isError={quarantineQuery.isError || lineScope.isError}
           />
           <KpiCard
             category="repair-task"
-            count={repairQuery.data?.length ?? 0}
-            isPending={repairQuery.isPending}
-            isError={repairQuery.isError}
+            count={scopedRepairEntries.length}
+            isPending={repairQuery.isPending || lineScope.isPending}
+            isError={repairQuery.isError || lineScope.isError}
           />
         </div>
       </section>

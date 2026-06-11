@@ -123,14 +123,21 @@ export function LiveMapPage() {
   // 공정 흐름 그룹 배치 — 라인 layout(canvas_json.flow) 로드/편집(draft)/저장.
   const { flow, isDirty, updateFlow, saveFlow, isSaving, saveError } = useLiveMapFlow(lineKey)
 
+  // 공정 흐름 보드에는 선택 라인 소속 설비만 배치한다 — 타 라인 설비가 미배정
+  // 그룹 카드에 노출되지 않게 한다. 상태/검색 필터는 dim(visibleEquipmentIds)으로 유지.
+  const lineScopedEquipmentNodes = useMemo(
+    () => equipmentNodes.filter((node) => node.lineValue === selectedLineValue),
+    [equipmentNodes, selectedLineValue],
+  )
+
   const groupCards = useMemo(() => {
-    const membersByGroup = groupLiveMapFlowMembers(flow, equipmentNodes)
+    const membersByGroup = groupLiveMapFlowMembers(flow, lineScopedEquipmentNodes)
     return flow.groups.map((group) => ({
       group,
       isUnassigned: group.id === LIVE_MAP_UNASSIGNED_GROUP_ID,
       nodes: membersByGroup.get(group.id) ?? [],
     }))
-  }, [equipmentNodes, flow])
+  }, [lineScopedEquipmentNodes, flow])
 
   const visibleEquipmentNodes = useMemo(
     () =>

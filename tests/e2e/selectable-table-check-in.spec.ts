@@ -39,6 +39,7 @@ const APPLIED_VERSION = '25.01.01.0000'
 const EQP_INFO = {
   eqpKey: 1,
   eqpId: EQP_ID,
+  lineKey: 1,
   commInterface: 'SECS' as const,
   commMode: 'ACTIVE',
   isDev: false,
@@ -101,6 +102,32 @@ const setupMocks = async (page: Page) => {
           contentType: 'application/json',
           body: JSON.stringify(
             createApiResponse({ items: [EQP_INFO], offset: 0, limit: 500, count: 1 }),
+          ),
+        })
+        return
+      }
+
+      if (pathname === '/api/line' && method === 'GET') {
+        // 라인 1개 — LineScopeSelector 가 자동 시드하여 lineKey=1 스코프로 설비가 표시된다.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            createApiResponse([{ lineKey: 1, lineCode: 'LINE_A', lineName: 'Line A' }]),
+          ),
+        })
+        return
+      }
+
+      if (pathname === '/api/eqp/gateway-shard-leases' && method === 'GET') {
+        // gateway 그룹 분류 기준 shard lease — partition 0 보유 group-1 → gateway_app1.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            createApiResponse([
+              { groupId: 'group-1', ownedPartitions: [0, 1], ownerInstanceId: 'gw-e2e-1' },
+            ]),
           ),
         })
         return

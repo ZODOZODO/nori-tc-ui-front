@@ -9,14 +9,15 @@ import type { DeployRegisterFilters } from '../types/deploy.types'
  */
 export function useDeployRegisterTargets(
   filters: DeployRegisterFilters,
+  lineKey: number | null,
   enabled: boolean,
   searchRevision: number,
   offset = 0,
   limit = 500,
 ) {
   return useQuery({
-    queryKey: deployQueryKeys.registerTargets(filters, searchRevision, offset, limit),
-    queryFn: () => deployApi.getRegisterTargets(filters, offset, limit),
+    queryKey: deployQueryKeys.registerTargets(filters, lineKey, searchRevision, offset, limit),
+    queryFn: () => deployApi.getRegisterTargets(filters, lineKey, offset, limit),
     enabled,
     staleTime: 0,
     placeholderData: keepPreviousData,

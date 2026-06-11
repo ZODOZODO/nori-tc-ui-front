@@ -3,8 +3,10 @@ import { TableRow } from '@/components/ui/table'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
+import { useDlqLineScope } from '../hooks/useDlqLineScope'
 import { useGatewayDlq } from '../hooks/useGatewayDlq'
 import { DLQ_PAGE_SIZE, filterDlqRows, formatDlqTime } from '../lib/dlq-format'
+import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 import type { GatewayDlqEntry } from '../types/dlq.types'
 import { DlqTableShell } from './DlqTableShell'
 
@@ -37,6 +39,7 @@ const buildGatewayDlqColumns = (
 export function GatewayDlqPanel() {
   const { t } = useI18n()
   const query = useGatewayDlq()
+  const lineScope = useDlqLineScope()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DLQ_PAGE_SIZE)
@@ -44,9 +47,9 @@ export function GatewayDlqPanel() {
   const columns = useMemo(() => buildGatewayDlqColumns(t), [t])
 
   const sortedEntries = useMemo<GatewayDlqEntry[]>(() => {
-    const items = query.data ?? []
-    return [...items].sort((left, right) => right.occurredAt - left.occurredAt)
-  }, [query.data])
+    const items = filterDlqEntriesByLine(query.data ?? [], (row) => row.equipmentId, lineScope.scope)
+    return items.sort((left, right) => right.occurredAt - left.occurredAt)
+  }, [query.data, lineScope.scope])
 
   const filteredEntries = useMemo(
     () => filterDlqRows(sortedEntries, columns, searchKeyword),
@@ -60,7 +63,8 @@ export function GatewayDlqPanel() {
 
   const lastUpdatedAt =
     query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null
-  const errorMessage = query.error instanceof Error ? query.error.message : null
+  const errorMessage =
+    query.error instanceof Error ? query.error.message : lineScope.errorMessage
   const emptyMessage =
     searchKeyword.trim() === '' ? t('dlq.table.empty') : t('dlq.table.searchNoResult')
 
@@ -69,9 +73,9 @@ export function GatewayDlqPanel() {
       title={t('dlq.panel.gateway')}
       testId="dlq-panel-gateway"
       totalCount={totalCount}
-      isLoading={query.isPending}
+      isLoading={query.isPending || lineScope.isPending}
       isFetching={query.isFetching}
-      isError={query.isError}
+      isError={query.isError || lineScope.isError}
       errorMessage={errorMessage}
       onRefresh={() => {
         void query.refetch()

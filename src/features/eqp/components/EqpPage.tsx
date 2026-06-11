@@ -29,6 +29,7 @@ import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.st
 import { eqpApi } from '../api/eqp.api'
 import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
+import { useGatewayShardLeases } from '../hooks/useGatewayShardLeases'
 import { useEqpModelInfo } from '../hooks/useEqpModelInfo'
 import { useEqpParamVersions } from '../hooks/useEqpParamVersions'
 import { useEqpRuntimeState } from '../hooks/useEqpRuntimeState'
@@ -52,6 +53,8 @@ import { groupEqpItems } from '../utils/eqp-group.util'
 import { isActiveEquipment } from '../utils/eqp-runtime-state.util'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
+import { useLineList } from '@/shared/hooks/useLineList'
+import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { useModelList } from '@/features/model/hooks/useModelList'
 import { modelQueryKeys } from '@/features/model/lib/model-query-keys'
 import type { ModelInfo } from '@/features/model/types/model.types'
@@ -314,7 +317,15 @@ export function EqpPage() {
   const currentUserId = meQuery.data?.userId ?? null
 
   const eqpListQuery = useEqpList()
+  const gatewayShardLeasesQuery = useGatewayShardLeases()
   const modelListQuery = useModelList()
+  const lineListQuery = useLineList()
+  const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
+  // 상단 라인 선택(lineCode)을 lineKey 로 해석 — 라인 스코프 필터 기준 (LiveMapPage 와 동일 방식).
+  const selectedLineKey = useMemo(
+    () => lineListQuery.data?.find((line) => line.lineCode === selectedLineValue)?.lineKey ?? null,
+    [lineListQuery.data, selectedLineValue],
+  )
   const eqpDetailQuery = useEqpDetail(selectedEqpId)
   const eqpParamVersionsQuery = useEqpParamVersions(selectedEqpId)
   const eqpRuntimeStateQuery = useEqpRuntimeState(selectedEqpId)
@@ -380,7 +391,12 @@ export function EqpPage() {
   } = useEqpMutations()
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
-  const eqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data as unknown), [eqpListQuery.data])
+  const allEqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data as unknown), [eqpListQuery.data])
+  // 선택 라인 소속 설비만 노출한다 — lineKey 미해석(라인 목록 로딩/선택 시드 전)이면 빈 목록.
+  const eqpItems = useMemo(
+    () => (selectedLineKey === null ? [] : allEqpItems.filter((item) => item.lineKey === selectedLineKey)),
+    [allEqpItems, selectedLineKey],
+  )
   // "EDIT"은 체크아웃 잠금용 내부 버전이므로 드롭다운에서 제외합니다.
   // "EDIT"을 sourceVersion으로 체크아웃하면 기존 EDIT 행과 중복 키 충돌이 발생합니다.
   const versionOptions = useMemo(
@@ -415,7 +431,11 @@ export function EqpPage() {
   }, [checkoutStatus.checkedOutBy, checkoutStatus.isCheckedOut, currentUserId])
 
   // 전체 eqpItems 기준으로 그룹화 (Gateway/gateway_group 선택 시 설비 목록 조회용)
-  const { gatewayGroups, businessGroups } = useMemo(() => groupEqpItems(eqpItems), [eqpItems])
+  // gateway 그룹은 Redis shard lease 점유 현황 기준으로 분류한다.
+  const { gatewayGroups, businessGroups } = useMemo(
+    () => groupEqpItems(eqpItems, gatewayShardLeasesQuery.data),
+    [eqpItems, gatewayShardLeasesQuery.data],
+  )
 
   // Gateway 선택 시 표시할 전체 게이트웨이 설비 목록입니다.
   const gatewayAllItems = useMemo(
@@ -423,14 +443,18 @@ export function EqpPage() {
     [gatewayGroups],
   )
 
-  // gateway_group 선택 시 해당 그룹의 설비 목록 파생
-  const gatewayGroupItems = useMemo(() => {
+  // gateway_group 선택 시 해당 그룹 파생 (설비 목록 + 미점유 뱃지 표시용)
+  const selectedGatewayGroup = useMemo(() => {
     if (selection.type !== 'gateway_group') {
-      return []
+      return null
     }
-    const group = gatewayGroups.find((g) => g.appIndex === selection.groupIndex)
-    return group?.items ?? []
+    return gatewayGroups.find((g) => g.appIndex === selection.groupIndex) ?? null
   }, [selection, gatewayGroups])
+
+  const gatewayGroupItems = useMemo(
+    () => selectedGatewayGroup?.items ?? [],
+    [selectedGatewayGroup],
+  )
 
   const businessGroupItems = useMemo(() => {
     if (selection.type !== 'business_group') {
@@ -536,13 +560,22 @@ export function EqpPage() {
     return `gateway_app${selection.groupIndex}`
   }, [selection])
 
-  const resetSelectionTransientStates = useCallback(() => {
-    clearSelection()
+  // 선택이 바뀌면 선택 종속(transient) 로컬 상태를 정리한다 — effect 대신 render 중
+  // prev 비교로 조정 (react.dev "adjusting state when a prop changes").
+  // store 액션(clearSelection/setEditMode)은 resetSelectionTransientStates 에 남기고,
+  // React 로컬 상태는 selection 변화를 감지해 같은 render pass 에서 초기화한다.
+  const [prevSelectionForTransients, setPrevSelectionForTransients] = useState(selection)
+  if (prevSelectionForTransients !== selection) {
+    setPrevSelectionForTransients(selection)
     setAppliedVersion(EMPTY_VERSION_VALUE)
-    setEditMode(false)
     setLocalEditRows([])
     setIsCheckInModalOpen(false)
     setCheckInErrorMessage(null)
+  }
+
+  const resetSelectionTransientStates = useCallback(() => {
+    clearSelection()
+    setEditMode(false)
   }, [clearSelection, setEditMode])
 
   const closeManagementDialog = useCallback(() => {
@@ -601,7 +634,9 @@ export function EqpPage() {
    * 목록 조회 성공 이후에만 검증해 로딩 중 오탐으로 선택이 해제되는 문제를 방지합니다.
    */
   useEffect(() => {
-    if (!eqpListQuery.isSuccess) {
+    // 라인 스코프 미확정(라인 목록 로딩/선택 시드 전)이면 eqpItems 가 빈 목록이므로,
+    // 오탐으로 선택이 풀리지 않게 lineKey 해석 이후에만 검증한다.
+    if (!eqpListQuery.isSuccess || selectedLineKey === null) {
       return
     }
 
@@ -614,6 +649,10 @@ export function EqpPage() {
     }
 
     if (selection.type === 'gateway_group') {
+      // gateway 그룹은 shard lease 조회가 끝나야 확정되므로, 조회 전 오탐으로 선택이 풀리지 않게 한다.
+      if (!gatewayShardLeasesQuery.isSuccess) {
+        return
+      }
       const existsSelectedGroup = gatewayGroups.some((group) => group.appIndex === selection.groupIndex)
       if (!existsSelectedGroup) {
         resetSelectionTransientStates()
@@ -634,66 +673,76 @@ export function EqpPage() {
       return
     }
 
-    if (selection.type === 'gateway_all' && gatewayGroups.length === 0) {
+    if (
+      selection.type === 'gateway_all' &&
+      gatewayShardLeasesQuery.isSuccess &&
+      gatewayGroups.length === 0
+    ) {
       resetSelectionTransientStates()
     }
-  }, [eqpListQuery.isSuccess, selection, eqpItems, gatewayGroups, businessGroups, resetSelectionTransientStates])
-
-  useEffect(() => {
-    if (!eqpListQuery.isSuccess || !managementTargetEqpId) {
-      return
-    }
-
-    const existsTargetEqp = eqpItems.some((item) => item.eqpId === managementTargetEqpId)
-    if (!existsTargetEqp) {
-      closeManagementDialog()
-    }
   }, [
-    closeManagementDialog,
-    eqpItems,
     eqpListQuery.isSuccess,
-    managementTargetEqpId,
+    gatewayShardLeasesQuery.isSuccess,
+    selectedLineKey,
+    selection,
+    eqpItems,
+    gatewayGroups,
+    businessGroups,
+    resetSelectionTransientStates,
   ])
 
-  /**
-   * 편집 모드가 활성화되면 EDIT 파라미터를 로컬 편집 행으로 동기화합니다.
-   * EDIT 파라미터 데이터가 갱신될 때마다 실행됩니다.
-   */
-  useEffect(() => {
-    if (!isEditMode) {
-      return
-    }
-    const editData = editParamsQuery.data
-    setLocalEditRows(
-      (editData ?? []).map((p) =>
-        toEditableParamRow({
-          paramName: p.paramName,
-          paramValue: p.paramValue ?? '',
-          description: p.description ?? '',
-        }),
-      ),
-    )
-  }, [isEditMode, editParamsQuery.data])
+  // 관리 다이얼로그 대상 EQP가 목록에서 사라지면 닫는다 — 조건부 render-phase 조정.
+  // 닫히면 managementTargetEqpId 가 null 이 되어 조건이 풀리므로 수렴이 보장된다.
+  if (
+    eqpListQuery.isSuccess &&
+    selectedLineKey !== null &&
+    managementTargetEqpId !== null &&
+    !eqpItems.some((item) => item.eqpId === managementTargetEqpId)
+  ) {
+    setManagementDialog(EMPTY_MANAGEMENT_DIALOG_STATE)
+    setManagementErrorMessage(null)
+  }
 
-  /**
-   * 선택 EQP 변경 또는 버전 목록 갱신 시 버전 기본 선택값을 조정합니다.
-   * selectedEqpId가 없으면 (none/gateway_group 상태) 빈 문자열로 초기화합니다.
-   */
-  useEffect(() => {
-    if (!selectedEqpId) {
+  // 편집 모드 진입 또는 EDIT 파라미터 갱신 시 로컬 편집 행을 동기화한다 —
+  // effect 대신 render 중 prev 비교로 조정 (react.dev "adjusting state when a prop changes").
+  const [prevEditSync, setPrevEditSync] = useState<{
+    isEditMode: boolean
+    data: typeof editParamsQuery.data
+  }>({ isEditMode: false, data: undefined })
+  if (prevEditSync.isEditMode !== isEditMode || prevEditSync.data !== editParamsQuery.data) {
+    setPrevEditSync({ isEditMode, data: editParamsQuery.data })
+    if (isEditMode) {
+      setLocalEditRows(
+        (editParamsQuery.data ?? []).map((p) =>
+          toEditableParamRow({
+            paramName: p.paramName,
+            paramValue: p.paramValue ?? '',
+            description: p.description ?? '',
+          }),
+        ),
+      )
+    }
+  }
+
+  // 선택 EQP 변경 또는 버전 목록 갱신 시 버전 기본 선택값을 조정한다 — render 중 prev 비교.
+  // selectedEqpId가 없으면 (none/gateway_group 상태) 빈 문자열로 초기화한다.
+  const [prevVersionDeps, setPrevVersionDeps] = useState<{
+    selectedEqpId: string | null
+    versionOptions: readonly string[]
+  }>({ selectedEqpId: null, versionOptions: [] })
+  if (
+    prevVersionDeps.selectedEqpId !== selectedEqpId ||
+    prevVersionDeps.versionOptions !== versionOptions
+  ) {
+    setPrevVersionDeps({ selectedEqpId, versionOptions })
+    if (!selectedEqpId || versionOptions.length === 0) {
       setAppliedVersion(EMPTY_VERSION_VALUE)
-      return
+    } else {
+      setAppliedVersion((previous) =>
+        previous && versionOptions.includes(previous) ? previous : versionOptions[0],
+      )
     }
-
-    if (versionOptions.length === 0) {
-      setAppliedVersion(EMPTY_VERSION_VALUE)
-      return
-    }
-
-    setAppliedVersion((previous) =>
-      previous && versionOptions.includes(previous) ? previous : versionOptions[0],
-    )
-  }, [selectedEqpId, versionOptions])
+  }
 
   /**
    * 체크아웃 상태를 감지해 자동으로 편집 모드를 복원합니다.
@@ -733,8 +782,9 @@ export function EqpPage() {
    * 선택 시 eqpList 캐시를 무효화해 최신 설비 목록을 반영합니다.
    */
   const handleSelectGatewayGroup = useCallback((groupIndex: number) => {
-    // 그룹 선택 시 eqpList 캐시 무효화 → 최신 설비 목록 반영
+    // 그룹 선택 시 eqpList/shard lease 캐시 무효화 → 최신 설비 목록·점유 현황 반영
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
     selectGatewayGroup(groupIndex)
   }, [queryClient, selectGatewayGroup])
 
@@ -764,6 +814,7 @@ export function EqpPage() {
    */
   const handleSelectGatewayAll = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
     selectGatewayAll()
   }, [queryClient, selectGatewayAll])
 
@@ -1238,6 +1289,12 @@ export function EqpPage() {
   const listErrorMessage = eqpListQuery.error
     ? resolveErrorMessage(eqpListQuery.error, t('eqp.page.listLoadError'))
     : null
+  const lineListErrorMessage = lineListQuery.error
+    ? resolveErrorMessage(lineListQuery.error, t('eqp.page.listLoadError'))
+    : null
+  const shardLeaseErrorMessage = gatewayShardLeasesQuery.error
+    ? resolveErrorMessage(gatewayShardLeasesQuery.error, t('error.eqp.shardLeases'))
+    : null
   const versionErrorMessage = eqpParamVersionsQuery.error
     ? resolveErrorMessage(eqpParamVersionsQuery.error, t('eqp.page.versionLoadError'))
     : null
@@ -1284,6 +1341,7 @@ export function EqpPage() {
       <main className="flex flex-1 min-h-0">
         <EqpSidebar
           eqpItems={eqpItems}
+          shardLeases={gatewayShardLeasesQuery.data}
           selectedEqpId={selectedEqpId}
           isGatewaySelected={isGatewaySelected}
           isBusinessSelected={selection.type === 'business_all'}
@@ -1291,8 +1349,10 @@ export function EqpPage() {
           selectedGroupIndex={selectedGroupIndex}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
-          isLoading={eqpListQuery.isLoading}
-          errorMessage={listErrorMessage}
+          isLoading={
+            eqpListQuery.isLoading || gatewayShardLeasesQuery.isLoading || lineListQuery.isLoading
+          }
+          errorMessage={listErrorMessage ?? shardLeaseErrorMessage ?? lineListErrorMessage}
           onSelectEqp={handleSelectEqp}
           onSelectGatewayAll={handleSelectGatewayAll}
           onSelectBusinessAll={handleSelectBusinessAll}
@@ -1321,6 +1381,7 @@ export function EqpPage() {
                   key={`${selection.type}-${selectedGroupName}`}
                   eqpItems={selection.type === 'gateway_all' ? gatewayAllItems : gatewayGroupItems}
                   groupName={selectedGroupName}
+                  isUnleased={selectedGatewayGroup?.isUnleased ?? false}
                   isLifecyclePending={isLifecyclePending}
                   onLifecycleAction={openLifecycleDialog}
                 />
@@ -1381,12 +1442,12 @@ export function EqpPage() {
                 >
                   <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex h-[34px] items-center gap-1.5">
+                      <div className="flex h-8.5 items-center gap-1.5">
                         <select
                           value={appliedVersion}
                           onChange={(event) => setAppliedVersion(event.target.value)}
                           disabled={isEditMode || versionOptions.length === 0 || eqpParamVersionsQuery.isLoading}
-                          className="h-8 min-w-[232px] rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                          className="h-8 min-w-58 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                         >
                           {versionOptions.length === 0 ? (
                             <option value={EMPTY_VERSION_VALUE}>{t('eqp.version.noOption')}</option>
@@ -1466,7 +1527,7 @@ export function EqpPage() {
                     </div>
 
                     <div className="mt-2 rounded-xl border border-border bg-muted px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         {t('eqp.version.currentApplied')}
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-foreground">

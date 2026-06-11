@@ -7,6 +7,7 @@ import type { QueryClient } from '@tanstack/react-query'
 export const eqpQueryKeys = {
   all: ['eqp'] as const,
   list: () => ['eqp', 'list'] as const,
+  gatewayShardLeases: () => ['eqp', 'gateway-shard-leases'] as const,
   detail: (eqpId: string | null) => ['eqp', 'detail', eqpId] as const,
   manage: (eqpId: string | null) => ['eqp', 'manage', eqpId] as const,
   manageBatch: (eqpIds: readonly string[]) => ['eqp', 'manage-batch', [...eqpIds].sort()] as const,
