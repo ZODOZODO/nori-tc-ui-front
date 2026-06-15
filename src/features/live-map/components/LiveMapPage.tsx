@@ -6,7 +6,11 @@ import { UserProfileModal } from '@/features/profile/components/UserProfileModal
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
-import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
+import {
+  hasPermission,
+  LIVE_MAP_LAYOUT_READ_PERMISSION,
+  LIVE_MAP_LAYOUT_WRITE_PERMISSION,
+} from '@/shared/lib/permission'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapBoard } from './LiveMapBoard'
@@ -57,8 +61,9 @@ type LiveMapViewMode = 'viewer' | 'builder' | 'scene3d'
 
 /**
  * live-map 페이지: 테마형 공정 플로우 뷰어({@link LiveMapBoard}) 가 기본 뷰이고,
- * LIVE_MAP_LAYOUT_WRITE 권한자는 "구조물 편집" 모드로 객체 라이브러리 에디터({@link LiveMapObjectEditor})
- * 에서 3D 객체를 CRUD 하고, "3D" 모드({@link LiveMap3DScene})로 등각 뷰어를 본다.
+ * LIVE_MAP_LAYOUT_READ 권한자는 "3D" 모드({@link LiveMap3DScene})로 등각 뷰어를 읽기 전용으로 보며,
+ * LIVE_MAP_LAYOUT_WRITE 권한자는 추가로 "구조물 편집" 모드로 객체 라이브러리 에디터({@link LiveMapObjectEditor})
+ * 에서 3D 객체를 CRUD 하고 3D 씬에서 배치를 편집한다.
  *
  * <p>뷰어는 GET /live-map 의 실설비를 공정 카드 그리드에 배치하고(라인 스코프 필터), IN→OUT
  * 흐름·실시간 상태를 보여주며, 설비 선택 시 우측 상세 패널(속성/포트/통신로그)을 연다.</p>
@@ -74,6 +79,10 @@ export function LiveMapPage() {
 
   const meQuery = useMe()
   const canEdit = hasPermission(meQuery.data?.permissionCodes, LIVE_MAP_LAYOUT_WRITE_PERMISSION)
+  // 3D 등각 뷰어는 LAYOUT_READ 만으로 읽기 전용 진입 가능(구조물/배치는 GET /live-map/layout 로 로드).
+  // WRITE 권한자는 GET 도 허용되므로(ANY-of 매칭) READ 미보유라도 진입 가능 → canEdit 도 OR.
+  const canViewLayout =
+    canEdit || hasPermission(meQuery.data?.permissionCodes, LIVE_MAP_LAYOUT_READ_PERMISSION)
 
   const searchKeyword = useLiveMapUiStore((state) => state.searchKeyword)
   const selectedStatus = useLiveMapUiStore((state) => state.selectedStatus)
@@ -213,7 +222,7 @@ export function LiveMapPage() {
   }
 
   const isBuilderMode = viewMode === 'builder' && canEdit
-  const isScene3dMode = viewMode === 'scene3d' && canEdit
+  const isScene3dMode = viewMode === 'scene3d' && canViewLayout
   const isViewerMode = !isBuilderMode && !isScene3dMode
 
   return (
@@ -246,7 +255,7 @@ export function LiveMapPage() {
               <Beaker className="size-3.5" />
               {t('livemap.board.demo')}
             </Button>
-            {canEdit ? (
+            {canViewLayout ? (
               <div className="inline-flex rounded-pill border border-border bg-card p-1 shadow-soft-sm">
                 <button
                   type="button"
@@ -274,19 +283,22 @@ export function LiveMapPage() {
                 >
                   3D
                 </button>
-                <button
-                  type="button"
-                  data-testid="live-map-mode-builder"
-                  aria-pressed={isBuilderMode}
-                  onClick={() => setViewMode('builder')}
-                  className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
-                    isBuilderMode
-                      ? 'bg-brand-primary/10 text-brand-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t('livemap.mode.builder')}
-                </button>
+                {/* 구조물 편집(builder)은 WRITE 권한자 전용 — READ 만 있는 사용자는 3D 읽기만 가능. */}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    data-testid="live-map-mode-builder"
+                    aria-pressed={isBuilderMode}
+                    onClick={() => setViewMode('builder')}
+                    className={`rounded-pill px-4 py-1.5 text-[12px] font-bold transition-colors ${
+                      isBuilderMode
+                        ? 'bg-brand-primary/10 text-brand-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {t('livemap.mode.builder')}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

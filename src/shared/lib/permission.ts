@@ -23,6 +23,13 @@ export const DLQ_READ_PERMISSION = 'DLQ_READ'
 export const LIVE_MAP_LAYOUT_WRITE_PERMISSION = 'LIVE_MAP_LAYOUT_WRITE'
 
 /**
+ * Live Map 레이아웃 조회 권한 코드입니다.
+ * DB seed 는 PREFIX `/api/live-map/layout` + `http_method='GET'`, ADMIN/DEVELOPER/OPERATOR backfill.
+ * 3D 등각 뷰어는 이 권한만으로 구조물/배치를 GET 해 읽기 전용으로 볼 수 있다(편집은 WRITE 필요).
+ */
+export const LIVE_MAP_LAYOUT_READ_PERMISSION = 'LIVE_MAP_LAYOUT_READ'
+
+/**
  * 사용자가 특정 권한 코드를 보유하는지 확인합니다.
  */
 export const hasPermission = (

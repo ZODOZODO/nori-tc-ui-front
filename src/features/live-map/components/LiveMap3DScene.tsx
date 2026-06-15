@@ -7,7 +7,7 @@ import { useMe } from '@/features/profile/hooks/useProfile'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { useThemeStore } from '@/shared/stores/theme.store'
-import type { LiveMapObjectResponse } from '../api/layout.api'
+import type { LiveMapObjectResponse, LiveMapPlacementResponse } from '../api/layout.api'
 import type { LiveMapEquipmentResponse as LiveMapEquipment } from '../api/live-map.api'
 import { useCreateObject, useLayout, useLayoutObjects, useSaveLayout } from '../hooks/useLayout'
 import { useLiveMap } from '../hooks/useLiveMap'
@@ -59,6 +59,19 @@ interface ResolvedPlacement extends WorkingPlacement {
   equipment: LiveMapEquipment | null
   objectName: string | null
 }
+
+/** 서버 placement → 편집 버퍼(working) 항목. 로드된 working 과 변경 기준선(baseline)이 같은 매핑을 쓰도록 단일 출처로 둔다.
+ *  저장된 항목은 placementKey 기반 결정적 localId(wp-saved-*), 미저장 로드는 인덱스 기반(wp-loaded-*) — 편집 중 추가분(wp-*)과 prefix 가 달라 충돌하지 않는다. */
+const toWorkingPlacement = (placement: LiveMapPlacementResponse, index: number): WorkingPlacement => ({
+  localId: placement.placementKey !== null ? `wp-saved-${placement.placementKey}` : `wp-loaded-${index}`,
+  placementKey: placement.placementKey,
+  objectKey: placement.objectKey,
+  eqpKey: placement.eqpKey,
+  xPx: placement.transformJson.x,
+  yPx: placement.transformJson.y,
+  rotationDeg: placement.transformJson.rotation,
+  floor: placement.transformJson.floor ?? 1,
+})
 
 const ROTATE_STEP = 15
 /** 키보드 화살표 미세 이동 단위(px). Shift 동반 시 거친 단위. */
@@ -354,7 +367,9 @@ function SceneContent({
         const colorOverride = placement.objectName ? LIVE_MAP_STRUCTURE_COLOR_BY_NAME[placement.objectName] : undefined
         return (
           <group key={placement.localId} position={[worldX, floorY, worldZ]} rotation={[0, (placement.rotationDeg * Math.PI) / 180, 0]}>
-            <group onPointerDown={(event) => beginInteract(placement.localId, floorY, event)}>
+            {/* 뷰어(비편집) 모드에선 구조물 선택을 막는다 — 설비만 클릭해 선택/상세를 보고, 구조물(벽/파티션)은
+                핸들러를 떼어 클릭이 OrbitControls 회전으로 흐르게 한다. 편집 모드에선 종전대로 선택/드래그 가능. */}
+            <group onPointerDown={editing ? (event) => beginInteract(placement.localId, floorY, event) : undefined}>
               <LiveMap3DObject shape={placement.shape} colorOverride={colorOverride} />
             </group>
             {isSelected
@@ -425,6 +440,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
   const [editing, setEditing] = useState(false)
   const [working, setWorking] = useState<WorkingPlacement[]>([])
+  // 단계별 실행취소 — 각 편집 동작 직전의 working 스냅샷을 쌓는다(Ctrl+Z / 되돌리기 버튼이 pop).
+  const [undoStack, setUndoStack] = useState<WorkingPlacement[][]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [addObjectKey, setAddObjectKey] = useState<string>('')
   const [addEqpKey, setAddEqpKey] = useState<string>('')
@@ -438,24 +455,62 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   const [prevLayoutData, setPrevLayoutData] = useState<typeof layoutQuery.data>(undefined)
   if (prevLayoutData !== layoutQuery.data) {
     setPrevLayoutData(layoutQuery.data)
-    const placements = layoutQuery.data?.placements ?? []
     setSelectedIds([])
-    setWorking(
-      placements.map((placement, placementIndex) => ({
-        localId:
-          placement.placementKey !== null
-            ? `wp-saved-${placement.placementKey}`
-            : `wp-loaded-${placementIndex}`,
-        placementKey: placement.placementKey,
-        objectKey: placement.objectKey,
-        eqpKey: placement.eqpKey,
-        xPx: placement.transformJson.x,
-        yPx: placement.transformJson.y,
-        rotationDeg: placement.transformJson.rotation,
-        floor: placement.transformJson.floor ?? 1,
-      })),
-    )
+    setWorking((layoutQuery.data?.placements ?? []).map(toWorkingPlacement))
+    // 서버 상태가 바뀌면(로드/저장 직후) 실행취소 히스토리를 비운다 — 저장/리로드 경계를 넘는 undo 는 막는다.
+    setUndoStack([])
   }
+
+  // 최신 working/undoStack 을 참조하는 ref — 안정적인 recordUndo/handleUndo/keydown 핸들러가 stale closure 없이 스냅샷한다.
+  const workingRef = useRef<WorkingPlacement[]>(working)
+  const undoStackRef = useRef<WorkingPlacement[][]>(undoStack)
+  useEffect(() => {
+    workingRef.current = working
+  }, [working])
+  useEffect(() => {
+    undoStackRef.current = undoStack
+  }, [undoStack])
+  // 드래그 1회당 실행취소 1건 — 첫 이동 시점에 드래그 직전 상태를 1번만 push(클릭만 한 경우엔 push 안 함).
+  const dragUndoPushedRef = useRef(false)
+
+  // 편집 동작 직전 working 을 실행취소 스택에 쌓는다(현재 커밋된 상태 스냅샷).
+  const recordUndo = useCallback(() => {
+    setUndoStack((previous) => [...previous, workingRef.current])
+  }, [])
+
+  // 가장 최근 스냅샷으로 working 복원 + 선택 해제.
+  const handleUndo = useCallback(() => {
+    const stack = undoStackRef.current
+    if (stack.length === 0) {
+      return
+    }
+    setWorking(stack[stack.length - 1])
+    setUndoStack(stack.slice(0, -1))
+    setSelectedIds([])
+  }, [])
+
+  // 편집 모드에서 Ctrl/Cmd+Z = 실행취소. 입력/셀렉트 포커스 시엔 무시(브라우저 기본 텍스트 undo 보존).
+  useEffect(() => {
+    if (!editing) {
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey) {
+        return
+      }
+      if (event.key !== 'z' && event.key !== 'Z') {
+        return
+      }
+      const tag = (document.activeElement?.tagName ?? '').toUpperCase()
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+        return
+      }
+      event.preventDefault()
+      handleUndo()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editing, handleUndo])
 
   const objectsByKey = useMemo(() => {
     const map = new Map<number, LiveMapObjectResponse>()
@@ -547,6 +602,65 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     return items
   }, [working, objectsByKey, equipmentByKey])
 
+  // 변경 기준선 — 마지막으로 로드/저장된 서버 상태. 저장 시 layoutQuery.data 가 교체돼 자동으로 0 으로 리셋된다.
+  const baseline = useMemo<WorkingPlacement[]>(
+    () => (layoutQuery.data?.placements ?? []).map(toWorkingPlacement),
+    [layoutQuery.data?.placements],
+  )
+
+  // 미저장 변경 수 — 추가 + 삭제 + 수정(객체/설비/위치/회전/층)을 각각 1건으로 센다.
+  const changedCount = useMemo(() => {
+    const baseById = new Map(baseline.map((placement) => [placement.localId, placement]))
+    const workById = new Map(working.map((placement) => [placement.localId, placement]))
+    let count = 0
+    for (const current of working) {
+      const base = baseById.get(current.localId)
+      if (!base) {
+        count += 1
+        continue
+      }
+      if (
+        base.objectKey !== current.objectKey ||
+        base.eqpKey !== current.eqpKey ||
+        Math.round(base.xPx) !== Math.round(current.xPx) ||
+        Math.round(base.yPx) !== Math.round(current.yPx) ||
+        base.rotationDeg !== current.rotationDeg ||
+        base.floor !== current.floor
+      ) {
+        count += 1
+      }
+    }
+    for (const base of baseline) {
+      if (!workById.has(base.localId)) {
+        count += 1
+      }
+    }
+    return count
+  }, [working, baseline])
+
+  // 현재 보고 있는 층(전체/단일)에 렌더되는 placement — "표시" 카운트/종류별 집계의 기준.
+  const floorScopedResolved = useMemo(
+    () => resolved.filter((placement) => floorView === 'all' || placement.floor === floorView),
+    [resolved, floorView],
+  )
+
+  // 구조물을 종류(objectName: 벽/파티션/바닥/기둥 또는 사용자 객체명)별로 집계.
+  const structureBreakdown = useMemo<readonly [string, number][]>(() => {
+    const byName = new Map<string, number>()
+    for (const placement of floorScopedResolved) {
+      if (placement.kind === 'STRUCTURE') {
+        const name = placement.objectName ?? t('livemap.viewer3d.structureUnnamed')
+        byName.set(name, (byName.get(name) ?? 0) + 1)
+      }
+    }
+    return [...byName.entries()]
+  }, [floorScopedResolved, t])
+
+  const equipmentVisibleCount = useMemo(
+    () => floorScopedResolved.filter((placement) => placement.kind === 'EQUIPMENT').length,
+    [floorScopedResolved],
+  )
+
 
   // 추가 드롭다운/템플릿 교체 후보 = 빌트인 구조물(벽/파티션/바닥) + DB 객체. 같은 이름 DB STRUCTURE 가 있으면 빌트인은 숨김(중복 방지).
   const libraryObjects = useMemo(() => {
@@ -619,6 +733,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   // 키보드 미세 이동(②) — 선택 전체를 px 만큼 이동. 효과 의존성 안정용 useCallback.
   const nudgeSelected = useCallback(
     (dxPx: number, dyPx: number) => {
+      recordUndo()
       setWorking((previous) =>
         previous.map((placement) =>
           selectedIdSet.has(placement.localId)
@@ -627,7 +742,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         ),
       )
     },
-    [selectedIdSet],
+    [selectedIdSet, recordUndo],
   )
 
   // ② 편집모드 + 선택 있을 때 화살표로 미세 이동. 입력/셀렉트 포커스 시엔 무시(타이핑/셀렉트 조작 보존).
@@ -675,6 +790,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   } | null>(null)
 
   const handleDragStart = (localId: string) => {
+    // 이 드래그에서 아직 실행취소 스냅샷을 안 쌓았음 — 첫 이동 시 1회 push 한다(클릭만 하면 push 없음).
+    dragUndoPushedRef.current = false
     const ids = selectedIds.includes(localId) ? selectedIds : [localId]
     const start = new Map<string, { xPx: number; yPx: number }>()
     for (const id of ids) {
@@ -688,6 +805,11 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   }
 
   const handleDragMove = (localId: string, worldX: number, worldZ: number) => {
+    // 드래그 직전 상태를 1회만 실행취소 스택에 쌓는다(이후 이동은 같은 스냅샷에 누적).
+    if (!dragUndoPushedRef.current) {
+      recordUndo()
+      dragUndoPushedRef.current = true
+    }
     const [hitXPx, hitYPx] = worldToPlacement(worldX, worldZ)
     const drag = dragStartRef.current
     if (!drag) {
@@ -716,6 +838,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       setStatus(t('livemap.viewer3d.statusPickObject'))
       return
     }
+    recordUndo()
     const localId = nextLocalId()
     // 새 객체는 보고 있는 층에 추가(전체 보기면 1층). 이후 선택 패널 층 버튼으로 이동 가능.
     const addFloor = floorView === 'all' ? 1 : floorView
@@ -735,6 +858,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       setStatus(t('livemap.viewer3d.statusSeedTaken', { floor: seedFloor }))
       return
     }
+    recordUndo()
     const seeds = buildDefaultStructureLayout().map((seed) => ({
       localId: nextLocalId(),
       placementKey: null,
@@ -757,6 +881,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       setStatus(t('livemap.viewer3d.statusPickEquipment'))
       return
     }
+    recordUndo()
     const localId = nextLocalId()
     const addFloor = floorView === 'all' ? 1 : floorView
     const placedCount = working.filter((placement) => placement.eqpKey != null).length
@@ -789,6 +914,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       setStatus(t('livemap.viewer3d.statusAutoPlaceNone'))
       return
     }
+    recordUndo()
     // 같은 클러스터(bay)가 한 줄에 모여 보이도록 clusterId → eqpId 순으로 정렬한 뒤 fab 라인 기하로 배치한다.
     const orderedEqpKeys = [...lineEquipments]
       .sort((a, b) => (a.clusterId === b.clusterId ? a.eqpId.localeCompare(b.eqpId) : a.clusterId.localeCompare(b.clusterId)))
@@ -810,15 +936,23 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     setStatus(t('livemap.viewer3d.statusAutoPlaced', { count: newEquipmentPlacements.length }))
   }
 
-  const rotateSelected = (deltaDeg: number) => patchSelected((placement) => ({ rotationDeg: placement.rotationDeg + deltaDeg }))
-  const setFloorForSelected = (floor: number) => patchSelected(() => ({ floor }))
+  const rotateSelected = (deltaDeg: number) => {
+    recordUndo()
+    patchSelected((placement) => ({ rotationDeg: placement.rotationDeg + deltaDeg }))
+  }
+  const setFloorForSelected = (floor: number) => {
+    recordUndo()
+    patchSelected(() => ({ floor }))
+  }
   const assignTemplateToPrimary = (objectKey: number) => {
     if (primaryId) {
+      recordUndo()
       patchWorking(primaryId, { objectKey })
     }
   }
   const bindEqpToPrimary = (eqpKey: number | null) => {
     if (primaryId) {
+      recordUndo()
       patchWorking(primaryId, { eqpKey })
     }
   }
@@ -827,6 +961,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     if (selectedIds.length === 0) {
       return
     }
+    recordUndo()
     setWorking((previous) => previous.filter((placement) => !selectedIdSet.has(placement.localId)))
     setSelectedIds([])
   }
@@ -981,12 +1116,34 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 상단 우측 — 편집 토글 + 저장 */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        {/* 현재 층(전체/1/2층) 기준 — 표시 합계 + 구조물 종류별 + 설비 대수. 편집 가능자에겐 미저장 변경 수도. */}
         <span
+          data-testid="live-map-3d-count-chip"
           title={t('livemap.viewer3d.countHint')}
-          className="rounded-pill border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur"
+          className="flex max-w-[60vw] flex-wrap items-center gap-x-2 gap-y-0.5 rounded-pill border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur"
         >
-          {t('livemap.viewer3d.countVisible')} <span data-testid="live-map-3d-visible-count">{resolved.length}</span> · {t('livemap.viewer3d.countSaved')}{' '}
-          <span data-testid="live-map-3d-placement-count">{working.length}</span>
+          <span>
+            {t('livemap.viewer3d.countVisible')}{' '}
+            <span data-testid="live-map-3d-visible-count">{floorScopedResolved.length}</span>
+          </span>
+          {structureBreakdown.map(([name, count]) => (
+            <span key={name}>
+              · {name} {count}
+            </span>
+          ))}
+          <span>
+            · {t('livemap.viewer3d.countEquip')} {equipmentVisibleCount}
+          </span>
+          {editing ? (
+            <span className="text-foreground">
+              · {t('livemap.viewer3d.countChanged')}{' '}
+              <span data-testid="live-map-3d-changed-count">{changedCount}</span>
+            </span>
+          ) : null}
+          {/* 총 배치 수 — 화면엔 노출하지 않고(요청대로 변경 수만 표시), 재배치/추가 invariant e2e 의 검증 핸들로만 둔다. */}
+          <span className="sr-only" data-testid="live-map-3d-placement-count">
+            {working.length}
+          </span>
         </span>
         {canEdit ? (
           <>
@@ -1005,6 +1162,18 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             >
               {editing ? t('livemap.viewer3d.editExit') : t('livemap.viewer3d.edit')}
             </button>
+            {editing ? (
+              <button
+                type="button"
+                data-testid="live-map-3d-undo"
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                title={t('livemap.viewer3d.undoTitle')}
+                className="rounded-pill border border-border bg-card/90 px-4 py-1.5 text-[12px] font-bold text-foreground backdrop-blur transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('livemap.viewer3d.undo')}
+              </button>
+            ) : null}
             {editing ? (
               <button
                 type="button"
