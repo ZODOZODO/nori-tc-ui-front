@@ -160,8 +160,8 @@ test('PLC 폼 제출 body 에 plcSettings 포함 AND socketSettings/hsmsSettings
   await page.getByTestId('eqp-form-line-select').click()
   await page.getByRole('option', { name: 'A Line' }).click()
 
-  await page.getByTestId('eqp-form-comm-mode-select').click()
-  await page.getByRole('option', { name: 'ACTIVE' }).click()
+  // PLC 는 Comm Mode 가 ACTIVE 로 고정·잠김(ReadOnlyField) — select 가 렌더되지 않는다.
+  await expect(page.getByTestId('eqp-form-comm-mode-select')).toHaveCount(0)
 
   await page.getByPlaceholder(/127\.0\.0\.1/).fill('10.0.0.5')
   await page.getByPlaceholder(/5000/).fill('502')
@@ -172,6 +172,8 @@ test('PLC 폼 제출 body 에 plcSettings 포함 AND socketSettings/hsmsSettings
   const body = state.createCalls[0].body
 
   expect(body.interfaceType).toBe('PLC')
+  // PLC 는 Comm Mode 고정·잠금이므로 select 조작 없이도 ACTIVE 가 운반돼야 한다.
+  expect(body.commMode, 'PLC Comm Mode 는 ACTIVE 고정').toBe('ACTIVE')
   // plcSettings 는 non-null 객체로 운반.
   expect(body.plcSettings, 'plcSettings 누락 — PLC 설정 미운반').toBeTruthy()
   const plcSettings = body.plcSettings as Record<string, unknown>

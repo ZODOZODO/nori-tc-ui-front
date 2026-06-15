@@ -113,8 +113,9 @@ const EQP_INFO_COLUMNS: ReadonlyArray<ColumnDef<EqpInfoRow>> = [
     key: 'commInterface',
     header: 'Comm Interface',
     accessor: (row) => row.eqp.commInterface,
+    // Comm Interface 는 상태가 아니라 분류(프로토콜)라 outline(무채색)로 둔다 — status/enabled 색 팔레트와 분리해 혼동을 막는다.
     renderCell: (row) => (
-      <Badge variant={row.eqp.commInterface.toUpperCase() === 'SOCKET' ? 'warning' : 'info'}>
+      <Badge variant="outline">
         {row.eqp.commInterface}
       </Badge>
     ),

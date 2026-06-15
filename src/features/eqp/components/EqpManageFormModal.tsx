@@ -25,6 +25,7 @@ import {
   DEFAULT_SECS_SETTINGS,
   DEFAULT_SOCKET_SETTINGS,
   EQP_COMM_MODE_OPTIONS,
+  PLC_FIXED_COMM_MODE,
   EQP_LOG_LEVEL_OPTIONS,
   EQP_SELECT_NONE_VALUE,
   findEqpModelOptionByVersionKey,
@@ -309,7 +310,7 @@ const createInitialFormState = (
     return {
       eqpId: '',
       lineKey: '',
-      commMode: '',
+      commMode: interfaceType === 'PLC' ? PLC_FIXED_COMM_MODE : '',
       isDev: false,
       routePartition: '0',
       eqpIp: interfaceType === 'SOCKET' ? '127.0.0.1' : '',
@@ -349,7 +350,7 @@ const createInitialFormState = (
   return {
     eqpId: detail?.eqpId ?? '',
     lineKey: detail?.lineKey ? toFieldString(detail.lineKey) : '',
-    commMode: detail?.commMode ?? '',
+    commMode: detail?.commInterface === 'PLC' ? PLC_FIXED_COMM_MODE : detail?.commMode ?? '',
     isDev: detail?.isDev ?? false,
     routePartition: toFieldString(detail?.routePartition ?? 0),
     eqpIp: detail?.eqpIp ?? '',
@@ -882,24 +883,28 @@ export function EqpManageFormModal({
 
                     <ReadOnlyField label="Comm Interface" value={resolvedInterfaceType} />
 
-                    <Field label="Comm Mode" required>
-                      <Select
-                        value={toSelectValue(formState.commMode)}
-                        onValueChange={handleSelectChange('commMode')}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger data-testid="eqp-form-comm-mode-select">
-                          <SelectValue placeholder={t('eqp.form.commModeRequired')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EQP_COMM_MODE_OPTIONS.map((commMode) => (
-                            <SelectItem key={commMode} value={commMode}>
-                              {commMode}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
+                    {resolvedInterfaceType === 'PLC' ? (
+                      <ReadOnlyField label="Comm Mode" value={PLC_FIXED_COMM_MODE} />
+                    ) : (
+                      <Field label="Comm Mode" required>
+                        <Select
+                          value={toSelectValue(formState.commMode)}
+                          onValueChange={handleSelectChange('commMode')}
+                          disabled={isPending}
+                        >
+                          <SelectTrigger data-testid="eqp-form-comm-mode-select">
+                            <SelectValue placeholder={t('eqp.form.commModeRequired')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EQP_COMM_MODE_OPTIONS.map((commMode) => (
+                              <SelectItem key={commMode} value={commMode}>
+                                {commMode}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
 
                     <ToggleField
                       label="Is Dev"

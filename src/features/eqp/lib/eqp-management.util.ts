@@ -12,6 +12,10 @@ import type {
 } from '../types/eqp.types'
 
 export const EQP_COMM_MODE_OPTIONS = ['ACTIVE', 'PASSIVE'] as const
+
+// PLC 는 gateway 가 Modbus master 로 ACTIVE outbound 폴링하는 구조라 PASSIVE 를 지원하지 않는다.
+// 따라서 PLC 는 Comm Mode 를 ACTIVE 로 고정하고 폼에서 잠근다(Comm Interface 와 동일한 read-only 취급).
+export const PLC_FIXED_COMM_MODE = 'ACTIVE'
 export const EQP_LOG_LEVEL_OPTIONS = ['INFO', 'DEBUG', 'TRACE', 'WARN', 'ERROR'] as const
 export const EQP_SELECT_NONE_VALUE = '__NONE__'
 
