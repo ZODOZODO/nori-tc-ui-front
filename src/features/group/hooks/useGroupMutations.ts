@@ -13,6 +13,11 @@ interface MembershipVariables {
   groupId: number
 }
 
+interface GroupPermissionVariables {
+  groupId: number
+  permId: number
+}
+
 /**
  * 그룹 신규 생성 mutation 입니다.
  */
@@ -84,6 +89,38 @@ export function useRemoveGroupMember() {
     onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['user'] })
       await queryClient.invalidateQueries({ queryKey: groupQueryKeys.members(variables.groupId) })
+    },
+  })
+}
+
+/**
+ * 그룹에 권한을 부여하는 mutation 훅입니다. (`POST /api/group/{groupId}/permission/{permId}`)
+ * 성공 시 해당 그룹의 권한 매핑 목록을 갱신합니다.
+ */
+export function useAddGroupPermission() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ groupId, permId }: GroupPermissionVariables) =>
+      groupApi.addGroupPermission(groupId, permId),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.permissions(variables.groupId) })
+    },
+  })
+}
+
+/**
+ * 그룹 권한을 회수하는 mutation 훅입니다. (`DELETE /api/group/{groupId}/permission/{permId}`)
+ * 성공 시 해당 그룹의 권한 매핑 목록을 갱신합니다.
+ */
+export function useRemoveGroupPermission() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ groupId, permId }: GroupPermissionVariables) =>
+      groupApi.removeGroupPermission(groupId, permId),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: groupQueryKeys.permissions(variables.groupId) })
     },
   })
 }

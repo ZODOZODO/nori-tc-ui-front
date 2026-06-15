@@ -38,3 +38,28 @@ export function useGroupMembers(groupId: number | null, enabled = true) {
     enabled: enabled && groupId !== null,
   })
 }
+
+/**
+ * 전체 UI 권한 카탈로그 조회 훅 (GET /api/permission).
+ * 한 번에 조회 (권한 종류가 적다고 가정). 권한 부여/회수 UI 의 후보 목록.
+ */
+export function useAllPermissions(enabled = true) {
+  return useQuery({
+    queryKey: groupQueryKeys.permissionCatalog,
+    queryFn: () => groupApi.listAllPermissions(0, 500),
+    enabled,
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * 특정 그룹이 보유한 권한 매핑 조회 훅 (GET /api/group/{groupId}/permission).
+ * 반환 행은 permId 기준 — 카탈로그(useAllPermissions)와 permId 로 교차해 보유 여부를 판단한다.
+ */
+export function useGroupPermissions(groupId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: groupId === null ? ['group', 'permissions', 'noop'] : groupQueryKeys.permissions(groupId),
+    queryFn: () => groupApi.listGroupPermissions(groupId as number, 0, 500),
+    enabled: enabled && groupId !== null,
+  })
+}

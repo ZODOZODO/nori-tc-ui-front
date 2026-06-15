@@ -17,8 +17,15 @@ import {
   type GroupMembershipResponse,
   type GroupPage,
   type GroupPageResponse,
+  type GroupPermissionMapping,
+  type GroupPermissionMappingResponse,
+  type GroupPermissionPage,
+  type GroupPermissionPageResponse,
   type GroupUpdateResponse,
   type GroupUpsertRequest,
+  type PermissionInfo,
+  type PermissionPage,
+  type PermissionPageResponse,
 } from '../types/group.types'
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
@@ -201,6 +208,62 @@ const normalizeGroupPagePayload = (
   return { items, offset, limit, count }
 }
 
+const permissionCatalogFallbackMessage = () => i18n.t('error.group.permissionCatalog')
+const groupPermissionListFallbackMessage = () => i18n.t('error.group.permissionList')
+
+const isPermissionInfoItem = (value: unknown): value is PermissionInfo =>
+  isRecord(value) &&
+  typeof value.permId === 'number' &&
+  typeof value.permCode === 'string' &&
+  typeof value.permName === 'string'
+
+const isGroupPermissionMappingItem = (value: unknown): value is GroupPermissionMapping =>
+  isRecord(value) &&
+  typeof value.ugpKey === 'number' &&
+  typeof value.groupId === 'number' &&
+  typeof value.permId === 'number'
+
+/**
+ * PagedResponse 또는 bare array 응답을 {items, offset, limit, count} 로 정규화합니다.
+ * 권한 카탈로그 / 그룹-권한 매핑 두 신규 엔드포인트가 공유합니다.
+ */
+const normalizePagedPayload = <TItem>(
+  payload: unknown,
+  isItem: (value: unknown) => value is TItem,
+  requestedOffset: number,
+  requestedLimit: number,
+  fallbackMessage: string,
+): { items: TItem[]; offset: number; limit: number; count: number } => {
+  const itemsSource = Array.isArray(payload)
+    ? payload
+    : isRecord(payload) && Array.isArray(payload.items)
+      ? payload.items
+      : null
+
+  if (itemsSource === null) {
+    throw new GroupApiError(
+      createGroupFailResponse(
+        {
+          success: false,
+          data: null,
+          errorCode: 'INVALID_RESPONSE',
+          errorMsg: fallbackMessage,
+        },
+        fallbackMessage,
+      ),
+    )
+  }
+
+  const items = itemsSource.filter(isItem)
+  const record = isRecord(payload) ? payload : {}
+  const offset = typeof record.offset === 'number' ? record.offset : requestedOffset
+  const limit = typeof record.limit === 'number' ? record.limit : requestedLimit
+  const count =
+    typeof record.count === 'number' ? Math.max(record.count, items.length) : items.length
+
+  return { items, offset, limit, count }
+}
+
 const withCsrfHeaders = async <TResponse>(
   requestFn: (csrfToken: string) => Promise<TResponse>,
 ): Promise<TResponse> => {
@@ -374,6 +437,104 @@ export const groupApi = {
       )
     } catch (error) {
       throw normalizeGroupError(error, i18n.t('error.group.removeMember'))
+    }
+  },
+
+  listAllPermissions: async (offset = 0, limit = 500): Promise<PermissionPage> => {
+    try {
+      const response = await apiClient.get<PermissionPageResponse>('/permission', {
+        params: { offset, limit },
+        withCredentials: true,
+      })
+
+      return normalizePagedPayload<PermissionInfo>(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          permissionCatalogFallbackMessage(),
+        ),
+        isPermissionInfoItem,
+        offset,
+        limit,
+        permissionCatalogFallbackMessage(),
+      )
+    } catch (error) {
+      throw normalizeGroupError(error, permissionCatalogFallbackMessage())
+    }
+  },
+
+  listGroupPermissions: async (
+    groupId: number,
+    offset = 0,
+    limit = 500,
+  ): Promise<GroupPermissionPage> => {
+    try {
+      const response = await apiClient.get<GroupPermissionPageResponse>(
+        `/group/${groupId}/permission`,
+        {
+          params: { offset, limit },
+          withCredentials: true,
+        },
+      )
+
+      return normalizePagedPayload<GroupPermissionMapping>(
+        resolveSuccessPayload<unknown>(
+          response.data,
+          response.status,
+          groupPermissionListFallbackMessage(),
+        ),
+        isGroupPermissionMappingItem,
+        offset,
+        limit,
+        groupPermissionListFallbackMessage(),
+      )
+    } catch (error) {
+      throw normalizeGroupError(error, groupPermissionListFallbackMessage())
+    }
+  },
+
+  addGroupPermission: async (groupId: number, permId: number): Promise<void> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post<GroupPermissionMappingResponse>(
+          `/group/${groupId}/permission/${permId}`,
+          null,
+          {
+            withCredentials: true,
+            headers: { [CSRF_HEADER_NAME]: csrfToken },
+            validateStatus: (status) => status >= 200 && status < 600,
+          },
+        ),
+      )
+
+      resolveSuccessPayload<GroupPermissionMapping>(
+        response.data,
+        response.status,
+        i18n.t('error.group.addPermission'),
+      )
+    } catch (error) {
+      throw normalizeGroupError(error, i18n.t('error.group.addPermission'))
+    }
+  },
+
+  removeGroupPermission: async (groupId: number, permId: number): Promise<void> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.delete<GroupDeleteResponse>(`/group/${groupId}/permission/${permId}`, {
+          withCredentials: true,
+          headers: { [CSRF_HEADER_NAME]: csrfToken },
+          validateStatus: (status) => status >= 200 && status < 600,
+        }),
+      )
+
+      resolveSuccessPayload<null>(
+        response.data,
+        response.status,
+        i18n.t('error.group.removePermission'),
+        true,
+      )
+    } catch (error) {
+      throw normalizeGroupError(error, i18n.t('error.group.removePermission'))
     }
   },
 }

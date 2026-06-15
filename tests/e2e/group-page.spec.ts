@@ -121,6 +121,21 @@ const setupMocks = async (page: Page, state: GroupApiMockState) => {
     })
   })
 
+  // 공유 topbar 의 LineScopeSelector 가 호출하는 GET /api/line — 배열 응답 필수.
+  // 미mock 시 401 → api-client interceptor 가 /login 으로 redirect → 모든 /user 진입 테스트 실패.
+  await page.route(/.*\/api\/line(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiSuccess([
+          { lineKey: 1, lineCode: 'LINE1', lineName: 'Line 1' },
+          { lineKey: 2, lineCode: 'LINE2', lineName: 'Line 2' },
+        ]),
+      ),
+    })
+  })
+
   await page.route('**/api/auth/csrf', async (route) => {
     await route.fulfill({
       status: 200,
@@ -474,4 +489,160 @@ test('Group-AC-8b: 권한 없는 사용자가 /user 직접 접근 시 차단', a
 
   await page.goto('/user')
   await expect(page).toHaveURL(/\/(login|forbidden|eqp)/)
+})
+
+// [Group-AC-9/10] 그룹 행의 권한 버튼 → GroupPermissionsModal:
+//   - GET /api/permission 카탈로그를 카테고리 그룹핑 + 활성 권한만 표시 (비활성 제외)
+//   - GET /api/group/{groupId}/permission 의 permId 로 체크 상태 결정
+//   - 체크는 로컬 draft, 저장 시 일괄 POST/DELETE, 취소 시 폐기
+const PERMISSION_CATALOG = [
+  { permId: 1, permCode: 'EQP_READ', permName: '설비 조회', resourceType: 'API', resource: '/api/eqp', httpMethod: 'GET', description: null, isActive: true },
+  { permId: 2, permCode: 'EQP_WRITE', permName: '설비 변경', resourceType: 'API', resource: '/api/eqp', httpMethod: null, description: null, isActive: true },
+  { permId: 3, permCode: 'DEPLOY_READ', permName: 'Deploy 조회', resourceType: 'API', resource: '/api/deploys', httpMethod: 'GET', description: null, isActive: true },
+  { permId: 9, permCode: 'LEGACY_INACTIVE', permName: '비활성 권한', resourceType: 'API', resource: '/api/legacy', httpMethod: 'GET', description: null, isActive: false },
+] as const
+
+// setupMocks 이후 등록 → 권한 라우트가 우선 매칭된다. AC-9/AC-10 공유.
+const setupGroupPermissionMocks = async (
+  page: Page,
+  grantedPermIds: Set<number>,
+  grantCalls: number[],
+  revokeCalls: number[],
+) => {
+  await page.route(/.*\/api\/permission(\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiSuccess({ items: PERMISSION_CATALOG, offset: 0, limit: 500, count: PERMISSION_CATALOG.length }),
+      ),
+    })
+  })
+
+  await page.route(/.*\/api\/group\/(\d+)\/permission(\/(\d+))?(\?.*)?$/, async (route, request) => {
+    const url = new URL(request.url())
+    const match = url.pathname.match(/\/api\/group\/(\d+)\/permission(?:\/(\d+))?$/)
+    if (!match) {
+      await route.fallback()
+      return
+    }
+    const groupId = Number(match[1])
+    const permId = match[2] ? Number(match[2]) : null
+    const method = request.method()
+
+    if (method === 'GET' && permId === null) {
+      const items = Array.from(grantedPermIds).map((id) => ({
+        ugpKey: id * 100,
+        groupId,
+        permId: id,
+        grantedAt: '2025-05-01T00:00:00Z',
+        grantedBy: 'SEED',
+      }))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(apiSuccess({ items, offset: 0, limit: 500, count: items.length })),
+      })
+      return
+    }
+    if (method === 'POST' && permId !== null) {
+      grantCalls.push(permId)
+      grantedPermIds.add(permId)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(apiSuccess({ ugpKey: permId * 100, groupId, permId, grantedAt: '2025-05-01T00:00:00Z', grantedBy: 'admin' })),
+      })
+      return
+    }
+    if (method === 'DELETE' && permId !== null) {
+      revokeCalls.push(permId)
+      grantedPermIds.delete(permId)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(apiNullSuccess()),
+      })
+      return
+    }
+    await route.fallback()
+  })
+}
+
+test('Group-AC-9: 권한 편집 스테이징 후 저장 시 일괄 적용', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+
+  const grantedPermIds = new Set<number>([1]) // EQP_READ 초기 보유
+  const grantCalls: number[] = []
+  const revokeCalls: number[] = []
+  await setupGroupPermissionMocks(page, grantedPermIds, grantCalls, revokeCalls)
+
+  const consoleErrors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text())
+    }
+  })
+  page.on('pageerror', (error) => {
+    consoleErrors.push(error.message)
+  })
+
+  await navigateToGroupPanel(page)
+  await expect(page.getByTestId('group-row-10')).toBeVisible()
+
+  // 행의 권한 관리 버튼 → 모달 오픈.
+  await page.getByTestId('group-row-permissions-10').click()
+  await expect(page.getByTestId('group-permissions-list')).toBeVisible()
+
+  // 활성 권한 3개 표시, 비활성(permId 9) 미표시.
+  await expect(page.getByTestId('group-permissions-row-1')).toBeVisible()
+  await expect(page.getByTestId('group-permissions-row-2')).toBeVisible()
+  await expect(page.getByTestId('group-permissions-row-3')).toBeVisible()
+  await expect(page.getByTestId('group-permissions-row-9')).toHaveCount(0)
+
+  // 요약: 활성 3개 중 1개 보유.
+  await expect(page.getByTestId('group-permissions-summary')).toContainText('1 / 3')
+
+  // 초기 체크 상태: EQP_READ(1) 보유, EQP_WRITE(2) 미보유.
+  await expect(page.getByTestId('group-permissions-checkbox-1')).toBeChecked()
+  await expect(page.getByTestId('group-permissions-checkbox-2')).not.toBeChecked()
+
+  // 스테이징: 토글은 로컬 draft 만 변경 — 저장 전 API 호출 없음.
+  await page.getByTestId('group-permissions-checkbox-2').click() // grant 2
+  await page.getByTestId('group-permissions-checkbox-1').click() // revoke 1
+  await expect(page.getByTestId('group-permissions-checkbox-2')).toBeChecked()
+  await expect(page.getByTestId('group-permissions-checkbox-1')).not.toBeChecked()
+  expect(grantCalls).toEqual([])
+  expect(revokeCalls).toEqual([])
+
+  // 저장 → 변경분 일괄 적용(POST 2, DELETE 1) 후 모달 닫힘.
+  await page.getByTestId('group-permissions-save').click()
+  await expect.poll(() => grantCalls).toContain(2)
+  await expect.poll(() => revokeCalls).toContain(1)
+  await expect(page.getByTestId('group-permissions-list')).toHaveCount(0)
+
+  expect(consoleErrors).toEqual([])
+})
+
+test('Group-AC-10: 권한 편집 취소 시 변경 폐기 (API 호출 없음)', async ({ page }) => {
+  const state = createDefaultMockState()
+  await setupMocks(page, state)
+
+  const grantedPermIds = new Set<number>([1])
+  const grantCalls: number[] = []
+  const revokeCalls: number[] = []
+  await setupGroupPermissionMocks(page, grantedPermIds, grantCalls, revokeCalls)
+
+  await navigateToGroupPanel(page)
+  await page.getByTestId('group-row-permissions-10').click()
+  await expect(page.getByTestId('group-permissions-list')).toBeVisible()
+
+  // 토글(로컬) → 취소 → 변경 폐기 + 모달 닫힘, API 호출 0.
+  await page.getByTestId('group-permissions-checkbox-2').click()
+  await page.getByTestId('group-permissions-checkbox-1').click()
+  await page.getByTestId('group-permissions-cancel').click()
+  await expect(page.getByTestId('group-permissions-list')).toHaveCount(0)
+  expect(grantCalls).toEqual([])
+  expect(revokeCalls).toEqual([])
 })

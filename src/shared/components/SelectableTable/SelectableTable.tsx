@@ -516,7 +516,7 @@ export const SelectableTable = <TRow,>({
             ))}
             {showActionColumn ? (
               <TableHead
-                className="whitespace-nowrap"
+                className={cn('whitespace-nowrap', actionColumn?.headerClassName)}
                 style={{ width: actionColumn?.width, minWidth: actionColumn?.width }}
               >
                 {actionColumn?.header ?? t('common.table.action')}

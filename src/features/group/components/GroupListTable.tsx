@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Pencil, Trash2, Users } from 'lucide-react'
+import { Pencil, ShieldCheck, Trash2, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -38,6 +38,7 @@ export function GroupListTable() {
   const openEditModal = useGroupUiStore((state) => state.openEditModal)
   const openDeleteDialog = useGroupUiStore((state) => state.openDeleteDialog)
   const openAddMembersModal = useGroupUiStore((state) => state.openAddMembersModal)
+  const openPermissionsModal = useGroupUiStore((state) => state.openPermissionsModal)
 
   const groupListQuery = useGroups(listOffset, GROUP_PAGE_SIZE)
 
@@ -87,12 +88,25 @@ export function GroupListTable() {
   const actionColumn = useMemo<SelectableTableActionColumn<GroupInfo>>(
     () => ({
       header: t('group.table.action'),
+      headerClassName: 'text-right',
       render: (row) => (
         <div className="flex justify-end gap-1">
           <Button
             type="button"
             variant="ghost"
             size="sm"
+            title={t('group.action.permissions')}
+            aria-label={t('group.aria.permissions', { code: row.groupCode })}
+            data-testid={`group-row-permissions-${row.groupId}`}
+            onClick={() => openPermissionsModal(row.groupId)}
+          >
+            <ShieldCheck className="size-4" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            title={t('group.action.members')}
             aria-label={t('group.aria.addMembers', { code: row.groupCode })}
             data-testid={`group-row-members-${row.groupId}`}
             onClick={() => openAddMembersModal(row.groupId)}
@@ -103,6 +117,7 @@ export function GroupListTable() {
             type="button"
             variant="ghost"
             size="sm"
+            title={t('group.action.edit')}
             aria-label={t('group.aria.edit', { code: row.groupCode })}
             data-testid={`group-row-edit-${row.groupId}`}
             onClick={() => openEditModal(row.groupId)}
@@ -113,6 +128,7 @@ export function GroupListTable() {
             type="button"
             variant="ghost"
             size="sm"
+            title={t('group.action.delete')}
             aria-label={t('group.aria.delete', { code: row.groupCode })}
             data-testid={`group-row-delete-${row.groupId}`}
             onClick={() => openDeleteDialog(row.groupId)}
@@ -122,7 +138,7 @@ export function GroupListTable() {
         </div>
       ),
     }),
-    [t, openAddMembersModal, openEditModal, openDeleteDialog],
+    [t, openPermissionsModal, openAddMembersModal, openEditModal, openDeleteDialog],
   )
 
   const isInitialLoading = groupListQuery.isLoading && items.length === 0

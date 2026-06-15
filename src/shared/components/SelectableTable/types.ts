@@ -80,6 +80,8 @@ export type SelectableTablePasteHandler<TRow> = (
  */
 export interface SelectableTableActionColumn<TRow> {
   header?: string
+  /** 액션 헤더 셀에 추가할 className (예: 우측 정렬 'text-right'). 미지정 시 기본 정렬. */
+  headerClassName?: string
   width?: string
   render: (row: TRow, rowIdx: number) => ReactNode
 }

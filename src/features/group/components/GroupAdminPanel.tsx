@@ -7,6 +7,7 @@ import { useGroupUiStore } from '../stores/group-ui.store'
 import { GroupAddMembersModal } from './GroupAddMembersModal'
 import { GroupDeleteConfirmDialog } from './GroupDeleteConfirmDialog'
 import { GROUP_PAGE_SIZE, GroupListTable } from './GroupListTable'
+import { GroupPermissionsModal } from './GroupPermissionsModal'
 import { GroupUpsertModal } from './GroupUpsertModal'
 
 export function GroupAdminPanel() {
@@ -19,10 +20,13 @@ export function GroupAdminPanel() {
   const pendingDeleteGroupId = useGroupUiStore((state) => state.pendingDeleteGroupId)
   const isAddMembersModalOpen = useGroupUiStore((state) => state.isAddMembersModalOpen)
   const addMembersTargetGroupId = useGroupUiStore((state) => state.addMembersTargetGroupId)
+  const isPermissionsModalOpen = useGroupUiStore((state) => state.isPermissionsModalOpen)
+  const permissionsTargetGroupId = useGroupUiStore((state) => state.permissionsTargetGroupId)
   const openCreateModal = useGroupUiStore((state) => state.openCreateModal)
   const closeUpsertModal = useGroupUiStore((state) => state.closeUpsertModal)
   const closeDeleteDialog = useGroupUiStore((state) => state.closeDeleteDialog)
   const closeAddMembersModal = useGroupUiStore((state) => state.closeAddMembersModal)
+  const closePermissionsModal = useGroupUiStore((state) => state.closePermissionsModal)
 
   const groupListQuery = useGroups(listOffset, GROUP_PAGE_SIZE)
 
@@ -43,6 +47,15 @@ export function GroupAdminPanel() {
       groupListQuery.data?.items.find((group) => group.groupId === addMembersTargetGroupId) ?? null
     )
   }, [addMembersTargetGroupId, groupListQuery.data?.items])
+
+  const permissionsTargetGroupRow = useMemo(() => {
+    if (permissionsTargetGroupId === null) {
+      return null
+    }
+    return (
+      groupListQuery.data?.items.find((group) => group.groupId === permissionsTargetGroupId) ?? null
+    )
+  }, [permissionsTargetGroupId, groupListQuery.data?.items])
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
@@ -76,6 +89,12 @@ export function GroupAdminPanel() {
         groupId={addMembersTargetGroupId}
         groupCode={addMembersTargetGroupRow?.groupCode ?? null}
         onClose={closeAddMembersModal}
+      />
+      <GroupPermissionsModal
+        open={isPermissionsModalOpen}
+        groupId={permissionsTargetGroupId}
+        groupCode={permissionsTargetGroupRow?.groupCode ?? null}
+        onClose={closePermissionsModal}
       />
     </div>
   )
