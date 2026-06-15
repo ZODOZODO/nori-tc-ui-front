@@ -124,15 +124,11 @@ function InstancedPart({
   geometry,
   material,
   instances,
-  castShadow = false,
-  receiveShadow = false,
   onPick,
 }: {
   geometry: THREE.BufferGeometry
   material: THREE.Material
   instances: PartInstance[]
-  castShadow?: boolean
-  receiveShadow?: boolean
   onPick?: (event: ThreeEvent<PointerEvent>) => void
 }) {
   const ref = useRef<THREE.InstancedMesh>(null)
@@ -160,14 +156,16 @@ function InstancedPart({
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true
     }
+    // 인스턴스를 옮긴 뒤 boundingSphere 를 무효화한다 — three.js InstancedMesh.raycast 는 boundingSphere 를 1회만
+    // 계산해 캐시하고 인스턴스 이동 시 갱신하지 않아, 설비를 그 sphere 밖으로 끌면 raycast 가 early-out 해 다시 못 집는다
+    // (드래그 후 재선택 불가의 직접 원인). null 로 두면 다음 raycast 가 현재 위치로 재계산한다.
+    mesh.boundingSphere = null
   }, [instances])
   return (
     <instancedMesh
       key={capacity}
       ref={ref}
       args={[geometry, material, capacity]}
-      castShadow={castShadow}
-      receiveShadow={receiveShadow}
       frustumCulled={false}
       onPointerDown={onPick}
     />
@@ -224,8 +222,10 @@ export function LiveMap3DEquipmentField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placements])
 
-  // 본체(mainframe) 클릭 → instanceId(=placement index) 로 매핑해 선택/드래그.
-  const pickMainframe = (event: ThreeEvent<PointerEvent>) => {
+  // 설비 본체 파트(plinth/mainframe/cap/EFEM) 클릭 → instanceId(=placement index, 모두 single 이라 1:1) 로 매핑해 선택/드래그.
+  // 보이는 메시에 직접 핸들러를 달아 raycast 가 확실하다. 특히 등각 카메라가 보는 전면 EFEM 까지 픽 가능해야
+  // 전면 클릭이 통과해 뒤의 바닥이 잡히는 일이 없다(투명 프록시 메시는 일부 환경에서 raycast 누락 → 사용 안 함).
+  const pickEquipment = (event: ThreeEvent<PointerEvent>) => {
     const id = event.instanceId
     if (id == null) {
       return
@@ -238,16 +238,16 @@ export function LiveMap3DEquipmentField({
 
   return (
     <>
-      <InstancedPart geometry={GEO.plinth} material={MAT.plinth} instances={parts.plinth} receiveShadow />
-      <InstancedPart geometry={GEO.mainframe} material={MAT.body} instances={parts.mainframe} castShadow receiveShadow onPick={pickMainframe} />
-      <InstancedPart geometry={GEO.cap} material={MAT.cap} instances={parts.cap} castShadow />
-      <InstancedPart geometry={GEO.efem} material={MAT.efem} instances={parts.efem} castShadow receiveShadow />
-      <InstancedPart geometry={GEO.screen} material={MAT.screen} instances={parts.screen} />
+      <InstancedPart geometry={GEO.plinth} material={MAT.plinth} instances={parts.plinth} onPick={pickEquipment} />
+      <InstancedPart geometry={GEO.mainframe} material={MAT.body} instances={parts.mainframe} onPick={pickEquipment} />
+      <InstancedPart geometry={GEO.cap} material={MAT.cap} instances={parts.cap} onPick={pickEquipment} />
+      <InstancedPart geometry={GEO.efem} material={MAT.efem} instances={parts.efem} onPick={pickEquipment} />
+      <InstancedPart geometry={GEO.screen} material={MAT.screen} instances={parts.screen} onPick={pickEquipment} />
       <InstancedPart geometry={GEO.accent} material={MAT.accent} instances={parts.accent} />
       <InstancedPart geometry={GEO.towerPole} material={MAT.towerPole} instances={parts.towerPole} />
       <InstancedPart geometry={GEO.towerSeg} material={MAT.tower} instances={parts.towerSeg} />
-      <InstancedPart geometry={GEO.dock} material={MAT.dock} instances={parts.dock} receiveShadow />
-      <InstancedPart geometry={GEO.foup} material={MAT.foup} instances={parts.foup} castShadow />
+      <InstancedPart geometry={GEO.dock} material={MAT.dock} instances={parts.dock} />
+      <InstancedPart geometry={GEO.foup} material={MAT.foup} instances={parts.foup} />
       <InstancedPart geometry={GEO.band} material={MAT.band} instances={parts.band} />
     </>
   )

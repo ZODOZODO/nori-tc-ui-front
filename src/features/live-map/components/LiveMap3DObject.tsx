@@ -8,25 +8,32 @@ import type { LiveMap3DPrim, LiveMap3DShape } from '../lib/live-map-3d.model'
  * 여기선 각 prim 의 객체 로컬 위치/회전/크기/색만 그린다.</p>
  */
 
-function Prim({ prim }: { prim: LiveMap3DPrim }) {
+function Prim({ prim, colorOverride }: { prim: LiveMap3DPrim; colorOverride?: string }) {
   const position: [number, number, number] = [prim.position.x, prim.position.y, prim.position.z]
   return (
-    <mesh position={position} rotation={[0, prim.rotationY, 0]} castShadow receiveShadow>
+    <mesh position={position} rotation={[0, prim.rotationY, 0]}>
       {prim.type === 'box' ? <boxGeometry args={[prim.size.x, prim.size.y, prim.size.z]} /> : null}
       {prim.type === 'cylinder' ? (
         <cylinderGeometry args={[prim.size.x / 2, prim.size.x / 2, prim.size.y, 24]} />
       ) : null}
       {prim.type === 'plane' ? <planeGeometry args={[prim.size.x, prim.size.z]} /> : null}
-      <meshStandardMaterial color={prim.color} metalness={0.25} roughness={0.65} />
+      <meshStandardMaterial color={colorOverride ?? prim.color} metalness={0.2} roughness={0.6} />
     </mesh>
   )
 }
 
-export const LiveMap3DObject = memo(function LiveMap3DObject({ shape }: { shape: LiveMap3DShape }) {
+/** colorOverride 가 있으면 모든 prim 을 그 색으로 칠한다(구조물 모던 팔레트 일괄 적용 — 저장된 옛 색 무시). */
+export const LiveMap3DObject = memo(function LiveMap3DObject({
+  shape,
+  colorOverride,
+}: {
+  shape: LiveMap3DShape
+  colorOverride?: string
+}) {
   return (
     <>
       {shape.prims.map((prim) => (
-        <Prim key={prim.id} prim={prim} />
+        <Prim key={prim.id} prim={prim} colorOverride={colorOverride} />
       ))}
     </>
   )

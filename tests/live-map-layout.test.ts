@@ -6,13 +6,19 @@ import { LIVE_MAP_EQUIPMENT_NODES } from '../src/features/live-map/mocks/live-ma
 test('선택 설비 fallback은 ERROR 설비를 우선합니다', () => {
   const visibleNodes = LIVE_MAP_EQUIPMENT_NODES.filter((equipment) => equipment.status === 'ERROR')
 
-  const selectedEquipment = resolveSelectedLiveMapEquipment(
-    LIVE_MAP_EQUIPMENT_NODES,
-    visibleNodes,
-    null,
-  )
+  const selectedEquipment = resolveSelectedLiveMapEquipment(visibleNodes, null)
 
   assert.equal(selectedEquipment?.eqpId, 'A-EQ17')
+})
+
+test('스코프에 보이는 설비가 없으면 전체 라인으로 폴백하지 않고 null 을 반환합니다', () => {
+  // 회귀: 설비 없는 라인(B Line) 선택 시 visible 가 비면, 과거 코드는 전체 라인의
+  // 첫 설비(예: CMP_001)를 '선택 설비'로 끌어와 타 라인 설비가 누수됐다.
+  const staleSelectedFromOtherLine = LIVE_MAP_EQUIPMENT_NODES[0]?.eqpId ?? 'A-EQ01'
+
+  const selectedEquipment = resolveSelectedLiveMapEquipment([], staleSelectedFromOtherLine)
+
+  assert.equal(selectedEquipment, null)
 })
 
 test('설비 tooltip용 포트 상태와 처리 방식 정보가 설비별로 존재합니다', () => {

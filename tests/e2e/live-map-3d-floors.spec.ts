@@ -1,10 +1,10 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * SPEC live-map-3d — 공정별 자동 층 배치 + 층 뷰 필터(④) (admin/viewer).
+ * SPEC live-map-3d — 층 뷰 필터(④) (admin/viewer).
  *
- * 자동 표시 설비는 clusterId(공정)로 층이 정해진다(2개 층): photo/etch/cvd/wet→1F, cmp/diff/imp/metal→2F.
- * 좌측 1F/2F 는 그 층만, 전체는 모두 보여준다(읽기 전용에서도 동작). console/pageerror 0.
+ * 배치(placement)는 자체 transform.floor 를 가진다. 좌측 1F/2F 버튼은 그 층 배치만, 전체는 모두 보여준다.
+ * (공정→층 자동 배치는 제거 — 자동 표시 설비는 1층 중립 그리드, 층은 사용자가 직접 지정한다.) console/pageerror 0.
  */
 
 const apiSuccess = <TData>(data: TData) => ({ success: true, data, errorCode: null, errorMsg: null })
@@ -17,22 +17,35 @@ const ME = {
 }
 const LINES = [{ lineKey: 1, lineCode: 'A_LINE', lineName: 'A Line' }]
 
-const eqp = (eqpKey: number, clusterId: string, clusterName: string) => ({
-  eqpKey, eqpId: `EQP-${eqpKey}`, eqpName: `${clusterName}-${eqpKey}`, lineValue: 'A_LINE', lineLabel: 'A Line',
-  clusterId, clusterName, equipmentModeLabel: 'Auto', status: 'RUN' as const, statusLabel: 'Run',
+const eqp = (eqpKey: number, name: string) => ({
+  eqpKey, eqpId: `EQP-${eqpKey}`, eqpName: name, lineValue: 'A_LINE', lineLabel: 'A Line',
+  clusterId: 'c1', clusterName: 'C1', equipmentModeLabel: 'Auto', status: 'RUN' as const, statusLabel: 'Run',
   portItems: [], tooltipMeta: '', tooltipStep: '', alertMessage: null,
 })
-// photo→1F, cmp→2F, wet→1F (2개 층).
-const LIVE_MAP = { equipmentItems: [eqp(77, 'photo', 'PHOTO'), eqp(88, 'cmp', 'CMP'), eqp(99, 'wet', 'WET')] }
-const EMPTY_LAYOUT = { layoutKey: null, lineKey: 1, canvasJson: null, placements: [], objects: [] }
+const LIVE_MAP = { equipmentItems: [eqp(77, 'A1'), eqp(88, 'A2'), eqp(99, 'A3')] }
+
+const EQUIP_OBJECT = { objectKey: 1, objectName: '기본 설비', objectKind: 'EQUIPMENT' as const, shapeJson: { v: 2, prims: [] }, isActive: true }
+const transform = (x: number, y: number, floor: number) => ({ v: 1, x, y, rotation: 0, scaleX: 1, scaleY: 1, skewX: 0, skewY: 0, zIndex: 0, depth: 0, floor })
+// 저장된 배치 — 77/99 는 1F, 88 은 2F. 자동 표시가 아니라 사용자가 층을 지정한 placement.
+const LAYOUT = {
+  layoutKey: 100,
+  lineKey: 1,
+  canvasJson: null,
+  placements: [
+    { placementKey: 1, objectKey: 1, eqpKey: 77, transformJson: transform(400, 355, 1) },
+    { placementKey: 2, objectKey: 1, eqpKey: 88, transformJson: transform(520, 355, 2) },
+    { placementKey: 3, objectKey: 1, eqpKey: 99, transformJson: transform(640, 355, 1) },
+  ],
+  objects: [EQUIP_OBJECT],
+}
 
 const setupMocks = async (page: Page) => {
   await page.route('**/api/auth/csrf', (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'set-cookie': 'XSRF-TOKEN=t; Path=/' }, body: JSON.stringify(apiNullSuccess()) }))
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(ME)) }))
   await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiNullSuccess()) }))
   await page.route('**/api/line', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LINES)) }))
-  await page.route(/\/api\/live-map\/layout\/objects(\/\d+)?(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) }))
-  await page.route(/\/api\/live-map\/layout(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'cache-control': 'no-store' }, body: JSON.stringify(apiSuccess(EMPTY_LAYOUT)) }))
+  await page.route(/\/api\/live-map\/layout\/objects(\/\d+)?(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([EQUIP_OBJECT])) }))
+  await page.route(/\/api\/live-map\/layout(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'cache-control': 'no-store' }, body: JSON.stringify(apiSuccess(LAYOUT)) }))
   await page.route(/.*\/api\/live-map(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LIVE_MAP)) }))
   await page.route(/.*\/api\/(eqp|model)(\/.*)?(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess({ items: [], offset: 0, limit: 500, count: 0 })) }))
   await page.route(/.*\/api\/comm-logs(\/.*)?(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) }))
@@ -52,7 +65,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('admin: 공정별로 설비가 1/2층에 자동 배치되고, 층 버튼이 그 층만 / 전체가 모두 보여준다 (console/pageerror 0)', async ({
+test('admin: 층 버튼이 그 층 배치만 / 전체가 모두 보여준다 (console/pageerror 0)', async ({
   page,
 }) => {
   test.setTimeout(90_000)
@@ -70,13 +83,13 @@ test('admin: 공정별로 설비가 1/2층에 자동 배치되고, 층 버튼이
   await expect(page.getByTestId('live-map-3d-badge-88')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-99')).toBeVisible()
 
-  // 1F → photo(77)·wet(99), cmp(88) 숨김.
+  // 1F → 77·99, 88 숨김.
   await page.getByTestId('live-map-3d-floor-1').click()
   await expect(page.getByTestId('live-map-3d-badge-77')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-99')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-88')).toHaveCount(0)
 
-  // 2F → cmp(88)만, photo(77)/wet(99) 숨김.
+  // 2F → 88만, 77/99 숨김.
   await page.getByTestId('live-map-3d-floor-2').click()
   await expect(page.getByTestId('live-map-3d-badge-88')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-badge-77')).toHaveCount(0)

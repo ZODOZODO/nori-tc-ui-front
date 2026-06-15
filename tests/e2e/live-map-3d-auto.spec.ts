@@ -1,11 +1,11 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * SPEC live-map-3d — 실설비 자동 표시 (admin).
+ * SPEC live-map-3d — 미배치 설비 수동 배치 (admin).
  *
- * 실제 환경(저장 layout 0 / 객체 라이브러리 0)에서도 선택 라인의 실설비(equipmentItems)를 캐비닛으로 자동 표시한다.
- * admin 이 자동 표시 설비를 편집(회전)하면 working 으로 승격되고, 저장 시 object_key NOT NULL FK 를 위해
- * 백킹 EQUIPMENT 객체를 1회 자동 생성(POST /objects) 후 PUT /layout 에 반영. console/pageerror 0.
+ * 미배치 설비(아직 배치 안 한 라인 실설비)는 3D 에 자동 표시되지 않는다. admin 이 편집모드 드롭다운에서 미배치 설비를
+ * 골라 '설비 추가' 해야 비로소 배치된다. 저장 시 object_key NOT NULL FK 를 위해 백킹 EQUIPMENT 객체를 1회 생성
+ * (POST /objects) 후 PUT /layout 에 반영. console/pageerror 0.
  */
 
 const apiSuccess = <TData>(data: TData) => ({ success: true, data, errorCode: null, errorMsg: null })
@@ -87,7 +87,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('admin: 저장 placement 0 이어도 라인 실설비가 캐비닛으로 자동 표시되고, 편집→저장 시 백킹 객체를 자동 생성한다 (console/pageerror 0)', async ({
+test('admin: 미배치 설비는 자동 표시되지 않고, 편집 드롭다운으로 선택→추가해야 배치된다 (console/pageerror 0)', async ({
   page,
 }) => {
   // r3f(three/drei) dev 첫 컴파일 + WebGL 초기화 여유.
@@ -102,33 +102,34 @@ test('admin: 저장 placement 0 이어도 라인 실설비가 캐비닛으로 �
   await page.getByTestId('live-map-mode-3d').click()
   await expect(page.getByTestId('live-map-3d-scene')).toBeVisible()
 
-  // 저장 0 인데도 실설비 2대가 자동 표시 — 상태 뱃지로 확인.
-  await expect(page.getByTestId('live-map-3d-badge-77')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-badge-78')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-visible-count')).toHaveText('2')
+  // 저장 0 + 미배치 설비는 화면에 안 뜬다(자동 표시 제거).
+  await expect(page.getByTestId('live-map-3d-visible-count')).toHaveText('0')
   await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('0')
+  await expect(page.getByTestId('live-map-3d-badge-77')).toHaveCount(0)
 
-  // 편집모드 → 자동 표시 설비(77) 선택 → 회전(승격) → 저장.
+  // 편집모드 → 미배치 설비 드롭다운에서 77 선택 → 설비 추가 → 비로소 표시(placement 1, 자동 선택).
   await page.getByTestId('live-map-3d-edit-toggle').click()
-  await page.getByTestId('live-map-3d-badge-77').click()
+  await page.getByTestId('live-map-3d-add-eqp-select').selectOption('77')
+  await page.getByTestId('live-map-3d-add-eqp').click()
+  await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('1')
+  await expect(page.getByTestId('live-map-3d-badge-77')).toBeVisible()
   await expect(page.getByTestId('live-map-3d-selected')).toBeVisible()
   await page.getByTestId('live-map-3d-rotate-cw').click()
-  await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('1')
 
   await page.getByTestId('live-map-3d-save').click()
 
-  // 백킹 EQUIPMENT 객체 1회 생성 + PUT /layout 에 그 objectKey 로 1건 반영.
+  // 백킹 EQUIPMENT 객체 1회 생성 + PUT /layout 에 그 objectKey + eqpKey 77 로 1건 반영.
   await expect.poll(() => state.postObjectCalls).toBe(1)
   await expect.poll(() => state.putCalls).toBe(1)
   expect(state.lastPlacements).toHaveLength(1)
   expect(state.lastPlacements[0].objectKey).toBe(9)
   expect(state.lastPlacements[0].eqpKey).toBe(77)
-  // 77 = c1 index0(bay 좌 열, base 90°) → CW 회전 +15 = 105.
-  expect(state.lastPlacements[0].transformJson.rotation).toBe(105)
+  // 추가 직후 base 회전 0° → CW +15 = 15.
+  expect(state.lastPlacements[0].transformJson.rotation).toBe(15)
   expect(state.lastPlacements[0].transformJson.x).toBeGreaterThan(0)
   expect(state.lastPlacements[0].transformJson.y).toBeGreaterThan(0)
 
-  // 회귀: 쓰기 요청에 CSRF 헤더(X-XSRF-TOKEN)가 실려야 한다 — 누락 시 서버 403(이번 버그).
+  // 회귀: 쓰기 요청에 CSRF 헤더(X-XSRF-TOKEN)가 실려야 한다 — 누락 시 서버 403.
   expect(state.postCsrf, 'POST /objects must carry X-XSRF-TOKEN').toBeTruthy()
   expect(state.putCsrf, 'PUT /layout must carry X-XSRF-TOKEN').toBeTruthy()
 

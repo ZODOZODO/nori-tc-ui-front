@@ -54,7 +54,7 @@ export const isLiveMap3DShape = (json: unknown): json is LiveMap3DShape => {
 }
 
 /**
- * 빌트인(기성) 구조물 — DB row 없이 편집기/뷰어 목록에 항상 노출되는 기본 구조물(벽/파티션).
+ * 빌트인(기성) 구조물 — DB row 없이 편집기/뷰어 목록(구조물 편집)에 항상 노출되는 기본 구조물(벽/파티션/바닥/기둥).
  * 뷰어에 배치 후 저장 시 같은 이름의 STRUCTURE 객체를 1회 영속(지연저장)하고 placement 키를 치환한다.
  * objectKey 는 음수 sentinel — 양수 DB 키 및 설비 자동표시(0)와 충돌하지 않는다. 길이축은 X 고정(세로벽은 배치에서 90° 회전).
  */
@@ -65,45 +65,61 @@ export interface LiveMapBuiltinStructure {
   shapeJson: LiveMap3DShape
 }
 
+/**
+ * 구조물(벽/파티션/바닥/기둥)의 모던·클린 색 — 설비 팔레트(밝은 쿨그레이)와 정합.
+ * 빌트인 템플릿과 렌더 오버라이드({@link LIVE_MAP_STRUCTURE_COLOR_BY_NAME})가 같은 값을 쓰도록 단일 출처로 둔다.
+ */
+const STRUCTURE_COLOR = {
+  wall: '#dde2e9',
+  partition: '#cbd2db',
+  floor: '#d2d8e0',
+  column: '#9aa3b2',
+} as const
+
 export const LIVE_MAP_BUILTIN_STRUCTURES: readonly LiveMapBuiltinStructure[] = [
   {
     objectKey: -1,
     slug: 'wall',
     objectName: '벽',
-    shapeJson: { v: 2, prims: [{ id: 'wall', type: 'box', size: { x: 10, y: 3, z: 0.3 }, position: { x: 0, y: 1.5, z: 0 }, rotationY: 0, color: '#94a3b8' }] },
+    shapeJson: { v: 2, prims: [{ id: 'wall', type: 'box', size: { x: 10, y: 3, z: 0.3 }, position: { x: 0, y: 1.5, z: 0 }, rotationY: 0, color: STRUCTURE_COLOR.wall }] },
   },
   {
     objectKey: -2,
     slug: 'partition',
     objectName: '파티션',
-    shapeJson: { v: 2, prims: [{ id: 'partition', type: 'box', size: { x: 5, y: 1.6, z: 0.15 }, position: { x: 0, y: 0.8, z: 0 }, rotationY: 0, color: '#b8c2d0' }] },
+    shapeJson: { v: 2, prims: [{ id: 'partition', type: 'box', size: { x: 5, y: 1.6, z: 0.15 }, position: { x: 0, y: 0.8, z: 0 }, rotationY: 0, color: STRUCTURE_COLOR.partition }] },
+  },
+  {
+    objectKey: -3,
+    slug: 'floor',
+    objectName: '바닥',
+    shapeJson: { v: 2, prims: [{ id: 'floor', type: 'box', size: { x: 10, y: 0.2, z: 10 }, position: { x: 0, y: 0.1, z: 0 }, rotationY: 0, color: STRUCTURE_COLOR.floor }] },
+  },
+  {
+    objectKey: -4,
+    slug: 'column',
+    objectName: '기둥',
+    shapeJson: { v: 2, prims: [{ id: 'column', type: 'box', size: { x: 0.8, y: 3.5, z: 0.8 }, position: { x: 0, y: 1.75, z: 0 }, rotationY: 0, color: STRUCTURE_COLOR.column }] },
   },
 ]
+
+/**
+ * 구조물 objectName → 색. 색 출처는 "구조물 편집" 빌트인 객체({@link LIVE_MAP_BUILTIN_STRUCTURES})에서 직접 가져온다
+ * (별도 하드코딩 아님 — 빌트인이 단일 출처). 이미 저장된 STRUCTURE 객체(예전 색이 shapeJson 에 박힘)도 뷰어/빌더
+ * 렌더 시 이 색으로 오버라이드해, 빌트인 변경만으로 안 바뀌는 기존 저장분까지 일관된 모던 룩을 갖게 한다.
+ */
+export const LIVE_MAP_STRUCTURE_COLOR_BY_NAME: Readonly<Record<string, string>> = Object.fromEntries(
+  LIVE_MAP_BUILTIN_STRUCTURES.map((builtin) => [builtin.objectName, builtin.shapeJson.prims[0]?.color]).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  ),
+)
 
 /** 빌트인 구조물 키(음수 sentinel)인지 — 저장 시 실 STRUCTURE 객체 키로 치환 대상. */
 export const isBuiltinStructureKey = (objectKey: number): boolean => objectKey < 0
 
-/**
- * 공정(클러스터)별 자동 표시 설비의 기본 층 — clusterId(소문자) 기준. 미지정 공정(metro/etc 등)은 1층.
- * 2개 층(1·2)만 사용해 층당 설비를 모아 라인을 길게 한다. 저장된 placement 는 자체 floor 를 가지므로 이 매핑은 자동 표시에만 적용된다.
- */
-export const PROCESS_FLOOR: Record<string, number> = {
-  photo: 1,
-  etch: 1,
-  cvd: 1,
-  wet: 1,
-  cmp: 2,
-  diff: 2,
-  imp: 2,
-  metal: 2,
-}
-
-export const floorForCluster = (clusterId: string | null | undefined): number =>
-  PROCESS_FLOOR[(clusterId ?? '').toLowerCase()] ?? 1
-
-/** 뷰어 board 좌표계(1350×710 px). placement.transform.x/y 가 이 평면 위 위치. */
-export const LIVE_MAP_BOARD_PX_WIDTH = 1350
-export const LIVE_MAP_BOARD_PX_HEIGHT = 710
+/** 뷰어 board 좌표계(2400×1500 px = 60×37.5 world). placement.transform.x/y 가 이 평면 위 위치. 설비 50+대를 펼칠 fab 규모. */
+export const LIVE_MAP_BOARD_PX_WIDTH = 2400
+export const LIVE_MAP_BOARD_PX_HEIGHT = 1500
 
 /** placement px 좌표를 3D world(중앙 원점)로 — y(px)→z(world). 1 world unit ≈ WORLD_SCALE px. */
 export const LIVE_MAP_WORLD_SCALE = 40
@@ -125,206 +141,209 @@ export const LIVE_MAP_SNAP_PX = LIVE_MAP_WORLD_SCALE
 /** px 좌표를 스냅 격자에 반올림 — 드래그 이동 결과를 격자점에 떨어뜨린다(바둑판에 돌 놓듯). */
 export const snapToGrid = (px: number): number => Math.round(px / LIVE_MAP_SNAP_PX) * LIVE_MAP_SNAP_PX
 
-/**
- * 공정(cluster) 자동 레이아웃 — 실제 fab fishbone(스파인-베이) 플랜.
- *
- * <p>board 중앙을 가로지르는 <b>물류 스파인 통로</b>(가로)를 따라 각 공정(cluster)이 <b>직교 핑거 bay</b>로
- * 위/아래 번갈아(쌍을 이뤄 마주보게) 뻗어 나온다. bay 안 설비는 bay 내부 통로(세로)를 향해 <b>좌/우 2열</b>로
- * 마주보게 놓인다 — 로드포트가 내부 통로를 면하고, 통로는 스파인에 연결된다. bay 폭(가로)은 전 공정 동일하고
- * 설비가 많은 공정은 스파인 바깥쪽으로 길어진다(세로). 좌표는 board px — placementToWorld 로 world 변환되며
- * 드래그/저장 파이프라인과 동일 단위(편집 승격 시 그대로 이어짐).</p>
- */
-/** 중앙 물류 스파인 통로 반폭(px) — 룸 중앙 통로(ROOM_AISLE_W=3.4 world)와 정합. bay 는 스파인 밖에서 시작. */
-const SPINE_HALF_PX = 68
-/** bay 중심 → 설비 열 중심(px). 두 열(좌/우) 사이가 내부 통로. */
-const BAY_COL_OFFSET_PX = 78
-/** bay 길이축(세로) 설비 줄 피치(px) — 설비 폭(2.0 world=80px) + 갭. */
-const BAY_ROW_PITCH_PX = 92
-/** bay 폭(가로 px) — 전 공정 동일(좌/우 2열 + 설비 깊이 여유). 길이만 설비 수로 가변. */
-const BAY_WIDTH_PX = 236
-/** 인접 bay 사이 서비스 chase 폭(px) — 파티션이 들어가는 공간. */
-const BAY_GAP_PX = 60
-/** bay 내부 통로 폭(px) — 씬이 통로 스트립 렌더에 사용(좌/우 열 사이). */
-export const LIVE_MAP_BAY_AISLE_PX = 80
-
-/** bay 길이축(세로) 설비 줄 수 — 좌/우 2열로 나눈 줄 개수(count 만으로 결정 → placed 무관 위치 안정성). */
-const bayRows = (count: number): number => Math.max(1, Math.ceil(count / 2))
-/** bay 길이(세로 px) — 줄 수 × 줄 피치. 설비 많은 공정일수록 스파인 바깥으로 길어진다. */
-const bayLengthPx = (count: number): number => bayRows(count) * BAY_ROW_PITCH_PX
-
-/** 공정 구간 1개 — board px 중심/크기. 구조물(구간 바닥존/컨베이어/라벨) 렌더와 설비 배치 공용. */
-export interface LiveMapBay {
-  clusterId: string
-  clusterName: string
-  floor: number
-  centerXPx: number
-  centerYPx: number
-  widthPx: number
-  depthPx: number
-}
-
-/** 설비 그룹화 입력 — 라인 실설비에서 추린 최소 필드. */
-export interface BayEquipmentInput {
-  eqpKey: number
-  clusterId: string
-  clusterName: string
-}
-
-interface ClusterGroup {
-  clusterId: string
-  clusterName: string
-  floor: number
-  eqpKeys: number[]
-}
-
-interface BayCell {
-  group: ClusterGroup
-  centerXPx: number
-  centerYPx: number
-  widthPx: number
-  depthPx: number
-  /** 스파인 기준 핑거 방향 — −1 위(y 감소), +1 아래(y 증가). 설비 줄을 바깥으로 쌓는 부호. */
-  side: 1 | -1
-}
-
-/** 라인 설비를 등장 순서 보존하며 cluster 로 그룹화(+층). 위치 안정성의 기반 = 그룹/순서가 placed 와 무관. */
-const groupByCluster = (equipments: readonly BayEquipmentInput[]): ClusterGroup[] => {
-  const order: string[] = []
-  const byId = new Map<string, ClusterGroup>()
-  for (const equipment of equipments) {
-    const existing = byId.get(equipment.clusterId)
-    if (existing) {
-      existing.eqpKeys.push(equipment.eqpKey)
-      continue
-    }
-    byId.set(equipment.clusterId, {
-      clusterId: equipment.clusterId,
-      clusterName: equipment.clusterName,
-      floor: floorForCluster(equipment.clusterId),
-      eqpKeys: [equipment.eqpKey],
-    })
-    order.push(equipment.clusterId)
-  }
-  return order.map((id) => byId.get(id) as ClusterGroup)
-}
-
-const groupsByFloor = (groups: readonly ClusterGroup[]): Map<number, ClusterGroup[]> => {
-  const byFloor = new Map<number, ClusterGroup[]>()
-  for (const group of groups) {
-    const list = byFloor.get(group.floor)
-    if (list) {
-      list.push(group)
-    } else {
-      byFloor.set(group.floor, [group])
-    }
-  }
-  return byFloor
-}
-
-/**
- * 한 층의 cluster 그룹들을 fishbone 으로 배치한다. 두 공정이 한 슬롯(x)을 공유해 스파인 위/아래로 마주보는
- * 핑거 bay 를 이루고, 슬롯들은 board 중앙(스파인)을 기준으로 좌→우 등간격. bay 길이(세로)는 설비 수로 가변.
- */
-const layoutFloorBays = (groups: readonly ClusterGroup[]): BayCell[] => {
-  const slotCount = Math.max(1, Math.ceil(groups.length / 2))
-  const totalWidth = slotCount * BAY_WIDTH_PX + (slotCount - 1) * BAY_GAP_PX
-  const startX = LIVE_MAP_BOARD_PX_WIDTH / 2 - totalWidth / 2
-  const spineY = LIVE_MAP_BOARD_PX_HEIGHT / 2
-  return groups.map((group, index) => {
-    const slot = Math.floor(index / 2)
-    // 쌍의 첫(짝수) 공정은 스파인 위(−1, y 감소), 둘째(홀수)는 아래(+1, y 증가) — 마주보는 핑거.
-    const side: 1 | -1 = index % 2 === 0 ? -1 : 1
-    const centerXPx = startX + slot * (BAY_WIDTH_PX + BAY_GAP_PX) + BAY_WIDTH_PX / 2
-    const lengthPx = bayLengthPx(group.eqpKeys.length)
-    const centerYPx = spineY + side * (SPINE_HALF_PX + lengthPx / 2)
-    return { group, centerXPx, centerYPx, widthPx: BAY_WIDTH_PX, depthPx: lengthPx, side }
-  })
-}
-
-/** 라인 설비로부터 공정 구간 목록(구조물 렌더용) — 층별 컨베이어 라인 배치. */
-export const buildLineBays = (equipments: readonly BayEquipmentInput[]): LiveMapBay[] => {
-  const bays: LiveMapBay[] = []
-  for (const [floor, floorGroups] of groupsByFloor(groupByCluster(equipments))) {
-    for (const cell of layoutFloorBays(floorGroups)) {
-      bays.push({
-        clusterId: cell.group.clusterId,
-        clusterName: cell.group.clusterName,
-        floor,
-        centerXPx: cell.centerXPx,
-        centerYPx: cell.centerYPx,
-        widthPx: cell.widthPx,
-        depthPx: cell.depthPx,
-      })
-    }
-  }
-  return bays
-}
-
-/** 룸 바닥 최소 크기(world) — 설비 적은 라인 대응 하한(작게 잡아 룸이 설비에 딱 붙어 꽉 차 보이게). */
-export const LIVE_MAP_ROOM_MIN_WIDTH = 20
-export const LIVE_MAP_ROOM_MIN_DEPTH = 7
-/** 설비 행 바깥 가장자리와 룸 외벽 사이 여백(px) — 설비를 외벽에 거의 붙이고 통로만 중앙에 남긴다(실 라인처럼 벽-투-벽). */
-const ROOM_MARGIN_PX = 24
-
-/**
- * 모든 공정 구간을 감싸는 룸 바닥 크기(world). 라인이 여러 컨베이어 줄로 접히면(wrap) 세로로 길어지므로 룸이 고정이면
- * 설비가 바닥/외벽 밖으로 floating 한다 — board 중앙(원점) 대칭으로 최대 반범위×2 + 여백을 덮어 모든 설비가 바닥 위에
- * 놓이게 한다. 전 층 동일 크기로 적층 정합. 빈 입력은 최소치.
- */
-export const liveMapRoomSizeWorld = (bays: readonly LiveMapBay[]): { width: number; depth: number } => {
-  let halfWidthPx = 0
-  let halfDepthPx = 0
-  for (const bay of bays) {
-    halfWidthPx = Math.max(halfWidthPx, Math.abs(bay.centerXPx - LIVE_MAP_BOARD_PX_WIDTH / 2) + bay.widthPx / 2)
-    halfDepthPx = Math.max(halfDepthPx, Math.abs(bay.centerYPx - LIVE_MAP_BOARD_PX_HEIGHT / 2) + bay.depthPx / 2)
-  }
-  return {
-    width: Math.max(LIVE_MAP_ROOM_MIN_WIDTH, (2 * (halfWidthPx + ROOM_MARGIN_PX)) / LIVE_MAP_WORLD_SCALE),
-    depth: Math.max(LIVE_MAP_ROOM_MIN_DEPTH, (2 * (halfDepthPx + ROOM_MARGIN_PX)) / LIVE_MAP_WORLD_SCALE),
-  }
-}
-
-export interface AutoBayPlacement {
-  eqpKey: number
+/** 기본 구조 시드 1칸의 배치(빌트인 구조물 objectKey + px 위치/회전). 층은 호출부가 정한다. */
+export interface DefaultStructurePlacement {
+  objectKey: number
   xPx: number
   yPx: number
   rotationDeg: number
-  floor: number
+}
+
+const builtinKeyBySlug = (slug: string): number => {
+  const builtin = LIVE_MAP_BUILTIN_STRUCTURES.find((item) => item.slug === slug)
+  if (builtin === undefined) {
+    // slug 리터럴 오타 — 조용히 NaN 키로 진행하지 않도록 즉시 드러낸다.
+    throw new Error(`unknown builtin structure slug: ${slug}`)
+  }
+  return builtin.objectKey
 }
 
 /**
- * bay 안 설비 위치(px) + 회전 — bay 내부 통로(세로) 양쪽(좌/우) 2열로 마주본다. 같은 줄 인덱스가 좌(90°,+x 면)·
- * 우(270°,−x 면) 한 쌍을 이뤄 스파인에서 바깥으로 줄을 쌓는다 — 모든 로드포트가 내부 통로를 면한다.
+ * 빈 레이아웃의 시작점 — 실제 반도체 fab 클린룸의 bay-and-chase 배치를 따른 시작 프레임.
+ *
+ * <p>fab 라인 배치 원칙(웹 리서치 기반): 설비는 도크월(bay/chase 경계벽)에 직선으로 줄지어 도킹하고(전면 load port = bay/통로,
+ * 후면 정비부 = chase), 웨이퍼는 중앙 메인 통로(spine)에서 각 bay 로 분기 이송된다(OHT 는 직선 경로 필요). 따라서 사람/이송이
+ * 다닐 통로가 필수다 — 이 시드는 ① raised floor 슬래브 ② 컷어웨이 외벽(후면·좌측) ③ 일정 간격 구조 기둥 격자 ④ 낮은 bay 도크월
+ * 을 깔되, <b>중앙 spine 메인통로</b>(세로)와 <b>외벽쪽 perimeter 통로</b>를 비워 둔다(파티션을 그 폭만큼 끊는다). 실제 라인 치수는
+ * 미상이라 "느낌" 수준의 시작 프레임이고, 모든 항목은 placement(빌트인 음수 키)라 드래그/삭제로 조정 + 저장 시 실 STRUCTURE 치환.</p>
  */
-const equipmentSlot = (cell: BayCell, indexInCluster: number): { xPx: number; yPx: number; rotationDeg: number } => {
-  const row = Math.floor(indexInCluster / 2)
-  const isLeft = indexInCluster % 2 === 0
-  const xPx = cell.centerXPx + (isLeft ? -BAY_COL_OFFSET_PX : BAY_COL_OFFSET_PX)
-  // 스파인 가장자리에서 cell.side 방향(위 −/아래 +)으로 줄을 바깥으로 쌓는다.
-  const spineEdgeYPx = LIVE_MAP_BOARD_PX_HEIGHT / 2 + cell.side * SPINE_HALF_PX
-  const yPx = spineEdgeYPx + cell.side * (row + 0.5) * BAY_ROW_PITCH_PX
-  return { xPx, yPx, rotationDeg: isLeft ? 90 : 270 }
-}
+export const buildDefaultStructureLayout = (): DefaultStructurePlacement[] => {
+  const wall = builtinKeyBySlug('wall')
+  const partition = builtinKeyBySlug('partition')
+  const floor = builtinKeyBySlug('floor')
+  const column = builtinKeyBySlug('column')
+  const s = LIVE_MAP_WORLD_SCALE
+  const cx = LIVE_MAP_BOARD_PX_WIDTH / 2
+  const cy = LIVE_MAP_BOARD_PX_HEIGHT / 2
+  const tile = s * 10 // 바닥/벽 1칸 = 10 world = 400px
+  const cols = 4
+  const rows = 3
+  const tileX = (c: number) => cx + (c - (cols - 1) / 2) * tile
+  const tileZ = (r: number) => cy + (r - (rows - 1) / 2) * tile
+  const minX = tileX(0) - tile / 2 // 좌측 외벽선
+  const maxX = tileX(cols - 1) + tile / 2
+  const minZ = tileZ(0) - tile / 2 // 후면 외벽선
 
-/**
- * 미배치 설비의 bay 자동 배치(px + 회전 + 층). 위치는 <b>전체 라인 설비를 cluster 로 그룹화한 뒤 그룹 내 고정 index</b>
- * 로 계산 — 일부 설비를 편집(승격)으로 placed 에 넣어도 나머지 위치는 불변(placed 는 출력 필터에만 쓰이고 그룹/인덱스 불변).
- */
-export const buildBayEquipmentPlacements = (
-  equipments: readonly BayEquipmentInput[],
-  placed: ReadonlySet<number>,
-): AutoBayPlacement[] => {
-  const placements: AutoBayPlacement[] = []
-  for (const [floor, floorGroups] of groupsByFloor(groupByCluster(equipments))) {
-    for (const cell of layoutFloorBays(floorGroups)) {
-      cell.group.eqpKeys.forEach((eqpKey, indexInCluster) => {
-        if (placed.has(eqpKey)) {
-          return
-        }
-        const slot = equipmentSlot(cell, indexInCluster)
-        placements.push({ eqpKey, xPx: slot.xPx, yPx: slot.yPx, rotationDeg: slot.rotationDeg, floor })
-      })
+  const placements: DefaultStructurePlacement[] = []
+
+  // ① raised floor 슬래브 격자.
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      placements.push({ objectKey: floor, xPx: tileX(c), yPx: tileZ(r), rotationDeg: 0 })
     }
   }
+
+  // ② 컷어웨이 외벽 — 등각 카메라 뒤쪽 2면(후면 minZ, 좌측 minX)만. 근접면 생략(내부 가시).
+  for (let c = 0; c < cols; c += 1) {
+    placements.push({ objectKey: wall, xPx: tileX(c), yPx: minZ, rotationDeg: 0 })
+  }
+  for (let r = 0; r < rows; r += 1) {
+    placements.push({ objectKey: wall, xPx: minX, yPx: tileZ(r), rotationDeg: 90 })
+  }
+
+  // ③ 구조 기둥 격자(cols×rows) — 일정 간격(AMHS/구조 제약).
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      placements.push({ objectKey: column, xPx: tileX(c), yPx: tileZ(r), rotationDeg: 0 })
+    }
+  }
+
+  // ④ 공정 bay 도크월(낮은 파티션) — 설비가 줄지어 도킹할 벽. 통로 확보를 위해 중앙 spine·외벽쪽 perimeter 폭만큼 끊는다.
+  const partLen = s * 5 // 파티션 1칸 = 5 world = 200px
+  const spineHalf = s * 3 // 중앙 메인통로 반폭 3 world → 통로 6 world(240px): OHT/사람 이동
+  const perim = s * 4 // 외벽~bay 도크월 통로 = 4 world(160px)
+  const fillRow = (z: number, from: number, to: number) => {
+    const n = Math.max(0, Math.floor((to - from) / partLen))
+    const start = from + (to - from - n * partLen) / 2 + partLen / 2
+    for (let i = 0; i < n; i += 1) {
+      placements.push({ objectKey: partition, xPx: start + i * partLen, yPx: z, rotationDeg: 0 })
+    }
+  }
+  // bay 도크월 2줄(타일 행 경계) — spine(중앙) 양쪽으로 끊어 통로를 남긴다.
+  for (const z of [tileZ(0) + tile / 2, tileZ(1) + tile / 2]) {
+    fillRow(z, minX + perim, cx - spineHalf)
+    fillRow(z, cx + spineHalf, maxX - perim)
+  }
+
   return placements
+}
+
+/** 자동 배치 결과 1건 — 설비(eqpKey)를 어느 층 어느 px 좌표에 어느 방향(deg)으로 놓을지. */
+export interface EquipmentAutoPlacement {
+  eqpKey: number
+  floor: number
+  xPx: number
+  yPx: number
+  rotationDeg: number
+}
+
+/** fab 라인(fishbone bay) 자동 배치 기하. 좌/우 bay 블록(중앙 spine 통로는 비움), bay(lane)는 Z 로 내려간다. */
+export interface FabLineLayoutParams {
+  /** 설비가 채워지는 좌·우 bay 블록의 X 범위(px). 두 블록 사이(중앙 spine 세로 통로)는 비운다. */
+  blocksX: ReadonlyArray<{ startPx: number; endPx: number }>
+  /** 첫 bay 줄(lane)의 Z(px). */
+  laneStartZPx: number
+  /** bay 줄 간 Z 간격(px) — 줄 사이 통로 포함(설비 간격보다 넓게 둬 "줄"이 드러난다). */
+  lanePitchPx: number
+  /** bay 줄 안 설비 간 X 간격(px) — 촘촘히(도킹된 라인 느낌). */
+  eqpPitchPx: number
+}
+
+/**
+ * fab 라인 자동 배치 기하 — {@link buildDefaultStructureLayout} 의 룸 치수와 정합(중앙 spine·perimeter 통로 위치 동일).
+ *
+ * <p>좌/우 bay 블록은 [minX+perim, cx-spineHalf] = [560,1080] 과 [cx+spineHalf, maxX-perim] = [1320,1840]
+ * (s=40, cx=1200, minX=400, maxX=2000, perim=160, spineHalf=120). 설비는 도크월을 따라 가로 줄로 도킹하고
+ * 중앙 spine(1080~1320)은 OHT/사람 통로로 비운다. 줄(lane)은 Z 로 내려가며 줄 사이에 통로를 둔다.</p>
+ */
+export const LIVE_MAP_FAB_LINE_LAYOUT: FabLineLayoutParams = {
+  blocksX: [
+    { startPx: 560, endPx: 1080 },
+    { startPx: 1320, endPx: 1840 },
+  ],
+  // 줄(lane)은 도크월(z≈550, 950)을 끼고 깔리도록 z=450 부터 200 간격(450·650·850·1050…) — bay 에 도킹된 느낌.
+  laneStartZPx: 450,
+  lanePitchPx: 200,
+  eqpPitchPx: 104,
+}
+
+/** bay 블록들을 X 슬롯 좌표 배열로 — 블록 순서대로(좌 → 우), 각 블록은 start 부터 eqpPitch 간격으로 end 까지. */
+const buildLineSlotXs = (blocksX: FabLineLayoutParams['blocksX'], eqpPitchPx: number): number[] => {
+  const slotXs: number[] = []
+  for (const block of blocksX) {
+    for (let x = block.startPx; x <= block.endPx + 0.001; x += eqpPitchPx) {
+      slotXs.push(x)
+    }
+  }
+  return slotXs
+}
+
+/**
+ * 미배치 설비를 gateway_app 기준 층(floorByEqpKey)에 fab 라인(fishbone bay) 형태로 자동 배치한다(순수).
+ *
+ * <p>층마다 좌/우 bay 블록을 가로 줄로 채우고(중앙 spine 통로는 비움), 한 줄이 차면 다음 줄(Z+lanePitch)로 내려간다.
+ * 줄(lane)은 짝/홀로 0°/180° 를 번갈아 향해, 이웃한 두 줄이 로드포트(전면)를 마주보는 통로(bay)와 등을 맞댄 chase 가
+ * 번갈아 생긴다(반도체 fab 의 bay-and-chase). 입력 순서를 보존하므로, 호출부가 clusterId 순으로 정렬해 넘기면 같은
+ * 클러스터가 한 bay 에 모여 보인다. floorByEqpKey 에 매핑이 없는 설비는 fallbackFloor 로 보내 누락을 막는다.</p>
+ */
+export const planEquipmentLineLayout = (
+  orderedEqpKeys: readonly number[],
+  floorByEqpKey: ReadonlyMap<number, number>,
+  fallbackFloor: number,
+  params: FabLineLayoutParams,
+): EquipmentAutoPlacement[] => {
+  const slotXs = buildLineSlotXs(params.blocksX, params.eqpPitchPx)
+  const eqpKeysByFloor = new Map<number, number[]>()
+  for (const eqpKey of orderedEqpKeys) {
+    const floor = floorByEqpKey.get(eqpKey) ?? fallbackFloor
+    const bucket = eqpKeysByFloor.get(floor) ?? []
+    bucket.push(eqpKey)
+    eqpKeysByFloor.set(floor, bucket)
+  }
+
+  const placements: EquipmentAutoPlacement[] = []
+  for (const [floor, eqpKeys] of eqpKeysByFloor) {
+    eqpKeys.forEach((eqpKey, index) => {
+      const lane = Math.floor(index / slotXs.length)
+      placements.push({
+        eqpKey,
+        floor,
+        xPx: slotXs[index % slotXs.length],
+        yPx: params.laneStartZPx + lane * params.lanePitchPx,
+        // 짝수 줄 180° / 홀수 줄 0° — 설비 등(back)이 도크월(파티션) 쪽을 향해 chase 를 이루고, 전면(로드포트)은
+        // 통로 쪽으로 열려 사람/OHT 가 다닐 수 있다. 이웃 줄은 전면끼리 마주보는 통로 + 등끼리 맞댄 chase 가 번갈아.
+        rotationDeg: lane % 2 === 0 ? 180 : 0,
+      })
+    })
+  }
+  return placements
+}
+
+/** 객체(shape) 의 로컬 축정렬 bounding box(중심/크기) — 선택 표시 박스를 객체 크기에 맞춰 그릴 때 쓴다(순수). */
+export const shapeBoundingBox = (shape: LiveMap3DShape): { center: Vec3; size: Vec3 } => {
+  if (shape.prims.length === 0) {
+    return { center: { x: 0, y: 0, z: 0 }, size: { x: 1, y: 1, z: 1 } }
+  }
+  let minX = Infinity
+  let minY = Infinity
+  let minZ = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let maxZ = -Infinity
+  for (const prim of shape.prims) {
+    const hx = prim.size.x / 2
+    const hy = prim.size.y / 2
+    // cylinder/plane 도 size.x 를 폭(지름)으로 쓰므로 size 절반으로 근사한다(빌트인은 box 라 정확).
+    const hz = prim.size.z / 2
+    minX = Math.min(minX, prim.position.x - hx)
+    maxX = Math.max(maxX, prim.position.x + hx)
+    minY = Math.min(minY, prim.position.y - hy)
+    maxY = Math.max(maxY, prim.position.y + hy)
+    minZ = Math.min(minZ, prim.position.z - hz)
+    maxZ = Math.max(maxZ, prim.position.z + hz)
+  }
+  return {
+    center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 },
+    size: { x: maxX - minX, y: maxY - minY, z: maxZ - minZ },
+  }
 }

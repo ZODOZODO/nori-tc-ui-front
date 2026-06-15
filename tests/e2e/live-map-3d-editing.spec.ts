@@ -175,8 +175,9 @@ test('admin: 3D 편집모드에서 객체 추가 → 회전 → 템플릿 교체
   expect(state.lastPlacements[0].objectKey).toBe(3)
   expect(state.lastPlacements[0].eqpKey).toBe(77)
   expect(state.lastPlacements[0].transformJson.rotation).toBe(15)
-  expect(state.lastPlacements[0].transformJson.x).toBe(675)
-  expect(state.lastPlacements[0].transformJson.y).toBe(355)
+  // 추가 기본 위치 = 보드 중앙(2400×1500 → 1200,750).
+  expect(state.lastPlacements[0].transformJson.x).toBe(1200)
+  expect(state.lastPlacements[0].transformJson.y).toBe(750)
 
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])

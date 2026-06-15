@@ -9,6 +9,7 @@ import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } f
 import {
   isLiveMap3DShape,
   LIVE_MAP_BUILTIN_STRUCTURES,
+  LIVE_MAP_STRUCTURE_COLOR_BY_NAME,
   type LiveMap3DPrim,
   type LiveMap3DPrimType,
   type LiveMap3DShape,
@@ -334,7 +335,8 @@ export function LiveMapObjectEditor() {
             <planeGeometry args={[30, 30]} />
             <meshStandardMaterial color="#0b0f1a" />
           </mesh>
-          <LiveMap3DObject shape={shape} />
+          {/* 표준 구조물(벽/파티션/바닥/기둥)은 뷰어와 동일한 모던 색으로 미리보기 — 저장된 옛 색도 일관되게 보이게. */}
+          <LiveMap3DObject shape={shape} colorOverride={LIVE_MAP_STRUCTURE_COLOR_BY_NAME[name.trim()]} />
           <OrbitControls target={[0, 1, 0]} makeDefault />
         </Canvas>
       </div>

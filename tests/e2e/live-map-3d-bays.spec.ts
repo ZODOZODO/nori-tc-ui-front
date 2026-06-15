@@ -1,10 +1,10 @@
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test'
 
 /**
- * SPEC live-map-3d — 공정 bay 레이아웃 (admin/viewer).
+ * SPEC live-map-3d — bay 라벨 + 자동 표시 제거 회귀 (admin/viewer).
  *
- * 자동 표시 설비는 평면 그리드가 아니라 공정(cluster)별 bay 로 묶여 배치되고, bay 마다 공정명 라벨(DOM 오버레이)이 뜬다.
- * 라벨은 층 필터를 따른다(그 층 bay 만). 좌표는 BayLabelProjector 가 갱신. console/pageerror 0.
+ * 공정 bay(자동 클러스터 존/벽/라벨)도, 미배치 설비 자동 표시도 모두 제거됐다. 어떤 bay 라벨 DOM 도 뜨지 않고,
+ * 배치하지 않은 설비는 3D 에 보이지 않는다(과거: 'ETC'/'PHOTO' 자동 라벨 + 설비 자동 표시가 혼란을 줬음). console/pageerror 0.
  */
 
 const apiSuccess = <TData>(data: TData) => ({ success: true, data, errorCode: null, errorMsg: null })
@@ -22,7 +22,7 @@ const eqp = (eqpKey: number, clusterId: string, clusterName: string) => ({
   clusterId, clusterName, equipmentModeLabel: 'Auto', status: 'RUN' as const, statusLabel: 'Run',
   portItems: [], tooltipMeta: '', tooltipStep: '', alertMessage: null,
 })
-// photo→1F, cmp→2F, wet→1F (2개 층). 같은 공정 2대(photo)는 한 bay 에 묶인다.
+// 과거엔 공정(clusterId)별 bay 라벨이 떴다. 이제는 어떤 clusterId 여도 라벨이 없어야 한다.
 const LIVE_MAP = {
   equipmentItems: [eqp(71, 'photo', 'PHOTO'), eqp(72, 'photo', 'PHOTO'), eqp(88, 'cmp', 'CMP'), eqp(99, 'wet', 'WET')],
 }
@@ -54,7 +54,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('공정별 bay 라벨이 뜨고, 층 필터를 따른다 (console/pageerror 0)', async ({ page }) => {
+test('bay 라벨이 없고, 미배치 설비는 자동 표시되지 않는다 (console/pageerror 0)', async ({ page }) => {
   // r3f(three/drei) dev 첫 컴파일 + WebGL 초기화 여유.
   test.setTimeout(90_000)
   await setupMocks(page)
@@ -66,29 +66,13 @@ test('공정별 bay 라벨이 뜨고, 층 필터를 따른다 (console/pageerror
   await page.getByTestId('live-map-mode-3d').click()
   await expect(page.getByTestId('live-map-3d-scene')).toBeVisible()
 
-  // 전체 보기 — 공정 3종 = bay 라벨 3개(photo/cmp/wet). photo 2대여도 라벨은 bay 1개.
-  await expect(page.getByTestId('live-map-3d-bay-label-photo')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-cmp')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-photo')).toHaveText('PHOTO')
+  // 미배치 설비는 자동 표시되지 않는다 — 설비 뱃지 0 + visible-count 0.
+  await expect(page.getByTestId('live-map-3d-visible-count')).toHaveText('0')
+  await expect(page.getByTestId('live-map-3d-badge-71')).toHaveCount(0)
+  await expect(page.getByTestId('live-map-3d-badge-88')).toHaveCount(0)
 
-  // 1F → photo·wet bay, cmp 숨김.
-  await page.getByTestId('live-map-3d-floor-1').click()
-  await expect(page.getByTestId('live-map-3d-bay-label-photo')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-cmp')).toHaveCount(0)
-
-  // 2F → cmp bay 만.
-  await page.getByTestId('live-map-3d-floor-2').click()
-  await expect(page.getByTestId('live-map-3d-bay-label-cmp')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-photo')).toHaveCount(0)
-  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toHaveCount(0)
-
-  // 전체 → 다시 3개.
-  await page.getByTestId('live-map-3d-floor-all').click()
-  await expect(page.getByTestId('live-map-3d-bay-label-photo')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-cmp')).toBeVisible()
-  await expect(page.getByTestId('live-map-3d-bay-label-wet')).toBeVisible()
+  // 어떤 bay 라벨 DOM 도 존재하지 않는다(자동 bay 전면 제거).
+  await expect(page.locator('[data-testid^="live-map-3d-bay-label-"]')).toHaveCount(0)
 
   expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
   expect(pageErrors, `page errors: ${pageErrors.join('\n')}`).toEqual([])

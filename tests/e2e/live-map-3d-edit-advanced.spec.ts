@@ -96,7 +96,7 @@ const attachConsoleGuards = (page: Page) => {
   return { consoleErrors, pageErrors }
 }
 
-test('admin: Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT 전체에 반영된다 (console/pageerror 0)', async ({
+test('admin: 미배치 설비 2대 추가 → Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT 전체에 반영된다 (console/pageerror 0)', async ({
   page,
 }) => {
   test.setTimeout(90_000)
@@ -111,14 +111,20 @@ test('admin: Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT �
   await expect(page.getByTestId('live-map-3d-scene')).toBeVisible()
   await page.getByTestId('live-map-3d-edit-toggle').click()
 
+  // 미배치 설비 2대를 드롭다운으로 추가(staging 격자라 겹치지 않음).
+  await page.getByTestId('live-map-3d-add-eqp-select').selectOption('77')
+  await page.getByTestId('live-map-3d-add-eqp').click()
+  await page.getByTestId('live-map-3d-add-eqp-select').selectOption('78')
+  await page.getByTestId('live-map-3d-add-eqp').click()
+  await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('2')
+
   // ③ 단일 클릭 → Shift+클릭으로 두 번째 추가 = 2개 선택. (e2e 기본 locale = en → en 라벨 단언)
   await page.getByTestId('live-map-3d-badge-77').click()
   await page.getByTestId('live-map-3d-badge-78').click({ modifiers: ['Shift'] })
   await expect(page.getByTestId('live-map-3d-selected-count')).toHaveText('+1 more')
 
-  // 그룹 회전 → 둘 다 승격(placement 2) + rotation 15.
+  // 그룹 회전 → 둘 다 rotation 15.
   await page.getByTestId('live-map-3d-rotate-cw').click()
-  await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('2')
 
   // ④ 선택 패널에서 2층으로 이동 → 둘 다 floor 2.
   await page.getByTestId('live-map-3d-set-floor-2').click()
@@ -127,9 +133,9 @@ test('admin: Shift+클릭 다중 선택 → 그룹 회전 + 층 이동이 PUT �
   await expect.poll(() => state.putCalls).toBe(1)
   expect(state.lastPlacements).toHaveLength(2)
   const byEqp = new Map(state.lastPlacements.map((placement) => [placement.eqpKey, placement]))
-  // 77 = c1 index0(bay 좌 열, base 90°), 78 = index1(우 열, base 270°) → 그룹 CW 회전 +15.
-  expect(byEqp.get(77)?.transformJson.rotation).toBe(105)
-  expect(byEqp.get(78)?.transformJson.rotation).toBe(285)
+  // 추가 직후 둘 다 base 회전 0° → 그룹 CW 회전 +15 = 15.
+  expect(byEqp.get(77)?.transformJson.rotation).toBe(15)
+  expect(byEqp.get(78)?.transformJson.rotation).toBe(15)
   for (const placement of state.lastPlacements) {
     expect(placement.transformJson.floor).toBe(2)
   }
@@ -161,7 +167,7 @@ test('admin: 2층 활성 + 빌트인 벽 추가 → 화살표로 미세 이동 �
   // ④ 전역 2층 활성 → 새 추가 기본 층 2.
   await page.getByTestId('live-map-3d-floor-2').click()
 
-  // 빌트인 벽 추가(x=675 기본) → 자동 선택.
+  // 빌트인 벽 추가(보드 중앙 x=1200 기본) → 자동 선택.
   await page.getByTestId('live-map-3d-add-select').selectOption('-1')
   await page.getByTestId('live-map-3d-add').click()
   await expect(page.getByTestId('live-map-3d-placement-count')).toHaveText('1')
@@ -175,7 +181,8 @@ test('admin: 2층 활성 + 빌트인 벽 추가 → 화살표로 미세 이동 �
   await page.getByTestId('live-map-3d-save').click()
   await expect.poll(() => state.putCalls).toBe(1)
   expect(state.lastPlacements).toHaveLength(1)
-  expect(state.lastPlacements[0].transformJson.x).toBe(699)
+  // 보드 중앙 1200 + 24(nudge) = 1224.
+  expect(state.lastPlacements[0].transformJson.x).toBe(1224)
   expect(state.lastPlacements[0].transformJson.floor).toBe(2)
   expect(state.lastPlacements[0].eqpKey).toBeNull()
   // 빌트인 구조물 백킹 STRUCTURE 객체 1회 생성.

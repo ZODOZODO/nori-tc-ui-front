@@ -11,14 +11,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
+import type { LiveMapDemoJobSummary } from '../api/live-map-demo.api'
 import { useI18n } from '@/i18n/i18n-context'
 import { useCancelLiveMapDemoJob } from '../hooks/useCancelLiveMapDemoJob'
 import { useCreateLiveMapDemoJobs } from '../hooks/useCreateLiveMapDemoJobs'
@@ -443,6 +438,90 @@ export function LiveMapDemoModal({
 
   const completedCount = demoJobs.filter((job) => job.state === 'COMPLETED').length
 
+  const targetEquipmentColumns: ColumnDef<LiveMapDemoTargetEquipment>[] = [
+    {
+      key: 'eqpId',
+      header: t('livemap.demo.colEqp'),
+      accessor: (targetEquipment) => targetEquipment.eqpId,
+      renderCell: (targetEquipment) => (
+        <span className="font-semibold text-foreground">{targetEquipment.eqpId}</span>
+      ),
+    },
+    {
+      key: 'process',
+      header: t('livemap.demo.colProcess'),
+      accessor: (targetEquipment) => targetEquipment.clusterName,
+    },
+    {
+      key: 'waferMode',
+      header: t('livemap.demo.colWaferMode'),
+      accessor: (targetEquipment) => targetEquipment.processingTypeLabel,
+    },
+    {
+      key: 'status',
+      header: t('livemap.demo.colStatus'),
+      accessor: (targetEquipment) => targetEquipment.statusLabel,
+    },
+  ]
+
+  const demoJobColumns: ColumnDef<LiveMapDemoJobSummary>[] = [
+    {
+      key: 'eqpId',
+      header: t('livemap.demo.colEqp'),
+      accessor: (job) => job.eqpId,
+      renderCell: (job) => <span className="font-semibold text-foreground">{job.eqpId}</span>,
+    },
+    {
+      key: 'process',
+      header: t('livemap.demo.colProcess'),
+      accessor: (job) => job.processType ?? 'ETC',
+    },
+    {
+      key: 'scenario',
+      header: t('livemap.demo.colScenario'),
+      accessor: (job) => job.scenarioName,
+    },
+    {
+      key: 'testType',
+      header: t('livemap.demo.colTestType'),
+      accessor: (job) => t(TEST_TYPE_I18N_KEY[job.testType]) || job.testType,
+    },
+    {
+      key: 'stage',
+      header: t('livemap.demo.colStage'),
+      accessor: (job) => job.currentStageName ?? job.currentStageCode ?? '-',
+    },
+    {
+      key: 'status',
+      header: t('livemap.demo.colStatus'),
+      accessor: (job) => job.state,
+      renderCell: (job) => (
+        <Badge variant={resolveJobBadgeVariant(job.state)}>{job.state}</Badge>
+      ),
+    },
+    {
+      key: 'progress',
+      header: t('livemap.demo.colProgress'),
+      width: '13.75rem',
+      accessor: (job) => `${job.progressPercent}%`,
+      renderCell: (job) => (
+        <div className="flex items-center gap-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                job.progressPercent >= 100 ? 'bg-success' : 'bg-brand-primary'
+              }`}
+              style={{ width: `${job.progressPercent}%` }}
+            />
+          </div>
+          <span className="min-w-11 text-right text-xs font-semibold text-muted-foreground">
+            {job.progressPercent}%
+          </span>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
       <DialogContent className="flex max-h-[92vh] max-w-340 flex-col gap-0 overflow-hidden border-border bg-background p-0">
@@ -519,53 +598,30 @@ export function LiveMapDemoModal({
                 <Badge>{targetEquipments.length}</Badge>
               </div>
 
-              <div className="mt-4 flex-1 overflow-hidden rounded-[18px] border border-border">
-                <div className="h-full overflow-auto">
-                  <Table className="min-w-130">
-                    <TableHeader>
-                      <TableRow className="bg-muted hover:bg-muted">
-                        <TableHead>{t('livemap.demo.colEqp')}</TableHead>
-                        <TableHead>{t('livemap.demo.colProcess')}</TableHead>
-                        <TableHead>{t('livemap.demo.colWaferMode')}</TableHead>
-                        <TableHead>{t('livemap.demo.colStatus')}</TableHead>
-                        <TableHead className="w-17.5 text-center">
-                          {t('livemap.demo.colDelete')}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {targetEquipments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
-                            {t('livemap.demo.targetEmpty')}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        targetEquipments.map((targetEquipment) => (
-                          <TableRow key={targetEquipment.eqpId}>
-                            <TableCell className="font-semibold text-foreground">
-                              {targetEquipment.eqpId}
-                            </TableCell>
-                            <TableCell>{targetEquipment.clusterName}</TableCell>
-                            <TableCell>{targetEquipment.processingTypeLabel}</TableCell>
-                            <TableCell>{targetEquipment.statusLabel}</TableCell>
-                            <TableCell className="text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveTargetEquipment(targetEquipment.eqpId)}
-                                className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/10 hover:text-danger"
-                                aria-label={`${targetEquipment.eqpId} ${t('livemap.demo.colDelete')}`}
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+              <SelectableTable<LiveMapDemoTargetEquipment>
+                columns={targetEquipmentColumns}
+                rows={targetEquipments}
+                rowKey={(targetEquipment) => targetEquipment.eqpId}
+                actionColumn={{
+                  header: t('livemap.demo.colDelete'),
+                  width: '4.375rem',
+                  render: (targetEquipment) => (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTargetEquipment(targetEquipment.eqpId)}
+                        className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/10 hover:text-danger"
+                        aria-label={`${targetEquipment.eqpId} ${t('livemap.demo.colDelete')}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  ),
+                }}
+                emptyState={t('livemap.demo.targetEmpty')}
+                containerClassName="mt-4 min-h-0 flex-1 rounded-[18px] border border-border"
+                tableClassName="min-w-130"
+              />
             </section>
           </div>
 
@@ -663,88 +719,49 @@ export function LiveMapDemoModal({
                 {startMessage ? <Badge variant="secondary">{startMessage}</Badge> : null}
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-[18px] border border-border">
-                <div className="max-h-90 overflow-auto">
-                  <Table className="min-w-295">
-                    <TableHeader>
-                      <TableRow className="bg-muted hover:bg-muted">
-                        <TableHead>{t('livemap.demo.colEqp')}</TableHead>
-                        <TableHead>{t('livemap.demo.colProcess')}</TableHead>
-                        <TableHead>{t('livemap.demo.colScenario')}</TableHead>
-                        <TableHead>{t('livemap.demo.colTestType')}</TableHead>
-                        <TableHead>{t('livemap.demo.colStage')}</TableHead>
-                        <TableHead>{t('livemap.demo.colStatus')}</TableHead>
-                        <TableHead className="min-w-55">{t('livemap.demo.colProgress')}</TableHead>
-                        <TableHead className="w-24 text-center">{t('livemap.demo.colEnd')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isJobsLoading && demoJobs.length === 0 ? (
-                        Array.from({ length: 5 }).map((_, rowIndex) => (
-                          <TableRow key={`live-map-demo-jobs-skeleton-${rowIndex}`} data-testid="live-map-demo-jobs-skeleton">
-                            {Array.from({ length: 8 }).map((_, cellIndex) => (
-                              <TableCell key={cellIndex}>
-                                <Skeleton className="h-4 w-full" />
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))
-                      ) : demoJobs.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
-                            {t('livemap.demo.jobsEmpty')}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        demoJobs.map((job) => (
-                          <TableRow key={job.jobId}>
-                            <TableCell className="font-semibold text-foreground">{job.eqpId}</TableCell>
-                            <TableCell>{job.processType ?? 'ETC'}</TableCell>
-                            <TableCell>{job.scenarioName}</TableCell>
-                            <TableCell>{t(TEST_TYPE_I18N_KEY[job.testType]) || job.testType}</TableCell>
-                            <TableCell>{job.currentStageName ?? job.currentStageCode ?? '-'}</TableCell>
-                            <TableCell>
-                              <Badge variant={resolveJobBadgeVariant(job.state)}>{job.state}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                                  <div
-                                    className={`h-full rounded-full transition-[width] duration-500 ${
-                                      job.progressPercent >= 100 ? 'bg-success' : 'bg-brand-primary'
-                                    }`}
-                                    style={{ width: `${job.progressPercent}%` }}
-                                  />
-                                </div>
-                                <span className="min-w-11 text-right text-xs font-semibold text-muted-foreground">
-                                  {job.progressPercent}%
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 rounded-[10px] border-border px-3 text-xs font-semibold text-foreground hover:border-danger hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={
-                                  TERMINAL_DEMO_JOB_STATES.has(job.state) ||
-                                  cancelDemoJobMutation.isPending
-                                }
-                                onClick={() => {
-                                  void handleCancelJob(job.jobId, job.testType)
-                                }}
-                              >
-                                {t('livemap.demo.end')}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+              {isJobsLoading && demoJobs.length === 0 ? (
+                <div className="mt-4 space-y-2 rounded-[18px] border border-border p-3">
+                  {Array.from({ length: 5 }).map((_, rowIndex) => (
+                    <Skeleton
+                      key={`live-map-demo-jobs-skeleton-${rowIndex}`}
+                      data-testid="live-map-demo-jobs-skeleton"
+                      className="h-9 w-full"
+                    />
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <SelectableTable<LiveMapDemoJobSummary>
+                  columns={demoJobColumns}
+                  rows={demoJobs}
+                  rowKey={(job) => job.jobId}
+                  actionColumn={{
+                    header: t('livemap.demo.colEnd'),
+                    width: '6rem',
+                    render: (job) => (
+                      <div className="flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-[10px] border-border px-3 text-xs font-semibold text-foreground hover:border-danger hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={
+                            TERMINAL_DEMO_JOB_STATES.has(job.state) ||
+                            cancelDemoJobMutation.isPending
+                          }
+                          onClick={() => {
+                            void handleCancelJob(job.jobId, job.testType)
+                          }}
+                        >
+                          {t('livemap.demo.end')}
+                        </Button>
+                      </div>
+                    ),
+                  }}
+                  emptyState={t('livemap.demo.jobsEmpty')}
+                  containerClassName="mt-4 max-h-90 rounded-[18px] border border-border"
+                  tableClassName="min-w-295"
+                />
+              )}
             </div>
           </section>
         </div>

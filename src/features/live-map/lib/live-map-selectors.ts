@@ -77,10 +77,12 @@ export const summarizeLiveMapEquipmentNodes = (
   )
 
 /**
- * 현재 필터 기준에서 선택 설비를 안정적으로 복원합니다.
+ * 현재 필터(라인 스코프 포함) 기준에서 선택 설비를 복원합니다.
+ *
+ * visible 가 비면 null 을 반환한다 — 전체 라인으로 폴백하면 설비 없는 라인 스코프에
+ * 타 라인 설비가 '선택 설비'로 누수되므로 visible 밖으로는 절대 넘어가지 않는다.
  */
 export const resolveSelectedLiveMapEquipment = (
-  allEquipmentNodes: readonly LiveMapEquipmentNode[],
   visibleEquipmentNodes: readonly LiveMapEquipmentNode[],
   selectedEqpId: string | null,
 ): LiveMapEquipmentNode | null => {
@@ -94,8 +96,6 @@ export const resolveSelectedLiveMapEquipment = (
   return (
     visibleEquipmentNodes.find((item) => item.status === 'ERROR') ??
     visibleEquipmentNodes[0] ??
-    allEquipmentNodes.find((item) => item.status === 'ERROR') ??
-    allEquipmentNodes[0] ??
     null
   )
 }

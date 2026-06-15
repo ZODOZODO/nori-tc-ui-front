@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { ContactShadows, Grid, OrbitControls } from '@react-three/drei'
+import { Grid, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe } from '@/features/profile/hooks/useProfile'
@@ -14,22 +14,26 @@ import { useLiveMap } from '../hooks/useLiveMap'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
 import {
-  LIVE_MAP_BAY_AISLE_PX,
-  buildBayEquipmentPlacements,
-  buildLineBays,
+  buildDefaultStructureLayout,
   isBuiltinStructureKey,
   isLiveMap3DShape,
+  LIVE_MAP_BOARD_PX_HEIGHT,
+  LIVE_MAP_BOARD_PX_WIDTH,
   LIVE_MAP_BUILTIN_STRUCTURES,
+  LIVE_MAP_FAB_LINE_LAYOUT,
   LIVE_MAP_STATUS_COLOR,
-  LIVE_MAP_WORLD_SCALE,
-  liveMapRoomSizeWorld,
+  LIVE_MAP_STRUCTURE_COLOR_BY_NAME,
   placementToWorld,
+  planEquipmentLineLayout,
+  shapeBoundingBox,
   snapToGrid,
   worldToPlacement,
   type LiveMap3DShape,
-  type LiveMapBay,
   type LiveMapBuiltinStructure,
 } from '../lib/live-map-3d.model'
+import { useEqpList } from '@/features/eqp/hooks/useEqpList'
+import { useGatewayShardLeases } from '@/features/eqp/hooks/useGatewayShardLeases'
+import { groupEqpItems } from '@/features/eqp/utils/eqp-group.util'
 import { LiveMap3DEquipmentField, type FieldPlacement } from './LiveMap3DEquipmentField'
 import { LiveMap3DObject } from './LiveMap3DObject'
 import { LiveMapTooltipCard } from './LiveMapTooltipCard'
@@ -53,12 +57,16 @@ interface ResolvedPlacement extends WorkingPlacement {
   kind: LiveMapObjectResponse['objectKind']
   shape: LiveMap3DShape
   equipment: LiveMapEquipment | null
+  objectName: string | null
 }
 
 const ROTATE_STEP = 15
 /** 키보드 화살표 미세 이동 단위(px). Shift 동반 시 거친 단위. */
 const NUDGE_PX = 8
 const NUDGE_COARSE_PX = 40
+/** 미배치 설비 추가 시 초기 staging 격자(겹침 방지) — 사용자가 끌어 bay 에 배치한다. */
+const ADD_EQP_COLS = 6
+const ADD_EQP_PITCH_PX = 260
 /** 층 — 1~2층, 층간 높이(world unit). 설비(~4 높이) 위로 충분한 여유(뱃지/시그널타워 안 겹치게) + 층 구분 강조. */
 const FLOOR_LEVELS = [1, 2] as const
 const FLOOR_HEIGHT = 9
@@ -77,24 +85,12 @@ interface ScenePalette {
   hemiGround: string
   ambient: number
   hemi: number
-  contactOpacity: number
   badgeBg: string
-  bayZone: string
-  bayWall: string
-  roomFloor: string
-  roomAisle: string
-  roomWall: string
 }
 const SCENE_PALETTE: Record<'light' | 'dark', ScenePalette> = {
-  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, contactOpacity: 0.45, badgeBg: 'rgba(11,16,32,0.92)', bayZone: '#22304b', bayWall: '#46556f', roomFloor: '#1a2740', roomAisle: '#27375a', roomWall: '#39496a' },
-  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, contactOpacity: 0.3, badgeBg: 'rgba(255,255,255,0.95)', bayZone: '#dbe5f1', bayWall: '#9aa9bf', roomFloor: '#e3ebf5', roomAisle: '#cfdbe9', roomWall: '#8c9cb4' },
+  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, badgeBg: 'rgba(11,16,32,0.92)' },
+  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, badgeBg: 'rgba(255,255,255,0.95)' },
 }
-
-/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 원거리 외벽 2면(-X/-Z) + 중앙 통로. mockup1(2.5D 등각 룸) 미감.
- *  바닥 크기(W/D)는 고정이 아니라 liveMapRoomSizeWorld 로 bay 범위를 덮게 산출(깊은 bay 설비 floating 방지). */
-const ROOM_WALL_HEIGHT = 3.4
-const ROOM_WALL_THICKNESS = 0.3
-const ROOM_AISLE_W = 3.4
 
 /** objectKey 0 = 라이브러리 객체 없이 자동 표시되는 빌트인 설비. 저장 시 백킹 EQUIPMENT 객체 키로 치환. */
 const AUTO_OBJECT_KEY = 0
@@ -125,7 +121,7 @@ function CameraRig({ floorView }: { floorView: FloorView }) {
     const orthographic = camera as THREE.OrthographicCamera
     // r3f 카메라 제어는 인스턴스 직접 변형이 정식 API — react-compiler immutability 오탐.
     // eslint-disable-next-line react-hooks/immutability
-    orthographic.zoom = floorView === 'all' ? 24 : 38
+    orthographic.zoom = floorView === 'all' ? 14 : 20
     orthographic.updateProjectionMatrix()
     if (controls) {
       controls.target.set(0, floorView === 'all' ? STACK_CENTER_Y : 0, 0)
@@ -136,21 +132,44 @@ function CameraRig({ floorView }: { floorView: FloorView }) {
   return null
 }
 
-/** 선택 강조 — 굵은 시안 링 + 외곽 글로우 링(멀리서도 footprint 가 즉시 보이게). 설비/구조물 공용. */
-function SelectionRings() {
+/** 설비 선택 표시 박스의 크기/중심(world unit) — 본체+EFEM+시그널타워를 감싼다. */
+const EQUIPMENT_SELECT_BOX = { center: [0, 1.55, 0.1] as const, size: [2.4, 3.15, 2.15] as const }
+
+/**
+ * 선택 강조 — 객체를 감싸는 와이어 박스(모서리 라인). 바닥 평면 링은 바닥/기둥/설비에 가려 안 보였으므로,
+ * 객체 크기에 맞춘 박스 외곽선으로 어느 객체든(바닥=납작 사각, 기둥=세로 박스, 설비=툴 박스) 선택이 보이게 한다.
+ * depthTest=false 라 다른 객체 뒤에 있어도 외곽선이 비쳐 항상 보인다. 상위 group 의 위치/회전을 그대로 따른다.
+ */
+function SelectionBox({
+  center,
+  size,
+}: {
+  center: readonly [number, number, number]
+  size: readonly [number, number, number]
+}) {
+  // 살짝 부풀려(+0.2) 객체 표면에 딱 붙지 않고 또렷이 감싸게 한다. WebGL 선은 두께가 1px 고정이라 외곽선만으론
+  // 옅어, 반투명 채움(시안 글로우 볼륨)을 같이 둬 어느 줌/각도에서도 선택이 확실히 보이게 한다.
+  const edges = useMemo(
+    () => new THREE.EdgesGeometry(new THREE.BoxGeometry(size[0] + 0.2, size[1] + 0.2, size[2] + 0.2)),
+    [size],
+  )
   return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-        <ringGeometry args={[2.0, 2.6, 48]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.95} />
+    <group position={[center[0], center[1], center[2]]}>
+      <mesh>
+        <boxGeometry args={[size[0] + 0.2, size[1] + 0.2, size[2] + 0.2]} />
+        {/* 반투명 채움 — depthWrite=false 라 객체를 가리지 않고 시안으로 감싼다. */}
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.18} depthWrite={false} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
-        <ringGeometry args={[2.6, 3.15, 48]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.22} />
-      </mesh>
+      {/* 외곽선 — depthTest=false 라 다른 객체 뒤에 있어도 비쳐 항상 보인다. */}
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color="#06b6d4" transparent opacity={1} depthTest={false} />
+      </lineSegments>
     </group>
   )
 }
+
+/** 뱃지를 씬 경계 안으로 유지하는 여백(px) — 가장자리 설비의 뱃지가 씬 밖으로 새어 클릭 불가가 되지 않게. */
+const BADGE_EDGE_MARGIN = 26
 
 /** 뱃지 좌표 투영 — N개 설비의 3D 위치를 화면 px 로 project 해 Canvas 밖 단일 오버레이의 버튼 transform 을 일괄 갱신.
  *  drei Html 포털 N개(O(N) 비용) 대신 plain 버튼 N개 + 이 projector 1개 → 진입 비용↓. frameloop=demand 라 카메라 변화/드래그(invalidate) 시 갱신. */
@@ -175,119 +194,10 @@ function BadgeProjector({
       }
       vec.set(p.worldX, p.floorY + 3.7, p.worldZ)
       vec.project(camera)
-      const x = (vec.x * 0.5 + 0.5) * width
-      const y = (-vec.y * 0.5 + 0.5) * height
-      el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`
-    }
-  })
-  return null
-}
-
-/** 층 룸(컷어웨이) — 솔리드 바닥 슬래브 + 중앙 통로 스트립 + 원거리 외벽 2면(-X/-Z). 등각 카메라(+X+Y+Z)라
- *  -X/-Z 면은 뒤쪽 → 그 두 벽만 세워 내부가 보인다(near 벽 생략). 전체 보기에선 하층만 솔리드, 상층은 반투명(하층 투시). */
-function FloorRoom({ floorY, solid, palette, width, depth }: { floorY: number; solid: boolean; palette: ScenePalette; width: number; depth: number }) {
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
-        <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial color={palette.roomFloor} transparent={!solid} opacity={solid ? 1 : 0.55} metalness={0.05} roughness={0.92} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY + 0.02, 0]}>
-        <planeGeometry args={[width, ROOM_AISLE_W]} />
-        <meshStandardMaterial color={palette.roomAisle} transparent opacity={solid ? 0.92 : 0.4} metalness={0.05} roughness={0.88} />
-      </mesh>
-      <mesh position={[-width / 2, floorY + ROOM_WALL_HEIGHT / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[ROOM_WALL_THICKNESS, ROOM_WALL_HEIGHT, depth]} />
-        <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, floorY + ROOM_WALL_HEIGHT / 2, -depth / 2]} castShadow receiveShadow>
-        <boxGeometry args={[width, ROOM_WALL_HEIGHT, ROOM_WALL_THICKNESS]} />
-        <meshStandardMaterial color={palette.roomWall} transparent={!solid} opacity={solid ? 1 : 0.35} metalness={0.1} roughness={0.8} />
-      </mesh>
-    </group>
-  )
-}
-
-/** 공정 핑거 bay 구조물 — bay 마다 바닥 존 + 세로 내부 통로(스파인 연결) + 좌/우 설비 뒤쪽 벽(긴 변).
- *  설비가 등지는 면(뒤쪽)만 벽으로 막고, 바깥 끝(옆)·스파인 쪽 입구는 열어 둔다. 천장(OHT/트레이)은 그리지 않는다. 라벨은 DOM 오버레이. */
-function BayStructures({
-  bays,
-  floorYOf,
-  palette,
-}: {
-  bays: LiveMapBay[]
-  floorYOf: (floor: number) => number
-  palette: ScenePalette
-}) {
-  const aisle = LIVE_MAP_BAY_AISLE_PX / LIVE_MAP_WORLD_SCALE
-  const partitionH = 1.6
-  const partitionT = 0.12
-  return (
-    <>
-      {bays.map((bay) => {
-        const [worldX, worldZ] = placementToWorld(bay.centerXPx, bay.centerYPx)
-        const width = bay.widthPx / LIVE_MAP_WORLD_SCALE
-        const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
-        const floorY = floorYOf(bay.floor)
-        return (
-          <group key={`${bay.floor}-${bay.clusterId}`}>
-            {/* bay 바닥존 */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[worldX, floorY + 0.03, worldZ]} receiveShadow>
-              <planeGeometry args={[width, depth]} />
-              <meshStandardMaterial color={palette.bayZone} transparent opacity={0.45} metalness={0.05} roughness={0.95} />
-            </mesh>
-            {/* 내부 통로(세로) — 좌/우 2열 사이를 스파인까지 잇는다. */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[worldX, floorY + 0.06, worldZ]} receiveShadow>
-              <planeGeometry args={[aisle, depth]} />
-              <meshStandardMaterial color={palette.roomAisle} transparent opacity={0.95} metalness={0.1} roughness={0.8} />
-            </mesh>
-            {/* 좌/우 설비 뒤쪽 벽(긴 변) — 좌/우 열 설비가 등지는 면. bay 길이만큼 세로로. */}
-            <mesh position={[worldX - width / 2, floorY + partitionH / 2, worldZ]} castShadow receiveShadow>
-              <boxGeometry args={[partitionT, partitionH, depth]} />
-              <meshStandardMaterial color={palette.bayWall} metalness={0.1} roughness={0.8} />
-            </mesh>
-            <mesh position={[worldX + width / 2, floorY + partitionH / 2, worldZ]} castShadow receiveShadow>
-              <boxGeometry args={[partitionT, partitionH, depth]} />
-              <meshStandardMaterial color={palette.bayWall} metalness={0.1} roughness={0.8} />
-            </mesh>
-          </group>
-        )
-      })}
-    </>
-  )
-}
-
-/** 공정 구간 라벨(공정명) 좌표 투영 — 구간 앞쪽 한 점을 화면 px 로 project 해 Canvas 밖 DOM 라벨 transform 갱신(뱃지와 동형).
- *  imperative transform 이라 Tailwind scale·translate 유틸 동시 적용 금지(합성 어긋남) — 크기/색만 클래스로. */
-function BayLabelProjector({
-  bays,
-  floorYOf,
-  labelRefs,
-}: {
-  bays: LiveMapBay[]
-  floorYOf: (floor: number) => number
-  labelRefs: RefObject<Map<string, HTMLDivElement | null>>
-}) {
-  const camera = useThree((state) => state.camera)
-  const gl = useThree((state) => state.gl)
-  const vecRef = useRef(new THREE.Vector3())
-  useFrame(() => {
-    const width = gl.domElement.clientWidth
-    const height = gl.domElement.clientHeight
-    const vec = vecRef.current
-    for (const bay of bays) {
-      const el = labelRefs.current?.get(`${bay.floor}-${bay.clusterId}`)
-      if (!el) {
-        continue
-      }
-      const [worldX, worldZ] = placementToWorld(bay.centerXPx, bay.centerYPx)
-      const depth = bay.depthPx / LIVE_MAP_WORLD_SCALE
-      // bay 입구(스파인 쪽) 위에 라벨을 띄운다 — 라벨이 중앙 스파인을 따라 정렬된다.
-      const side = Math.sign(worldZ) || 1
-      vec.set(worldX, floorYOf(bay.floor) + 1.9, worldZ - (side * depth) / 2 - 0.2)
-      vec.project(camera)
-      const x = (vec.x * 0.5 + 0.5) * width
-      const y = (-vec.y * 0.5 + 0.5) * height
+      // 설비를 씬 가장자리로 옮기면 뱃지(+3.7 띄움)가 씬 밖(상단바 등)으로 투영돼 클릭 불가가 된다 →
+      // 씬 안으로 clamp 해 드래그/재선택 핸들을 항상 잡을 수 있게 유지(선택링은 3D 상 설비 위치 그대로).
+      const x = Math.max(BADGE_EDGE_MARGIN, Math.min(width - BADGE_EDGE_MARGIN, (vec.x * 0.5 + 0.5) * width))
+      const y = Math.max(BADGE_EDGE_MARGIN, Math.min(height - BADGE_EDGE_MARGIN, (-vec.y * 0.5 + 0.5) * height))
       el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`
     }
   })
@@ -297,32 +207,28 @@ function BayLabelProjector({
 /** Canvas 내부 — 다중 선택 + 그룹 바닥 드래그(수동 ray-plane + 포인터 캡처) + 층 슬래브. 뱃지는 Canvas 밖 단일 오버레이. */
 function SceneContent({
   placements,
-  bays,
-  roomSize,
   selectedIdSet,
   editing,
   palette,
   floorView,
   badgeRefs,
-  bayLabelRefs,
   onSelect,
   onDragStart,
   onDragMove,
   onDragEnd,
+  beginDragRef,
 }: {
   placements: ResolvedPlacement[]
-  bays: LiveMapBay[]
-  roomSize: { width: number; depth: number }
   selectedIdSet: ReadonlySet<string>
   editing: boolean
   palette: ScenePalette
   floorView: FloorView
   badgeRefs: RefObject<Map<string, HTMLButtonElement | null>>
-  bayLabelRefs: RefObject<Map<string, HTMLDivElement | null>>
   onSelect: (localId: string, additive: boolean) => void
   onDragStart: (localId: string) => void
   onDragMove: (localId: string, worldX: number, worldZ: number) => void
   onDragEnd: () => void
+  beginDragRef: RefObject<((localId: string, pointerId: number, planeY: number) => void) | null>
 }) {
   // 단일 층 보기는 그 층을 바닥(Y=0)으로 평탄화해 포커스 — 전체 보기는 층별 Y 로 적층.
   const floorYOf = (floor: number) => (floorView === 'all' ? (floor - 1) * FLOOR_HEIGHT : 0)
@@ -351,20 +257,34 @@ function SceneContent({
     }
     const handleUp = (event: PointerEvent) => {
       if (dragRef.current?.pointerId === event.pointerId) {
-        element.releasePointerCapture?.(event.pointerId)
         dragRef.current = null
         onDragEnd()
       }
     }
-    element.addEventListener('pointermove', handleMove)
-    element.addEventListener('pointerup', handleUp)
-    element.addEventListener('pointercancel', handleUp)
+    // 드래그 이동/종료는 window 에서 듣는다(포인터 캡처 미사용) — gl.domElement 에 직접 setPointerCapture 하면
+    // r3f 자체 이벤트 시스템의 캡처 관리와 충돌해, 한 번 드래그한 뒤 캔버스 raycast 픽이 죽는다(재선택 불가). window 리스너는
+    // 포인터가 캔버스를 벗어나도 잡고, r3f 이벤트 시스템을 전혀 건드리지 않는다.
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
     return () => {
-      element.removeEventListener('pointermove', handleMove)
-      element.removeEventListener('pointerup', handleUp)
-      element.removeEventListener('pointercancel', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
   }, [gl, camera, raycaster, onDragMove, onDragEnd])
+
+  // 뱃지(Canvas 밖 HTML)로 설비를 끌 때, 설비 메시 드래그와 동일한 경로로 통합한다 — dragRef 를 세팅하면
+  // window 의 pointermove/up/cancel 리스너가 이동/종료를 처리한다(포인터 캡처 미사용).
+  useEffect(() => {
+    beginDragRef.current = (localId, pointerId, planeY) => {
+      dragPlaneRef.current.constant = -planeY
+      dragRef.current = { localId, pointerId }
+    }
+    return () => {
+      beginDragRef.current = null
+    }
+  }, [beginDragRef])
 
   const beginInteract = useCallback(
     (localId: string, floorY: number, event: ThreeEvent<PointerEvent>) => {
@@ -375,12 +295,13 @@ function SceneContent({
         return
       }
       event.stopPropagation()
-      gl.domElement.setPointerCapture?.(event.pointerId)
+      // 포인터 캡처는 걸지 않는다 — window 리스너가 이동/종료를 처리하고, 직접 캡처 시 r3f 이벤트 시스템과 충돌해
+      // 드래그 후 재픽이 죽는다(아래 useEffect 주석 참고).
       dragPlaneRef.current.constant = -floorY
       dragRef.current = { localId, pointerId: event.pointerId }
       onDragStart(localId)
     },
-    [onSelect, editing, gl, onDragStart],
+    [onSelect, editing, onDragStart],
   )
 
   // 보이는 층만 렌더. 설비는 InstancedMesh 필드로 일괄(부품 종류당 1 draw call, 설비 수 무관), 구조물은 소수라 per-instance.
@@ -408,30 +329,20 @@ function SceneContent({
       }),
     [equipVisible, floorView],
   )
-  // 룸을 그릴 층 = 보이는 bay 가 있는 층. 전체 보기에선 최하층만 솔리드(하층 투시), 나머지 반투명.
-  const roomFloors = useMemo(() => [...new Set(bays.map((bay) => bay.floor))].sort((a, b) => a - b), [bays])
-  const lowestRoomFloor = roomFloors[0] ?? 1
-
   return (
     <>
       <color attach="background" args={[palette.background]} />
       <hemisphereLight intensity={palette.hemi} groundColor={palette.hemiGround} color={palette.hemiSky} />
       <ambientLight intensity={palette.ambient} />
-      <directionalLight position={[14, 22, 10]} intensity={1.15} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} />
-      {/* 전면 필 — 등각 카메라 쪽 면(설비 전면)이 어둠에 묻히지 않게. 그림자 없음. */}
+      {/* 그림자 비사용(성능) — 메인 디렉셔널 + 전면 필 라이트로만 입체감. */}
+      <directionalLight position={[14, 22, 10]} intensity={1.15} />
+      {/* 전면 필 — 등각 카메라 쪽 면(설비 전면)이 어둠에 묻히지 않게. */}
       <directionalLight position={[6, 9, 18]} intensity={0.5} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[160, 160]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <planeGeometry args={[260, 260]} />
         <meshStandardMaterial color={palette.ground} metalness={0.1} roughness={0.95} />
       </mesh>
-      <Grid args={[160, 160]} cellSize={1} cellColor={palette.gridCell} sectionSize={5} sectionColor={palette.gridSection} infiniteGrid fadeDistance={56} fadeStrength={1.3} />
-      <ContactShadows position={[0, 0.01, 0]} opacity={palette.contactOpacity} scale={80} blur={2.2} far={22} resolution={512} />
-      {/* 층 룸 — 보이는 bay 가 있는 층마다 솔리드 바닥 + 중앙 통로 + 원거리 외벽(컷어웨이). 모든 구조물의 배경. */}
-      {roomFloors.map((floor) => (
-        <FloorRoom key={floor} floorY={floorYOf(floor)} solid={floorView !== 'all' || floor === lowestRoomFloor} palette={palette} width={roomSize.width} depth={roomSize.depth} />
-      ))}
-      {/* 공정 bay — 바닥 존 + 통로 반대쪽 3면 낮은 파티션(통로 쪽 열림). 설비보다 먼저 그려 배경처럼. */}
-      <BayStructures bays={bays} floorYOf={floorYOf} palette={palette} />
+      <Grid args={[260, 260]} cellSize={1} cellColor={palette.gridCell} sectionSize={5} sectionColor={palette.gridSection} infiniteGrid fadeDistance={120} fadeStrength={1.3} />
       {/* 설비 — InstancedMesh 일괄(부품 종류당 1 draw call). 선택/드래그는 본체 instance onPointerDown → beginInteract. */}
       <LiveMap3DEquipmentField placements={equipField} onPartPointerDown={beginInteract} />
 
@@ -440,29 +351,38 @@ function SceneContent({
         const [worldX, worldZ] = placementToWorld(placement.xPx, placement.yPx)
         const floorY = floorYOf(placement.floor)
         const isSelected = selectedIdSet.has(placement.localId)
+        const colorOverride = placement.objectName ? LIVE_MAP_STRUCTURE_COLOR_BY_NAME[placement.objectName] : undefined
         return (
           <group key={placement.localId} position={[worldX, floorY, worldZ]} rotation={[0, (placement.rotationDeg * Math.PI) / 180, 0]}>
             <group onPointerDown={(event) => beginInteract(placement.localId, floorY, event)}>
-              <LiveMap3DObject shape={placement.shape} />
+              <LiveMap3DObject shape={placement.shape} colorOverride={colorOverride} />
             </group>
-            {isSelected ? <SelectionRings /> : null}
+            {isSelected
+              ? (() => {
+                  const bbox = shapeBoundingBox(placement.shape)
+                  return <SelectionBox center={[bbox.center.x, bbox.center.y, bbox.center.z]} size={[bbox.size.x, bbox.size.y, bbox.size.z]} />
+                })()
+              : null}
           </group>
         )
       })}
 
-      {/* 설비 선택링 — 선택된 것만(few). 뱃지는 Canvas 밖 단일 오버레이(BadgeProjector 가 좌표 갱신). */}
+      {/* 설비 선택 표시 박스 — 선택된 것만(few). 회전을 적용해 설비 방향에 맞춰 감싼다. 뱃지는 Canvas 밖 오버레이. */}
       {equipVisible
         .filter((placement) => selectedIdSet.has(placement.localId))
         .map((placement) => {
           const [worldX, worldZ] = placementToWorld(placement.xPx, placement.yPx)
           return (
-            <group key={placement.localId} position={[worldX, floorYOf(placement.floor), worldZ]}>
-              <SelectionRings />
+            <group
+              key={placement.localId}
+              position={[worldX, floorYOf(placement.floor), worldZ]}
+              rotation={[0, (placement.rotationDeg * Math.PI) / 180, 0]}
+            >
+              <SelectionBox center={EQUIPMENT_SELECT_BOX.center} size={EQUIPMENT_SELECT_BOX.size} />
             </group>
           )
         })}
       <BadgeProjector equip={equipField} badgeRefs={badgeRefs} />
-      <BayLabelProjector bays={bays} floorYOf={floorYOf} labelRefs={bayLabelRefs} />
       {/* 편집 모드에선 카메라 회전(좌드래그)을 끈다 — 설비 좌드래그 이동과 orbit 충돌 방지. pan(우드래그)/zoom(휠)은 유지. */}
       <OrbitControls enableRotate={!editing} makeDefault />
       <CameraRig floorView={floorView} />
@@ -485,6 +405,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   const objectsQuery = useLayoutObjects(canEdit)
   const saveLayout = useSaveLayout(lineKey)
   const createObject = useCreateObject()
+  // gateway_app 기준 층 자동 배치용 — live-map 설비 응답엔 routePartition 이 없어, eqp 목록(routePartition)과
+  // shard lease 를 따로 받아 groupEqpItems 로 gateway_app 을 산출한다(eqpKey 로 live-map 설비와 조인).
+  const eqpListQuery = useEqpList()
+  const gatewayShardLeasesQuery = useGatewayShardLeases()
   const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
   const theme = useThemeStore((state) => state.theme)
   const palette = SCENE_PALETTE[theme]
@@ -496,13 +420,14 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   }
   // 단일 뱃지 오버레이 — 버튼 DOM 을 localId 로 등록, Canvas 안 BadgeProjector 가 좌표를 일괄 갱신.
   const badgeRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map())
-  // bay 라벨 오버레이 — DOM 을 `${floor}-${clusterId}` 로 등록, Canvas 안 BayLabelProjector 가 좌표를 일괄 갱신.
-  const bayLabelRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  // 뱃지를 설비 드래그 핸들로 — Canvas 안 SceneContent 가 "안정 노드(canvas)에 캡처 + dragRef 세팅" 함수를 여기에 등록한다.
+  const beginDragRef = useRef<((localId: string, pointerId: number, planeY: number) => void) | null>(null)
 
   const [editing, setEditing] = useState(false)
   const [working, setWorking] = useState<WorkingPlacement[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [addObjectKey, setAddObjectKey] = useState<string>('')
+  const [addEqpKey, setAddEqpKey] = useState<string>('')
   const [floorView, setFloorView] = useState<FloorView>('all')
   const [status, setStatus] = useState<string | null>(null)
 
@@ -560,67 +485,70 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     [liveMapQuery.data?.equipmentItems, selectedLineValue],
   )
 
-  // 저장 placement 에 이미 잡힌 실설비(eqpKey) — 자동 표시에서 제외(중복 방지).
+  // working 에 이미 배치된 실설비(eqpKey) — 미배치 설비 드롭다운에서 제외(중복 방지).
   const placedEqpKeys = useMemo(
     () => new Set(working.map((placement) => placement.eqpKey).filter((key): key is number => key != null)),
     [working],
   )
 
-  // 라인 실설비를 cluster 로 묶어 추출(bay 배치/구조물 공용 입력).
-  const bayEquipmentInput = useMemo(
-    () => lineEquipments.map((equipment) => ({ eqpKey: equipment.eqpKey, clusterId: equipment.clusterId, clusterName: equipment.clusterName })),
-    [lineEquipments],
+  // 미배치 설비 — 라인 실설비 중 아직 배치 안 된 것. 편집모드 드롭다운에서 골라 추가한다(배치 전엔 3D 에 표시 안 됨).
+  const unplacedEquipments = useMemo(
+    () => lineEquipments.filter((equipment) => !placedEqpKeys.has(equipment.eqpKey)),
+    [lineEquipments, placedEqpKeys],
   )
 
-  // 공정 bay 목록 — 라인 전 설비 기준(placed 와 무관). 구조물(바닥존/벽)·라벨 렌더의 배경.
-  const bays = useMemo(() => buildLineBays(bayEquipmentInput), [bayEquipmentInput])
+  // eqpKey → 자동 배치 대상 층. gateway_app{N} → N층(가용 층 범위로 clamp). 라인 소속 설비만 매핑한다.
+  const floorByEqpKey = useMemo(() => {
+    const map = new Map<number, number>()
+    if (lineKey === null) {
+      return map
+    }
+    const lineEqpInfos = (eqpListQuery.data?.items ?? []).filter((eqp) => eqp.lineKey === lineKey)
+    const { gatewayGroups } = groupEqpItems(lineEqpInfos, gatewayShardLeasesQuery.data)
+    const maxFloor = Math.max(...FLOOR_LEVELS)
+    for (const group of gatewayGroups) {
+      const floor = Math.min(group.appIndex, maxFloor)
+      for (const eqp of group.items) {
+        map.set(eqp.eqpKey, floor)
+      }
+    }
+    return map
+  }, [eqpListQuery.data, gatewayShardLeasesQuery.data, lineKey])
 
-  // 룸 바닥/외벽 크기 — 전 층의 모든 bay 를 덮게(깊은 bay 설비가 바닥/벽 밖으로 floating 방지). 전 층 동일 크기로 적층 정합.
-  const roomSize = useMemo(() => liveMapRoomSizeWorld(bays), [bays])
+  // 자동 배치는 gateway_app 산출에 두 조회(eqp 목록 + shard lease)가 모두 필요하다. 둘 다 성공해야 활성화한다.
+  const gatewayDataReady = eqpListQuery.isSuccess && gatewayShardLeasesQuery.isSuccess
 
-  // 저장 placement 가 없는 라인 실설비를 공정 bay 에 자동 배치(objectKey 0 = 빌트인, 저장 시 백킹 객체로 치환).
-  // 위치는 cluster 그룹 내 고정 index 기반(buildBayEquipmentPlacements) — 일부 승격(편집)해도 나머지 위치 불변.
-  // 층/회전은 공정(clusterId)·bay 행으로 결정 — 1F: photo/etch/cvd, 2F: cmp/diff/imp, 3F: wet/metal, 그 외 1층.
-  const autoPlacements = useMemo<WorkingPlacement[]>(
+  // 기본 구조 채우기 대상 층(전체 보기면 1층). 그 층에 이미 구조물이 있으면 재시드 금지 — 층마다 1회(중복 방지).
+  const seedFloor = floorView === 'all' ? 1 : floorView
+  const seedFloorHasStructure = useMemo(
     () =>
-      buildBayEquipmentPlacements(bayEquipmentInput, placedEqpKeys).map(({ eqpKey, xPx, yPx, rotationDeg, floor }) => ({
-        localId: `auto-${eqpKey}`,
-        placementKey: null,
-        objectKey: AUTO_OBJECT_KEY,
-        eqpKey,
-        xPx,
-        yPx,
-        rotationDeg,
-        floor,
-      })),
-    [bayEquipmentInput, placedEqpKeys],
+      working.some(
+        (placement) => placement.floor === seedFloor && objectsByKey.get(placement.objectKey)?.objectKind === 'STRUCTURE',
+      ),
+    [working, seedFloor, objectsByKey],
   )
 
-  const autoById = useMemo(() => new Map(autoPlacements.map((placement) => [placement.localId, placement])), [autoPlacements])
-
-  // 화면에 그리는 전체 = 저장/편집된 placement + 자동 표시 설비.
-  const allPlacements = useMemo(() => [...working, ...autoPlacements], [working, autoPlacements])
-
+  // 화면에 그리는 전체 = 사용자가 배치한 placement 만(자동 표시 없음 — 미배치 설비는 보이지 않는다).
   const resolved = useMemo(() => {
     const items: ResolvedPlacement[] = []
-    for (const placement of allPlacements) {
+    for (const placement of working) {
       const object = objectsByKey.get(placement.objectKey)
       const kind = object?.objectKind ?? (placement.eqpKey != null ? 'EQUIPMENT' : null)
       if (kind === 'STRUCTURE') {
         if (!object || !isLiveMap3DShape(object.shapeJson)) {
           continue
         }
-        items.push({ ...placement, kind, shape: object.shapeJson, equipment: null })
+        items.push({ ...placement, kind, shape: object.shapeJson, equipment: null, objectName: object.objectName })
       } else if (kind === 'EQUIPMENT') {
         const equipment = placement.eqpKey != null ? equipmentByKey.get(placement.eqpKey) ?? null : null
-        items.push({ ...placement, kind, shape: EMPTY_SHAPE, equipment })
+        items.push({ ...placement, kind, shape: EMPTY_SHAPE, equipment, objectName: object?.objectName ?? null })
       }
     }
     return items
-  }, [allPlacements, objectsByKey, equipmentByKey])
+  }, [working, objectsByKey, equipmentByKey])
 
 
-  // 추가 드롭다운/템플릿 교체 후보 = 빌트인 구조물(벽/파티션) + DB 객체. 같은 이름 DB STRUCTURE 가 있으면 빌트인은 숨김(중복 방지).
+  // 추가 드롭다운/템플릿 교체 후보 = 빌트인 구조물(벽/파티션/바닥) + DB 객체. 같은 이름 DB STRUCTURE 가 있으면 빌트인은 숨김(중복 방지).
   const libraryObjects = useMemo(() => {
     const dbObjects = (objectsQuery.data ?? []).filter((object) => isLiveMap3DShape(object.shapeJson))
     const dbStructureNames = new Set(
@@ -645,9 +573,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       ),
     [resolved, floorView],
   )
-  // bay 라벨 오버레이용 — 보이는 층의 bay 만. 좌표는 BayLabelProjector(Canvas 안)가 갱신.
-  const visibleBays = useMemo(() => bays.filter((bay) => floorView === 'all' || bay.floor === floorView), [bays, floorView])
-  const primary = allPlacements.find((placement) => placement.localId === primaryId) ?? null
+  const primary = working.find((placement) => placement.localId === primaryId) ?? null
   const primaryObject = primary ? objectsByKey.get(primary.objectKey) ?? null : null
   const isEquipmentPrimary = primaryObject?.objectKind === 'EQUIPMENT'
   const primaryEquipment = primary?.eqpKey != null ? equipmentByKey.get(primary.eqpKey) ?? null : null
@@ -674,61 +600,34 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     })
   }
 
-  // 편집 시 working 에 반영 — 자동 표시 설비(auto-*)는 working 에 없으므로 이때 승격(promote)한다.
+  // 선택 placement 1개에 patch 반영.
   const patchWorking = (localId: string, patch: Partial<WorkingPlacement>) => {
-    setWorking((previous) => {
-      if (previous.some((placement) => placement.localId === localId)) {
-        return previous.map((placement) => (placement.localId === localId ? { ...placement, ...patch } : placement))
-      }
-      const auto = autoById.get(localId)
-      if (!auto) {
-        return previous
-      }
-      return [...previous, { ...auto, ...patch }]
-    })
+    setWorking((previous) =>
+      previous.map((placement) => (placement.localId === localId ? { ...placement, ...patch } : placement)),
+    )
   }
 
-  // 선택 전체에 patch 적용(자동 설비는 승격). makePatch 는 현재 값 기반 변환(회전/이동 누적 등)도 지원.
+  // 선택 전체에 patch 적용. makePatch 는 현재 값 기반 변환(회전/이동 누적 등)도 지원.
   const patchSelected = (makePatch: (placement: WorkingPlacement) => Partial<WorkingPlacement>) => {
-    setWorking((previous) => {
-      const present = new Set(previous.map((placement) => placement.localId))
-      const next = previous.map((placement) =>
+    setWorking((previous) =>
+      previous.map((placement) =>
         selectedIdSet.has(placement.localId) ? { ...placement, ...makePatch(placement) } : placement,
-      )
-      for (const id of selectedIds) {
-        if (!present.has(id)) {
-          const auto = autoById.get(id)
-          if (auto) {
-            next.push({ ...auto, ...makePatch(auto) })
-          }
-        }
-      }
-      return next
-    })
+      ),
+    )
   }
 
   // 키보드 미세 이동(②) — 선택 전체를 px 만큼 이동. 효과 의존성 안정용 useCallback.
   const nudgeSelected = useCallback(
     (dxPx: number, dyPx: number) => {
-      setWorking((previous) => {
-        const present = new Set(previous.map((placement) => placement.localId))
-        const next = previous.map((placement) =>
+      setWorking((previous) =>
+        previous.map((placement) =>
           selectedIdSet.has(placement.localId)
             ? { ...placement, xPx: placement.xPx + dxPx, yPx: placement.yPx + dyPx }
             : placement,
-        )
-        for (const id of selectedIds) {
-          if (!present.has(id)) {
-            const auto = autoById.get(id)
-            if (auto) {
-              next.push({ ...auto, xPx: auto.xPx + dxPx, yPx: auto.yPx + dyPx })
-            }
-          }
-        }
-        return next
-      })
+        ),
+      )
     },
-    [selectedIds, selectedIdSet, autoById],
+    [selectedIdSet],
   )
 
   // ② 편집모드 + 선택 있을 때 화살표로 미세 이동. 입력/셀렉트 포커스 시엔 무시(타이핑/셀렉트 조작 보존).
@@ -779,12 +678,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const ids = selectedIds.includes(localId) ? selectedIds : [localId]
     const start = new Map<string, { xPx: number; yPx: number }>()
     for (const id of ids) {
-      const placement = allPlacements.find((item) => item.localId === id)
+      const placement = working.find((item) => item.localId === id)
       if (placement) {
         start.set(id, { xPx: placement.xPx, yPx: placement.yPx })
       }
     }
-    const anchor = allPlacements.find((item) => item.localId === localId)
+    const anchor = working.find((item) => item.localId === localId)
     dragStartRef.current = anchor ? { ids, start, anchorXPx: anchor.xPx, anchorYPx: anchor.yPx } : null
   }
 
@@ -798,23 +697,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     // 드래그 중인 객체(anchor)를 격자점에 스냅 → 그 변위를 선택 전체에 적용(상대 배치 유지).
     const dxPx = snapToGrid(hitXPx) - drag.anchorXPx
     const dyPx = snapToGrid(hitYPx) - drag.anchorYPx
-    setWorking((previous) => {
-      const present = new Set(previous.map((placement) => placement.localId))
-      const next = previous.map((placement) => {
+    setWorking((previous) =>
+      previous.map((placement) => {
         const snapshot = drag.start.get(placement.localId)
         return snapshot ? { ...placement, xPx: snapshot.xPx + dxPx, yPx: snapshot.yPx + dyPx } : placement
-      })
-      for (const id of drag.ids) {
-        if (!present.has(id)) {
-          const auto = autoById.get(id)
-          const snapshot = drag.start.get(id)
-          if (auto && snapshot) {
-            next.push({ ...auto, xPx: snapshot.xPx + dxPx, yPx: snapshot.yPx + dyPx })
-          }
-        }
-      }
-      return next
-    })
+      }),
+    )
   }
 
   const handleDragEnd = () => {
@@ -833,10 +721,93 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const addFloor = floorView === 'all' ? 1 : floorView
     setWorking((previous) => [
       ...previous,
-      { localId, placementKey: null, objectKey, eqpKey: null, xPx: 675, yPx: 355, rotationDeg: 0, floor: addFloor },
+      { localId, placementKey: null, objectKey, eqpKey: null, xPx: LIVE_MAP_BOARD_PX_WIDTH / 2, yPx: LIVE_MAP_BOARD_PX_HEIGHT / 2, rotationDeg: 0, floor: addFloor },
     ])
     setSelectedIds([localId])
     setStatus(null)
+  }
+
+  // 기본 구조 채우기 — 일반 fab 룸(바닥/외벽/기둥/파티션)을 시작점으로 보고 있는 층에 한 번에 깐다(전체 보기면 1층).
+  // 빌트인 음수 키 placement 라 추가 후 각각 드래그/회전/삭제 가능하고, 저장 시 실 STRUCTURE 객체로 치환된다.
+  // 그 층에 이미 구조물이 있으면 중복 시드 금지(층마다 1회).
+  const handleSeedStructures = () => {
+    if (seedFloorHasStructure) {
+      setStatus(t('livemap.viewer3d.statusSeedTaken', { floor: seedFloor }))
+      return
+    }
+    const seeds = buildDefaultStructureLayout().map((seed) => ({
+      localId: nextLocalId(),
+      placementKey: null,
+      objectKey: seed.objectKey,
+      eqpKey: null,
+      xPx: seed.xPx,
+      yPx: seed.yPx,
+      rotationDeg: seed.rotationDeg,
+      floor: seedFloor,
+    }))
+    setWorking((previous) => [...previous, ...seeds])
+    setSelectedIds([])
+    setStatus(t('livemap.viewer3d.statusSeeded', { count: seeds.length }))
+  }
+
+  // 미배치 설비 추가 — 선택한 실설비를 working 에 배치(백킹 EQUIPMENT 객체 키는 저장 시 치환). 초기 위치는 겹치지 않는 staging 격자.
+  const handleAddEquipment = () => {
+    const eqpKey = Number(addEqpKey)
+    if (!Number.isInteger(eqpKey) || eqpKey <= 0) {
+      setStatus(t('livemap.viewer3d.statusPickEquipment'))
+      return
+    }
+    const localId = nextLocalId()
+    const addFloor = floorView === 'all' ? 1 : floorView
+    const placedCount = working.filter((placement) => placement.eqpKey != null).length
+    const col = placedCount % ADD_EQP_COLS
+    const row = Math.floor(placedCount / ADD_EQP_COLS)
+    const startXPx = LIVE_MAP_BOARD_PX_WIDTH / 2 - ((ADD_EQP_COLS - 1) * ADD_EQP_PITCH_PX) / 2
+    setWorking((previous) => [
+      ...previous,
+      {
+        localId,
+        placementKey: null,
+        objectKey: AUTO_OBJECT_KEY,
+        eqpKey,
+        xPx: startXPx + col * ADD_EQP_PITCH_PX,
+        yPx: LIVE_MAP_BOARD_PX_HEIGHT / 2 + row * ADD_EQP_PITCH_PX,
+        rotationDeg: 0,
+        floor: addFloor,
+      },
+    ])
+    setSelectedIds([localId])
+    setAddEqpKey('')
+    setStatus(null)
+  }
+
+  // gateway_app 자동 배치 — 라인 소속 설비 "전체"를 gateway_app 기준 층(gateway_app1→1층, gateway_app2→2층)의
+  // fab 라인(bay)으로 재배치한다. 기존 설비 배치는 덮어쓰고(이미 저장된 것도 다시 깔림), 구조물은 보존한다.
+  // 분류 불가 설비는 1층에 모은다(누락 방지). 이후 드래그로 bay 미세조정 + 저장.
+  const handleAutoPlaceEquipment = () => {
+    if (lineEquipments.length === 0) {
+      setStatus(t('livemap.viewer3d.statusAutoPlaceNone'))
+      return
+    }
+    // 같은 클러스터(bay)가 한 줄에 모여 보이도록 clusterId → eqpId 순으로 정렬한 뒤 fab 라인 기하로 배치한다.
+    const orderedEqpKeys = [...lineEquipments]
+      .sort((a, b) => (a.clusterId === b.clusterId ? a.eqpId.localeCompare(b.eqpId) : a.clusterId.localeCompare(b.clusterId)))
+      .map((equipment) => equipment.eqpKey)
+    const plan = planEquipmentLineLayout(orderedEqpKeys, floorByEqpKey, 1, LIVE_MAP_FAB_LINE_LAYOUT)
+    const newEquipmentPlacements = plan.map((item) => ({
+      localId: nextLocalId(),
+      placementKey: null,
+      objectKey: AUTO_OBJECT_KEY,
+      eqpKey: item.eqpKey,
+      xPx: item.xPx,
+      yPx: item.yPx,
+      rotationDeg: item.rotationDeg,
+      floor: item.floor,
+    }))
+    // 기존 설비 placement(eqpKey 보유)는 모두 걷어내고 라인 레이아웃으로 교체. 구조물(eqpKey 없음)은 그대로 둔다.
+    setWorking((previous) => [...previous.filter((placement) => placement.eqpKey == null), ...newEquipmentPlacements])
+    setSelectedIds([])
+    setStatus(t('livemap.viewer3d.statusAutoPlaced', { count: newEquipmentPlacements.length }))
   }
 
   const rotateSelected = (deltaDeg: number) => patchSelected((placement) => ({ rotationDeg: placement.rotationDeg + deltaDeg }))
@@ -930,61 +901,34 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   return (
     <section data-testid="live-map-3d-scene" className="relative h-[calc(100dvh-16rem)] min-h-110 overflow-hidden rounded-3xl border border-border bg-card shadow-soft-lg">
       {/* frameloop=demand — 연속 rAF 루프 대신 상호작용/상태변화 시에만 렌더(병렬 e2e teardown 안정 + 부하↓).
-          dpr 캡(레티나 과샘플 방지) + 그림자맵 1024 로 3D 진입/조작 렌더 부하를 낮춘다. */}
+          그림자 비사용 + dpr 캡(레티나 과샘플 방지)으로 3D 진입/조작 렌더 부하를 낮춘다. */}
       <Canvas
         frameloop="demand"
-        shadows
         dpr={[1, 1.5]}
         gl={{ powerPreference: 'high-performance' }}
         orthographic
-        camera={{ position: [16, 16, 16], zoom: 32, near: -200, far: 200 }}
+        camera={{ position: [16, 16, 16], zoom: 14, near: -200, far: 200 }}
       >
         <SceneContent
           placements={resolved}
-          bays={visibleBays}
-          roomSize={roomSize}
           selectedIdSet={selectedIdSet}
           editing={editing}
           palette={palette}
           floorView={floorView}
           badgeRefs={badgeRefs}
-          bayLabelRefs={bayLabelRefs}
           onSelect={selectPlacement}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          beginDragRef={beginDragRef}
         />
       </Canvas>
 
-      {/* 공정 bay 라벨 — DOM 오버레이(비상호작용). 위치는 BayLabelProjector 가 매 프레임 transform 으로 갱신.
-          뱃지(z-6)보다 뒤(z-5). imperative transform 이라 Tailwind scale·translate 유틸은 걸지 않는다. */}
-      <div className="pointer-events-none absolute inset-0 z-5 overflow-hidden">
-        {visibleBays.map((bay) => {
-          const key = `${bay.floor}-${bay.clusterId}`
-          return (
-            <div
-              key={key}
-              ref={(element) => {
-                const map = bayLabelRefs.current
-                if (element) {
-                  map.set(key, element)
-                } else {
-                  map.delete(key)
-                }
-              }}
-              data-testid={`live-map-3d-bay-label-${bay.clusterId}`}
-              className="absolute left-0 top-0 whitespace-nowrap rounded-md border border-border bg-card/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground shadow-soft-md backdrop-blur"
-              style={{ transform: 'translate(-9999px, -9999px)' }}
-            >
-              {bay.clusterName}
-            </div>
-          )
-        })}
-      </div>
-
       {/* 상태 뱃지 — 단일 DOM 오버레이(plain 버튼 N개). 위치는 BadgeProjector 가 매 프레임 transform 으로 갱신.
           drei Html 포털 N개 제거 → 진입 비용↓. 항상표시 라벨·뱃지클릭 선택 유지. */}
-      <div className="pointer-events-none absolute inset-0 z-6 overflow-hidden">
+      {/* 편집 모드에선 뱃지를 컨트롤 패널(z-10) 위로 올린다 — 설비를 패널 영역(상단 추가 패널 등)으로 옮겼을 때
+          뱃지가 패널에 덮여 다시 못 잡는 버그를 막는다. 뷰어 모드에선 chrome 이 위(z-6). */}
+      <div className={`pointer-events-none absolute inset-0 ${editing ? 'z-20' : 'z-6'}`}>
         {visibleEquipForBadge.map((badge) => {
           const isSelected = selectedIdSet.has(badge.localId)
           const color = LIVE_MAP_STATUS_COLOR[badge.status]
@@ -1001,8 +945,24 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               }}
               type="button"
               data-testid={`live-map-3d-badge-${badge.eqpKey}`}
-              onClick={(event) => selectPlacement(badge.localId, event.shiftKey || event.ctrlKey || event.metaKey)}
-              className={`pointer-events-auto absolute left-0 top-0 flex items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md transition-transform ${
+              // 뱃지 = 설비 선택 + 드래그 핸들(작은 줌에서 3D 메시 직접 잡기 어려움 → 큰 HTML 타깃으로 이동).
+              // 선택은 pointerdown 한 곳에서만(shift 토글이 click 과 중복돼 상쇄되지 않게). 드래그는 안정 노드(canvas)에
+              // 캡처를 걸어 Canvas 의 pointermove/up/cancel 리스너가 처리한다 — 뱃지 버튼 자체 캡처는 재렌더 시 풀린다.
+              onPointerDown={(event) => {
+                const additive = event.shiftKey || event.ctrlKey || event.metaKey
+                selectPlacement(badge.localId, additive)
+                if (!canEdit || !editing || additive) {
+                  return
+                }
+                const placement = working.find((item) => item.localId === badge.localId)
+                if (!placement) {
+                  return
+                }
+                event.preventDefault()
+                handleDragStart(badge.localId)
+                beginDragRef.current?.(badge.localId, event.pointerId, floorView === 'all' ? (placement.floor - 1) * FLOOR_HEIGHT : 0)
+              }}
+              className={`pointer-events-auto absolute left-0 top-0 flex cursor-grab items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md active:cursor-grabbing ${
                 isSelected ? 'z-1 border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
               }`}
               style={{
@@ -1093,9 +1053,9 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         </button>
       </div>
 
-      {/* 편집 — 추가 패널 */}
+      {/* 편집 — 추가 패널: 구조물(라이브러리 + 기본 구조) | 미배치 설비 */}
       {editing ? (
-        <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-[14px] border border-border bg-card/90 px-3 py-2 shadow-soft-md backdrop-blur">
+        <div className="absolute left-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-[14px] border border-border bg-card/90 px-3 py-2 shadow-soft-md backdrop-blur">
           <select
             data-testid="live-map-3d-add-select"
             className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
@@ -1111,6 +1071,48 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           </select>
           <button type="button" data-testid="live-map-3d-add" onClick={handleAdd} title={t('livemap.viewer3d.addToFloor', { floor: floorView === 'all' ? 1 : floorView })} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
             {t('livemap.viewer3d.add')}
+          </button>
+          <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
+          <button
+            type="button"
+            data-testid="live-map-3d-seed-structures"
+            onClick={handleSeedStructures}
+            disabled={seedFloorHasStructure}
+            title={seedFloorHasStructure ? t('livemap.viewer3d.seedStructuresDoneTitle', { floor: seedFloor }) : t('livemap.viewer3d.seedStructuresTitle')}
+            className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t('livemap.viewer3d.seedStructures')}
+          </button>
+          <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
+          {/* 미배치 설비 — 골라서 추가해야만 3D 에 표시된다(자동 표시 없음). */}
+          <select
+            data-testid="live-map-3d-add-eqp-select"
+            className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+            value={addEqpKey}
+            onChange={(event) => setAddEqpKey(event.target.value)}
+            disabled={unplacedEquipments.length === 0}
+          >
+            <option value="">
+              {unplacedEquipments.length === 0 ? t('livemap.viewer3d.optAllPlaced') : t('livemap.viewer3d.optUnplacedEqp')}
+            </option>
+            {unplacedEquipments.map((equipment) => (
+              <option key={equipment.eqpKey} value={equipment.eqpKey}>
+                {equipment.eqpName}
+              </option>
+            ))}
+          </select>
+          <button type="button" data-testid="live-map-3d-add-eqp" onClick={handleAddEquipment} title={t('livemap.viewer3d.addEquipmentTitle')} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
+            {t('livemap.viewer3d.addEquipment')}
+          </button>
+          <button
+            type="button"
+            data-testid="live-map-3d-auto-place"
+            onClick={handleAutoPlaceEquipment}
+            disabled={lineEquipments.length === 0 || !gatewayDataReady}
+            title={t('livemap.viewer3d.autoPlaceTitle')}
+            className="rounded-md border border-primary bg-primary/5 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t('livemap.viewer3d.autoPlace')}
           </button>
         </div>
       ) : null}
@@ -1186,8 +1188,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         </div>
       ) : null}
 
-      {/* 선택 설비 상세(R5) — 뷰어와 동일한 LiveMapTooltipCard(속성/포트/통신로그). top-16~bottom-4 로 통신로그 flex 높이 확보. */}
-      {selectedNode ? (
+      {/* 선택 설비 상세(R5) — 뷰어와 동일한 LiveMapTooltipCard(속성/포트/통신로그). top-16~bottom-4 로 통신로그 flex 높이 확보.
+          편집 모드에선 숨긴다 — 우측 큰 패널(z-10)이 설비 뱃지(z-6)를 덮어, 우측으로 옮긴 설비를 다시 못 잡는 버그를 유발.
+          편집 중 선택 객체 제어는 하단 편집 패널이 담당하고, 상세 모니터링(상태/포트/로그)은 뷰어 모드 전용으로 둔다. */}
+      {!editing && selectedNode ? (
         <div data-testid="live-map-3d-detail" className="absolute right-4 top-16 bottom-4 z-10 w-82.5">
           <LiveMapTooltipCard equipment={selectedNode} onClose={() => setSelectedIds([])} />
         </div>

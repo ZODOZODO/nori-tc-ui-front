@@ -155,8 +155,8 @@ export function LiveMapPage() {
   )
 
   const selectedEquipment = useMemo(
-    () => resolveSelectedLiveMapEquipment(equipmentNodes, visibleEquipmentNodes, selectedEqpId),
-    [equipmentNodes, selectedEqpId, visibleEquipmentNodes],
+    () => resolveSelectedLiveMapEquipment(visibleEquipmentNodes, selectedEqpId),
+    [selectedEqpId, visibleEquipmentNodes],
   )
 
   // 사용자가 X 로 닫았으면 폴백 설비를 표시하지 않는다.
