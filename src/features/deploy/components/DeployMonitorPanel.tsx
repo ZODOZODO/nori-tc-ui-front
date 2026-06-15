@@ -913,8 +913,15 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     },
     {
       key: 'currentStep',
+      width: '8rem',
       header: t('deploy.monitor.colCurrentStep'),
       accessor: (target) => target.currentStepCode || '-',
+      // 긴 step code(예: 'APPLY_MODEL_VERSION')가 한 줄로 펼쳐져 테이블을 넓히지 않게 줄바꿈.
+      renderCell: (target) => (
+        <span className="block min-w-0 whitespace-normal break-all text-xs text-muted-foreground">
+          {target.currentStepCode || '-'}
+        </span>
+      ),
     },
     {
       key: 'stepStatus',
@@ -940,10 +947,14 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     },
     {
       key: 'updatedAt',
+      width: '8rem',
       header: t('deploy.monitor.colUpdatedAt'),
       accessor: (target) => formatDateTime(target.updatedAt),
+      // 날짜 문자열이 한 줄로 펼쳐지지 않게 고정 폭 안에서 줄바꿈.
       renderCell: (target) => (
-        <span className="text-xs text-muted-foreground">{formatDateTime(target.updatedAt)}</span>
+        <span className="block min-w-0 whitespace-normal break-words text-xs text-muted-foreground">
+          {formatDateTime(target.updatedAt)}
+        </span>
       ),
     },
   ]
@@ -986,7 +997,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         }}
       >
         {commentHistoryItem ? (
-          <DialogContent className="max-h-[85vh] max-w-230 overflow-hidden rounded-2xl p-0">
+          <DialogContent className="max-h-[85vh] max-w-300 overflow-hidden rounded-2xl p-0">
             <div className="flex max-h-[85vh] flex-col">
               <DialogHeader className="border-b border-border px-6 py-5">
                 <DialogTitle className="flex flex-wrap items-center gap-2 text-foreground">
@@ -1028,6 +1039,9 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                       rows={commentTargets}
                       rowKey={(target) => target.deployTargetKey}
                       containerClassName="mt-3 rounded-2xl border border-border bg-card"
+                      // 기본 min-w-max 는 8개 컬럼을 한 줄로 편 폭을 테이블 최소너비로 강제해 모달(overflow-hidden) 밖으로
+                      // 밀어낸다 → min-w-full 로 덮어, 컬럼 width + 긴 컬럼 줄바꿈이 모달 폭 안에서 동작하게 한다.
+                      tableClassName="min-w-full"
                     />
                   )}
                 </div>

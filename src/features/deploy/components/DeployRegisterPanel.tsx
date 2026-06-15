@@ -985,22 +985,33 @@ export function DeployRegisterPanel() {
     },
     {
       key: 'scenarioName',
+      width: '11rem',
       header: t('deploy.register.colScenarioName'),
       accessor: (scenario) => scenario.name,
-      renderCell: (scenario) => <span className="font-medium text-foreground">{scenario.name}</span>,
+      // 긴 시나리오명(예: 'Model + Business Jar + Eqp Param 변경')이 한 줄로 펼쳐져 테이블을 넓히지 않게 줄바꿈.
+      renderCell: (scenario) => (
+        <span className="block min-w-0 whitespace-normal break-words font-medium text-foreground">{scenario.name}</span>
+      ),
     },
     {
       key: 'code',
+      width: '12rem',
       header: t('deploy.register.colCode'),
       accessor: (scenario) => scenario.code,
-      renderCell: (scenario) => <span className="text-xs text-muted-foreground">{scenario.code}</span>,
+      // 긴 코드(예: 'REGISTER_MODEL_BUSINESS_JAR_EQP_PARAM')는 단어 경계가 없어 break-words 로 안 끊기므로 break-all.
+      renderCell: (scenario) => (
+        <span className="block min-w-0 whitespace-normal break-all text-xs text-muted-foreground">{scenario.code}</span>
+      ),
     },
     {
       key: 'coversChanges',
+      width: '9rem',
       header: t('deploy.register.colCoversChanges'),
       accessor: (scenario) => formatChangeKinds(scenario.coversChangeKinds),
       renderCell: (scenario) => (
-        <span className="text-xs text-muted-foreground">
+        // 셀 기본이 whitespace-nowrap 이라 가변 길이 변경종류 나열이 한 줄로 펼쳐져 테이블을 넓힌다 →
+        // 고정 폭 안에서 줄바꿈(normal/break-words)해 모달 폭을 넘지 않게 한다.
+        <span className="block min-w-0 whitespace-normal break-words text-xs text-muted-foreground">
           {formatChangeKinds(scenario.coversChangeKinds)}
         </span>
       ),
@@ -1018,10 +1029,12 @@ export function DeployRegisterPanel() {
     },
     {
       key: 'description',
+      width: '16rem',
       header: t('deploy.register.colDescription'),
       accessor: (scenario) => scenario.summary,
       renderCell: (scenario) => (
-        <div className="text-xs text-muted-foreground">
+        // 요약+사유는 백엔드 가변 길이 문구 → 고정 폭 안에서 줄바꿈해 테이블이 모달을 넘지 않게 한다.
+        <div className="min-w-0 whitespace-normal break-words text-xs text-muted-foreground">
           <p>{scenario.summary}</p>
           <p className="mt-1 text-muted-foreground">{scenario.reason}</p>
         </div>
@@ -1094,7 +1107,7 @@ export function DeployRegisterPanel() {
           }
         }}
       >
-        <DialogContent className="max-w-230 rounded-2xl p-0">
+        <DialogContent className="max-w-280 rounded-2xl p-0">
           <div className="border-b border-border px-6 py-5">
             <DialogHeader className="p-0">
               <DialogTitle>{t('deploy.register.scenarioDialogTitle')}</DialogTitle>
@@ -1161,6 +1174,9 @@ export function DeployRegisterPanel() {
                       </TableRow>
                     )}
                     containerClassName="rounded-[14px] border border-border"
+                    // 기본 min-w-max 는 모든 셀을 한 줄로 편 폭을 테이블 최소너비로 강제해 설명 컬럼 줄바꿈을
+                    // 무력화한다 → min-w-full 로 덮어, 컬럼 width + whitespace-normal 이 모달 폭 안에서 줄바꿈되게 한다.
+                    tableClassName="min-w-full"
                   />
                 )}
               </>
@@ -1397,6 +1413,7 @@ export function DeployRegisterPanel() {
           <>
             <Button
               type="button"
+              data-testid="deploy-register-submit"
               onClick={() => void handleDeploy()}
               disabled={
                 createDeployMutation.isPending ||

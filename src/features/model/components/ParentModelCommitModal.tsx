@@ -276,7 +276,7 @@ export function ParentModelCommitModal({
       }}
     >
       <DialogContent className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 overflow-hidden p-0">
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 min-w-0 flex-col">
           <DialogHeader className="border-b border-border px-6 py-5">
             <DialogTitle>Parent Model Commit</DialogTitle>
             <DialogDescription>
@@ -284,7 +284,7 @@ export function ParentModelCommitModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <section className="grid gap-3 xl:grid-cols-4 md:grid-cols-2">
               <div className="rounded-xl border border-border bg-muted px-3 py-3">
                 <p className="text-[11px] font-semibold text-muted-foreground">Branch Model</p>
