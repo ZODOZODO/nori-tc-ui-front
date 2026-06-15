@@ -4,6 +4,7 @@ import { buildModelTreeGroups } from '../src/features/model/lib/model-tree.util.
 import {
   MODEL_DETAIL_NODE_LABELS,
   PLC_DETAIL_NODES,
+  isValidPlcGroupMessageName,
 } from '../src/features/model/types/model.types.ts'
 import type { ModelInfo } from '../src/features/model/types/model.types.ts'
 
@@ -85,8 +86,35 @@ test('buildModelTreeGroups: 소문자 plc commInterface 도 plcRoots 로 정규�
   assert.equal(groups.secsRoots.length, 0)
 })
 
-test('PLC_DETAIL_NODES: plc-group/plc-register 노드를 라벨과 함께 노출한다', () => {
-  assert.deepEqual(PLC_DETAIL_NODES, ['plc-group', 'plc-register'])
+test('PLC_DETAIL_NODES: PLC 전용 노드 + 공통 노드(파라미터/MES/MDF/DCOP)를 라벨과 함께 노출한다', () => {
+  assert.deepEqual(PLC_DETAIL_NODES, [
+    'model-parameter',
+    'plc-group',
+    'plc-register',
+    'mes-message',
+    'mdf',
+    'dcop-itemes',
+  ])
   assert.equal(MODEL_DETAIL_NODE_LABELS['plc-group'], 'PLC Group')
   assert.equal(MODEL_DETAIL_NODE_LABELS['plc-register'], 'PLC Register')
+  assert.equal(MODEL_DETAIL_NODE_LABELS['mdf'], 'MDF')
+})
+
+test('isValidPlcGroupMessageName: UPPER_SNAKE_CASE 만 허용한다 (Kafka eventType 네이밍)', () => {
+  // 유효 — Business KafkaEventTypeNamingPolicy(DEFAULT_EVENT_TYPE_PATTERN) 통과 형식
+  assert.equal(isValidPlcGroupMessageName('STATUS_REPORT'), true)
+  assert.equal(isValidPlcGroupMessageName('EQP_STATUS_REPORT'), true)
+  assert.equal(isValidPlcGroupMessageName('STATUS'), true)
+  assert.equal(isValidPlcGroupMessageName('S6F11'), true)
+  assert.equal(isValidPlcGroupMessageName('  STATUS_REPORT  '), true) // 트림 후 검사
+
+  // 무효 — Business 가 INVALID_EVENT_TYPE 로 거부해 폴링 메시지를 drop 하는 형식
+  assert.equal(isValidPlcGroupMessageName('status_report'), false) // 소문자 시작
+  assert.equal(isValidPlcGroupMessageName('Status_Report'), false) // 대소문자 혼합
+  assert.equal(isValidPlcGroupMessageName('STATUS-REPORT'), false) // 하이픈
+  assert.equal(isValidPlcGroupMessageName('STATUS REPORT'), false) // 공백
+  assert.equal(isValidPlcGroupMessageName('1STATUS'), false) // 숫자 시작
+  assert.equal(isValidPlcGroupMessageName('STATUS__REPORT'), false) // 연속 언더스코어
+  assert.equal(isValidPlcGroupMessageName('STATUS_'), false) // 끝 언더스코어
+  assert.equal(isValidPlcGroupMessageName(''), false) // 빈값
 })

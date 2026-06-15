@@ -44,7 +44,7 @@ const formatDateTime = (isoDateTime: string): string => {
 /**
  * 모델 상태값을 Badge variant로 변환합니다.
  */
-const resolveStatusBadgeVariant = (status: string): 'default' | 'info' | 'warning' | 'outline' => {
+const resolveStatusBadgeVariant = (status: string): 'default' | 'develop' | 'warning' | 'outline' => {
   const normalizedStatus = status.trim().toUpperCase()
 
   if (normalizedStatus === 'OPERATE') {
@@ -52,7 +52,7 @@ const resolveStatusBadgeVariant = (status: string): 'default' | 'info' | 'warnin
   }
 
   if (normalizedStatus === 'DEVELOP') {
-    return 'info'
+    return 'develop'
   }
 
   if (normalizedStatus === 'DEPRECATED') {

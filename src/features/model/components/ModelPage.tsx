@@ -14,15 +14,14 @@ import { useModelManagementMutations } from '../hooks/useModelManagementMutation
 import { useModelNodeDetail } from '../hooks/useModelNodeDetail'
 import { useModelMutations } from '../hooks/useModelMutations'
 import { useModelUiStore } from '../stores/model-ui.store'
+import { computeNodeDiff } from '../lib/model-diff.util'
 import {
   ModelApiError,
   PLC_DETAIL_NODES,
-  PLC_PLACEHOLDER_DETAIL_NODES,
   SECS_DETAIL_NODES,
   SOCKET_DETAIL_NODES,
   type ModelDetailNode,
   type ModelDetailRow,
-  type ModelDiffItem,
   type ModelDiffSection,
   type ModelMdfContent,
   type ModelInfo,
@@ -83,51 +82,6 @@ const sortByUpdatedAtDesc = (models: ModelInfo[]): ModelInfo[] =>
  * MDF 노드는 XML 비교가 의미 없으므로 diff 대상에서 제외합니다.
  */
 const DIFF_EXCLUDED_NODES: ReadonlySet<ModelDetailNode> = new Set(['mdf'])
-
-/**
- * 두 row 배열을 비교하여 추가/변경/삭제 항목을 도출합니다.
- *
- * identity 기준: values[0] (각 노드의 이름/식별 컬럼)이 비어 있으면 row.id 사용.
- * branchValues = 현재 EDIT 버전 값, parentValues = 이전 저장 버전 값.
- *
- * @param currentRows  현재 EDIT 버전 rows
- * @param previousRows 이전 버전 rows
- * @returns added / changed / deleted 항목 배열
- */
-const computeNodeDiff = (
-  currentRows: ModelDetailRow[],
-  previousRows: ModelDetailRow[],
-): Pick<ModelDiffSection, 'added' | 'changed' | 'deleted'> => {
-  const toIdentity = (row: ModelDetailRow): string =>
-    (row.values[0] ?? '').trim() || row.id
-
-  const currentMap = new Map(currentRows.map((row) => [toIdentity(row), row]))
-  const previousMap = new Map(previousRows.map((row) => [toIdentity(row), row]))
-
-  const added: ModelDiffItem[] = []
-  const changed: ModelDiffItem[] = []
-  const deleted: ModelDiffItem[] = []
-
-  for (const [identity, currentRow] of currentMap) {
-    const previousRow = previousMap.get(identity)
-    if (!previousRow) {
-      added.push({ identity, branchValues: currentRow.values, parentValues: [] })
-    } else {
-      const isChanged = currentRow.values.some((value, index) => value !== previousRow.values[index])
-      if (isChanged) {
-        changed.push({ identity, branchValues: currentRow.values, parentValues: previousRow.values })
-      }
-    }
-  }
-
-  for (const [identity, previousRow] of previousMap) {
-    if (!currentMap.has(identity)) {
-      deleted.push({ identity, branchValues: [], parentValues: previousRow.values })
-    }
-  }
-
-  return { added, changed, deleted }
-}
 
 /**
  * 인터페이스 타입별 상세 노드 기본 집합을 반환합니다.
@@ -382,13 +336,9 @@ export function ModelPage() {
     return modelItems.find((item) => item.modelVersionKey === activeTab) ?? null
   }, [activeTab, modelItems])
 
-  // PLC group/register 노드는 조회 백엔드가 없으므로(별 SPEC) 내용 fetch 를 막아 dead 요청을 방지한다.
-  // 좌측 트리에 라벨만 렌더하고, 선택 시 패널은 빈 상태로 표시한다.
-  const isPlcPlaceholderNode =
-    detailNode !== null && PLC_PLACEHOLDER_DETAIL_NODES.has(detailNode)
   const detailNodeQuery = useModelNodeDetail(
     activeTabModel?.modelVersionKey ?? null,
-    isPlcPlaceholderNode ? null : detailNode,
+    detailNode,
   )
   const flowMdfQuery = useModelNodeDetail(
     activeTabModel?.modelVersionKey ?? null,
@@ -1204,7 +1154,7 @@ export function ModelPage() {
 
       const sections: ModelDiffSection[] = results
         .map(({ node, currentData, previousData }) => {
-          const { added, changed, deleted } = computeNodeDiff(currentData.rows, previousData.rows)
+          const { added, changed, deleted } = computeNodeDiff(node, currentData.rows, previousData.rows)
           return {
             detailNode: node,
             columns: currentData.columns.length > 0 ? currentData.columns : previousData.columns,

@@ -49,6 +49,7 @@ import {
   createDcopItemsColumns,
   createGenericInputColumns,
   createModelParameterColumns,
+  createPlcColumns,
   createWorkflowColumns,
 } from './modelDetailColumnDefs'
 import { useModelUiStore } from '../stores/model-ui.store'
@@ -236,9 +237,15 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   // Flow 선택 (selectedFlowId !== null) 또는 draft Flow 입력 모드일 때도 활성화.
   // SPEC line 115-116: Flow Message dropdown 은 protocol 별 (SECS+MES) / (Socket+MES) 통합.
   const isFlowCardVisible = selectedFlowId !== null || draftFlow !== null
-  // workflow 편집 시 Message Name 정합성을 위해 secs-message / socket-message 데이터를 조회합니다.
+  // workflow 편집 시 Message Name 정합성을 위해 protocol 별 메시지 카탈로그를 조회합니다.
+  // PLC 는 plc-group 의 message_name 이 Flow Message Name 의 소스다(SPEC line 1024-1026 — gateway 가
+  // 그 messageName 으로 ParsedMessage 발행 → 같은 이름의 flow 매칭). plc-group col0 = Message Name.
   // (workflow / Flow 어느 쪽도 보이지 않으면 fetch 생략 — 읽기 전용 reference 노드 진입 시 무용 query 방지)
-  const flowMessageDetailNode = isSocketModel ? 'socket-message' : 'secs-message'
+  const flowMessageDetailNode = isSocketModel
+    ? 'socket-message'
+    : isPlcModel
+      ? 'plc-group'
+      : 'secs-message'
   const messagesQueryEnabled =
     (isFlowNode && !isReadOnly) || isFlowCardVisible
   const flowMessageQuery = useModelNodeDetail(
@@ -300,6 +307,19 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
   const flowEventIdOptions = useMemo(
     () => flowEventIdQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
     [flowEventIdQuery.data?.rows],
+  )
+
+  // plc-register 편집 시 Group 컬럼 드롭다운에 쓸 plc-group message_name 목록을 조회합니다.
+  // (plc-register 노드 + 편집 가능 상태에서만 — plc-group col0 = Message Name)
+  const plcGroupOptionsQuery = useModelNodeDetail(
+    isPlcModel && normalizedDetailNode === 'plc-register' && !isReadOnly
+      ? (activeModel?.modelVersionKey ?? null)
+      : null,
+    'plc-group',
+  )
+  const plcGroupOptions = useMemo(
+    () => plcGroupOptionsQuery.data?.rows.map((row) => row.values[0] ?? '').filter(Boolean) ?? [],
+    [plcGroupOptionsQuery.data?.rows],
   )
 
   const { t } = useI18n()
@@ -1023,12 +1043,21 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                                 isReadOnly,
                                 onChangeDetailValue,
                               })
-                            : createGenericInputColumns({
-                                visibleColumns,
-                                detailColumnWidths,
-                                isReadOnly,
-                                onChangeDetailValue,
-                              })
+                            : normalizedDetailNode === 'plc-group' ||
+                                normalizedDetailNode === 'plc-register'
+                              ? createPlcColumns({
+                                  visibleColumns,
+                                  detailColumnWidths,
+                                  isReadOnly,
+                                  groupOptions: plcGroupOptions,
+                                  onChangeDetailValue,
+                                })
+                              : createGenericInputColumns({
+                                  visibleColumns,
+                                  detailColumnWidths,
+                                  isReadOnly,
+                                  onChangeDetailValue,
+                                })
 
                     const detailActionColumn:
                       | SelectableTableActionColumn<ModelDetailRow>

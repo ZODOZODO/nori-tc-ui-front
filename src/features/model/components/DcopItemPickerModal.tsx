@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
 import { useDcopItemPickerState } from '../hooks/useDcopItemPickerState'
 import type { ModelDcopItem } from '../types/model.types'
@@ -37,6 +38,12 @@ interface DcopItemPickerModalProps {
    */
   onSave: (next: readonly number[]) => void
   onClose: () => void
+}
+
+type RightDisplayItem = {
+  dcopItemKey: number
+  dcopItemName: string
+  variableId: string
 }
 
 /**
@@ -113,7 +120,7 @@ export function DcopItemPickerModal({
 
   // 우측 행을 ModelDcopItem 으로 다시 매핑해 본체 표시 (dcopItemName / variableId).
   // referenceItems 가 model 단위 권위 소스이므로 그 안에서 찾아 사용. 없으면 placeholder.
-  const rightDisplayItems = useMemo(() => {
+  const rightDisplayItems = useMemo<RightDisplayItem[]>(() => {
     return rightItems.map((key) => {
       const found = referenceItems.find((item) => item.dcopItemKey === key)
       return {
@@ -161,6 +168,19 @@ export function DcopItemPickerModal({
   const handleClickSave = () => {
     onSave(rightItems)
   }
+
+  const rightColumns: ColumnDef<RightDisplayItem>[] = [
+    {
+      key: 'dcopItemName',
+      header: 'DCOP Item Name',
+      accessor: (item) => item.dcopItemName,
+    },
+    {
+      key: 'variableId',
+      header: 'Variable Id',
+      accessor: (item) => item.variableId,
+    },
+  ]
 
   return (
     <Dialog
@@ -302,47 +322,30 @@ export function DcopItemPickerModal({
               </div>
             </div>
 
-            <div className="mt-3 flex-1 overflow-hidden rounded-[12px] border border-border">
-              <div className="h-full overflow-auto">
-                <Table className="min-w-90">
-                  <TableHeader>
-                    <TableRow className="bg-muted hover:bg-muted">
-                      <TableHead>DCOP Item Name</TableHead>
-                      <TableHead>Variable Id</TableHead>
-                      <TableHead className="w-17.5 text-center">{t('common.delete')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rightDisplayItems.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="py-12 text-center text-xs text-muted-foreground">
-                          {t('model.dcop.emptyRight')}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      rightDisplayItems.map((item) => (
-                        <TableRow key={item.dcopItemKey}>
-                          <TableCell className="font-semibold text-foreground">
-                            {item.dcopItemName}
-                          </TableCell>
-                          <TableCell>{item.variableId}</TableCell>
-                          <TableCell className="text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeFromRight(item.dcopItemKey)}
-                              className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/5 hover:text-danger"
-                              aria-label={t('model.dcop.unmapAria', { name: item.dcopItemName })}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
+            <SelectableTable<RightDisplayItem>
+              columns={rightColumns}
+              rows={rightDisplayItems}
+              rowKey={(item) => item.dcopItemKey}
+              actionColumn={{
+                header: t('common.delete'),
+                width: '4.375rem',
+                render: (item) => (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => removeFromRight(item.dcopItemKey)}
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/5 hover:text-danger"
+                      aria-label={t('model.dcop.unmapAria', { name: item.dcopItemName })}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                ),
+              }}
+              emptyState={t('model.dcop.emptyRight')}
+              containerClassName="mt-3 min-h-0 flex-1 rounded-[12px] border border-border"
+              tableClassName="min-w-90"
+            />
           </section>
         </div>
 

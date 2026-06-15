@@ -9,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
 import {
   DRAFT_FLOW_ID_SENTINEL,
@@ -231,6 +232,13 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
     })
   }
 
+  const dcopItemColumns: ColumnDef<ModelDcopItem>[] = [
+    { key: 'dcopItemName', header: 'DCOP Item Name', accessor: (item) => item.dcopItemName },
+    { key: 'variableId', header: 'Variable Id', accessor: (item) => item.variableId },
+    { key: 'collectionRule', header: 'Collection Rule', accessor: (item) => item.collectionRule },
+    { key: 'eventId', header: 'Event Id', accessor: (item) => item.eventId ?? '—' },
+  ]
+
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(20,46,36,0.04)]">
       <header className="flex items-baseline justify-between gap-3">
@@ -445,39 +453,14 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
           </Button>
         }
       >
-        <div className="rounded-xl border border-border">
-          <Table className="min-w-160">
-            <TableHeader>
-              <TableRow className="bg-muted">
-                <TableHead>DCOP Item Name</TableHead>
-                <TableHead>Variable Id</TableHead>
-                <TableHead>Collection Rule</TableHead>
-                <TableHead>Event Id</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {draft.dcopItems.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="py-6 text-center text-xs text-muted-foreground"
-                  >
-                    {t('model.flowCard.collectEmpty')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                draft.dcopItems.map((item) => (
-                  <TableRow key={item.dcopItemKey ?? `${item.dcopItemName}-${item.variableId}`}>
-                    <TableCell>{item.dcopItemName}</TableCell>
-                    <TableCell>{item.variableId}</TableCell>
-                    <TableCell>{item.collectionRule}</TableCell>
-                    <TableCell>{item.eventId ?? '—'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <SelectableTable<ModelDcopItem>
+          columns={dcopItemColumns}
+          rows={draft.dcopItems}
+          rowKey={(item) => item.dcopItemKey ?? `${item.dcopItemName}-${item.variableId}`}
+          emptyState={t('model.flowCard.collectEmpty')}
+          containerClassName="rounded-xl border border-border"
+          tableClassName="min-w-160"
+        />
       </FlowCardSection>
 
       {isDraftCard && onCancelDraft !== null ? (

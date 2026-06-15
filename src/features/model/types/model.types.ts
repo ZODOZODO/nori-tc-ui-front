@@ -275,20 +275,32 @@ export const SOCKET_DETAIL_NODES: ModelDetailNode[] = [
 /**
  * PLC 계열 상세 노드 순서입니다.
  *
- * PoC 는 PLC 그룹/레지스터 스펙의 편집/조회 백엔드가 없으므로(별 SPEC) 좌측 트리에
- * 라벨만 렌더하고, 클릭 시 내용 조회 호출은 하지 않습니다(빈 상태). 트리 분류·노드
- * 라벨 표시가 본 PoC 의 PLC 모델 화면 범위입니다.
+ * - plc-group = 읽기 명령 카탈로그(message_name·area·주소·read_count·poll_period_ms),
+ *   plc-register = 디코드 변수(평면 테이블, Group 컬럼으로 소속 그룹 지정). PLC 전용 노드.
+ * - model-parameter / mes-message / mdf / dcop-itemes 는 protocol 무관 공통 노드 —
+ *   PLC 도 모델 파라미터(PORTCOUNT 등)·MES 메시지·MES 보고 포맷(MDF)·데이터 수집(DCOP)을 가지므로 포함.
+ *   dcop-itemes 는 PLC 에서 SECS 레이아웃(EventId 컬럼 포함, event 미사용 시 빈값)으로 동작한다.
  */
-export const PLC_DETAIL_NODES: ModelDetailNode[] = ['plc-group', 'plc-register']
-
-/**
- * 백엔드 조회/저장 핸들러가 아직 없는 PLC 전용 placeholder 노드입니다.
- * 이 노드 선택 시 내용 조회 호출을 막아 dead 요청을 방지합니다(붙일 API 없음).
- */
-export const PLC_PLACEHOLDER_DETAIL_NODES: ReadonlySet<ModelDetailNode> = new Set([
+export const PLC_DETAIL_NODES: ModelDetailNode[] = [
+  'model-parameter',
   'plc-group',
   'plc-register',
-])
+  'mes-message',
+  'mdf',
+  'dcop-itemes',
+]
+
+/**
+ * plc-group Message Name 은 gateway 가 Kafka eventType(metadata.eventType)으로 그대로 발행하고
+ * Business 가 KafkaEventTypeNamingPolicy 로 검증한다 — 위반 시 폴링 메시지가 거부(silent drop)된다.
+ * 그래서 동일 규칙(대문자 시작, 대문자/숫자/언더스코어만)으로 입력을 사전 검증한다.
+ * 원본 패턴: nori-tc-common KafkaEventTypeNamingPolicy.DEFAULT_EVENT_TYPE_PATTERN
+ */
+export const PLC_GROUP_MESSAGE_NAME_PATTERN = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/
+
+/** plc-group Message Name 형식 유효성(공백 트림 후 검사). */
+export const isValidPlcGroupMessageName = (value: string): boolean =>
+  PLC_GROUP_MESSAGE_NAME_PATTERN.test(value.trim())
 
 /**
  * 상세 노드별 라벨 매핑입니다.

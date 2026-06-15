@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { ModelDetailRow } from '../types/model.types'
+import { isValidPlcGroupMessageName } from '../types/model.types'
 
 /**
  * SPEC `selectable-table-rollout` R3 — ModelDetailPanel 의 9 개 detail 노드를 한
@@ -40,6 +41,33 @@ const isDcopCollectionRuleColumnName = (columnName: string): boolean =>
 
 /** dcop-itemes 의 Collection Rule 선택 옵션 (기본값: LAST) */
 export const DCOP_COLLECTION_RULE_OPTIONS = ['LAST', 'FIRST', 'AVERAGE', 'MIN', 'MAX'] as const
+
+/** plc-group Area 선택 옵션 — backend PlcArea enum 과 동일해야 함(영속 경계 검증). */
+export const PLC_AREA_OPTIONS = ['COIL', 'DISCRETE_INPUT', 'INPUT_REGISTER', 'HOLDING_REGISTER'] as const
+
+/** plc-register Data Type 선택 옵션 — backend PlcDataType enum 과 동일해야 함. */
+export const PLC_DATA_TYPE_OPTIONS = [
+  'BOOL', 'SINT8', 'USINT8', 'INT16', 'UINT16', 'INT32', 'UINT32', 'INT64', 'UINT64',
+  'FLOAT32', 'FLOAT64', 'BCD16', 'BCD32', 'BCD64', 'STRING', 'BYTES',
+] as const
+
+/** plc-register BCD Signed 선택 옵션(빈값=null 허용). */
+export const PLC_BCD_SIGNED_OPTIONS = ['true', 'false'] as const
+
+const isPlcAreaColumnName = (columnName: string): boolean =>
+  columnName.trim().toLowerCase() === 'area'
+
+const isPlcDataTypeColumnName = (columnName: string): boolean =>
+  columnName.trim().toLowerCase() === 'data type'
+
+const isPlcGroupColumnName = (columnName: string): boolean =>
+  columnName.trim().toLowerCase() === 'group'
+
+const isPlcBcdSignedColumnName = (columnName: string): boolean =>
+  columnName.trim().toLowerCase() === 'bcd signed'
+
+const isPlcMessageNameColumnName = (columnName: string): boolean =>
+  columnName.trim().toLowerCase() === 'message name'
 
 /**
  * workflow 첫 번째 컬럼 (Flow Name) 의 중복 여부를 판단합니다.
@@ -441,6 +469,140 @@ export const createDcopItemsColumns = ({
               {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
                 <option key={rule} value={rule}>
                   {rule}
+                </option>
+              ))}
+            </select>
+          )
+        }
+
+        if (!isEditing) {
+          return (
+            <span
+              className={cn(
+                'min-w-0 truncate text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
+              )}
+              title={rawValue}
+            >
+              {rawValue || '—'}
+            </span>
+          )
+        }
+        return (
+          <Input
+            autoFocus
+            value={rawValue}
+            onChange={(event) => onChangeDetailValue(row.id, columnIndex, event.target.value)}
+            onBlur={endEdit}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                endEdit()
+              }
+            }}
+            className="h-7 w-full min-w-0"
+          />
+        )
+      },
+    }
+  })
+
+interface PlcColumnsDeps {
+  visibleColumns: readonly VisibleColumn[]
+  detailColumnWidths: readonly string[]
+  isReadOnly: boolean
+  /** plc-register 의 Group 컬럼 드롭다운 옵션(모델의 plc-group message_name 목록). */
+  groupOptions: readonly string[]
+  onChangeDetailValue: (rowId: string, columnIndex: number, nextValue: string) => void
+}
+
+/**
+ * plc-group / plc-register 노드 공통 ColumnDef factory.
+ * Area / Data Type / BCD Signed 는 고정 enum 드롭다운, Group 은 plc-group message_name 드롭다운,
+ * 그 외(Message Name / Word Offset / 주소 / Variable Name 등)는 일반 Input(generic UX).
+ */
+export const createPlcColumns = ({
+  visibleColumns,
+  detailColumnWidths,
+  isReadOnly,
+  groupOptions,
+  onChangeDetailValue,
+}: PlcColumnsDeps): ColumnDef<ModelDetailRow>[] =>
+  visibleColumns.map(({ columnName, columnIndex }, visibleIndex) => {
+    const fixedOptions: readonly string[] | null = isPlcAreaColumnName(columnName)
+      ? PLC_AREA_OPTIONS
+      : isPlcDataTypeColumnName(columnName)
+        ? PLC_DATA_TYPE_OPTIONS
+        : isPlcBcdSignedColumnName(columnName)
+          ? PLC_BCD_SIGNED_OPTIONS
+          : null
+    const isGroup = isPlcGroupColumnName(columnName)
+
+    return {
+      key: `${columnName}-${visibleIndex}`,
+      header: columnName,
+      accessor: (row) => row.values[columnIndex] ?? '',
+      editable: !isReadOnly,
+      sticky: visibleIndex === 0,
+      width: detailColumnWidths[columnIndex],
+      renderCell: (row, _rowIdx, _colIdx, { isEditing, endEdit }) => {
+        const rawValue = row.values[columnIndex] ?? ''
+
+        if (isReadOnly) {
+          return (
+            <span
+              className={cn(
+                'inline-block whitespace-nowrap text-sm text-foreground',
+                rawValue ? null : 'text-muted-foreground',
+              )}
+              title={rawValue}
+            >
+              {rawValue || '—'}
+            </span>
+          )
+        }
+
+        const options: readonly string[] | null = isGroup ? groupOptions : fixedOptions
+        // plc-group Message Name(=Kafka eventType) 은 편집 중 형식 위반 시 빨간 border 로 즉시 피드백.
+        if (isPlcMessageNameColumnName(columnName) && isEditing) {
+          const isInvalid = rawValue.trim() !== '' && !isValidPlcGroupMessageName(rawValue)
+          return (
+            <Input
+              autoFocus
+              value={rawValue}
+              onChange={(event) => onChangeDetailValue(row.id, columnIndex, event.target.value)}
+              onBlur={endEdit}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  endEdit()
+                }
+              }}
+              aria-invalid={isInvalid || undefined}
+              title={isInvalid ? i18n.t('model.detail.invalidPlcMessageName') : undefined}
+              className={cn(
+                'h-7 w-full min-w-0',
+                isInvalid ? 'border-danger focus-visible:ring-danger/30' : null,
+              )}
+            />
+          )
+        }
+        if (options) {
+          return (
+            <select
+              value={rawValue}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                onChangeDetailValue(row.id, columnIndex, event.target.value)
+              }
+              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+            >
+              <option value="">—</option>
+              {rawValue && !options.includes(rawValue) ? (
+                <option value={rawValue}>{rawValue}</option>
+              ) : null}
+              {options.map((optionValue) => (
+                <option key={optionValue} value={optionValue}>
+                  {optionValue}
                 </option>
               ))}
             </select>
