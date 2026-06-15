@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,14 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
 import type { EqpJarOption, EqpModelOption } from '@/features/eqp/types/eqp.types'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { deployApi } from '../api/deploy.api'
@@ -41,8 +34,10 @@ import {
 } from '../lib/deploy-register-utils'
 import { useI18n } from '@/i18n/i18n-context'
 import { PageCard } from '@/shared/layout/PageCard'
+import { SelectableTable } from '@/shared/components/SelectableTable'
+import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { deployQueryKeys } from '../lib/deploy-query-keys'
-import { SelectedEquipmentRow } from './SelectedEquipmentRow'
+import { SelectedParamVersionCell } from './SelectedParamVersionCell'
 import { useCreateDeploy } from '../hooks/useCreateDeploy'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployRegisterScenarioPreview } from '../hooks/useDeployRegisterScenarioPreview'
@@ -79,6 +74,8 @@ type ScenarioDialogState = {
   selectedScenarioCode: string
   preview: DeployRegisterScenarioPreviewResult | null
 }
+
+type ScenarioRow = DeployRegisterScenarioPreviewResult['scenarios'][number]
 
 export function DeployRegisterPanel() {
   const { t } = useI18n()
@@ -816,6 +813,222 @@ export function DeployRegisterPanel() {
     setDeployDialogState(state)
   }
 
+  const registerSearchColumns: ColumnDef<DeployRegisterTargetItem>[] = [
+    {
+      key: 'select',
+      width: '3.5rem',
+      header: (
+        <div className="flex justify-center">
+          <input
+            ref={searchSelectAllRef}
+            type="checkbox"
+            checked={isAllSearchSelected}
+            onChange={handleToggleAllSearchSelections}
+            disabled={selectableSearchItemIds.length === 0}
+            className="size-4 accent-brand-primary"
+            aria-label={
+              isAllSearchSelected ? t('deploy.register.deselectAll') : t('deploy.register.selectAll')
+            }
+          />
+        </div>
+      ),
+      accessor: () => '',
+      renderCell: (item) => (
+        <div className="flex w-full justify-center">
+          <input
+            type="checkbox"
+            checked={!item.blockedByActiveDeploy && searchSelectionIds.includes(item.eqpId)}
+            onChange={() => handleToggleSearchSelection(item.eqpId)}
+            disabled={item.blockedByActiveDeploy}
+            className="size-4 accent-brand-primary"
+            aria-label={t('deploy.register.eqpSelectAria', { eqpId: item.eqpId })}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'eqpId',
+      header: 'Eqp ID',
+      accessor: (item) => item.eqpId,
+      renderCell: (item) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{item.eqpId}</span>
+            {item.blockedByActiveDeploy ? (
+              <Badge variant="warning">
+                {item.activeDeployStatus ? `ACTIVE ${item.activeDeployStatus}` : 'ACTIVE'}
+              </Badge>
+            ) : null}
+          </div>
+          {item.blockedByActiveDeploy ? (
+            <p className="text-xs text-warning">
+              {formatActiveDeployHint(item) ?? t('deploy.register.activeFallback')}
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
+    { key: 'model', header: 'Model', accessor: (item) => item.modelName ?? '-' },
+    {
+      key: 'modelVersionStatus',
+      header: 'Model Version / Status',
+      accessor: (item) =>
+        item.modelVersion && item.modelStatus ? `${item.modelVersion} / ${item.modelStatus}` : '-',
+    },
+    {
+      key: 'businessJar',
+      header: 'Business Jar File',
+      accessor: (item) => item.businessJarFileName ?? '-',
+    },
+    {
+      key: 'interface',
+      header: 'Interface',
+      accessor: (item) => item.commInterface,
+      renderCell: (item) => (
+        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
+          {item.commInterface}
+        </span>
+      ),
+    },
+  ]
+
+  const selectedEqpColumns: ColumnDef<DeployRegisterTargetItem>[] = [
+    {
+      key: 'eqpId',
+      header: 'Eqp ID',
+      accessor: (item) => item.eqpId,
+      renderCell: (item) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{item.eqpId}</span>
+            {item.blockedByActiveDeploy ? (
+              <Badge variant="warning">
+                {item.activeDeployStatus ? `ACTIVE ${item.activeDeployStatus}` : 'ACTIVE'}
+              </Badge>
+            ) : null}
+          </div>
+          {item.blockedByActiveDeploy ? (
+            <p className="text-xs text-warning">
+              {formatActiveDeployHint(item) ?? t('deploy.register.activeFallback')}
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
+    { key: 'model', header: 'Model', accessor: (item) => item.modelName ?? '-' },
+    {
+      key: 'selectedVersion',
+      header: 'Selected Version',
+      accessor: (item) => item.modelVersion ?? '-',
+    },
+    {
+      key: 'businessJar',
+      header: 'Business Jar File',
+      accessor: (item) => item.businessJarFileName ?? '-',
+    },
+    { key: 'interface', header: 'Interface', accessor: (item) => item.commInterface },
+    {
+      key: 'paramVersion',
+      header: 'Eqp Param Version',
+      width: '11.25rem',
+      accessor: (item) => selectedEqpParamVersions[item.eqpId] ?? item.appliedParamVersion ?? '',
+      renderCell: (item) => (
+        <SelectedParamVersionCell
+          item={item}
+          selectedEqpParamVersion={selectedEqpParamVersions[item.eqpId]}
+          onChangeEqpParamVersion={setSelectedEqpParamVersion}
+        />
+      ),
+    },
+  ]
+
+  const scenarioColumns: ColumnDef<ScenarioRow>[] = [
+    {
+      key: 'select',
+      width: '4rem',
+      header: <div className="flex justify-center">{t('deploy.register.colSelect')}</div>,
+      accessor: () => '',
+      renderCell: (scenario) => (
+        <div className="flex w-full justify-center">
+          <input
+            type="radio"
+            name="deploy-register-scenario"
+            checked={scenario.code === scenarioDialogState.selectedScenarioCode}
+            onChange={() =>
+              setScenarioDialogState((currentState) => ({
+                ...currentState,
+                selectedScenarioCode: scenario.code,
+              }))
+            }
+            className="size-4 accent-brand-primary"
+            aria-label={t('deploy.register.scenarioSelectAria', { code: scenario.code })}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'recommended',
+      width: '5rem',
+      header: <div className="flex justify-center">{t('deploy.register.colRecommended')}</div>,
+      accessor: (scenario) => (scenario.recommended ? t('deploy.register.colRecommended') : '-'),
+      renderCell: (scenario) => (
+        <div className="flex w-full justify-center">
+          {scenario.recommended ? (
+            <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-brand-primary">
+              {t('deploy.register.colRecommended')}
+            </span>
+          ) : (
+            '-'
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'scenarioName',
+      header: t('deploy.register.colScenarioName'),
+      accessor: (scenario) => scenario.name,
+      renderCell: (scenario) => <span className="font-medium text-foreground">{scenario.name}</span>,
+    },
+    {
+      key: 'code',
+      header: t('deploy.register.colCode'),
+      accessor: (scenario) => scenario.code,
+      renderCell: (scenario) => <span className="text-xs text-muted-foreground">{scenario.code}</span>,
+    },
+    {
+      key: 'coversChanges',
+      header: t('deploy.register.colCoversChanges'),
+      accessor: (scenario) => formatChangeKinds(scenario.coversChangeKinds),
+      renderCell: (scenario) => (
+        <span className="text-xs text-muted-foreground">
+          {formatChangeKinds(scenario.coversChangeKinds)}
+        </span>
+      ),
+    },
+    {
+      key: 'stepCount',
+      width: '6rem',
+      header: <div className="flex justify-center">{t('deploy.register.colStepCount')}</div>,
+      accessor: (scenario) => String(scenario.stepCount),
+      renderCell: (scenario) => (
+        <div className="flex w-full justify-center text-sm text-muted-foreground">
+          {scenario.stepCount}
+        </div>
+      ),
+    },
+    {
+      key: 'description',
+      header: t('deploy.register.colDescription'),
+      accessor: (scenario) => scenario.summary,
+      renderCell: (scenario) => (
+        <div className="text-xs text-muted-foreground">
+          <p>{scenario.summary}</p>
+          <p className="mt-1 text-muted-foreground">{scenario.reason}</p>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6">
       <Dialog
@@ -931,70 +1144,24 @@ export function DeployRegisterPanel() {
                     {t('deploy.register.noSelectableScenario')}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-[14px] border border-border">
-                    <Table>
-                      <TableHeader className="bg-muted">
-                        <TableRow className="bg-muted hover:bg-muted">
-                          <TableHead className="w-16 text-center">{t('deploy.register.colSelect')}</TableHead>
-                          <TableHead className="w-20 text-center">{t('deploy.register.colRecommended')}</TableHead>
-                          <TableHead>{t('deploy.register.colScenarioName')}</TableHead>
-                          <TableHead>{t('deploy.register.colCode')}</TableHead>
-                          <TableHead>{t('deploy.register.colCoversChanges')}</TableHead>
-                          <TableHead className="text-center">{t('deploy.register.colStepCount')}</TableHead>
-                          <TableHead>{t('deploy.register.colDescription')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {scenarioDialogState.preview.scenarios.map((scenario) => (
-                          <TableRow
-                            key={scenario.code}
-                            className={
-                              scenario.code === scenarioDialogState.selectedScenarioCode
-                                ? 'bg-brand-primary/5'
-                                : undefined
-                            }
-                          >
-                            <TableCell className="text-center">
-                              <input
-                                type="radio"
-                                name="deploy-register-scenario"
-                                checked={scenario.code === scenarioDialogState.selectedScenarioCode}
-                                onChange={() =>
-                                  setScenarioDialogState((currentState) => ({
-                                    ...currentState,
-                                    selectedScenarioCode: scenario.code,
-                                  }))
-                                }
-                                className="size-4 accent-brand-primary"
-                                aria-label={t('deploy.register.scenarioSelectAria', { code: scenario.code })}
-                              />
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {scenario.recommended ? (
-                                <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-brand-primary">
-                                  {t('deploy.register.colRecommended')}
-                                </span>
-                              ) : (
-                                '-'
-                              )}
-                            </TableCell>
-                            <TableCell className="font-medium text-foreground">{scenario.name}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{scenario.code}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {formatChangeKinds(scenario.coversChangeKinds)}
-                            </TableCell>
-                            <TableCell className="text-center text-sm text-muted-foreground">
-                              {scenario.stepCount}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              <p>{scenario.summary}</p>
-                              <p className="mt-1 text-muted-foreground">{scenario.reason}</p>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <SelectableTable<ScenarioRow>
+                    testId="deploy-register-scenario-table"
+                    columns={scenarioColumns}
+                    rows={scenarioDialogState.preview.scenarios}
+                    rowKey={(scenario) => scenario.code}
+                    wrapRow={(scenario, _rowIdx, children) => (
+                      <TableRow
+                        className={
+                          scenario.code === scenarioDialogState.selectedScenarioCode
+                            ? 'bg-brand-primary/5'
+                            : undefined
+                        }
+                      >
+                        {children}
+                      </TableRow>
+                    )}
+                    containerClassName="rounded-[14px] border border-border"
+                  />
                 )}
               </>
             ) : (
@@ -1130,101 +1297,33 @@ export function DeployRegisterPanel() {
             <p className="py-8 text-center text-sm text-danger">
               {getErrorMessage(registerTargetsQuery.error, t('deploy.register.targetsLoadError'))}
             </p>
-          ) : !registerTargetsQuery.isLoading && registerTargetItems.length === 0 ? (
+          ) : registerTargetsQuery.isLoading ? (
+            <div className="space-y-2 rounded-[14px] border border-border p-3">
+              {Array.from({ length: 6 }).map((_, rowIndex) => (
+                <Skeleton
+                  key={`deploy-register-skeleton-${rowIndex}`}
+                  data-testid="deploy-register-skeleton"
+                  className="h-9 w-full"
+                />
+              ))}
+            </div>
+          ) : registerTargetItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               {t('deploy.register.searchEmpty')}
             </p>
           ) : (
-          <div className="max-h-100 overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
-            <Table>
-              <TableHeader className="bg-muted">
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="w-14 text-center">
-                    <input
-                      ref={searchSelectAllRef}
-                      type="checkbox"
-                      checked={isAllSearchSelected}
-                      onChange={handleToggleAllSearchSelections}
-                      disabled={selectableSearchItemIds.length === 0}
-                      className="size-4 accent-brand-primary"
-                      aria-label={
-                        isAllSearchSelected
-                          ? t('deploy.register.deselectAll')
-                          : t('deploy.register.selectAll')
-                      }
-                    />
-                  </TableHead>
-                  <TableHead>Eqp ID</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Model Version / Status</TableHead>
-                  <TableHead>Business Jar File</TableHead>
-                  <TableHead>Interface</TableHead>
+            <SelectableTable<DeployRegisterTargetItem>
+              testId="deploy-register-search-table"
+              columns={registerSearchColumns}
+              rows={registerTargetItems}
+              rowKey={(item) => item.eqpId}
+              wrapRow={(item, _rowIdx, children) => (
+                <TableRow className={item.blockedByActiveDeploy ? 'bg-warning/10' : undefined}>
+                  {children}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {registerTargetsQuery.isLoading ? (
-                  Array.from({ length: 6 }).map((_, rowIndex) => (
-                    <TableRow key={`deploy-register-skeleton-${rowIndex}`} data-testid="deploy-register-skeleton">
-                      {Array.from({ length: 6 }).map((_, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  registerTargetItems.map((item) => (
-                    <TableRow
-                      key={item.eqpId}
-                      className={item.blockedByActiveDeploy ? 'bg-warning/10' : undefined}
-                    >
-                      <TableCell className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={
-                            !item.blockedByActiveDeploy && searchSelectionIds.includes(item.eqpId)
-                          }
-                          onChange={() => handleToggleSearchSelection(item.eqpId)}
-                          disabled={item.blockedByActiveDeploy}
-                          className="size-4 accent-brand-primary"
-                          aria-label={t('deploy.register.eqpSelectAria', { eqpId: item.eqpId })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>{item.eqpId}</span>
-                          {item.blockedByActiveDeploy ? (
-                            <Badge variant="warning">
-                              {item.activeDeployStatus
-                                ? `ACTIVE ${item.activeDeployStatus}`
-                                : 'ACTIVE'}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        {item.blockedByActiveDeploy ? (
-                          <p className="mt-1 text-xs text-warning">
-                            {formatActiveDeployHint(item) ?? t('deploy.register.activeFallback')}
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{item.modelName ?? '-'}</TableCell>
-                      <TableCell>
-                        {item.modelVersion && item.modelStatus
-                          ? `${item.modelVersion} / ${item.modelStatus}`
-                          : '-'}
-                      </TableCell>
-                      <TableCell>{item.businessJarFileName ?? '-'}</TableCell>
-                      <TableCell>
-                        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                          {item.commInterface}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              )}
+              containerClassName="max-h-100 rounded-[14px] border border-border"
+            />
           )}
 
           <div className="flex justify-center">
@@ -1261,40 +1360,32 @@ export function DeployRegisterPanel() {
         ) : null}
 
         <div className="px-6 py-5">
-          <div className="max-h-100 overflow-y-auto overflow-x-auto rounded-[14px] border border-border">
-            <Table>
-              <TableHeader className="bg-muted">
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead>Eqp ID</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Selected Version</TableHead>
-                  <TableHead>Business Jar File</TableHead>
-                  <TableHead>Interface</TableHead>
-                  <TableHead className="min-w-45">Eqp Param Version</TableHead>
-                  <TableHead className="w-16 text-center">Remove</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedEqpItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                      {t('deploy.register.selectedEmpty')}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  selectedEqpItems.map((item) => (
-                    <SelectedEquipmentRow
-                      key={item.eqpId}
-                      item={item}
-                      selectedEqpParamVersion={selectedEqpParamVersions[item.eqpId]}
-                      onChangeEqpParamVersion={setSelectedEqpParamVersion}
-                      onRemove={removeSelectedEqp}
-                    />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <SelectableTable<DeployRegisterTargetItem>
+            testId="deploy-register-selected-table"
+            columns={selectedEqpColumns}
+            rows={selectedEqpItems}
+            rowKey={(item) => item.eqpId}
+            actionColumn={{
+              header: 'Remove',
+              width: '4rem',
+              render: (item) => (
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
+                    onClick={() => removeSelectedEqp(item.eqpId)}
+                    aria-label={t('deploy.register.removeAria', { eqpId: item.eqpId })}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              ),
+            }}
+            emptyState={t('deploy.register.selectedEmpty')}
+            containerClassName="max-h-100 rounded-[14px] border border-border"
+          />
         </div>
       </PageCard>
 

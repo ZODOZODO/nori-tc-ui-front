@@ -29,11 +29,10 @@ import {
 } from '@/components/ui/table'
 import { useI18n } from '@/i18n/i18n-context'
 import { resolveDateLocale } from '@/shared/lib/date-locale'
-import { PageCard, PageCardGrid } from '@/shared/layout/PageCard'
+import { PageCard } from '@/shared/layout/PageCard'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { EqpModelOption } from '@/features/eqp/types/eqp.types'
-import { DeployStatusChart, type DeployStatusAggregate } from './DeployStatusChart'
 import { useDeployRegisterOptions } from '../hooks/useDeployRegisterOptions'
 import { useDeployHistoryList } from '../hooks/useDeployHistoryList'
 import { useDeployScenarios } from '../hooks/useDeployScenarios'
@@ -46,7 +45,7 @@ import { useStartDeploy } from '../hooks/useStartDeploy'
 import { useMe, useUsers } from '@/features/profile/hooks/useProfile'
 import { resolveDeployTaskLabel } from '../lib/deploy-utils'
 import { createDefaultMonitorFilters, useDeployUiStore } from '../stores/deploy-ui.store'
-import type { DeployHistoryItem, DeployStatus } from '../types/deploy.types'
+import type { DeployHistoryItem, DeployStatus, DeployTargetItem } from '../types/deploy.types'
 
 interface DeployMonitorPanelProps {
   historyOnly?: boolean
@@ -367,24 +366,6 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const activeHistoryItem = useMemo(
     () => resolvedHistoryItems.find((item) => item.deployKey === activeDeployKey) ?? null,
     [activeDeployKey, resolvedHistoryItems],
-  )
-
-  const statusAggregate = useMemo<DeployStatusAggregate>(
-    () =>
-      resolvedHistoryItems.reduce<DeployStatusAggregate>(
-        (acc, item) => {
-          const summary = item.targetSummary
-          acc.total += summary.total
-          acc.completed += summary.completed + summary.noChange
-          acc.running += summary.running
-          acc.pending += summary.pending
-          acc.failed += summary.failed + summary.compensationFailed
-          acc.canceled += summary.canceled + summary.rolledBack
-          return acc
-        },
-        { total: 0, completed: 0, running: 0, pending: 0, failed: 0, canceled: 0 },
-      ),
-    [resolvedHistoryItems],
   )
 
   const isServerBackedRow = (deployKey: number) =>
@@ -892,6 +873,81 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setCommentDeployKey(deployKey)
   }
 
+  const commentTargetColumns: ColumnDef<DeployTargetItem>[] = [
+    {
+      key: 'eqpId',
+      header: 'EQP ID',
+      accessor: (target) => target.eqpId,
+      renderCell: (target) => <span className="font-medium text-foreground">{target.eqpId}</span>,
+    },
+    {
+      key: 'task',
+      header: t('deploy.monitor.colTask'),
+      accessor: () => t(commentTaskTypeLabelKey),
+      renderCell: () => (
+        <div className="min-w-45">
+          <p className="font-medium text-foreground">{t(commentTaskTypeLabelKey)}</p>
+          <p className="text-xs text-muted-foreground">
+            {commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'result',
+      header: t('deploy.monitor.colResult'),
+      accessor: (target) => resolveTargetResultLabel(target.targetStatus),
+      renderCell: (target) => (
+        <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
+          {resolveTargetResultLabel(target.targetStatus)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'detailStatus',
+      header: t('deploy.monitor.colDetailStatus'),
+      accessor: (target) => target.targetStatus,
+      renderCell: (target) => (
+        <Badge variant={resolveTargetResultVariant(target.targetStatus)}>{target.targetStatus}</Badge>
+      ),
+    },
+    {
+      key: 'currentStep',
+      header: t('deploy.monitor.colCurrentStep'),
+      accessor: (target) => target.currentStepCode || '-',
+    },
+    {
+      key: 'stepStatus',
+      header: t('deploy.monitor.colStepStatus'),
+      accessor: (target) => target.currentStepStatus ?? '-',
+      renderCell: (target) =>
+        target.currentStepStatus ? (
+          <Badge variant="secondary">{target.currentStepStatus}</Badge>
+        ) : (
+          '-'
+        ),
+    },
+    {
+      key: 'errorSummary',
+      header: t('deploy.monitor.colErrorSummary'),
+      maxWidth: '17.5rem',
+      accessor: (target) => target.lastErrorMessage || target.lastErrorCode || '-',
+      renderCell: (target) => (
+        <span className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
+          {target.lastErrorMessage || target.lastErrorCode || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'updatedAt',
+      header: t('deploy.monitor.colUpdatedAt'),
+      accessor: (target) => formatDateTime(target.updatedAt),
+      renderCell: (target) => (
+        <span className="text-xs text-muted-foreground">{formatDateTime(target.updatedAt)}</span>
+      ),
+    },
+  ]
+
   return (
     <div className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6">
       <ConfirmDialog
@@ -966,61 +1022,13 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                       {t('deploy.monitor.targetProgressEmpty')}
                     </div>
                   ) : (
-                    <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>EQP ID</TableHead>
-                            <TableHead>{t('deploy.monitor.colTask')}</TableHead>
-                            <TableHead>{t('deploy.monitor.colResult')}</TableHead>
-                            <TableHead>{t('deploy.monitor.colDetailStatus')}</TableHead>
-                            <TableHead>{t('deploy.monitor.colCurrentStep')}</TableHead>
-                            <TableHead>{t('deploy.monitor.colStepStatus')}</TableHead>
-                            <TableHead>{t('deploy.monitor.colErrorSummary')}</TableHead>
-                            <TableHead className="text-right">{t('deploy.monitor.colUpdatedAt')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {commentTargets.map((target) => (
-                            <TableRow key={target.deployTargetKey}>
-                              <TableCell className="font-medium text-foreground">{target.eqpId}</TableCell>
-                              <TableCell>
-                                <div className="min-w-45">
-                                  <p className="font-medium text-foreground">{t(commentTaskTypeLabelKey)}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {commentScenario?.name ?? commentSummaryQuery.data?.resolvedScenarioCode ?? '-'}
-                                  </p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
-                                  {resolveTargetResultLabel(target.targetStatus)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
-                                  {target.targetStatus}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{target.currentStepCode || '-'}</TableCell>
-                              <TableCell>
-                                {target.currentStepStatus ? (
-                                  <Badge variant="secondary">{target.currentStepStatus}</Badge>
-                                ) : (
-                                  '-'
-                                )}
-                              </TableCell>
-                              <TableCell className="max-w-70 whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                                {target.lastErrorMessage || target.lastErrorCode || '-'}
-                              </TableCell>
-                              <TableCell className="text-right text-xs text-muted-foreground">
-                                {formatDateTime(target.updatedAt)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <SelectableTable<DeployTargetItem>
+                      testId="deploy-monitor-target-progress-table"
+                      columns={commentTargetColumns}
+                      rows={commentTargets}
+                      rowKey={(target) => target.deployTargetKey}
+                      containerClassName="mt-3 rounded-2xl border border-border bg-card"
+                    />
                   )}
                 </div>
 
@@ -1130,34 +1138,6 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
           </DialogContent>
         ) : null}
       </Dialog>
-
-      {!historyOnly && resolvedHistoryItems.length > 0 ? (
-        <PageCardGrid className="shrink-0 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
-          <PageCard title={t('deploy.overview.statusTitle')}>
-            <DeployStatusChart aggregate={statusAggregate} />
-          </PageCard>
-          <PageCard title={t('deploy.overview.summaryTitle')}>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-              <div>
-                <dt className="text-xs text-muted-foreground">{t('deploy.overview.totalTargets')}</dt>
-                <dd className="text-2xl font-semibold text-foreground">{statusAggregate.total}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t('deploy.overview.deployCount')}</dt>
-                <dd className="text-2xl font-semibold text-foreground">{displayTotalCount}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t('deploy.chart.completed')}</dt>
-                <dd className="text-2xl font-semibold text-success">{statusAggregate.completed}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t('deploy.chart.failed')}</dt>
-                <dd className="text-2xl font-semibold text-danger">{statusAggregate.failed}</dd>
-              </div>
-            </dl>
-          </PageCard>
-        </PageCardGrid>
-      ) : null}
 
       <PageCard
         title={historyOnly ? t('deploy.monitor.historySearchTitle') : t('deploy.monitor.searchTitle')}
