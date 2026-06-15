@@ -72,6 +72,7 @@
   --color-danger-foreground: var(--danger-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-develop: var(--develop);
 
   /* surface (R1 / D1) — grid row stripe / select */
   --color-grid-row-stripe: var(--grid-row-stripe);
@@ -137,6 +138,7 @@
   --danger-foreground: oklch(0.985 0 0);
   --info: oklch(0.55 0.02 250);           /* blue 제거 → neutral cool gray (chroma 0.02 거의 무채색) */
   --info-foreground: oklch(0.985 0 0);
+  --develop: oklch(0.55 0.16 250);        /* blue — 모델 DEVELOP 상태 전용. info(gray)와 별도로 둔다(info 는 deploy/comm-interface 배지가 사용). */
 
   /* surface (R1 재정의) — grid row stripe warm tint, select 는 coral 통일 (cyan 제거) */
   --grid-row-stripe: oklch(0.97 0.005 40);  /* 거의 흰색 + 살짝 warm tint */

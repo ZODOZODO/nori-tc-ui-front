@@ -34,7 +34,9 @@ export interface SelectableTableRenderCellHelpers {
  */
 export interface ColumnDef<TRow> {
   key: string
-  header: string
+  // ReactNode 허용 — 헤더에 select-all 체크박스 같은 인터랙티브 노드를 넣기 위함(deploy register).
+  // 문자열은 ReactNode 의 부분집합이라 기존 소비처는 그대로 호환된다.
+  header: ReactNode
   accessor: (row: TRow) => string
   renderCell?: (
     row: TRow,
