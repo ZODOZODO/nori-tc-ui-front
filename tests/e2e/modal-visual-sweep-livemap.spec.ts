@@ -21,10 +21,10 @@ const LIVE_MAP = {
   ],
 }
 
-// worst-case: 긴 시나리오명/설명 + 다양한 testType 조합.
-const DEMO_SCENARIOS = [
-  { scenarioId: 'SCN_FULL_E2E_LONG', version: 3, name: 'CMP 폴리싱 → 세정 → 계측 풀 E2E 통합 시나리오 (장시간)', description: 'MES 생성 → TC relay → 설비 반응 전 구간을 커버하는 종단 시나리오로, 다운스트림 게이트웨이 라우팅까지 검증한다.', supportedTestTypes: ['E2E', 'SOCKET_ONLY', 'MES_ONLY'], enabled: true },
-  { scenarioId: 'SCN_SOCKET', version: 1, name: 'Socket 단독', description: '소켓 경로만.', supportedTestTypes: ['SOCKET_ONLY'], enabled: true },
+// worst-case: 긴 시나리오명 + commInterface/supportedModes(신규 Run 경로 카탈로그 형상).
+const DEMO_RUN_SCENARIOS = [
+  { scenarioId: 'normal-flow', version: 3, name: 'CMP 폴리싱 → 세정 → 계측 풀 E2E 통합 시나리오 (장시간)', commInterface: 'SOCKET', supportedModes: ['ALL', 'EQUIPMENT_ONLY', 'UPSTREAM_ONLY'] },
+  { scenarioId: 'modbus-tcp-normal-flow', version: 1, name: 'Modbus TCP PLC 노멀 플로우', commInterface: 'PLC', supportedModes: ['ALL', 'EQUIPMENT_ONLY', 'UPSTREAM_ONLY'] },
 ]
 
 const setupMocks = async (page: Page) => {
@@ -40,9 +40,10 @@ const setupMocks = async (page: Page) => {
       if (p === '/api/line') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LINES)) })
       if (/\/api\/live-map\/layout\/objects/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
       if (/\/api\/live-map\/layout/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess({ layoutKey: null, lineKey: 1, canvasJson: null, placements: [], objects: [] })) })
-      // DemoModal: 시나리오 카탈로그/잡은 배열 형태 필수(객체면 scenarioOptions.some 크래시).
-      if (/\/api\/live-map\/demo-scenarios/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(DEMO_SCENARIOS)) })
-      if (/\/api\/live-map\/demo-jobs/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
+      // DemoModal Run 경로: 시나리오 카탈로그는 배열 형태 필수(객체면 scenarioOptions.some 크래시). /scenarios 를
+      // 일반 /demo-runs 보다 먼저 매칭한다. getRun(/demo-runs/{id})은 run 시작 전엔 호출되지 않으나 안전망으로 둔다.
+      if (/\/api\/live-map\/demo-runs\/scenarios/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(DEMO_RUN_SCENARIOS)) })
+      if (/\/api\/live-map\/demo-runs/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess({ runId: 'run-test', mode: 'ALL', state: 'RUNNING', targets: [] })) })
       if (/\/api\/live-map/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess(LIVE_MAP)) })
       if (/\/api\/comm-logs/.test(p)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess([])) })
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(apiSuccess({ items: [], offset: 0, limit: 500, count: 0 })) })

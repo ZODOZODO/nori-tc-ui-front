@@ -13,12 +13,12 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
-import type { LiveMapDemoJobSummary } from '../api/live-map-demo.api'
+import type { SimulatorRunTarget } from '../api/live-map-demo-run.api'
 import { useI18n } from '@/i18n/i18n-context'
-import { useCancelLiveMapDemoJob } from '../hooks/useCancelLiveMapDemoJob'
-import { useCreateLiveMapDemoJobs } from '../hooks/useCreateLiveMapDemoJobs'
-import { useLiveMapDemoJobs } from '../hooks/useLiveMapDemoJobs'
-import { useLiveMapDemoScenarios } from '../hooks/useLiveMapDemoScenarios'
+import { useCreateSimulatorRun } from '../hooks/useCreateSimulatorRun'
+import { useSimulatorRun, isTerminalRunState } from '../hooks/useSimulatorRun'
+import { useSimulatorRunScenarios } from '../hooks/useSimulatorRunScenarios'
+import { useStopSimulatorRun } from '../hooks/useStopSimulatorRun'
 import {
   buildLiveMapDemoTree,
   collectLiveMapDemoEquipmentsByEqpIds,
@@ -41,15 +41,12 @@ interface LiveMapDemoModalProps {
 }
 
 const DEFAULT_EXPANDED_NODE_IDS = ['line:A_LINE'] as const
-const ACTIVE_DEMO_JOB_STATES =
-  'QUEUED,PREPARING,SYNCING_SPEC,CONNECTING,AWAITING_TRIGGER,RUNNING,CLEANING_UP,CANCEL_REQUESTED,COMPLETED,FAILED,CANCELED'
 const DEMO_TEST_TYPES = ['SOCKET_ONLY', 'MES_ONLY', 'E2E'] as const satisfies readonly LiveMapDemoTestType[]
 const TEST_TYPE_I18N_KEY: Record<LiveMapDemoTestType, string> = {
   SOCKET_ONLY: 'livemap.demo.testType.socket',
   MES_ONLY: 'livemap.demo.testType.mes',
   E2E: 'livemap.demo.testType.e2e',
 }
-const TERMINAL_DEMO_JOB_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELED'])
 
 const TREE_NODE_STYLE_BY_DEPTH = {
   0: 'border-border bg-muted/50 text-foreground',
@@ -57,21 +54,18 @@ const TREE_NODE_STYLE_BY_DEPTH = {
   2: 'border-transparent bg-transparent text-muted-foreground',
 } as const
 
-const resolveJobBadgeVariant = (state: string) => {
-  if (state === 'COMPLETED') {
+const resolveRunStateBadgeVariant = (state: string) => {
+  if (state === 'COMPLETED' || state === 'TERMINAL') {
     return 'default' as const
   }
-  if (state === 'FAILED' || state === 'CANCELED') {
+  if (state === 'FAILED' || state === 'ERRORED' || state === 'CANCELED') {
     return 'warning' as const
   }
   if (state === 'RUNNING') {
     return 'info' as const
   }
-  if (state === 'QUEUED') {
+  if (state === 'STOPPING') {
     return 'secondary' as const
-  }
-  if (state === 'AWAITING_TRIGGER') {
-    return 'outline' as const
   }
   return 'outline' as const
 }
@@ -118,23 +112,25 @@ export function LiveMapDemoModal({
   const [selectedTestType, setSelectedTestType] = useState<LiveMapDemoTestType>('E2E')
   const [selectedScenarioId, setSelectedScenarioId] = useState('')
   const [startMessage, setStartMessage] = useState<string | null>(null)
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
   const {
     data: scenarioOptions = [],
     isLoading: isScenarioLoading,
     isFetching: isScenarioFetching,
     refetch: refetchScenarios,
-  } = useLiveMapDemoScenarios(selectedTestType, open)
+  } = useSimulatorRunScenarios(open)
   const {
-    data: demoJobs = [],
-    isLoading: isJobsLoading,
-    isFetching: isJobsFetching,
-    refetch: refetchJobs,
-  } = useLiveMapDemoJobs(open, ACTIVE_DEMO_JOB_STATES, 100)
+    data: run,
+    isLoading: isRunLoading,
+    isFetching: isRunFetching,
+    refetch: refetchRun,
+  } = useSimulatorRun(activeRunId, open)
   // 수동 플래그 대신 쿼리 fetching 상태에서 파생 — effect 안 sync setState 를 없앤다.
-  const isRefreshing = isScenarioFetching || isJobsFetching
-  const createDemoJobsMutation = useCreateLiveMapDemoJobs()
-  const cancelDemoJobMutation = useCancelLiveMapDemoJob()
+  const isRefreshing = isScenarioFetching || isRunFetching
+  const createRunMutation = useCreateSimulatorRun()
+  const stopRunMutation = useStopSimulatorRun()
+  const runTargets = run?.targets ?? []
 
   const demoTree = useMemo(() => buildLiveMapDemoTree(equipmentNodes), [equipmentNodes])
 
@@ -183,18 +179,21 @@ export function LiveMapDemoModal({
    * 콜백에서 메시지를 반영합니다.
    */
   const refreshDemoData = useCallback(async (): Promise<string | null> => {
-    const [scenarioResult, jobsResult] = await Promise.allSettled([refetchScenarios(), refetchJobs()])
+    const [scenarioResult, runResult] = await Promise.allSettled([
+      refetchScenarios(),
+      activeRunId ? refetchRun() : Promise.resolve(null),
+    ])
 
     const failure =
       (scenarioResult.status === 'rejected' && scenarioResult.reason) ||
-      (jobsResult.status === 'rejected' && jobsResult.reason)
+      (runResult.status === 'rejected' && runResult.reason)
 
     if (failure instanceof Error) {
       return failure.message
     }
 
     return failure ? t('livemap.demo.refreshFailed') : null
-  }, [refetchJobs, refetchScenarios, t])
+  }, [activeRunId, refetchRun, refetchScenarios, t])
 
   useEffect(() => {
     if (!open) {
@@ -220,9 +219,10 @@ export function LiveMapDemoModal({
     setSelectedTestType('E2E')
     setSelectedScenarioId('')
     setStartMessage(null)
+    setActiveRunId(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
-    createDemoJobsMutation.reset()
-    cancelDemoJobMutation.reset()
+    createRunMutation.reset()
+    stopRunMutation.reset()
     onClose()
   }
 
@@ -291,17 +291,16 @@ export function LiveMapDemoModal({
 
     setStartMessage(null)
     try {
-      const result = await createDemoJobsMutation.mutateAsync({
+      const response = await createRunMutation.mutateAsync({
         testType: selectedTestType,
         scenarioId: selectedScenario.scenarioId,
-        scenarioVersion: selectedScenario.version,
         eqpIds: targetEquipments.map((targetEquipment) => targetEquipment.eqpId),
-        requestedBy: 'LIVE_MAP_UI',
       })
+      setActiveRunId(response.runId)
       setStartMessage(
-        t('livemap.demo.startResult', {
-          started: result.acceptedJobs.length,
-          excluded: result.rejectedEquipments.length,
+        t('livemap.demo.runStarted', {
+          runId: response.runId,
+          count: response.targets.length,
         }),
       )
     } catch (error) {
@@ -309,18 +308,16 @@ export function LiveMapDemoModal({
     }
   }
 
-  const handleCancelJob = async (jobId: string, testType: LiveMapDemoTestType) => {
-    const testTypeLabel = t(TEST_TYPE_I18N_KEY[testType])
+  const handleStopRun = async () => {
+    if (!activeRunId) {
+      return
+    }
     setStartMessage(null)
     try {
-      await cancelDemoJobMutation.mutateAsync(jobId)
-      setStartMessage(t('livemap.demo.cancelRequested', { testType: testTypeLabel }))
+      await stopRunMutation.mutateAsync(activeRunId)
+      setStartMessage(t('livemap.demo.stopRequested'))
     } catch (error) {
-      setStartMessage(
-        error instanceof Error
-          ? error.message
-          : t('livemap.demo.cancelFailed', { testType: testTypeLabel }),
-      )
+      setStartMessage(error instanceof Error ? error.message : t('livemap.demo.stopFailed'))
     }
   }
 
@@ -436,7 +433,7 @@ export function LiveMapDemoModal({
       )
     })
 
-  const completedCount = demoJobs.filter((job) => job.state === 'COMPLETED').length
+  const completedCount = runTargets.filter((target) => target.state === 'COMPLETED').length
 
   const targetEquipmentColumns: ColumnDef<LiveMapDemoTargetEquipment>[] = [
     {
@@ -464,61 +461,28 @@ export function LiveMapDemoModal({
     },
   ]
 
-  const demoJobColumns: ColumnDef<LiveMapDemoJobSummary>[] = [
+  const runTargetColumns: ColumnDef<SimulatorRunTarget>[] = [
     {
       key: 'eqpId',
       header: t('livemap.demo.colEqp'),
-      accessor: (job) => job.eqpId,
-      renderCell: (job) => <span className="font-semibold text-foreground">{job.eqpId}</span>,
-    },
-    {
-      key: 'process',
-      header: t('livemap.demo.colProcess'),
-      accessor: (job) => job.processType ?? 'ETC',
-    },
-    {
-      key: 'scenario',
-      header: t('livemap.demo.colScenario'),
-      accessor: (job) => job.scenarioName,
-    },
-    {
-      key: 'testType',
-      header: t('livemap.demo.colTestType'),
-      accessor: (job) => t(TEST_TYPE_I18N_KEY[job.testType]) || job.testType,
-    },
-    {
-      key: 'stage',
-      header: t('livemap.demo.colStage'),
-      accessor: (job) => job.currentStageName ?? job.currentStageCode ?? '-',
+      accessor: (target) => target.eqpId,
+      renderCell: (target) => (
+        <span className="font-semibold text-foreground">{target.eqpId}</span>
+      ),
     },
     {
       key: 'status',
       header: t('livemap.demo.colStatus'),
-      accessor: (job) => job.state,
-      renderCell: (job) => (
-        <Badge variant={resolveJobBadgeVariant(job.state)}>{job.state}</Badge>
+      accessor: (target) => target.state,
+      renderCell: (target) => (
+        <Badge variant={resolveRunStateBadgeVariant(target.state)}>{target.state}</Badge>
       ),
     },
     {
-      key: 'progress',
-      header: t('livemap.demo.colProgress'),
+      key: 'cycles',
+      header: t('livemap.demo.colCycles'),
       width: '13.75rem',
-      accessor: (job) => `${job.progressPercent}%`,
-      renderCell: (job) => (
-        <div className="flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className={`h-full rounded-full transition-[width] duration-500 ${
-                job.progressPercent >= 100 ? 'bg-success' : 'bg-brand-primary'
-              }`}
-              style={{ width: `${job.progressPercent}%` }}
-            />
-          </div>
-          <span className="min-w-11 text-right text-xs font-semibold text-muted-foreground">
-            {job.progressPercent}%
-          </span>
-        </div>
-      ),
+      accessor: (target) => `${target.completedCycleCount} / ${target.erroredCycleCount}`,
     },
   ]
 
@@ -698,13 +662,25 @@ export function LiveMapDemoModal({
                       onClick={() => {
                         void handleStartRun()
                       }}
-                      disabled={targetEquipments.length === 0 || !selectedScenario || createDemoJobsMutation.isPending}
+                      disabled={targetEquipments.length === 0 || !selectedScenario || createRunMutation.isPending}
                       className="h-10 rounded-[14px] bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                     >
                       <Play className="size-4" />
-                      {createDemoJobsMutation.isPending
+                      {createRunMutation.isPending
                         ? t('livemap.demo.startPending')
                         : t('livemap.demo.start')}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        void handleStopRun()
+                      }}
+                      disabled={!activeRunId || isTerminalRunState(run?.state) || stopRunMutation.isPending}
+                      className="h-10 rounded-[14px] px-4 text-sm font-semibold"
+                    >
+                      {t('livemap.demo.end')}
                     </Button>
                   </div>
                 </div>
@@ -713,53 +689,33 @@ export function LiveMapDemoModal({
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Badge variant="info">{selectedScenario?.name ?? t('livemap.demo.scenarioUnselected')}</Badge>
                 {selectedScenario ? (
-                  <Badge variant="secondary">{selectedScenario.description}</Badge>
+                  <Badge variant="secondary">{selectedScenario.commInterface}</Badge>
                 ) : null}
-                <Badge variant="outline">{completedCount}/{demoJobs.length}</Badge>
+                {run ? (
+                  <Badge variant={resolveRunStateBadgeVariant(run.state)}>{run.state}</Badge>
+                ) : null}
+                <Badge variant="outline">{completedCount}/{runTargets.length}</Badge>
                 {startMessage ? <Badge variant="secondary">{startMessage}</Badge> : null}
               </div>
 
-              {isJobsLoading && demoJobs.length === 0 ? (
+              {isRunLoading && runTargets.length === 0 ? (
                 <div className="mt-4 space-y-2 rounded-[18px] border border-border p-3">
                   {Array.from({ length: 5 }).map((_, rowIndex) => (
                     <Skeleton
-                      key={`live-map-demo-jobs-skeleton-${rowIndex}`}
-                      data-testid="live-map-demo-jobs-skeleton"
+                      key={`live-map-demo-run-skeleton-${rowIndex}`}
+                      data-testid="live-map-demo-run-skeleton"
                       className="h-9 w-full"
                     />
                   ))}
                 </div>
               ) : (
-                <SelectableTable<LiveMapDemoJobSummary>
-                  columns={demoJobColumns}
-                  rows={demoJobs}
-                  rowKey={(job) => job.jobId}
-                  actionColumn={{
-                    header: t('livemap.demo.colEnd'),
-                    width: '6rem',
-                    render: (job) => (
-                      <div className="flex justify-center">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 rounded-[10px] border-border px-3 text-xs font-semibold text-foreground hover:border-danger hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={
-                            TERMINAL_DEMO_JOB_STATES.has(job.state) ||
-                            cancelDemoJobMutation.isPending
-                          }
-                          onClick={() => {
-                            void handleCancelJob(job.jobId, job.testType)
-                          }}
-                        >
-                          {t('livemap.demo.end')}
-                        </Button>
-                      </div>
-                    ),
-                  }}
+                <SelectableTable<SimulatorRunTarget>
+                  columns={runTargetColumns}
+                  rows={runTargets}
+                  rowKey={(target) => target.eqpId}
                   emptyState={t('livemap.demo.jobsEmpty')}
                   containerClassName="mt-4 max-h-90 rounded-[18px] border border-border"
-                  tableClassName="min-w-295"
+                  tableClassName="min-w-130"
                 />
               )}
             </div>
