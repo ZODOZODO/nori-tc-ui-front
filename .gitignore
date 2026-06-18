@@ -37,3 +37,6 @@ blob-report/
 .claude/harness/
 .claude/perf/
 .claude/mr-review/
+
+# 테스트 코드/산출물은 추적 제외 (로컬 전용)
+/tests/
