@@ -50,3 +50,23 @@ export const LIVE_MAP_PORT_STATUS_CLASS: Record<LiveMapPortStatus, LiveMapStatus
   IDLE: LIVE_MAP_STATUS_CLASS.IDLE,
   DOWN: LIVE_MAP_STATUS_CLASS.DOWN,
 }
+
+/**
+ * run/target 상태(RunState/TargetState 문자열) 뱃지 색을 설비 상태 색(LIVE_MAP_STATUS_CLASS)과 단일 출처로 매핑한다.
+ *
+ * - RUNNING → RUN(초록), COMPLETED/TERMINAL → IDLE(파랑), FAILED/CANCELED → ERROR(빨강).
+ * - CANCELED(사용자 명시 종료)도 FAILED 와 동일하게 오류색(빨강)으로 표시한다(미완료 종료를 시각적으로 강조).
+ * - STOPPING/CREATED/PENDING 등 그 외는 중립(DOWN). 백엔드 enum 에 없는 'ERRORED' 유령 분기는 제거(Lo3) — 기본 DOWN.
+ */
+export const resolveRunStateChipClass = (state: string): string => {
+  if (state === 'RUNNING') {
+    return LIVE_MAP_STATUS_CLASS.RUN.chip
+  }
+  if (state === 'COMPLETED' || state === 'TERMINAL') {
+    return LIVE_MAP_STATUS_CLASS.IDLE.chip
+  }
+  if (state === 'FAILED' || state === 'CANCELED') {
+    return LIVE_MAP_STATUS_CLASS.ERROR.chip
+  }
+  return LIVE_MAP_STATUS_CLASS.DOWN.chip
+}

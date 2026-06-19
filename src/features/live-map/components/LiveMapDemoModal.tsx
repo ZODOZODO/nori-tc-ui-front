@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +19,7 @@ import { useCreateSimulatorRun } from '../hooks/useCreateSimulatorRun'
 import { useSimulatorRun, isTerminalRunState } from '../hooks/useSimulatorRun'
 import { useSimulatorRunScenarios } from '../hooks/useSimulatorRunScenarios'
 import { useStopSimulatorRun } from '../hooks/useStopSimulatorRun'
+import { useStopSimulatorTarget } from '../hooks/useStopSimulatorTarget'
 import {
   buildLiveMapDemoTree,
   collectLiveMapDemoEquipmentsByEqpIds,
@@ -27,6 +28,7 @@ import {
   filterLiveMapDemoTree,
   mergeLiveMapDemoTargetEquipments,
 } from '../lib/live-map-demo'
+import { resolveRunStateChipClass } from '../lib/live-map-status-theme'
 import type {
   LiveMapDemoTargetEquipment,
   LiveMapDemoTestType,
@@ -54,21 +56,8 @@ const TREE_NODE_STYLE_BY_DEPTH = {
   2: 'border-transparent bg-transparent text-muted-foreground',
 } as const
 
-const resolveRunStateBadgeVariant = (state: string) => {
-  if (state === 'COMPLETED' || state === 'TERMINAL') {
-    return 'default' as const
-  }
-  if (state === 'FAILED' || state === 'ERRORED' || state === 'CANCELED') {
-    return 'warning' as const
-  }
-  if (state === 'RUNNING') {
-    return 'info' as const
-  }
-  if (state === 'STOPPING') {
-    return 'secondary' as const
-  }
-  return 'outline' as const
-}
+const TERMINAL_TARGET_STATES = new Set(['COMPLETED', 'CANCELED', 'FAILED'])
+const isTerminalTargetState = (state: string) => TERMINAL_TARGET_STATES.has(state)
 
 type TreeCheckState = 'checked' | 'unchecked' | 'indeterminate'
 
@@ -114,6 +103,8 @@ export function LiveMapDemoModal({
   const [startMessage, setStartMessage] = useState<string | null>(null)
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
+  // 종료 진행 중인 설비 — 전역 mutation pending 대신 per-eqpId 추적으로 해당 행만 비활성한다(H3).
+  const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
   const {
     data: scenarioOptions = [],
     isLoading: isScenarioLoading,
@@ -129,6 +120,7 @@ export function LiveMapDemoModal({
   // 수동 플래그 대신 쿼리 fetching 상태에서 파생 — effect 안 sync setState 를 없앤다.
   const isRefreshing = isScenarioFetching || isRunFetching
   const createRunMutation = useCreateSimulatorRun()
+  const stopTargetMutation = useStopSimulatorTarget()
   const stopRunMutation = useStopSimulatorRun()
   const runTargets = run?.targets ?? []
 
@@ -213,6 +205,11 @@ export function LiveMapDemoModal({
   }, [open, refreshDemoData])
 
   const handleClose = () => {
+    // 진행 중 run 을 고아로 두지 않도록 전체 종료한다(H4). per-target 모델엔 run-level 종료 버튼이 없어 모달 닫기가
+    // UNTIL_STOPPED 설비 누수(lease/포트/워커 loop 영구 점유)를 막는 유일 경로다. best-effort — 닫기를 막지 않는다.
+    if (activeRunId && !isTerminalRunState(run?.state)) {
+      stopRunMutation.mutate(activeRunId)
+    }
     setSelectedEqpIds([])
     setSearchKeyword('')
     setTargetEquipments([])
@@ -221,8 +218,9 @@ export function LiveMapDemoModal({
     setStartMessage(null)
     setActiveRunId(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
+    setStoppingEqpIds(new Set())
     createRunMutation.reset()
-    stopRunMutation.reset()
+    stopTargetMutation.reset()
     onClose()
   }
 
@@ -308,16 +306,24 @@ export function LiveMapDemoModal({
     }
   }
 
-  const handleStopRun = async () => {
+  const handleStopTarget = async (eqpId: string) => {
     if (!activeRunId) {
       return
     }
     setStartMessage(null)
+    setStoppingEqpIds((prev) => new Set(prev).add(eqpId))
     try {
-      await stopRunMutation.mutateAsync(activeRunId)
-      setStartMessage(t('livemap.demo.stopRequested'))
+      await stopTargetMutation.mutateAsync({ runId: activeRunId, eqpId })
+      // M8: 어느 설비를 종료했는지 메시지에 eqpId 포함(다중 설비 run 식별).
+      setStartMessage(`${eqpId} — ${t('livemap.demo.stopRequested')}`)
     } catch (error) {
-      setStartMessage(error instanceof Error ? error.message : t('livemap.demo.stopFailed'))
+      setStartMessage(error instanceof Error ? error.message : `${eqpId} — ${t('livemap.demo.stopFailed')}`)
+    } finally {
+      setStoppingEqpIds((prev) => {
+        const next = new Set(prev)
+        next.delete(eqpId)
+        return next
+      })
     }
   }
 
@@ -475,7 +481,7 @@ export function LiveMapDemoModal({
       header: t('livemap.demo.colStatus'),
       accessor: (target) => target.state,
       renderCell: (target) => (
-        <Badge variant={resolveRunStateBadgeVariant(target.state)}>{target.state}</Badge>
+        <Badge className={resolveRunStateChipClass(target.state)}>{target.state}</Badge>
       ),
     },
     {
@@ -670,18 +676,6 @@ export function LiveMapDemoModal({
                         ? t('livemap.demo.startPending')
                         : t('livemap.demo.start')}
                     </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        void handleStopRun()
-                      }}
-                      disabled={!activeRunId || isTerminalRunState(run?.state) || stopRunMutation.isPending}
-                      className="h-10 rounded-[14px] px-4 text-sm font-semibold"
-                    >
-                      {t('livemap.demo.end')}
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -692,7 +686,7 @@ export function LiveMapDemoModal({
                   <Badge variant="secondary">{selectedScenario.commInterface}</Badge>
                 ) : null}
                 {run ? (
-                  <Badge variant={resolveRunStateBadgeVariant(run.state)}>{run.state}</Badge>
+                  <Badge className={resolveRunStateChipClass(run.state)}>{run.state}</Badge>
                 ) : null}
                 <Badge variant="outline">{completedCount}/{runTargets.length}</Badge>
                 {startMessage ? <Badge variant="secondary">{startMessage}</Badge> : null}
@@ -713,6 +707,30 @@ export function LiveMapDemoModal({
                   columns={runTargetColumns}
                   rows={runTargets}
                   rowKey={(target) => target.eqpId}
+                  actionColumn={{
+                    header: t('livemap.demo.colEnd'),
+                    width: '4.375rem',
+                    render: (target) => (
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleStopTarget(target.eqpId)
+                          }}
+                          disabled={
+                            !activeRunId ||
+                            isTerminalRunState(run?.state) ||
+                            isTerminalTargetState(target.state) ||
+                            stoppingEqpIds.has(target.eqpId)
+                          }
+                          className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label={`${target.eqpId} ${t('livemap.demo.colEnd')}`}
+                        >
+                          <Square className="size-4" />
+                        </button>
+                      </div>
+                    ),
+                  }}
                   emptyState={t('livemap.demo.jobsEmpty')}
                   containerClassName="mt-4 max-h-90 rounded-[18px] border border-border"
                   tableClassName="min-w-130"

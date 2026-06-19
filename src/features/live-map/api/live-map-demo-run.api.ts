@@ -164,4 +164,25 @@ export const liveMapDemoRunApi = {
       throw normalizeError(error, i18n.t('error.livemap.demoStop'))
     }
   },
+
+  // 설비-단위 종료 — Run 안의 한 설비만 중단(다른 설비는 계속). 진행 테이블 행별 종료 버튼에서 호출.
+  async stopTarget(runId: string, eqpId: string): Promise<SimulatorRunResponse> {
+    try {
+      const csrfToken = await issueCsrfToken()
+      const response = await apiClient.post<ApiResponse<SimulatorRunResponse>>(
+        `/live-map/demo-runs/${encodeURIComponent(runId)}/targets/${encodeURIComponent(eqpId)}/stop`,
+        null,
+        {
+          withCredentials: true,
+          headers: { [CSRF_HEADER_NAME]: csrfToken },
+        },
+      )
+      return resolveSuccessPayload<SimulatorRunResponse>(
+        response.data,
+        i18n.t('error.livemap.demoStop'),
+      )
+    } catch (error) {
+      throw normalizeError(error, i18n.t('error.livemap.demoStop'))
+    }
+  },
 }
