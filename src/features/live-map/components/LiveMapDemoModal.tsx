@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -48,6 +49,12 @@ const TEST_TYPE_I18N_KEY: Record<LiveMapDemoTestType, string> = {
   SOCKET_ONLY: 'livemap.demo.testType.socket',
   MES_ONLY: 'livemap.demo.testType.mes',
   E2E: 'livemap.demo.testType.e2e',
+}
+// run.mode(orchestrator SimulatorMode) → 연결 유형 라벨 i18n 키. 테스트타입 버튼 라벨과 동일 출처라 표기 일관.
+const RUN_MODE_TEST_TYPE_I18N_KEY: Record<string, string> = {
+  ALL: 'livemap.demo.testType.e2e',
+  EQUIPMENT_ONLY: 'livemap.demo.testType.socket',
+  UPSTREAM_ONLY: 'livemap.demo.testType.mes',
 }
 
 const TREE_NODE_STYLE_BY_DEPTH = {
@@ -105,6 +112,8 @@ export function LiveMapDemoModal({
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
   // 종료 진행 중인 설비 — 전역 mutation pending 대신 per-eqpId 추적으로 해당 행만 비활성한다(H3).
   const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
+  // 시작 실패(409 등)는 작은 배지로는 잘 안 보여 모달 팝업으로 강조한다.
+  const [startError, setStartError] = useState<string | null>(null)
   const {
     data: scenarioOptions = [],
     isLoading: isScenarioLoading,
@@ -216,6 +225,7 @@ export function LiveMapDemoModal({
     setSelectedTestType('E2E')
     setSelectedScenarioId('')
     setStartMessage(null)
+    setStartError(null)
     setActiveRunId(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
     setStoppingEqpIds(new Set())
@@ -302,7 +312,8 @@ export function LiveMapDemoModal({
         }),
       )
     } catch (error) {
-      setStartMessage(error instanceof Error ? error.message : t('error.livemap.demoStart'))
+      // 시작 실패는 배지가 아니라 팝업으로 강조(409=이미 점유 등 사용자가 놓치면 안 되는 메시지).
+      setStartError(error instanceof Error ? error.message : t('error.livemap.demoStart'))
     }
   }
 
@@ -441,6 +452,10 @@ export function LiveMapDemoModal({
 
   const completedCount = runTargets.filter((target) => target.state === 'COMPLETED').length
 
+  // 연결 유형(모두/설비만/MES만)은 run 단위 값이라 모든 행에 동일 — run.mode 를 라벨로 매핑(미지정 모드는 원문 노출).
+  const connectionTypeKey = run ? RUN_MODE_TEST_TYPE_I18N_KEY[run.mode] : undefined
+  const connectionTypeLabel = run ? (connectionTypeKey ? t(connectionTypeKey) : run.mode) : '-'
+
   const targetEquipmentColumns: ColumnDef<LiveMapDemoTargetEquipment>[] = [
     {
       key: 'eqpId',
@@ -477,6 +492,16 @@ export function LiveMapDemoModal({
       ),
     },
     {
+      key: 'connection',
+      header: t('livemap.demo.colConnection'),
+      accessor: () => connectionTypeLabel,
+    },
+    {
+      key: 'commInterface',
+      header: t('livemap.demo.colCommInterface'),
+      accessor: (target) => target.commInterface || '-',
+    },
+    {
       key: 'status',
       header: t('livemap.demo.colStatus'),
       accessor: (target) => target.state,
@@ -485,8 +510,8 @@ export function LiveMapDemoModal({
       ),
     },
     {
-      key: 'cycles',
-      header: t('livemap.demo.colCycles'),
+      key: 'result',
+      header: t('livemap.demo.colResult'),
       width: '13.75rem',
       accessor: (target) => `${target.completedCycleCount} / ${target.erroredCycleCount}`,
     },
@@ -613,10 +638,7 @@ export function LiveMapDemoModal({
                       <button
                         key={testType}
                         type="button"
-                        onClick={() => {
-                          setSelectedTestType(testType)
-                          setSelectedScenarioId('')
-                        }}
+                        onClick={() => setSelectedTestType(testType)}
                         className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                           selectedTestType === testType
                             ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
@@ -740,6 +762,25 @@ export function LiveMapDemoModal({
           </section>
         </div>
       </DialogContent>
+
+      <Dialog open={startError !== null} onOpenChange={(nextOpen) => !nextOpen && setStartError(null)}>
+        <DialogContent className="max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-danger">
+              <AlertTriangle className="size-5" aria-hidden="true" />
+              {t('livemap.demo.startErrorTitle')}
+            </DialogTitle>
+            <DialogDescription className="whitespace-pre-wrap break-words text-sm text-foreground">
+              {startError}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setStartError(null)}>
+              {t('common.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

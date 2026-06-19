@@ -22,6 +22,8 @@ export interface SimulatorRunScenarioItem {
 export interface SimulatorRunTarget {
   eqpId: string
   state: string
+  // 설비 통신타입(SOCKET / SECS / PLC) — tc_eqp.comm_interface 실값. 진행 테이블 '통신' 컬럼 표시용.
+  commInterface: string
   completedCycleCount: number
   erroredCycleCount: number
   issuedLotRunIds: string[]
@@ -80,15 +82,18 @@ const resolveSuccessPayload = <TData>(payload: unknown, fallbackMessage: string)
 }
 
 const normalizeError = (error: unknown, fallbackMessage: string): Error => {
-  if (error instanceof Error) {
-    return error
-  }
-
+  // axios 에러도 Error 인스턴스라 instanceof 를 먼저 검사하면 백엔드 errorMsg("설비가 이미 다른 Run 에 점유...")를
+  // 버리고 "Request failed with status code 409" 원문을 노출한다 — isAxiosError 를 먼저 본다.
   if (isAxiosError(error)) {
     const payload = error.response?.data
     if (isApiResponse(payload) && payload.success === false) {
       return new Error(payload.errorMsg || fallbackMessage)
     }
+    return new Error(fallbackMessage)
+  }
+
+  if (error instanceof Error) {
+    return error
   }
 
   return new Error(fallbackMessage)
