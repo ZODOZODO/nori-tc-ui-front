@@ -17,6 +17,8 @@ export interface SimulatorRunScenarioItem {
   version: number
   commInterface: string
   supportedModes: string[]
+  // 시드 시나리오 여부(R-8) — true 면 삭제 불가(SEED_PROTECTED). 기존 필드 무변경, append-only.
+  isSeed: boolean
 }
 
 export interface SimulatorRunTarget {
@@ -167,6 +169,42 @@ export const liveMapDemoRunApi = {
       )
     } catch (error) {
       throw normalizeError(error, i18n.t('error.livemap.demoStop'))
+    }
+  },
+
+  // 시나리오 업로드(R-8) — .scenario.md 파일을 multipart 로 전송. 성공 시 생성된 카탈로그 항목 반환.
+  async uploadScenario(file: File): Promise<SimulatorRunScenarioItem> {
+    try {
+      const csrfToken = await issueCsrfToken()
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await apiClient.post<ApiResponse<SimulatorRunScenarioItem>>(
+        '/live-map/demo-runs/scenarios',
+        formData,
+        {
+          withCredentials: true,
+          headers: { [CSRF_HEADER_NAME]: csrfToken },
+        },
+      )
+      return resolveSuccessPayload<SimulatorRunScenarioItem>(
+        response.data,
+        i18n.t('error.livemap.scenarioUpload'),
+      )
+    } catch (error) {
+      throw normalizeError(error, i18n.t('error.livemap.scenarioUpload'))
+    }
+  },
+
+  // 시나리오 삭제(R-8) — 시드(409)/미존재(404)는 백엔드가 차단. 권한 게이팅은 프론트가 1차(백엔드 closed-by-default 가 최종).
+  async deleteScenario(scenarioId: string): Promise<void> {
+    try {
+      const csrfToken = await issueCsrfToken()
+      await apiClient.delete(`/live-map/demo-runs/scenarios/${encodeURIComponent(scenarioId)}`, {
+        withCredentials: true,
+        headers: { [CSRF_HEADER_NAME]: csrfToken },
+      })
+    } catch (error) {
+      throw normalizeError(error, i18n.t('error.livemap.scenarioDelete'))
     }
   },
 

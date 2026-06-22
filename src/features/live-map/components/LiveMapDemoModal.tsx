@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2, Upload } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +30,9 @@ import {
   mergeLiveMapDemoTargetEquipments,
 } from '../lib/live-map-demo'
 import { resolveRunStateChipClass } from '../lib/live-map-status-theme'
+import { liveMapDemoRunApi } from '../api/live-map-demo-run.api'
+import { useMe } from '@/features/profile/hooks/useProfile'
+import { hasPermission, LIVE_MAP_DEMO_RUN_SCENARIO_DELETE_PERMISSION } from '@/shared/lib/permission'
 import type {
   LiveMapDemoTargetEquipment,
   LiveMapDemoTestType,
@@ -114,6 +117,14 @@ export function LiveMapDemoModal({
   const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
   // 시작 실패(409 등)는 작은 배지로는 잘 안 보여 모달 팝업으로 강조한다.
   const [startError, setStartError] = useState<string | null>(null)
+  // 시나리오 업로드/삭제 진행 상태(R-8). 파일 입력은 hidden — 업로드 버튼이 트리거한다.
+  const [isScenarioMutating, setIsScenarioMutating] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const meQuery = useMe()
+  const canDeleteScenario = hasPermission(
+    meQuery.data?.permissionCodes,
+    LIVE_MAP_DEMO_RUN_SCENARIO_DELETE_PERMISSION,
+  )
   const {
     data: scenarioOptions = [],
     isLoading: isScenarioLoading,
@@ -335,6 +346,45 @@ export function LiveMapDemoModal({
         next.delete(eqpId)
         return next
       })
+    }
+  }
+
+  const handleUploadScenarioFile = async (file: File | null) => {
+    if (!file) {
+      return
+    }
+    setStartMessage(null)
+    setStartError(null)
+    setIsScenarioMutating(true)
+    try {
+      const created = await liveMapDemoRunApi.uploadScenario(file)
+      await refetchScenarios()
+      setSelectedScenarioId(created.scenarioId)
+      setStartMessage(t('livemap.demo.scenarioUploaded', { name: created.name }))
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : t('error.livemap.scenarioUpload'))
+    } finally {
+      setIsScenarioMutating(false)
+    }
+  }
+
+  const handleDeleteSelectedScenario = async () => {
+    // 시드(isSeed) 또는 권한 미보유면 호출 경로가 비활성이지만, 안전하게 가드한다(백엔드가 최종 강제).
+    if (!selectedScenario || selectedScenario.isSeed || !canDeleteScenario) {
+      return
+    }
+    setStartMessage(null)
+    setStartError(null)
+    setIsScenarioMutating(true)
+    try {
+      await liveMapDemoRunApi.deleteScenario(selectedScenario.scenarioId)
+      await refetchScenarios()
+      setSelectedScenarioId('')
+      setStartMessage(t('livemap.demo.scenarioDeleted', { scenarioId: selectedScenario.scenarioId }))
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : t('error.livemap.scenarioDelete'))
+    } finally {
+      setIsScenarioMutating(false)
     }
   }
 
@@ -684,6 +734,52 @@ export function LiveMapDemoModal({
                     >
                       <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
+
+                    {/* 시나리오 업로드(R-8) — hidden file input 을 업로드 버튼이 트리거. 권한 무관(업로드는 기존 WRITE). */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".md,.scenario.md,text/markdown,text/plain"
+                      className="hidden"
+                      data-testid="scenario-upload-input"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null
+                        void handleUploadScenarioFile(file)
+                        event.target.value = ''
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isScenarioMutating}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-card text-muted-foreground transition hover:border-brand-primary/40 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={t('livemap.demo.uploadAria')}
+                      title={isScenarioMutating ? t('livemap.demo.uploadPending') : t('livemap.demo.uploadScenario')}
+                      data-testid="scenario-upload-button"
+                    >
+                      <Upload className="size-4" />
+                    </button>
+
+                    {/* 시나리오 삭제(R-8) — 삭제 권한 미보유 시 비표시, 시드 시나리오는 비활성(SEED_PROTECTED). */}
+                    {canDeleteScenario ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleDeleteSelectedScenario()
+                        }}
+                        disabled={isScenarioMutating || !selectedScenario || selectedScenario.isSeed}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-card text-muted-foreground transition hover:border-destructive/40 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={t('livemap.demo.deleteScenarioAria')}
+                        title={
+                          selectedScenario?.isSeed
+                            ? t('livemap.demo.seedProtected')
+                            : t('livemap.demo.deleteScenario')
+                        }
+                        data-testid="scenario-delete-button"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    ) : null}
 
                     <Button
                       type="button"

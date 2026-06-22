@@ -30,6 +30,13 @@ export const LIVE_MAP_LAYOUT_WRITE_PERMISSION = 'LIVE_MAP_LAYOUT_WRITE'
 export const LIVE_MAP_LAYOUT_READ_PERMISSION = 'LIVE_MAP_LAYOUT_READ'
 
 /**
+ * 데모 시나리오 삭제 권한 코드입니다.
+ * DB seed 는 PREFIX `/api/live-map/demo-runs/scenarios` + `http_method='DELETE'`, ADMIN 명시 매핑.
+ * 업로드(POST)는 기존 `LIVE_MAP_DEMO_RUN_WRITE` 가 커버하므로 별도 코드가 없습니다(삭제만 게이팅).
+ */
+export const LIVE_MAP_DEMO_RUN_SCENARIO_DELETE_PERMISSION = 'LIVE_MAP_DEMO_RUN_SCENARIO_DELETE'
+
+/**
  * 사용자가 특정 권한 코드를 보유하는지 확인합니다.
  */
 export const hasPermission = (
