@@ -51,14 +51,6 @@ export interface LiveMapDemoTreeNode {
   children: LiveMapDemoTreeNode[]
 }
 
-export interface LiveMapDemoScenarioOption {
-  id: string
-  label: string
-  description: string
-  phaseLabels: readonly string[]
-  durationTicks: number
-}
-
 export interface LiveMapDemoTargetEquipment {
   eqpId: string
   eqpName: string
@@ -67,13 +59,6 @@ export interface LiveMapDemoTargetEquipment {
   clusterName: string
   processingTypeLabel: string
   statusLabel: string
-}
-
-export interface LiveMapDemoRunRow extends LiveMapDemoTargetEquipment {
-  statusText: string
-  currentPhase: string
-  progress: number
-  elapsedTicks: number
 }
 
 export interface LiveMapSummary {

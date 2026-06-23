@@ -1,5 +1,4 @@
 import type {
-  LiveMapDemoScenarioOption,
   LiveMapEquipmentNode,
   LiveMapEquipmentPortItem,
   LiveMapEqpProcessingType,
@@ -11,30 +10,6 @@ export const LIVE_MAP_BOARD_HEIGHT = 710
 
 // 라인 옵션은 GET /api/line 실데이터(useLineList)로 대체되어 상단바 LineScopeSelector 가 채운다.
 // 상태 필터 옵션은 LiveMapPage 가 i18n 라벨('livemap.state.all')로 직접 구성한다.
-
-export const LIVE_MAP_DEMO_SCENARIO_OPTIONS: readonly LiveMapDemoScenarioOption[] = [
-  {
-    id: 'smoke-run',
-    label: 'Smoke Run',
-    description: '기본 경로만 빠르게 확인하는 데모 시나리오입니다.',
-    phaseLabels: ['준비', '조건 확인', '가상 실행', '결과 확인'],
-    durationTicks: 8,
-  },
-  {
-    id: 'alarm-recovery',
-    label: 'Alarm Recovery',
-    description: '알람 감지와 복구 흐름을 함께 살펴보는 시나리오입니다.',
-    phaseLabels: ['준비', '알람 주입', '복구 확인', '최종 검증'],
-    durationTicks: 10,
-  },
-  {
-    id: 'batch-validation',
-    label: 'Batch Validation',
-    description: '선택 설비를 순차적으로 돌려 전체 흐름을 점검하는 시나리오입니다.',
-    phaseLabels: ['준비', '배치 실행', '결과 수집', '리포트 정리'],
-    durationTicks: 12,
-  },
-] as const
 
 const createPortItems = (
   statuses: readonly LiveMapPortStatus[],

@@ -4,9 +4,8 @@ import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.type
 import { apiClient } from '@/shared/lib/api-client'
 import type { LiveMapDemoTestType } from '../types/live-map.types'
 
-// 신규 simulator orchestrator Run 경로(R-1) API. 레거시 demo-tester job 경로(live-map-demo.api.ts)와 병행하며,
-// 응답 형상이 job 모델과 다르다(run 1개 + targets[]; progress%/stage 없음). CSRF/에러 헬퍼는 job 파일을 손대지
-// 않고 cutover 시 함께 제거하기 위해 의도적으로 이 모듈에 별도 보유한다.
+// simulator orchestrator Run 경로(R-1) API. 응답 형상은 run 1개 + targets[](progress%/stage 없음).
+// CSRF/에러 헬퍼는 이 모듈에 자체 보유한다.
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
