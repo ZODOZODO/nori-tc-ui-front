@@ -61,8 +61,38 @@ helm-validate:
       changes:
         - helm/**/*
 
+# ------------------------------------------------------------------------------
+# W3-1 — 단위 테스트 게이트 (2026.07.13~07.17)
+# ------------------------------------------------------------------------------
+# package(빌드) 전에 프론트 단위 테스트(node --test)를 돌려 회귀를 차단한다.
+# e2e(Playwright)는 브라우저가 필요해 self-hosted 러너에서 미실행(로컬/검증 트랙 유지) — 본 잡은 test:unit 만.
+test:
+  stage: check
+  tags:
+    - norilab
+  image: harbor.nori.local/library/node:20-alpine
+  script:
+    - npm install
+    - npm run test:unit
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*
+
 package:
   stage: package
+  # W3-2 게이트: test 실패 시 package 차단 → build/scan/deploy 까지 연쇄 차단.
+  needs: ["test"]
   tags:
     - norilab
   image: harbor.nori.local/library/node:20-alpine
@@ -125,8 +155,8 @@ build:
 # W1-4b — Trivy 이미지 취약점 스캔 (명령·임계 정의, 2026.07.13~07.17)
 # ------------------------------------------------------------------------------
 # build 가 Harbor 로 push 한 tc-ui-front 이미지를 스캔한다. 임계: HIGH,CRITICAL → exit-code 1(차단),
-# OWASP High(CVSS>=7.0) 차단 임계와 정합. 본 주는 명령·임계 정의까지. stage 배선(scan 실패 시 deploy 차단)은
-# W3 에서 needs + allow_failure:false 로 자동 게이트 전환. 그전까지 when:manual + allow_failure:true 로 비간섭.
+# OWASP High(CVSS>=7.0) 차단 임계와 정합. W3-2 자동 게이트: when:manual + allow_failure:true 제거 →
+# 자동 실행 + 차단(allow_failure 기본 false). deploy 는 needs:["scan-image"] 로 scan 통과를 강제한다.
 scan-image:
   stage: scan
   needs: ["build"]
@@ -154,12 +184,11 @@ scan-image:
         - Dockerfile
         - nginx.conf
         - helm/**/*
-      when: manual
-      allow_failure: true
 
+# W3-2 게이트: deploy 는 scan-image 통과 후에만 가능(needs) + prod 배포는 수동 승인(when:manual).
 deploy:
   stage: deploy
-  needs: ["build"]
+  needs: ["scan-image"]
   tags:
     - norilab
   image: harbor.nori.local/library/kubectl:1.32.2
@@ -184,3 +213,4 @@ deploy:
         - Dockerfile
         - nginx.conf
         - helm/**/*
+      when: manual
