@@ -2,6 +2,7 @@ stages:
   - check
   - package
   - build
+  - scan
   - deploy
 
 variables:
@@ -98,6 +99,42 @@ build:
         - Dockerfile
         - nginx.conf
         - helm/**/*
+
+# ------------------------------------------------------------------------------
+# W1-4b — Trivy 이미지 취약점 스캔 (명령·임계 정의, 2026.07.13~07.17)
+# ------------------------------------------------------------------------------
+# build 가 Harbor 로 push 한 tc-ui-front 이미지를 스캔한다. 임계: HIGH,CRITICAL → exit-code 1(차단),
+# OWASP High(CVSS>=7.0) 차단 임계와 정합. 본 주는 명령·임계 정의까지. stage 배선(scan 실패 시 deploy 차단)은
+# W3 에서 needs + allow_failure:false 로 자동 게이트 전환. 그전까지 when:manual + allow_failure:true 로 비간섭.
+scan-image:
+  stage: scan
+  needs: ["build"]
+  tags:
+    - norilab
+  image:
+    name: harbor.nori.local/library/trivy:latest
+    entrypoint: [""]
+  variables:
+    TRIVY_SEVERITY: "HIGH,CRITICAL"
+    TRIVY_EXIT_CODE: "1"
+  script:
+    - trivy image --severity "$TRIVY_SEVERITY" --exit-code "$TRIVY_EXIT_CODE" --ignore-unfixed --no-progress "$IMAGE_NAME:$IMAGE_TAG"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - Dockerfile
+        - nginx.conf
+        - helm/**/*
+      when: manual
+      allow_failure: true
 
 deploy:
   stage: deploy
