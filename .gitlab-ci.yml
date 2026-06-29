@@ -40,6 +40,27 @@ pipeline-ok:
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
 
+# ------------------------------------------------------------------------------
+# W2-7 — Helm 차트 검증 (helm lint + helm template 오프라인 렌더, 2026.07.13~07.17)
+# ------------------------------------------------------------------------------
+# ui-front 자체 helm 차트(./helm)가 lint + 렌더되는지 클러스터 없이 검증한다.
+# kubectl:1.32.2 이미지에 helm 이 포함된다. 본 주는 "검증 잡 정의"까지 —
+# deploy 단계 차단 needs 배선(scan/helm-validate 실패 시 deploy 차단)은 W3 에서 한다.
+helm-validate:
+  stage: check
+  tags:
+    - norilab
+  image: harbor.nori.local/library/kubectl:1.32.2
+  script:
+    - echo "== helm lint =="
+    - helm lint ./helm -f ./helm/values.yaml
+    - echo "== helm template (dry render) =="
+    - helm template tc-ui-front ./helm -f ./helm/values.yaml > /dev/null
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - helm/**/*
+
 package:
   stage: package
   tags:
