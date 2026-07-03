@@ -18,7 +18,7 @@ pipeline-ok:
   # 자체호스팅 norilab 러너에서 실행한다(ci_quota_exceeded 회피). package 잡과 동일 러너/이미지.
   tags:
     - norilab
-  image: harbor.nori.local/library/node:20-alpine
+  image: harbor.nori.local/mes-services/node:22-alpine
   script:
     - echo "no relevant changes"
   rules:
@@ -68,7 +68,7 @@ test:
   stage: check
   tags:
     - norilab
-  image: harbor.nori.local/library/node:20-alpine
+  image: harbor.nori.local/mes-services/node:22-alpine
   script:
     - npm install
     - npm run test:unit
@@ -93,7 +93,7 @@ package:
   needs: ["test"]
   tags:
     - norilab
-  image: harbor.nori.local/library/node:20-alpine
+  image: harbor.nori.local/mes-services/node:22-alpine
   script:
     - npm install
     - npm run build
