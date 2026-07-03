@@ -11,8 +11,6 @@ variables:
   IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/tc-ui-front
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   NAMESPACE: mes
-  HARBOR_USER: admin
-  HARBOR_PASSWORD: Harbor12345
 
 pipeline-ok:
   stage: check
@@ -126,10 +124,8 @@ build:
   image:
     name: harbor.nori.local/library/kaniko:debug
     entrypoint: [""]
-  before_script:
-    - export DOCKER_CONFIG=$CI_PROJECT_DIR/.docker
-    - mkdir -p $DOCKER_CONFIG
-    - echo "{\"auths\":{\"$HARBOR_REGISTRY\":{\"auth\":\"$(echo -n $HARBOR_USER:$HARBOR_PASSWORD | base64 | tr -d '\n')\"}}}" > $DOCKER_CONFIG/config.json
+  # Harbor push 인증: 러너(k8s-tc-runner)가 harbor-creds-secret 을 /kaniko/.docker 로 마운트한다.
+  # kaniko 가 기본 위치(/kaniko/.docker/config.json)에서 읽으므로 여기서 자격증명을 다루지 않는다.
   script:
     - /kaniko/executor
       --context $CI_PROJECT_DIR
