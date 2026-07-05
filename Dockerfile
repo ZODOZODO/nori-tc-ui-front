@@ -1,5 +1,8 @@
 FROM harbor.nori.local/library/nginx:stable-alpine
 
+# alpine 베이스 패키지를 빌드시점 최신 패치로 갱신(Trivy HIGH/CRITICAL 스캔 게이트 대응).
+RUN apk upgrade --no-cache
+
 ENV TZ=Asia/Seoul
 
 WORKDIR /app/build
