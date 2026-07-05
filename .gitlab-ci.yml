@@ -164,6 +164,15 @@ scan-image:
   variables:
     TRIVY_SEVERITY: "HIGH,CRITICAL"
     TRIVY_EXIT_CODE: "1"
+    # 자체서명 Harbor(nori.local 사설 CA) 신뢰. SSL_CERT_FILE(시스템 풀 대체)이 아니라
+    # SSL_CERT_DIR(추가)라 trivy 의 공개 vuln DB(mirror.gcr.io) 다운로드 TLS 도 그대로 유지된다.
+    SSL_CERT_DIR: "/etc/ssl/certs:/tmp/extra-certs"
+    # 스캔 대상 이미지 pull 인증: 러너가 /kaniko/.docker 에 마운트한 harbor-creds-secret(config.json) 재사용.
+    DOCKER_CONFIG: "/kaniko/.docker"
+  before_script:
+    # HARBOR_CA_CERT = File 타입 CI 변수(nori.local CA PEM). Go 가 스캔하는 디렉터리에 배치.
+    - mkdir -p /tmp/extra-certs
+    - cp "$HARBOR_CA_CERT" /tmp/extra-certs/nori-local-ca.crt
   script:
     - trivy image --severity "$TRIVY_SEVERITY" --exit-code "$TRIVY_EXIT_CODE" --ignore-unfixed --no-progress "$IMAGE_NAME:$IMAGE_TAG"
   rules:
