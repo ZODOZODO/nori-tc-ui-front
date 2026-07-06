@@ -435,6 +435,7 @@
   "livemap.demo.colEnd": "종료",
   "livemap.demo.runTitle": "시뮬레이션 진행 현황",
   "livemap.demo.runSubtitle": "선택한 설비를 시나리오로 실행하면 진행률과 현재 단계를 실시간으로 확인할 수 있습니다.",
+  "livemap.demo.runStartedAt": "시작 시각",
   "livemap.demo.scenarioEmpty": "시나리오 없음",
   "livemap.demo.refreshAria": "시나리오 및 진행 현황 새로고침",
   "livemap.demo.refreshTitle": "새로고침",

@@ -435,6 +435,7 @@
   "livemap.demo.colEnd": "End",
   "livemap.demo.runTitle": "Simulation progress",
   "livemap.demo.runSubtitle": "Run the selected equipment with a scenario to see progress and current stage in real time.",
+  "livemap.demo.runStartedAt": "Started at",
   "livemap.demo.scenarioEmpty": "No scenario",
   "livemap.demo.refreshAria": "Refresh scenarios and progress",
   "livemap.demo.refreshTitle": "Refresh",

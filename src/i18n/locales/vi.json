@@ -435,6 +435,7 @@
   "livemap.demo.colEnd": "Kết thúc",
   "livemap.demo.runTitle": "Tiến độ mô phỏng",
   "livemap.demo.runSubtitle": "Chạy thiết bị đã chọn với một kịch bản để xem tiến độ và giai đoạn hiện tại theo thời gian thực.",
+  "livemap.demo.runStartedAt": "Thời điểm bắt đầu",
   "livemap.demo.scenarioEmpty": "Không có kịch bản",
   "livemap.demo.refreshAria": "Làm mới kịch bản và tiến độ",
   "livemap.demo.refreshTitle": "Làm mới",

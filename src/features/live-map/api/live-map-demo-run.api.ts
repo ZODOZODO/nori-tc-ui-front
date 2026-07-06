@@ -35,6 +35,9 @@ export interface SimulatorRunResponse {
   mode: string
   state: string
   targets: SimulatorRunTarget[]
+  // 이력/목록 표시용 append-only(R5). createdAt=ISO-8601 문자열(정렬·시작시각 표시), scenarioId=시나리오 그룹 표시 출처.
+  createdAt: string
+  scenarioId: string
 }
 
 export interface SimulatorRunCreateRequest {
@@ -146,6 +149,19 @@ export const liveMapDemoRunApi = {
         { withCredentials: true },
       )
       return resolveSuccessPayload<SimulatorRunResponse>(response.data, defaultErrorMessage())
+    } catch (error) {
+      throw normalizeError(error, defaultErrorMessage())
+    }
+  },
+
+  // run 이력 목록(DB 출처) — 과거·실행중 run 을 모두 조회(재부착 포함). 모달 열림 동안 폴링.
+  async listRuns(): Promise<SimulatorRunResponse[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<SimulatorRunResponse[]>>(
+        '/live-map/demo-runs',
+        { withCredentials: true },
+      )
+      return resolveSuccessPayload<SimulatorRunResponse[]>(response.data, defaultErrorMessage())
     } catch (error) {
       throw normalizeError(error, defaultErrorMessage())
     }

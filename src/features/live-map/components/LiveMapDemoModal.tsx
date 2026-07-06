@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Beaker, ChevronRight, Cpu, Play, RefreshCw, Search, Square, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Beaker, ChevronRight, CircleStop, Cpu, Play, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,10 +17,11 @@ import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { SimulatorRunTarget } from '../api/live-map-demo-run.api'
 import { useI18n } from '@/i18n/i18n-context'
 import { useCreateSimulatorRun } from '../hooks/useCreateSimulatorRun'
-import { useSimulatorRun, isTerminalRunState } from '../hooks/useSimulatorRun'
+import { isTerminalRunState } from '../hooks/useSimulatorRun'
+import { useSimulatorRunList } from '../hooks/useSimulatorRunList'
 import { useSimulatorRunScenarios } from '../hooks/useSimulatorRunScenarios'
-import { useStopSimulatorRun } from '../hooks/useStopSimulatorRun'
 import { useStopSimulatorTarget } from '../hooks/useStopSimulatorTarget'
+import { buildRunHistoryGroups } from '../lib/live-map-demo-run-history'
 import {
   buildLiveMapDemoTree,
   collectLiveMapDemoEquipmentsByEqpIds,
@@ -111,7 +112,6 @@ export function LiveMapDemoModal({
   const [selectedTestType, setSelectedTestType] = useState<LiveMapDemoTestType>('E2E')
   const [selectedScenarioId, setSelectedScenarioId] = useState('')
   const [startMessage, setStartMessage] = useState<string | null>(null)
-  const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
   // 종료 진행 중인 설비 — 전역 mutation pending 대신 per-eqpId 추적으로 해당 행만 비활성한다(H3).
   const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
@@ -132,17 +132,17 @@ export function LiveMapDemoModal({
     refetch: refetchScenarios,
   } = useSimulatorRunScenarios(open)
   const {
-    data: run,
+    data: runList = [],
     isLoading: isRunLoading,
     isFetching: isRunFetching,
-    refetch: refetchRun,
-  } = useSimulatorRun(activeRunId, open)
+    refetch: refetchRunList,
+  } = useSimulatorRunList(open)
   // 수동 플래그 대신 쿼리 fetching 상태에서 파생 — effect 안 sync setState 를 없앤다.
   const isRefreshing = isScenarioFetching || isRunFetching
   const createRunMutation = useCreateSimulatorRun()
   const stopTargetMutation = useStopSimulatorTarget()
-  const stopRunMutation = useStopSimulatorRun()
-  const runTargets = run?.targets ?? []
+  // 목록 → 최신순 run 그룹(과거·실행중 모두, 재부착 포함). 데이터 출처는 서버 목록이라 로컬 activeRunId 불요.
+  const runGroups = useMemo(() => buildRunHistoryGroups(runList), [runList])
 
   const demoTree = useMemo(() => buildLiveMapDemoTree(equipmentNodes), [equipmentNodes])
 
@@ -193,7 +193,7 @@ export function LiveMapDemoModal({
   const refreshDemoData = useCallback(async (): Promise<string | null> => {
     const [scenarioResult, runResult] = await Promise.allSettled([
       refetchScenarios(),
-      activeRunId ? refetchRun() : Promise.resolve(null),
+      refetchRunList(),
     ])
 
     const failure =
@@ -205,7 +205,7 @@ export function LiveMapDemoModal({
     }
 
     return failure ? t('livemap.demo.refreshFailed') : null
-  }, [activeRunId, refetchRun, refetchScenarios, t])
+  }, [refetchRunList, refetchScenarios, t])
 
   useEffect(() => {
     if (!open) {
@@ -225,11 +225,8 @@ export function LiveMapDemoModal({
   }, [open, refreshDemoData])
 
   const handleClose = () => {
-    // 진행 중 run 을 고아로 두지 않도록 전체 종료한다(H4). per-target 모델엔 run-level 종료 버튼이 없어 모달 닫기가
-    // UNTIL_STOPPED 설비 누수(lease/포트/워커 loop 영구 점유)를 막는 유일 경로다. best-effort — 닫기를 막지 않는다.
-    if (activeRunId && !isTerminalRunState(run?.state)) {
-      stopRunMutation.mutate(activeRunId)
-    }
+    // 모달 닫기는 시뮬레이션에 영향을 주지 않는다 — run 은 백그라운드에서 계속 실행되고,
+    // 종료는 '시뮬레이션 진행 현황' 테이블의 per-target 종료 버튼으로만 수행한다.
     setSelectedEqpIds([])
     setSearchKeyword('')
     setTargetEquipments([])
@@ -237,7 +234,6 @@ export function LiveMapDemoModal({
     setSelectedScenarioId('')
     setStartMessage(null)
     setStartError(null)
-    setActiveRunId(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
     setStoppingEqpIds(new Set())
     createRunMutation.reset()
@@ -315,7 +311,8 @@ export function LiveMapDemoModal({
         scenarioId: selectedScenario.scenarioId,
         eqpIds: targetEquipments.map((targetEquipment) => targetEquipment.eqpId),
       })
-      setActiveRunId(response.runId)
+      // 진행 현황은 서버 목록 폴링에서 이 run 을 픽업한다(로컬 activeRunId 바인딩 없음 — 재부착 원천 해소).
+      void refetchRunList()
       setStartMessage(
         t('livemap.demo.runStarted', {
           runId: response.runId,
@@ -328,14 +325,11 @@ export function LiveMapDemoModal({
     }
   }
 
-  const handleStopTarget = async (eqpId: string) => {
-    if (!activeRunId) {
-      return
-    }
+  const handleStopTarget = async (runId: string, eqpId: string) => {
     setStartMessage(null)
     setStoppingEqpIds((prev) => new Set(prev).add(eqpId))
     try {
-      await stopTargetMutation.mutateAsync({ runId: activeRunId, eqpId })
+      await stopTargetMutation.mutateAsync({ runId, eqpId })
       // M8: 어느 설비를 종료했는지 메시지에 eqpId 포함(다중 설비 run 식별).
       setStartMessage(`${eqpId} — ${t('livemap.demo.stopRequested')}`)
     } catch (error) {
@@ -500,11 +494,25 @@ export function LiveMapDemoModal({
       )
     })
 
-  const completedCount = runTargets.filter((target) => target.state === 'COMPLETED').length
+  // scenarioId → 시나리오 명(카탈로그 조회). 과거/재시작 run 은 create-side selectedScenario 로 복원 불가라
+  // 서버 run.scenarioId 가 유일 출처 — 카탈로그에 없으면(삭제됨 등) scenarioId 를 그대로 노출한다.
+  const scenarioNameById = useMemo(
+    () => new Map(scenarioOptions.map((scenarioOption) => [scenarioOption.scenarioId, scenarioOption.name])),
+    [scenarioOptions],
+  )
+  const resolveScenarioName = (scenarioId: string) => scenarioNameById.get(scenarioId) ?? scenarioId
 
-  // 연결 유형(모두/설비만/MES만)은 run 단위 값이라 모든 행에 동일 — run.mode 를 라벨로 매핑(미지정 모드는 원문 노출).
-  const connectionTypeKey = run ? RUN_MODE_TEST_TYPE_I18N_KEY[run.mode] : undefined
-  const connectionTypeLabel = run ? (connectionTypeKey ? t(connectionTypeKey) : run.mode) : '-'
+  // 연결 유형(모두/설비만/MES만)은 run 단위 값 — run.mode 를 라벨로 매핑(미지정 모드는 원문 노출).
+  const resolveConnectionTypeLabel = (mode: string) => {
+    const connectionTypeKey = RUN_MODE_TEST_TYPE_I18N_KEY[mode]
+    return connectionTypeKey ? t(connectionTypeKey) : mode
+  }
+
+  // ISO-8601(UTC) 시작시각을 로컬 표기로. 파싱 불가(빈/기형)면 원문 그대로 노출(방어).
+  const formatStartedAt = (iso: string) => {
+    const parsed = new Date(iso)
+    return Number.isNaN(parsed.getTime()) ? iso : parsed.toLocaleString()
+  }
 
   const targetEquipmentColumns: ColumnDef<LiveMapDemoTargetEquipment>[] = [
     {
@@ -532,7 +540,8 @@ export function LiveMapDemoModal({
     },
   ]
 
-  const runTargetColumns: ColumnDef<SimulatorRunTarget>[] = [
+  // 연결 유형은 run 그룹 단위라 컬럼 accessor 가 그룹 라벨을 클로저로 받는다(기존 컬럼 구성 재사용, 그룹별 생성).
+  const buildRunTargetColumns = (connectionTypeLabel: string): ColumnDef<SimulatorRunTarget>[] => [
     {
       key: 'eqpId',
       header: t('livemap.demo.colEqp'),
@@ -803,14 +812,10 @@ export function LiveMapDemoModal({
                 {selectedScenario ? (
                   <Badge variant="secondary">{selectedScenario.commInterface}</Badge>
                 ) : null}
-                {run ? (
-                  <Badge className={resolveRunStateChipClass(run.state)}>{run.state}</Badge>
-                ) : null}
-                <Badge variant="outline">{completedCount}/{runTargets.length}</Badge>
                 {startMessage ? <Badge variant="secondary">{startMessage}</Badge> : null}
               </div>
 
-              {isRunLoading && runTargets.length === 0 ? (
+              {isRunLoading && runGroups.length === 0 ? (
                 <div className="mt-4 space-y-2 rounded-[18px] border border-border p-3">
                   {Array.from({ length: 5 }).map((_, rowIndex) => (
                     <Skeleton
@@ -820,39 +825,60 @@ export function LiveMapDemoModal({
                     />
                   ))}
                 </div>
+              ) : runGroups.length === 0 ? (
+                <p className="mt-4 rounded-[18px] border border-border p-6 text-center text-sm text-muted-foreground">
+                  {t('livemap.demo.jobsEmpty')}
+                </p>
               ) : (
-                <SelectableTable<SimulatorRunTarget>
-                  columns={runTargetColumns}
-                  rows={runTargets}
-                  rowKey={(target) => target.eqpId}
-                  actionColumn={{
-                    header: t('livemap.demo.colEnd'),
-                    width: '4.375rem',
-                    render: (target) => (
-                      <div className="flex justify-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void handleStopTarget(target.eqpId)
-                          }}
-                          disabled={
-                            !activeRunId ||
-                            isTerminalRunState(run?.state) ||
-                            isTerminalTargetState(target.state) ||
-                            stoppingEqpIds.has(target.eqpId)
-                          }
-                          className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label={`${target.eqpId} ${t('livemap.demo.colEnd')}`}
-                        >
-                          <Square className="size-4" />
-                        </button>
+                <div className="mt-4 max-h-90 space-y-4 overflow-y-auto">
+                  {runGroups.map((group) => (
+                    <div key={group.runId} className="rounded-[18px] border border-border">
+                      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+                        <span className="font-mono text-sm font-semibold text-foreground">{group.runId}</span>
+                        <Badge variant="secondary">{resolveConnectionTypeLabel(group.mode)}</Badge>
+                        <Badge variant="info">{resolveScenarioName(group.scenarioId)}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {t('livemap.demo.runStartedAt')}: {formatStartedAt(group.createdAt)}
+                        </span>
+                        <Badge className={resolveRunStateChipClass(group.state)}>{group.state}</Badge>
+                        <Badge variant="outline">
+                          {group.completedCount}/{group.totalCount}
+                        </Badge>
                       </div>
-                    ),
-                  }}
-                  emptyState={t('livemap.demo.jobsEmpty')}
-                  containerClassName="mt-4 max-h-90 rounded-[18px] border border-border"
-                  tableClassName="min-w-130"
-                />
+                      <SelectableTable<SimulatorRunTarget>
+                        columns={buildRunTargetColumns(resolveConnectionTypeLabel(group.mode))}
+                        rows={group.targets}
+                        rowKey={(target) => target.eqpId}
+                        actionColumn={{
+                          header: t('livemap.demo.colEnd'),
+                          width: '4.375rem',
+                          render: (target) => (
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleStopTarget(group.runId, target.eqpId)
+                                }}
+                                disabled={
+                                  isTerminalRunState(group.state) ||
+                                  isTerminalTargetState(target.state) ||
+                                  stoppingEqpIds.has(target.eqpId)
+                                }
+                                className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label={`${target.eqpId} ${t('livemap.demo.colEnd')}`}
+                              >
+                                <CircleStop className="size-5" />
+                              </button>
+                            </div>
+                          ),
+                        }}
+                        emptyState={t('livemap.demo.jobsEmpty')}
+                        containerClassName="rounded-b-[18px]"
+                        tableClassName="min-w-130"
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </section>
