@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -95,6 +95,20 @@ function CommLogListModal({
   onSelectEntry: (entry: CommLogEntry) => void
 }) {
   const { t } = useI18n()
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // 로그는 시간 오름차순(과거→최신)이라 최신이 맨 아래. 열릴 때/로그 증가 시 하단으로 스크롤해 최신을 보여준다.
+  // rAF 로 미룬다 — 다이얼로그 마운트 직후엔 스크롤 컨테이너가 아직 flex-1 높이로 제약되기 전이라
+  // 그 시점 scrollTop=scrollHeight 가 0 으로 clamp 되어 무효화됨.
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open, logs.length])
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="!left-4 !right-4 !top-4 !bottom-4 !w-auto !max-w-none !translate-x-0 !translate-y-0 flex flex-col gap-0 overflow-hidden bg-card p-0 text-foreground">
@@ -109,14 +123,14 @@ function CommLogListModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="thin-scroll min-h-0 flex-1 overflow-auto">
+        <div ref={scrollRef} className="thin-scroll min-h-0 flex-1 overflow-auto">
           {logs.length === 0 ? (
             <div className="flex h-full items-center justify-center py-16 text-[12px] text-muted-foreground">
               {t('livemap.commlog.empty')}
             </div>
           ) : (
-            <div className="flex min-w-max flex-col-reverse">
-              {[...logs].reverse().map((entry, idx) => (
+            <div className="flex min-w-max flex-col">
+              {logs.map((entry, idx) => (
                 <ClickableLogRow
                   key={`${entry.timestampMs}-${idx}`}
                   entry={entry}
@@ -196,8 +210,13 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
   const { data: logs = [], isFetching } = useCommLog(eqpId, 'all')
   const [isListOpen, setIsListOpen] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState<CommLogEntry | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  const recentLogs = [...logs].reverse()
+  // 로그는 시간 오름차순(과거→최신)이라 최신이 맨 아래. 로그 증가 시 하단으로 스크롤해 최신을 보여준다.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [logs.length])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -219,14 +238,17 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
         </button>
       </div>
 
-      <div className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto rounded-[12px] border border-border bg-muted/40 p-1.5">
-        {recentLogs.length === 0 ? (
+      <div
+        ref={scrollRef}
+        className="thin-scroll mt-2 min-h-0 flex-1 overflow-auto rounded-[12px] border border-border bg-muted/40 p-1.5"
+      >
+        {logs.length === 0 ? (
           <div className="flex h-full min-h-20 items-center justify-center text-[10px] text-muted-foreground">
             {t('livemap.commlog.empty')}
           </div>
         ) : (
           <ul className="space-y-0.5">
-            {recentLogs.map((entry, idx) => {
+            {logs.map((entry, idx) => {
               const isRecv = entry.direction === 'RECV'
               return (
                 <li key={`${entry.timestampMs}-${idx}`}>

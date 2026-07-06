@@ -896,6 +896,7 @@ export function LiveMapBoard({
           }`}
         >
           <div
+            style={{ maxHeight: 760 }}
             className={`h-full w-85 2xl:w-90 transition-transform duration-300 ease-out ${
               isPanelOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
