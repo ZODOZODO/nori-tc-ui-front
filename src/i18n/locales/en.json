@@ -224,6 +224,7 @@
   "deploy.register.createSuccessTitle": "Deploy created",
   "deploy.register.snapshotFailDetail": "Failed to load details right after creation. Check the status from the Deploy tab.",
   "deploy.register.selectToAddFirst": "Select equipment to add first.",
+  "deploy.register.maxTargetsExceeded": "Up to {{max}} equipment can be deployed at once. Please reduce your selection.",
   "deploy.register.activeCannotAdd": "Equipment in an active Deploy cannot be added to Selected Equipments.",
   "deploy.register.addedToSelected": "Added the selected equipment to Selected Equipments. Active and duplicate equipment are excluded.",
   "deploy.register.goToDeployTab": "Go to Deploy tab",

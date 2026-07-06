@@ -19,6 +19,7 @@ import type { EqpJarOption, EqpModelOption } from '@/features/eqp/types/eqp.type
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { deployApi } from '../api/deploy.api'
 import { createDeployName } from '../lib/deploy-utils'
+import { MAX_DEPLOY_TARGETS_PER_REQUEST, willExceedMaxTargets } from '../lib/deploy-register-selection'
 import {
   EMPTY_SELECT_VALUE,
   delay,
@@ -255,6 +256,7 @@ export function DeployRegisterPanel() {
     () => new Set(searchSelectionIds),
     [searchSelectionIds],
   )
+  const selectedEqpIdSet = useMemo(() => new Set(selectedEqpIds), [selectedEqpIds])
   const selectedSelectableSearchCount = useMemo(
     () => selectableSearchItemIds.filter((eqpId) => selectedSearchItemIdSet.has(eqpId)).length,
     [selectableSearchItemIds, selectedSearchItemIdSet],
@@ -291,8 +293,8 @@ export function DeployRegisterPanel() {
       return
     }
 
-    syncSelectedEqpTargets(registerTargetItems.filter((item) => selectedEqpIds.includes(item.eqpId)))
-  }, [registerTargetItems, selectedEqpIds, syncSelectedEqpTargets])
+    syncSelectedEqpTargets(registerTargetItems.filter((item) => selectedEqpIdSet.has(item.eqpId)))
+  }, [registerTargetItems, selectedEqpIds, selectedEqpIdSet, syncSelectedEqpTargets])
 
   useEffect(() => {
     if (!searchSelectAllRef.current) {
@@ -470,6 +472,21 @@ export function DeployRegisterPanel() {
         isSuccess: false,
         title: t('deploy.register.createFailTitle'),
         message: t('deploy.register.modelVersionUnknown'),
+        detail: null,
+        nextMode: null,
+        nextDeployKey: null,
+      })
+      return
+    }
+
+    // 개수 가드: 서버 상한(max-targets-per-request) 초과 시 preview/create 호출 전에 차단해 raw 400 을 방지한다.
+    if (willExceedMaxTargets(selectedEqpItems.length, 0)) {
+      const message = t('deploy.register.maxTargetsExceeded', { max: MAX_DEPLOY_TARGETS_PER_REQUEST })
+      setFeedbackMessage(message)
+      openDeployDialog({
+        isSuccess: false,
+        title: t('deploy.register.createFailTitle'),
+        message,
         detail: null,
         nextMode: null,
         nextDeployKey: null,
@@ -756,6 +773,14 @@ export function DeployRegisterPanel() {
       return
     }
 
+    const newlyAddedItems = addableSearchItems.filter((item) => !selectedEqpIdSet.has(item.eqpId))
+    if (willExceedMaxTargets(selectedEqpIds.length, newlyAddedItems.length)) {
+      setFeedbackMessage(
+        t('deploy.register.maxTargetsExceeded', { max: MAX_DEPLOY_TARGETS_PER_REQUEST }),
+      )
+      return
+    }
+
     addSelectedEqps(addableSearchItems)
     setSearchSelectionIds([])
     setFeedbackMessage(t('deploy.register.addedToSelected'))
@@ -837,7 +862,7 @@ export function DeployRegisterPanel() {
         <div className="flex w-full justify-center">
           <input
             type="checkbox"
-            checked={!item.blockedByActiveDeploy && searchSelectionIds.includes(item.eqpId)}
+            checked={!item.blockedByActiveDeploy && selectedSearchItemIdSet.has(item.eqpId)}
             onChange={() => handleToggleSearchSelection(item.eqpId)}
             disabled={item.blockedByActiveDeploy}
             className="size-4 accent-brand-primary"
@@ -1333,6 +1358,7 @@ export function DeployRegisterPanel() {
               columns={registerSearchColumns}
               rows={registerTargetItems}
               rowKey={(item) => item.eqpId}
+              features={{ virtualization: true }}
               wrapRow={(item, _rowIdx, children) => (
                 <TableRow className={item.blockedByActiveDeploy ? 'bg-warning/10' : undefined}>
                   {children}
@@ -1381,6 +1407,7 @@ export function DeployRegisterPanel() {
             columns={selectedEqpColumns}
             rows={selectedEqpItems}
             rowKey={(item) => item.eqpId}
+            features={{ virtualization: true }}
             actionColumn={{
               header: 'Remove',
               width: '4rem',

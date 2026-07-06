@@ -224,6 +224,7 @@
   "deploy.register.createSuccessTitle": "Đã tạo triển khai",
   "deploy.register.snapshotFailDetail": "Không thể tải chi tiết ngay sau khi tạo. Kiểm tra trạng thái từ tab Triển khai.",
   "deploy.register.selectToAddFirst": "Vui lòng chọn thiết bị cần thêm trước.",
+  "deploy.register.maxTargetsExceeded": "Chỉ có thể triển khai tối đa {{max}} thiết bị cùng lúc. Vui lòng giảm bớt lựa chọn.",
   "deploy.register.activeCannotAdd": "Thiết bị thuộc một triển khai đang hoạt động không thể thêm vào Thiết bị đã chọn.",
   "deploy.register.addedToSelected": "Đã thêm thiết bị đã chọn vào Thiết bị đã chọn. Thiết bị đang hoạt động và trùng lặp được loại trừ.",
   "deploy.register.goToDeployTab": "Đi đến tab Triển khai",
