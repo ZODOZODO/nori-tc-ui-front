@@ -224,6 +224,7 @@
   "deploy.register.createSuccessTitle": "Deploy 생성 완료",
   "deploy.register.snapshotFailDetail": "생성 직후 상세 조회에 실패했습니다. Deploy 탭에서 상태를 확인해 주세요.",
   "deploy.register.selectToAddFirst": "추가할 설비를 먼저 선택해 주세요.",
+  "deploy.register.maxTargetsExceeded": "한 번에 최대 {{max}}대까지 배포할 수 있습니다. 선택을 줄여 주세요.",
   "deploy.register.activeCannotAdd": "active Deploy에 포함된 설비는 Selected Equipments에 추가할 수 없습니다.",
   "deploy.register.addedToSelected": "선택한 설비를 Selected Equipments에 추가했습니다. active 설비와 중복 설비는 제외됩니다.",
   "deploy.register.goToDeployTab": "Deploy 탭으로 이동",
