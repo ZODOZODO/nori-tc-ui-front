@@ -198,7 +198,12 @@ export const liveMapDemoRunApi = {
         formData,
         {
           withCredentials: true,
-          headers: { [CSRF_HEADER_NAME]: csrfToken },
+          headers: {
+            [CSRF_HEADER_NAME]: csrfToken,
+            // apiClient 기본 헤더의 'Content-Type: application/json' 을 벗겨야 axios 가 FormData 를 감지해
+            // boundary 포함 multipart/form-data 를 자동 설정한다(안 벗기면 백엔드 consumes=multipart 가 415 로 거부).
+            'Content-Type': undefined,
+          },
         },
       )
       return resolveSuccessPayload<SimulatorRunScenarioItem>(
