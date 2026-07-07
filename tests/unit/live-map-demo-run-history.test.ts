@@ -13,8 +13,8 @@ const run = (
   ...overrides,
 })
 
-// AC-F3: 최신순(createdAt DESC) 정렬 + createdAt/scenarioId 노출 + 설비행 값.
-test('과거 terminal run 이 createdAt DESC 로 정렬되고 각 그룹이 scenario/시작시각/설비행을 담는다', () => {
+// AC-F3: 과거순(createdAt ASC) 정렬 — 최신이 맨 아래 + createdAt/scenarioId 노출 + 설비행 값.
+test('과거 terminal run 이 createdAt ASC 로 정렬되고(최신이 맨 아래) 각 그룹이 scenario/시작시각/설비행을 담는다', () => {
   const groups = buildRunHistoryGroups([
     run({
       runId: 'run-old',
@@ -38,15 +38,15 @@ test('과거 terminal run 이 createdAt DESC 로 정렬되고 각 그룹이 scen
   ])
 
   assert.equal(groups.length, 2)
-  assert.equal(groups[0].runId, 'run-new', '최신 run 이 먼저')
-  assert.equal(groups[1].runId, 'run-old')
-  assert.equal(groups[0].createdAt, '2026-07-06T02:00:00Z', 'createdAt 노출')
-  assert.equal(groups[1].scenarioId, 'socket-flow', 'scenarioId 노출')
+  assert.equal(groups[0].runId, 'run-old', '오래된 run 이 먼저(위)')
+  assert.equal(groups[1].runId, 'run-new', '최신 run 이 맨 아래')
+  assert.equal(groups[1].createdAt, '2026-07-06T02:00:00Z', 'createdAt 노출')
+  assert.equal(groups[0].scenarioId, 'socket-flow', 'scenarioId 노출')
   // 설비행 값 + 완료/전체 집계.
-  assert.equal(groups[1].totalCount, 2)
-  assert.equal(groups[1].completedCount, 1, 'COMPLETED 설비 1대')
-  assert.equal(groups[1].targets[0].eqpId, 'EQP_A')
-  assert.equal(groups[1].targets[1].erroredCycleCount, 1)
+  assert.equal(groups[0].totalCount, 2)
+  assert.equal(groups[0].completedCount, 1, 'COMPLETED 설비 1대')
+  assert.equal(groups[0].targets[0].eqpId, 'EQP_A')
+  assert.equal(groups[0].targets[1].erroredCycleCount, 1)
 })
 
 // AC-F2: 이번 세션에서 시작하지 않은 실행중 run 도 목록 mock 에 있으면 그룹 결과에 포함(재부착).
