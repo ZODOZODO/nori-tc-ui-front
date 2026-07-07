@@ -115,6 +115,8 @@ export function LiveMapDemoModal({
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
   // 종료 진행 중인 설비 — 전역 mutation pending 대신 per-eqpId 추적으로 해당 행만 비활성한다(H3).
   const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
+  // '시뮬레이션 진행 현황' run 그룹 접기/펴기 — 기본 접힘(헤더만). 정보량이 많아 헤더 클릭 시에만 설비 상세를 편다.
+  const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set())
   // 시작 실패(409 등)는 작은 배지로는 잘 안 보여 모달 팝업으로 강조한다.
   const [startError, setStartError] = useState<string | null>(null)
   // 시나리오 업로드/삭제 진행 상태(R-8). 파일 입력은 hidden — 업로드 버튼이 트리거한다.
@@ -236,6 +238,7 @@ export function LiveMapDemoModal({
     setStartError(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
     setStoppingEqpIds(new Set())
+    setExpandedRunIds(new Set())
     createRunMutation.reset()
     stopTargetMutation.reset()
     onClose()
@@ -251,6 +254,18 @@ export function LiveMapDemoModal({
         ? currentNodeIds.filter((currentNodeId) => currentNodeId !== nodeId)
         : [...currentNodeIds, nodeId],
     )
+  }
+
+  const handleToggleRunGroup = (runId: string) => {
+    setExpandedRunIds((currentRunIds) => {
+      const nextRunIds = new Set(currentRunIds)
+      if (nextRunIds.has(runId)) {
+        nextRunIds.delete(runId)
+      } else {
+        nextRunIds.add(runId)
+      }
+      return nextRunIds
+    })
   }
 
   const handleToggleEquipment = (eqpId: string) => {
@@ -692,21 +707,38 @@ export function LiveMapDemoModal({
                 </div>
 
                 <div className="flex flex-col gap-2 sm:min-w-105">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {DEMO_TEST_TYPES.map((testType) => (
-                      <button
-                        key={testType}
-                        type="button"
-                        onClick={() => setSelectedTestType(testType)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          selectedTestType === testType
-                            ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                            : 'border-border bg-card text-muted-foreground hover:border-brand-primary/40'
-                        }`}
-                      >
-                        {t(TEST_TYPE_I18N_KEY[testType])}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {DEMO_TEST_TYPES.map((testType) => (
+                        <button
+                          key={testType}
+                          type="button"
+                          onClick={() => setSelectedTestType(testType)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                            selectedTestType === testType
+                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                              : 'border-border bg-card text-muted-foreground hover:border-brand-primary/40'
+                          }`}
+                        >
+                          {t(TEST_TYPE_I18N_KEY[testType])}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* 선택된 시나리오 표기(이름+통신유형) — 테스트 타입 버튼 오른쪽 고정폭. 이름이 길어도(모드버스 등)
+                        레이아웃이 흔들리지 않게 폭을 고정하고 넘치면 말줄임한다. */}
+                    <div className="ml-auto flex w-52 shrink-0 items-center gap-1.5">
+                      <Badge variant="info" className="min-w-0 flex-1 overflow-hidden">
+                        <span className="min-w-0 flex-1 truncate">
+                          {selectedScenario?.name ?? t('livemap.demo.scenarioUnselected')}
+                        </span>
+                      </Badge>
+                      {selectedScenario ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          {selectedScenario.commInterface}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -807,13 +839,11 @@ export function LiveMapDemoModal({
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Badge variant="info">{selectedScenario?.name ?? t('livemap.demo.scenarioUnselected')}</Badge>
-                {selectedScenario ? (
-                  <Badge variant="secondary">{selectedScenario.commInterface}</Badge>
-                ) : null}
-                {startMessage ? <Badge variant="secondary">{startMessage}</Badge> : null}
-              </div>
+              {startMessage ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{startMessage}</Badge>
+                </div>
+              ) : null}
 
               {isRunLoading && runGroups.length === 0 ? (
                 <div className="mt-4 space-y-2 rounded-[18px] border border-border p-3">
@@ -831,9 +861,23 @@ export function LiveMapDemoModal({
                 </p>
               ) : (
                 <div className="mt-4 max-h-90 space-y-4 overflow-y-auto">
-                  {runGroups.map((group) => (
+                  {runGroups.map((group) => {
+                    const isRunExpanded = expandedRunIds.has(group.runId)
+                    return (
                     <div key={group.runId} className="rounded-[18px] border border-border">
-                      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRunGroup(group.runId)}
+                        aria-expanded={isRunExpanded}
+                        className={`flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/40 ${
+                          isRunExpanded ? 'border-b border-border' : ''
+                        }`}
+                      >
+                        <ChevronRight
+                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                            isRunExpanded ? 'rotate-90' : 'rotate-0'
+                          }`}
+                        />
                         <span className="font-mono text-sm font-semibold text-foreground">{group.runId}</span>
                         <Badge variant="secondary">{resolveConnectionTypeLabel(group.mode)}</Badge>
                         <Badge variant="info">{resolveScenarioName(group.scenarioId)}</Badge>
@@ -844,7 +888,8 @@ export function LiveMapDemoModal({
                         <Badge variant="outline">
                           {group.completedCount}/{group.totalCount}
                         </Badge>
-                      </div>
+                      </button>
+                      {isRunExpanded ? (
                       <SelectableTable<SimulatorRunTarget>
                         columns={buildRunTargetColumns(resolveConnectionTypeLabel(group.mode))}
                         rows={group.targets}
@@ -876,8 +921,10 @@ export function LiveMapDemoModal({
                         containerClassName="rounded-b-[18px]"
                         tableClassName="min-w-130"
                       />
+                      ) : null}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
