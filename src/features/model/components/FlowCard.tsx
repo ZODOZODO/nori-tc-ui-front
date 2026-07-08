@@ -458,7 +458,7 @@ export const FlowCard = forwardRef<FlowCardHandle, FlowCardProps>(function FlowC
           rows={draft.dcopItems}
           rowKey={(item) => item.dcopItemKey ?? `${item.dcopItemName}-${item.variableId}`}
           emptyState={t('model.flowCard.collectEmpty')}
-          containerClassName="rounded-xl border border-border"
+          containerClassName="rounded-xl border border-border bg-card"
           tableClassName="min-w-160"
         />
       </FlowCardSection>
