@@ -12,6 +12,22 @@ variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   NAMESPACE: mes
 
+# 애플리케이션 이미지와 배포 결과에 영향을 주는 파일을 한곳에서 관리한다.
+.frontend-change-rules:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes: &frontend-changes
+        - src/**/*
+        - public/**/*
+        - index.html
+        - package.json
+        - package-lock.json
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - deploy/**/*
+
 pipeline-ok:
   stage: check
   # 비코드(docs 등) 푸시의 placeholder. GitLab.com 공유러너(월 400분 그룹 쿼터)를 쓰지 않도록
@@ -23,25 +39,14 @@ pipeline-ok:
     - echo "no relevant changes"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
+      changes: *frontend-changes
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ------------------------------------------------------------------------------
 # W2-7 — Helm 차트 검증 (helm lint + helm template 오프라인 렌더, 2026.07.13~07.17)
 # ------------------------------------------------------------------------------
-# ui-front 자체 helm 차트(./helm)가 lint + 렌더되는지 클러스터 없이 검증한다.
+# ui-front 자체 Helm 차트가 lint + 렌더되는지 클러스터 없이 검증한다.
 # kubectl:1.32.2 이미지에 helm 이 포함된다. 본 주는 "검증 잡 정의"까지 —
 # deploy 단계 차단 needs 배선(scan/helm-validate 실패 시 deploy 차단)은 W3 에서 한다.
 helm-validate:
@@ -51,13 +56,13 @@ helm-validate:
   image: harbor.nori.local/library/kubectl:1.32.2
   script:
     - echo "== helm lint =="
-    - helm lint ./helm -f ./helm/values.yaml
+    - helm lint ./deploy/helm/tc-ui-front -f ./deploy/helm/tc-ui-front/values.yaml
     - echo "== helm template (dry render) =="
-    - helm template tc-ui-front ./helm -f ./helm/values.yaml > /dev/null
+    - helm template tc-ui-front ./deploy/helm/tc-ui-front -f ./deploy/helm/tc-ui-front/values.yaml > /dev/null
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - helm/**/*
+        - deploy/helm/**/*
 
 # ------------------------------------------------------------------------------
 # W3-1 — 단위 테스트 게이트 (2026.07.13~07.17)
@@ -65,6 +70,7 @@ helm-validate:
 # package(빌드) 전에 프론트 단위 테스트(node --test)를 돌려 회귀를 차단한다.
 # e2e(Playwright)는 브라우저가 필요해 self-hosted 러너에서 미실행(로컬/검증 트랙 유지) — 본 잡은 test:unit 만.
 test:
+  extends: .frontend-change-rules
   stage: check
   tags:
     - norilab
@@ -72,22 +78,9 @@ test:
   script:
     - npm install
     - npm run test:unit
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
 
 package:
+  extends: .frontend-change-rules
   stage: package
   # W3-2 게이트: test 실패 시 package 차단 → build/scan/deploy 까지 연쇄 차단.
   needs: ["test"]
@@ -101,22 +94,9 @@ package:
     paths:
       - dist/
     expire_in: 1h
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
 
 build:
+  extends: .frontend-change-rules
   stage: build
   needs: ["package"]
   tags:
@@ -129,23 +109,9 @@ build:
   script:
     - /kaniko/executor
       --context $CI_PROJECT_DIR
-      --dockerfile $CI_PROJECT_DIR/Dockerfile
+      --dockerfile $CI_PROJECT_DIR/deploy/docker/Dockerfile-ci
       --destination $IMAGE_NAME:$IMAGE_TAG
       --destination $IMAGE_NAME:latest
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
 
 # ------------------------------------------------------------------------------
 # W1-4b — Trivy 이미지 취약점 스캔 (명령·임계 정의, 2026.07.13~07.17)
@@ -154,6 +120,7 @@ build:
 # OWASP High(CVSS>=7.0) 차단 임계와 정합. W3-2 자동 게이트: when:manual + allow_failure:true 제거 →
 # 자동 실행 + 차단(allow_failure 기본 false). deploy 는 needs:["scan-image"] 로 scan 통과를 강제한다.
 scan-image:
+  extends: .frontend-change-rules
   stage: scan
   needs: ["build"]
   tags:
@@ -175,20 +142,6 @@ scan-image:
     - cp "$HARBOR_CA_CERT" /tmp/extra-certs/nori-local-ca.crt
   script:
     - trivy image --severity "$TRIVY_SEVERITY" --exit-code "$TRIVY_EXIT_CODE" --ignore-unfixed --no-progress "$IMAGE_NAME:$IMAGE_TAG"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
 
 # W3-2 게이트: deploy 는 scan-image 통과 후에만 가능(needs) + prod 배포는 수동 승인(when:manual).
 deploy:
@@ -198,24 +151,13 @@ deploy:
     - norilab
   image: harbor.nori.local/library/kubectl:1.32.2
   script:
-    - helm upgrade --install $NAMESPACE-tc-ui-front ./helm
+    - helm upgrade --install $NAMESPACE-tc-ui-front ./deploy/helm/tc-ui-front
       --namespace $NAMESPACE
       --set app.imageTag=$IMAGE_TAG
-      -f ./helm/values.yaml
+      -f ./deploy/helm/tc-ui-front/values.yaml
       --wait
       --timeout 300s
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - src/**/*
-        - public/**/*
-        - index.html
-        - package.json
-        - vite.config.ts
-        - tsconfig.json
-        - tsconfig.app.json
-        - tsconfig.node.json
-        - Dockerfile
-        - nginx.conf
-        - helm/**/*
+      changes: *frontend-changes
       when: manual
