@@ -20,6 +20,7 @@ import { useCreateSimulatorRun } from '../hooks/useCreateSimulatorRun'
 import { isTerminalRunState } from '../hooks/useSimulatorRun'
 import { useSimulatorRunList } from '../hooks/useSimulatorRunList'
 import { useSimulatorRunScenarios } from '../hooks/useSimulatorRunScenarios'
+import { useStopSimulatorRun } from '../hooks/useStopSimulatorRun'
 import { useStopSimulatorTarget } from '../hooks/useStopSimulatorTarget'
 import { buildRunHistoryGroups } from '../lib/live-map-demo-run-history'
 import {
@@ -115,6 +116,8 @@ export function LiveMapDemoModal({
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([...DEFAULT_EXPANDED_NODE_IDS])
   // 종료 진행 중인 설비 — 전역 mutation pending 대신 per-eqpId 추적으로 해당 행만 비활성한다(H3).
   const [stoppingEqpIds, setStoppingEqpIds] = useState<Set<string>>(new Set())
+  // run 전체 종료 진행 중 — 카드별 버튼을 pending 동안 비활성한다(설비별 stoppingEqpIds 와 동일 패턴).
+  const [stoppingRunIds, setStoppingRunIds] = useState<Set<string>>(new Set())
   // '시뮬레이션 진행 현황' run 그룹 접기/펴기 — 기본 접힘(헤더만). 정보량이 많아 헤더 클릭 시에만 설비 상세를 편다.
   const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set())
   // 시작 실패(409 등)는 작은 배지로는 잘 안 보여 모달 팝업으로 강조한다.
@@ -143,6 +146,7 @@ export function LiveMapDemoModal({
   const isRefreshing = isScenarioFetching || isRunFetching
   const createRunMutation = useCreateSimulatorRun()
   const stopTargetMutation = useStopSimulatorTarget()
+  const stopRunMutation = useStopSimulatorRun()
   // 목록 → 최신순 run 그룹(과거·실행중 모두, 재부착 포함). 데이터 출처는 서버 목록이라 로컬 activeRunId 불요.
   const runGroups = useMemo(() => buildRunHistoryGroups(runList), [runList])
 
@@ -238,9 +242,11 @@ export function LiveMapDemoModal({
     setStartError(null)
     setExpandedNodeIds([...DEFAULT_EXPANDED_NODE_IDS])
     setStoppingEqpIds(new Set())
+    setStoppingRunIds(new Set())
     setExpandedRunIds(new Set())
     createRunMutation.reset()
     stopTargetMutation.reset()
+    stopRunMutation.reset()
     onClose()
   }
 
@@ -353,6 +359,24 @@ export function LiveMapDemoModal({
       setStoppingEqpIds((prev) => {
         const next = new Set(prev)
         next.delete(eqpId)
+        return next
+      })
+    }
+  }
+
+  // run 카드의 '전체 종료' — 해당 run 의 모든 설비를 한 번에 stop(orchestrator stopRun). 설비별 종료(handleStopTarget)의 run 단위 대응.
+  const handleStopRun = async (runId: string) => {
+    setStartMessage(null)
+    setStoppingRunIds((prev) => new Set(prev).add(runId))
+    try {
+      await stopRunMutation.mutateAsync(runId)
+      setStartMessage(t('livemap.demo.stopRunAllRequested', { runId }))
+    } catch (error) {
+      setStartMessage(error instanceof Error ? error.message : t('livemap.demo.stopFailed'))
+    } finally {
+      setStoppingRunIds((prev) => {
+        const next = new Set(prev)
+        next.delete(runId)
         return next
       })
     }
@@ -865,13 +889,14 @@ export function LiveMapDemoModal({
                     const isRunExpanded = expandedRunIds.has(group.runId)
                     return (
                     <div key={group.runId} className="rounded-[18px] border border-border">
+                      <div
+                        className={`flex items-center ${isRunExpanded ? 'border-b border-border' : ''}`}
+                      >
                       <button
                         type="button"
                         onClick={() => handleToggleRunGroup(group.runId)}
                         aria-expanded={isRunExpanded}
-                        className={`flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/40 ${
-                          isRunExpanded ? 'border-b border-border' : ''
-                        }`}
+                        className="flex flex-1 flex-wrap items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/40"
                       >
                         <ChevronRight
                           className={`size-4 shrink-0 text-muted-foreground transition-transform ${
@@ -889,6 +914,19 @@ export function LiveMapDemoModal({
                           {group.completedCount}/{group.totalCount}
                         </Badge>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleStopRun(group.runId)
+                        }}
+                        disabled={isTerminalRunState(group.state) || stoppingRunIds.has(group.runId)}
+                        className="mr-3 inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={t('livemap.demo.stopRunAll', { runId: group.runId })}
+                      >
+                        <CircleStop className="size-4" />
+                        {t('livemap.demo.stopRunAllLabel')}
+                      </button>
+                      </div>
                       {isRunExpanded ? (
                       <SelectableTable<SimulatorRunTarget>
                         columns={buildRunTargetColumns(resolveConnectionTypeLabel(group.mode))}
