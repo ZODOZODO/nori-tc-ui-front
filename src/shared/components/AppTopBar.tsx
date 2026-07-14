@@ -3,6 +3,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
 import { useI18n } from '@/i18n/i18n-context'
 import { LanguageToggle } from '@/i18n/LanguageToggle'
 import { authApi } from '@/features/auth/api/auth.api'
@@ -143,7 +144,7 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   return (
     <header className="fixed inset-x-0 top-0 z-40 grid h-13.25 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
       <div className="flex items-center">
-        <img src="/nori-tc-logo.png" alt="Nori-TC" className="h-10 w-auto" />
+        <img src={noriTcLogoUrl} alt="Nori-TC" className="h-10 w-auto" />
       </div>
 
       <div className="flex min-w-0 items-center justify-center overflow-hidden">
