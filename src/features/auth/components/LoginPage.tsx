@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Eye, EyeOff, LogIn, Lock, Loader2, User } from 'lucide-react'
+import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
 import { useI18n } from '@/i18n/i18n-context'
 import { LanguageToggle } from '@/i18n/LanguageToggle'
 import { useLogin } from '../hooks/useLogin'
@@ -11,9 +12,9 @@ interface RecoveryModalProps {
   onClose: () => void
 }
 
-/** nori tc 브랜드 로고. public/nori-tc-logo.png (사용자 제공 원본). */
+/** nori tc 브랜드 로고. Vite 자산 해시를 적용해 배포 시 캐시를 안전하게 갱신한다. */
 function BrandMark() {
-  return <img src="/nori-tc-logo.png" alt="nori-tc" className="h-16 w-auto" />
+  return <img src={noriTcLogoUrl} alt="nori-tc" className="h-16 w-auto" />
 }
 
 /** 아이디 / 비밀번호 찾기 모달. 현재 API 스펙 미제공이라 닫기 동작만 제공합니다. */
