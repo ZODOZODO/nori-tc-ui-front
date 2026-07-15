@@ -104,20 +104,24 @@ export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardPro
             const portVariant = LIVE_MAP_PORT_STATUS_CLASS[portItem.status]
             return (
               <li key={portItem.id} className="flex items-center gap-2 text-[12px]">
-                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                <span className="min-w-0 basis-1/4 truncate font-medium text-foreground">
                   {portItem.label}
                 </span>
-                {portItem.carrierId && (
-                  <span className="min-w-0 truncate font-medium text-muted-foreground">
-                    {portItem.carrierId}
-                  </span>
-                )}
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold ${portVariant.text}`}
+                  className={`inline-flex min-w-0 basis-1/4 items-center gap-1.5 text-[11px] font-bold ${portVariant.text}`}
                 >
-                  <span className={`size-1.5 rounded-full ${portVariant.dot}`} />
-                  {portItem.statusLabel}
+                  <span className={`size-1.5 shrink-0 rounded-full ${portVariant.dot}`} />
+                  <span className="truncate">{portItem.statusLabel}</span>
                 </span>
+                <div className="flex min-w-0 basis-1/2 justify-end">
+                  {portItem.carrierId ? (
+                    <span className="inline-flex max-w-full items-center truncate rounded-md border border-border bg-background px-2 py-0.5 font-mono text-[11px] font-bold text-foreground">
+                      {portItem.carrierId}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
               </li>
             )
           })}
