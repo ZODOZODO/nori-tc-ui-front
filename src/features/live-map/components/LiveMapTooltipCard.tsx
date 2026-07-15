@@ -107,6 +107,11 @@ export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardPro
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                   {portItem.label}
                 </span>
+                {portItem.carrierId && (
+                  <span className="min-w-0 truncate font-medium text-muted-foreground">
+                    {portItem.carrierId}
+                  </span>
+                )}
                 <span
                   className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold ${portVariant.text}`}
                 >

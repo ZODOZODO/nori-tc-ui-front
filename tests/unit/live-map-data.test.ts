@@ -48,3 +48,16 @@ test('clusterId 는 API 값을 그대로 유지한다(고정 공정 카탈로그
   assert.equal(equipmentNodes[0]?.clusterId, 'custom')
   assert.equal(equipmentNodes[0]?.clusterName, 'CUSTOM')
 })
+
+test('port carrierId 값을 null 포함 그대로 매핑한다', () => {
+  const response = equipmentResponse({ eqpId: 'EQP-01', clusterId: 'cvd', clusterName: 'CVD' })
+  response.portItems = [
+    { id: 'LP1', label: '1', carrierId: 'CAR-01', status: 'RUN', statusLabel: 'RUN' },
+    { id: 'LP2', label: '2', carrierId: null, status: 'IDLE', statusLabel: 'IDLE' },
+  ]
+
+  const equipmentNodes = buildLiveMapEquipmentNodes([response])
+
+  assert.equal(equipmentNodes[0]?.portItems[0]?.carrierId, 'CAR-01')
+  assert.equal(equipmentNodes[0]?.portItems[1]?.carrierId, null)
+})

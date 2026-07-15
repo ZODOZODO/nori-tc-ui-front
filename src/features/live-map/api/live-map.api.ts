@@ -6,6 +6,7 @@ import { apiClient } from '@/shared/lib/api-client'
 export interface LiveMapPortResponse {
   id: string
   label: string
+  carrierId: string | null
   status: 'RUN' | 'IDLE' | 'DOWN'
   statusLabel: string
 }

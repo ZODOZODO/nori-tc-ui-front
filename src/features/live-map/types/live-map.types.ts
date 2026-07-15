@@ -34,6 +34,7 @@ export interface LiveMapEquipmentNode {
 export interface LiveMapEquipmentPortItem {
   id: string
   label: string
+  carrierId: string | null
   status: LiveMapPortStatus
   statusLabel: string
 }

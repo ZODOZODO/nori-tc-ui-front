@@ -29,6 +29,7 @@ export const buildLiveMapEquipmentNodes = (
       portItems: equipment.portItems.map((portItem) => ({
         id: portItem.id,
         label: portItem.label,
+        carrierId: portItem.carrierId,
         status: portItem.status,
         statusLabel: portItem.statusLabel,
       })),

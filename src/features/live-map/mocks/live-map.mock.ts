@@ -17,6 +17,7 @@ const createPortItems = (
   statuses.map((status, index) => ({
     id: `port-${index + 1}`,
     label: `PORT ${index + 1}`,
+    carrierId: null,
     status,
     statusLabel:
       status === 'RUN' ? 'RUN' : status === 'IDLE' ? 'IDLE' : 'DOWN',
