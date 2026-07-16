@@ -722,6 +722,48 @@ export const eqpApi = {
   },
 
   /**
+   * 설비 reconnect(EQP_RECONNECT)를 요청하고 polling traceId를 반환합니다.
+   *
+   * stuck(desired_state=STARTED + control=OFFLINE) 인 ACTIVE 설비 복구용. EQP_START 는 desired!=ENDED 를
+   * 거부하므로 이미 STARTED 인 stuck 설비의 재연결은 이 엔드포인트(EQP_RECONNECT)로 라우팅한다.
+   */
+  reconnectEqp: async (eqpId: string, request: EqpLifecycleRequest): Promise<string> => {
+    try {
+      const response = await withCsrfHeaders((csrfToken) =>
+        apiClient.post<AsyncAcceptResponse>(`/eqp/${encodeURIComponent(eqpId)}/reconnect`, request, {
+          withCredentials: true,
+          headers: {
+            [CSRF_HEADER_NAME]: csrfToken,
+          },
+          validateStatus: (status) => status >= 200 && status < 600,
+        }),
+      )
+
+      const payload = resolveSuccessPayload<{ traceId: string }>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.endRequest'),
+      )
+
+      if (!payload.traceId) {
+        throw new EqpApiError(
+          createEqpFailResponse({
+            success: false,
+            data: null,
+            errorCode: 'INVALID_RESPONSE',
+            errorMsg: i18n.t('error.eqp.endNoTraceId'),
+          }),
+          response.status,
+        )
+      }
+
+      return payload.traceId
+    } catch (error) {
+      throw normalizeEqpError(error, i18n.t('error.eqp.endRequest'))
+    }
+  },
+
+  /**
    * PLC 폴링 그룹 시작 명령(EQP_PLC_GROUP_START)을 요청하고 polling traceId를 반환합니다.
    * 백엔드는 PathVariable(eqpId/groupMessageName)만 받고 body가 없으므로 빈 body로 POST합니다.
    */

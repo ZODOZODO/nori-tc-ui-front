@@ -65,6 +65,13 @@ export function useEqpMutations() {
     },
   })
 
+  const reconnectEqpMutation = useMutation({
+    mutationFn: ({ eqpId, request }: LifecycleVariables) => eqpApi.reconnectEqp(eqpId, request),
+    onSuccess: async () => {
+      await invalidateEqpMutationQueries(queryClient)
+    },
+  })
+
   const startPollingGroupMutation = useMutation({
     mutationFn: ({ eqpId, groupMessageName }: PollingGroupVariables) =>
       eqpApi.startPollingGroup(eqpId, groupMessageName),
@@ -81,6 +88,7 @@ export function useEqpMutations() {
     deleteEqpMutation,
     startEqpMutation,
     endEqpMutation,
+    reconnectEqpMutation,
     startPollingGroupMutation,
     endPollingGroupMutation,
   }

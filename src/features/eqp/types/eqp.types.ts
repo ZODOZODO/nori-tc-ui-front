@@ -56,6 +56,11 @@ export interface EqpRuntimeState {
   controlState: string | null
   eqpState: string | null
   connectionState: string | null
+  /**
+   * 연결 의도(STARTED/ENDED, null=미확정). controlState 와 함께 관측해
+   * stuck(STARTED+끊김)을 정상-ended(ENDED+끊김)와 구분한다.
+   */
+  desiredState: string | null
 }
 
 // =========================================================================

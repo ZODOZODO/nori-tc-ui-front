@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n/i18n-context'
 
-type EqpLifecycleAction = 'start' | 'end' | 'restart'
+type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
 
 interface EqpLifecycleResultDialogProps {
   open: boolean
@@ -26,6 +26,7 @@ const ACTION_RESULT_TITLE_KEYS: Record<EqpLifecycleAction, { success: string; fa
   start: { success: 'eqp.lifecycle.startSuccess', failure: 'eqp.lifecycle.startFailure' },
   end: { success: 'eqp.lifecycle.endSuccess', failure: 'eqp.lifecycle.endFailure' },
   restart: { success: 'eqp.lifecycle.restartSuccess', failure: 'eqp.lifecycle.restartFailure' },
+  reconnect: { success: 'eqp.lifecycle.reconnectSuccess', failure: 'eqp.lifecycle.reconnectFailure' },
 }
 
 /** action × status → 결과 메시지 i18n 키. eqpId 는 보간으로 주입한다. */
@@ -33,6 +34,7 @@ const ACTION_RESULT_MESSAGE_KEYS: Record<EqpLifecycleAction, { success: string; 
   start: { success: 'eqp.lifecycle.resultStartSuccess', failure: 'eqp.lifecycle.resultStartFailure' },
   end: { success: 'eqp.lifecycle.resultEndSuccess', failure: 'eqp.lifecycle.resultEndFailure' },
   restart: { success: 'eqp.lifecycle.resultRestartSuccess', failure: 'eqp.lifecycle.resultRestartFailure' },
+  reconnect: { success: 'eqp.lifecycle.resultReconnectSuccess', failure: 'eqp.lifecycle.resultReconnectFailure' },
 }
 
 export function EqpLifecycleResultDialog({

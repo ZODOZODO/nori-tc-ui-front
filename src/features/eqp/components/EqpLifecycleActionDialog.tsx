@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n/i18n-context'
 
-type EqpLifecycleAction = 'start' | 'end' | 'restart'
+type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
 
 interface EqpLifecycleActionDialogProps {
   open: boolean
@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<EqpLifecycleAction, string> = {
   start: 'Eqp Start',
   end: 'Eqp End',
   restart: 'Eqp Restart',
+  reconnect: 'Eqp Reconnect',
 }
 
 // action → 동사 i18n 키. 확인 문구는 eqpId 유무에 따라 두 키로 분기한다.
@@ -33,6 +34,7 @@ const ACTION_VERB_KEYS: Record<EqpLifecycleAction, string> = {
   start: 'eqp.lifecycle.verbStart',
   end: 'eqp.lifecycle.verbEnd',
   restart: 'eqp.lifecycle.verbRestart',
+  reconnect: 'eqp.lifecycle.verbReconnect',
 }
 
 export function EqpLifecycleActionDialog({
