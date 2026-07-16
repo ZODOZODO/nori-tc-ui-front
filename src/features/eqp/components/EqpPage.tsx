@@ -81,7 +81,7 @@ interface EqpDeleteResultDialogState {
   message: string | null
 }
 
-type EqpLifecycleAction = 'start' | 'end' | 'restart'
+type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
 
 interface EqpLifecycleDialogState {
   open: boolean
@@ -386,6 +386,7 @@ export function EqpPage() {
     deleteEqpMutation,
     startEqpMutation,
     endEqpMutation,
+    reconnectEqpMutation,
     startPollingGroupMutation,
     endPollingGroupMutation,
   } = useEqpMutations()
@@ -926,13 +927,20 @@ export function EqpPage() {
         return
       }
 
+      if (action === 'reconnect') {
+        // stuck(desired=STARTED + control=OFFLINE) 복구 — END+START 가 아니라 EQP_RECONNECT 단일 명령.
+        const traceId = await reconnectEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
+        await waitForEqpAsyncCompletion(traceId, t('eqp.page.startTimeout'))
+        return
+      }
+
       const endTraceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
       await waitForEqpAsyncCompletion(endTraceId, t('eqp.page.endTimeout'))
 
       const startTraceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
       await waitForEqpAsyncCompletion(startTraceId, t('eqp.page.startTimeout'))
     },
-    [endEqpMutation, startEqpMutation, waitForEqpAsyncCompletion, t],
+    [endEqpMutation, startEqpMutation, reconnectEqpMutation, waitForEqpAsyncCompletion, t],
   )
 
   const handleConfirmLifecycleAction = useCallback(async () => {
@@ -972,7 +980,8 @@ export function EqpPage() {
     }
   }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog, t])
 
-  const isLifecyclePending = startEqpMutation.isPending || endEqpMutation.isPending
+  const isLifecyclePending =
+    startEqpMutation.isPending || endEqpMutation.isPending || reconnectEqpMutation.isPending
 
   const isPollingGroupPending =
     startPollingGroupMutation.isPending || endPollingGroupMutation.isPending

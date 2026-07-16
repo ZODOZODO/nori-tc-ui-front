@@ -30,7 +30,7 @@ import {
 
 const EQP_INFO_COLUMN_COUNT = 12
 
-type EqpLifecycleAction = 'start' | 'end' | 'restart'
+type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
 
 interface EqpInfoTableProps {
   eqp: EqpInfo | null
@@ -162,11 +162,12 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   const { t } = useI18n()
   const lifecycleCommandVisibility = eqp
     ? resolveLifecycleCommandVisibility(eqp, runtimeState)
-    : { canStart: false, canEnd: false, canRestart: false }
+    : { canStart: false, canEnd: false, canRestart: false, canReconnect: false }
   const hasLifecycleCommand =
     lifecycleCommandVisibility.canStart
     || lifecycleCommandVisibility.canEnd
     || lifecycleCommandVisibility.canRestart
+    || lifecycleCommandVisibility.canReconnect
 
   const tableRows = useMemo<EqpInfoRow[]>(
     () => (eqp ? [{ eqp, modelInfo, runtimeState }] : []),
@@ -253,6 +254,14 @@ export const EqpInfoTable = memo(function EqpInfoTable({
                           onSelect={() => onLifecycleAction?.(eqp, 'restart')}
                         >
                           Eqp Restart
+                        </ContextMenuItem>
+                      ) : null}
+                      {lifecycleCommandVisibility.canReconnect ? (
+                        <ContextMenuItem
+                          disabled={isLifecyclePending}
+                          onSelect={() => onLifecycleAction?.(eqp, 'reconnect')}
+                        >
+                          Eqp Reconnect
                         </ContextMenuItem>
                       ) : null}
                     </>

@@ -37,6 +37,21 @@ registerHooks({
         }
       }
     }
+    // 확장자 없는 상대 경로(`../types/eqp.types`)도 해석한다. Vite/tsc 는 확장자 생략을 허용하지만
+    // node 기본 resolver 는 못 찾으므로, 값 import 를 쓰는 모듈(예: api)을 단위 테스트가 로드하면 깨진다.
+    if (
+      (specifier.startsWith('./') || specifier.startsWith('../')) &&
+      !/\.(ts|tsx|js|jsx|mjs|cjs|json)$/.test(specifier) &&
+      context.parentURL
+    ) {
+      const base = resolvePath(fileURLToPath(context.parentURL), '..', specifier)
+      const candidates = [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          return { url: pathToFileURL(candidate).href, shortCircuit: true }
+        }
+      }
+    }
     return nextResolve(specifier, context)
   },
 })
