@@ -184,6 +184,12 @@ find tests/e2e  -type f -name "*.ts*" | wc -l   # 59
 `LiveMapToolbar` 는 `live-map-layout-builder-phase1-plan.md:264` 가 "lineOptions prop 보유하나 현재 미연결 — 통합 필요" 로
 **미연결 상태를 이미 인지**하고 있다 → 제거 vs 통합은 사용자 결정 사항.
 
+**[검증 보정] (S10 세션 완결성 게이트, 2026-07-27)** — 위 §1.2 ④ 의 "나머지 히트는 `.claude/specs/*.md` 문서 서술" 은
+**ui-front 레포 밖 문서 1건을 누락**했다. 게이트가 `c:\workspace_nori` 전 레포 Grep 을 재실행해 확인한 추가 히트:
+`c:\workspace_nori\nori-tc-exec\docs\Architecture\ui\front\10-live-map-dashboard-and-demo-control.md:15` 이
+`LiveMapToolbar` 를 구성요소로 서술한다. **코드 참조가 아니므로 dead 판정(확신도 HIGH)은 그대로 유효**하며,
+제거 시 동시 정정이 필요한 문서 목록에 이 exec 아키텍처 문서를 추가한다.
+
 **심각도** P3 · **난이도** S · **다운스트림** 없음(ui-front 내부. 단 제거 시 위 SPEC 문서 정정 동반)
 
 ### 1.3 A-2 / R1 / R / **P3** — 미사용 의존성 `recharts`
