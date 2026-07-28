@@ -31,9 +31,9 @@ variables:
 pipeline-ok:
   stage: check
   # 비코드(docs 등) 푸시의 placeholder. GitLab.com 공유러너(월 400분 그룹 쿼터)를 쓰지 않도록
-  # 자체호스팅 norilab 러너에서 실행한다(ci_quota_exceeded 회피). package 잡과 동일 러너/이미지.
+  # 자체호스팅 nori-msa 러너에서 실행한다(ci_quota_exceeded 회피). package 잡과 동일 러너/이미지.
   tags:
-    - norilab
+    - nori-msa
   image: node:22-alpine
   script:
     - echo "no relevant changes"
@@ -52,7 +52,7 @@ pipeline-ok:
 helm-validate:
   stage: check
   tags:
-    - norilab
+    - nori-msa
   image: harbor.nori.local/library/kubectl:1.32.2
   script:
     - echo "== helm lint =="
@@ -73,7 +73,7 @@ test:
   extends: .frontend-change-rules
   stage: check
   tags:
-    - norilab
+    - nori-msa
   image: node:22-alpine
   script:
     - npm install
@@ -85,7 +85,7 @@ package:
   # W3-2 게이트: test 실패 시 package 차단 → build/scan/deploy 까지 연쇄 차단.
   needs: ["test"]
   tags:
-    - norilab
+    - nori-msa
   image: node:22-alpine
   script:
     - npm install
@@ -100,7 +100,7 @@ build:
   stage: build
   needs: ["package"]
   tags:
-    - norilab
+    - nori-msa
   image:
     name: harbor.nori.local/library/kaniko:debug
     entrypoint: [""]
@@ -124,7 +124,7 @@ scan-image:
   stage: scan
   needs: ["build"]
   tags:
-    - norilab
+    - nori-msa
   image:
     name: harbor.nori.local/library/trivy:latest
     entrypoint: [""]
@@ -148,7 +148,7 @@ deploy:
   stage: deploy
   needs: ["scan-image"]
   tags:
-    - norilab
+    - nori-msa
   image: harbor.nori.local/library/kubectl:1.32.2
   script:
     - helm upgrade --install $NAMESPACE-tc-ui-front ./deploy/helm/tc-ui-front
