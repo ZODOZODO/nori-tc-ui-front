@@ -12,6 +12,7 @@ import type { LiveMapEquipmentResponse as LiveMapEquipment } from '../api/live-m
 import { useCreateObject, useLayout, useLayoutObjects, useSaveLayout } from '../hooks/useLayout'
 import { useLiveMap } from '../hooks/useLiveMap'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
+import { createSelectionEdgesGeometry, SELECTION_BOX_INFLATE } from '../lib/selection-box-geometry'
 import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
 import {
   buildDefaultStructureLayout,
@@ -160,16 +161,27 @@ function SelectionBox({
   center: readonly [number, number, number]
   size: readonly [number, number, number]
 }) {
-  // 살짝 부풀려(+0.2) 객체 표면에 딱 붙지 않고 또렷이 감싸게 한다. WebGL 선은 두께가 1px 고정이라 외곽선만으론
-  // 옅어, 반투명 채움(시안 글로우 볼륨)을 같이 둬 어느 줌/각도에서도 선택이 확실히 보이게 한다.
+  // 살짝 부풀려(SELECTION_BOX_INFLATE) 객체 표면에 딱 붙지 않고 또렷이 감싸게 한다. WebGL 선은 두께가 1px
+  // 고정이라 외곽선만으론 옅어, 반투명 채움(시안 글로우 볼륨)을 같이 둬 어느 줌/각도에서도 선택이 확실히 보이게 한다.
+  // 의존성은 `size` 배열이 아니라 치수 3개다 — 구조물 호출부가 매 렌더 새 배열 리터럴을 넘기므로
+  // 배열 identity 에 의존하면 memo 가 매 렌더 무효화돼 geometry 가 프레임마다 새로 쌓인다(S09 D-4).
+  const [sizeX, sizeY, sizeZ] = size
   const edges = useMemo(
-    () => new THREE.EdgesGeometry(new THREE.BoxGeometry(size[0] + 0.2, size[1] + 0.2, size[2] + 0.2)),
-    [size],
+    () => createSelectionEdgesGeometry([sizeX, sizeY, sizeZ]),
+    [sizeX, sizeY, sizeZ],
   )
+  // r3f 는 prop 주입 geometry 를 자동 해제하지 않는다 → 치수 변경·언마운트 시 직접 해제.
+  useEffect(() => () => edges.dispose(), [edges])
   return (
     <group position={[center[0], center[1], center[2]]}>
       <mesh>
-        <boxGeometry args={[size[0] + 0.2, size[1] + 0.2, size[2] + 0.2]} />
+        <boxGeometry
+          args={[
+            size[0] + SELECTION_BOX_INFLATE,
+            size[1] + SELECTION_BOX_INFLATE,
+            size[2] + SELECTION_BOX_INFLATE,
+          ]}
+        />
         {/* 반투명 채움 — depthWrite=false 라 객체를 가리지 않고 시안으로 감싼다. */}
         <meshBasicMaterial color="#22d3ee" transparent opacity={0.18} depthWrite={false} />
       </mesh>
