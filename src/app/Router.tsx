@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useI18n } from '@/i18n/i18n-context'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
+import { RequireAuth } from './RequireAuth'
 
 const LoginPage = lazy(async () => {
   const module = await import('@/features/auth/components/LoginPage')
@@ -67,13 +68,56 @@ export function Router() {
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* /login 은 가드 밖 — 안에 넣으면 미인증 시 리다이렉트 루프가 된다. */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/eqp" element={<EqpPage />} />
-          <Route path="/eqp/live-map" element={<LiveMapPage />} />
-          <Route path="/model" element={<ModelPage />} />
-          <Route path="/deploy" element={<DeployPage />} />
-          <Route path="/dlq" element={<DlqPage />} />
-          <Route path="/user" element={<UserManagementPage />} />
+          <Route
+            path="/eqp"
+            element={
+              <RequireAuth>
+                <EqpPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/eqp/live-map"
+            element={
+              <RequireAuth>
+                <LiveMapPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/model"
+            element={
+              <RequireAuth>
+                <ModelPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/deploy"
+            element={
+              <RequireAuth>
+                <DeployPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dlq"
+            element={
+              <RequireAuth>
+                <DlqPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/user"
+            element={
+              <RequireAuth>
+                <UserManagementPage />
+              </RequireAuth>
+            }
+          />
           {import.meta.env.DEV ? (
             <Route path="/__fixtures/selectable-table" element={<SelectableTableFixture />} />
           ) : null}

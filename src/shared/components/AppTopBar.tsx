@@ -7,6 +7,7 @@ import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
 import { useI18n } from '@/i18n/i18n-context'
 import { LanguageToggle } from '@/i18n/LanguageToggle'
 import { authApi } from '@/features/auth/api/auth.api'
+import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { dlqApi } from '@/features/dlq/api/dlq.api'
 import { eqpApi } from '@/features/eqp/api/eqp.api'
 import { eqpQueryKeys } from '@/features/eqp/lib/eqp-query-keys'
@@ -21,6 +22,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { LineScopeSelector } from './LineScopeSelector'
 import type { AppTopNavigationKey } from '../lib/app-navigation'
 import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
+import { clearPersistedQueryCache } from '../lib/query-persistence'
 import { clearCsrfCookie } from '../lib/session'
 
 interface AppTopBarProps {
@@ -136,6 +138,10 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
     } finally {
       await onAfterLogout?.()
       queryClient.clear()
+      // clear() 는 인메모리만 비운다 — localStorage 사본과 sessionStorage 는 별개로 지워야
+      // 공유 PC 에서 다음 사용자가 이전 사용자의 업무 데이터를 복원해 보지 않는다(S09 E-1 / E-3).
+      clearPersistedQueryCache()
+      clearDeployUiSessionState()
       clearCsrfCookie()
       navigate(LOGIN_ROUTE, { replace: true })
     }

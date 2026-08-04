@@ -3,6 +3,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { I18nProvider } from '@/i18n/I18nProvider'
+import { isPersistableQueryHead, QUERY_CACHE_STORAGE_KEY } from '@/shared/lib/query-persistence'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,34 +19,16 @@ const queryClient = new QueryClient({
 
 const persister = createSyncStoragePersister({
   storage: window.localStorage,
-  key: 'nori-tc-ui-cache',
+  key: QUERY_CACHE_STORAGE_KEY,
 })
 
-// 보안 민감 / polling / 동적 filter 의존 query 는 dehydrate 제외.
-// - auth: 로그인 사용자 권한 코드 — 권한 변경 즉시 반영을 위해 매번 fresh.
-// - user / group: 다른 사용자/그룹 정보 — 공유 PC 에서 localStorage 노출 차단.
-// - live-map / live-map-layout / live-map-objects: 재방문·저작 직후 항상 최신을 봐야 하므로 persist 제외.
-//   (특히 layout 은 PUT 직후 setQueryData 가 persist flush 되기 전 새로고침되면 stale 빈 캐시가 복원돼 영속이 깨진다.)
-// - deploy: 전부 동적 filter (history) / polling (targets/summary) 라 cache hit 가능성 낮음.
-const PERSIST_DENY_QUERY_HEADS = new Set([
-  'auth',
-  'user',
-  'group',
-  'live-map',
-  'live-map-layout',
-  'live-map-objects',
-  'deploy',
-])
-
+// 영속 대상은 allow-list 다(`PERSISTED_QUERY_HEADS`) — 목록에 없는 head 는 전부 제외.
+// 종전 deny-list 는 기본값이 "영속" 이라 eqp/model/dlq 업무 데이터가 localStorage 에 남았다(S09 E-1).
 const shouldDehydrateQuery = (query: Query): boolean => {
   if (!defaultShouldDehydrateQuery(query)) {
     return false
   }
-  const head = query.queryKey[0]
-  if (typeof head !== 'string') {
-    return false
-  }
-  return !PERSIST_DENY_QUERY_HEADS.has(head)
+  return isPersistableQueryHead(query.queryKey[0])
 }
 
 interface AppProviderProps {
