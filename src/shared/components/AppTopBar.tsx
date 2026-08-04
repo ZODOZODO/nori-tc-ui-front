@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
 import { useI18n } from '@/i18n/i18n-context'

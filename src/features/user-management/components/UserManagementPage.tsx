@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { GroupAdminPanel } from '@/features/group/components/GroupAdminPanel'
 import { useMe } from '@/features/profile/hooks/useProfile'

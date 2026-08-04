@@ -44,7 +44,7 @@ export default defineConfig({
           if (/[\\/]node_modules[\\/](konva|react-konva|react-reconciler)[\\/]/.test(id)) return 'konva-vendor'
           if (/[\\/]node_modules[\\/](three|three-stdlib)[\\/]/.test(id)) return 'three-vendor'
           if (/[\\/]node_modules[\\/]@react-three[\\/]/.test(id)) return 'three-vendor'
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom)[\\/]/.test(id)) return 'react-vendor'
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router)[\\/]/.test(id)) return 'react-vendor'
           if (/[\\/]node_modules[\\/]@tanstack[\\/]/.test(id)) return 'query-vendor'
           if (/[\\/]node_modules[\\/](react-hook-form|@hookform[\\/]resolvers|zod)[\\/]/.test(id)) return 'form-vendor'
           if (/[\\/]node_modules[\\/]zustand[\\/]/.test(id)) return 'state-vendor'

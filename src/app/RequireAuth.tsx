@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useI18n } from '@/i18n/i18n-context'
 

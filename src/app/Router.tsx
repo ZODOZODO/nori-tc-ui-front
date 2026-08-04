@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { useI18n } from '@/i18n/i18n-context'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import { RequireAuth } from './RequireAuth'
