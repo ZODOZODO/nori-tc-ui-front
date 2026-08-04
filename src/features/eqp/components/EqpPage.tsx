@@ -4,6 +4,7 @@ import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import { AppPageShell } from '@/shared/components/AppPageShell'
+import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
@@ -379,6 +380,9 @@ export function EqpPage() {
   // 체크아웃 중복 요청(더블 클릭) 방지용 로컬 가드
   const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false)
   const isCheckoutSubmittingRef = useRef(false)
+  // 202 + 폴링으로 완결되는 명령의 in-flight 가드 — 폴링 구간까지 재진입을 막는다.
+  const lifecycleGuard = useAsyncCommandGuard()
+  const pollingGroupGuard = useAsyncCommandGuard()
 
   const {
     createEqpMutation,
@@ -952,54 +956,69 @@ export function EqpPage() {
       return
     }
 
-    try {
-      setLifecycleErrorMessage(null)
-      await executeLifecycleAction(targetEqp, action)
-      closeLifecycleDialog()
-      setLifecycleResultDialog({
-        open: true,
-        status: 'success',
-        action,
-        eqpId: targetEqp.eqpId,
-        message: null,
-      })
-    } catch (error) {
-      const resolvedMessage =
-        error instanceof Error && error.message
-          ? error.message
-          : resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
+    await lifecycleGuard.run(async () => {
+      try {
+        setLifecycleErrorMessage(null)
+        await executeLifecycleAction(targetEqp, action)
+        closeLifecycleDialog()
+        setLifecycleResultDialog({
+          open: true,
+          status: 'success',
+          action,
+          eqpId: targetEqp.eqpId,
+          message: null,
+        })
+      } catch (error) {
+        const resolvedMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
 
-      closeLifecycleDialog()
-      setLifecycleResultDialog({
-        open: true,
-        status: 'failure',
-        action,
-        eqpId: targetEqp.eqpId,
-        message: resolvedMessage,
-      })
-    }
-  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog, t])
+        closeLifecycleDialog()
+        setLifecycleResultDialog({
+          open: true,
+          status: 'failure',
+          action,
+          eqpId: targetEqp.eqpId,
+          message: resolvedMessage,
+        })
+      }
+    })
+  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog, lifecycleGuard, t])
 
+  // 두 flag 는 mutateAsync(202) settle 뒤 최장 60초 폴링 구간까지 덮어야 한다 — guard 없이
+  // mutation.isPending 만 보면 그 구간에 버튼이 되살아나 명령이 중복 발행된다(S09 D-1 / D-2).
   const isLifecyclePending =
-    startEqpMutation.isPending || endEqpMutation.isPending || reconnectEqpMutation.isPending
+    lifecycleGuard.isRunning ||
+    startEqpMutation.isPending ||
+    endEqpMutation.isPending ||
+    reconnectEqpMutation.isPending
 
   const isPollingGroupPending =
-    startPollingGroupMutation.isPending || endPollingGroupMutation.isPending
+    pollingGroupGuard.isRunning ||
+    startPollingGroupMutation.isPending ||
+    endPollingGroupMutation.isPending
 
   const handleStartPollingGroup = useCallback(
-    async (eqpId: string, groupMessageName: string) => {
-      const traceId = await startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
-      await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupStartTimeout'))
+    async (eqpId: string, groupMessageName: string): Promise<boolean> => {
+      const result = await pollingGroupGuard.run(async () => {
+        const traceId = await startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
+        await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupStartTimeout'))
+      })
+      return result.dispatched
     },
-    [startPollingGroupMutation, waitForEqpAsyncCompletion, t],
+    [pollingGroupGuard, startPollingGroupMutation, waitForEqpAsyncCompletion, t],
   )
 
   const handleEndPollingGroup = useCallback(
-    async (eqpId: string, groupMessageName: string) => {
-      const traceId = await endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
-      await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupEndTimeout'))
+    async (eqpId: string, groupMessageName: string): Promise<boolean> => {
+      const result = await pollingGroupGuard.run(async () => {
+        const traceId = await endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
+        await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupEndTimeout'))
+      })
+      return result.dispatched
     },
-    [endPollingGroupMutation, waitForEqpAsyncCompletion, t],
+    [pollingGroupGuard, endPollingGroupMutation, waitForEqpAsyncCompletion, t],
   )
 
   /**

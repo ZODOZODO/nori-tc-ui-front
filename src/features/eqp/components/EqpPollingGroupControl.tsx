@@ -7,8 +7,9 @@ import { useI18n } from '@/i18n/i18n-context'
 interface EqpPollingGroupControlProps {
   eqpId: string
   isPending: boolean
-  onStartGroup: (eqpId: string, groupMessageName: string) => Promise<void>
-  onEndGroup: (eqpId: string, groupMessageName: string) => Promise<void>
+  /** 명령을 실제 발행했으면 true. 선행 명령이 폴링 중이면 false(미발행) — 결과 메시지를 내지 않는다. */
+  onStartGroup: (eqpId: string, groupMessageName: string) => Promise<boolean>
+  onEndGroup: (eqpId: string, groupMessageName: string) => Promise<boolean>
 }
 
 type PollingGroupResult =
@@ -43,7 +44,10 @@ export function EqpPollingGroupControl({
     setResult(null)
     try {
       if (action === 'start') {
-        await onStartGroup(eqpId, trimmedGroupMessageName)
+        const dispatched = await onStartGroup(eqpId, trimmedGroupMessageName)
+        if (!dispatched) {
+          return
+        }
         setResult({
           kind: 'success',
           message: t('eqp.pollingGroup.startSuccess', { group: trimmedGroupMessageName }),
@@ -51,7 +55,10 @@ export function EqpPollingGroupControl({
         return
       }
 
-      await onEndGroup(eqpId, trimmedGroupMessageName)
+      const dispatched = await onEndGroup(eqpId, trimmedGroupMessageName)
+      if (!dispatched) {
+        return
+      }
       setResult({
         kind: 'success',
         message: t('eqp.pollingGroup.endSuccess', { group: trimmedGroupMessageName }),
