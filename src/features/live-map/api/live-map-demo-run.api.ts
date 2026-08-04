@@ -2,13 +2,11 @@ import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import type { LiveMapDemoTestType } from '../types/live-map.types'
 
 // simulator orchestrator Run 경로(R-1) API. 응답 형상은 run 1개 + targets[](progress%/stage 없음).
-// CSRF/에러 헬퍼는 이 모듈에 자체 보유한다.
-
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+// 에러 헬퍼는 이 모듈에 자체 보유하고, CSRF 는 공통 `@/shared/lib/csrf` 를 쓴다.
 
 export interface SimulatorRunScenarioItem {
   scenarioId: string
@@ -48,27 +46,10 @@ export interface SimulatorRunCreateRequest {
 
 const defaultErrorMessage = () => i18n.t('error.livemap.demoDefault')
 
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const targetCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!targetCookie) {
-    return null
-  }
-
-  return decodeURIComponent(targetCookie.substring(encodedName.length))
-}
-
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', { withCredentials: true })
+  await requestCsrfCookie()
 
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  const csrfToken = readCsrfCookieToken()
   if (!csrfToken) {
     throw new Error(i18n.t('error.livemap.csrf'))
   }

@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import {
   createEqpFailResponse,
   defaultEqpErrorMessage,
@@ -40,40 +41,16 @@ import {
   isRecord,
 } from '../types/eqp.types'
 
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
-
-/**
- * document.cookie에서 특정 쿠키 값을 추출합니다.
- */
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const matchedCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!matchedCookie) {
-    return null
-  }
-
-  return decodeURIComponent(matchedCookie.substring(encodedName.length))
-}
 
 /**
  * 상태 변경 요청 이전에 CSRF 토큰을 발급하고 헤더 값을 반환합니다.
  */
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', {
-    withCredentials: true,
-  })
+  await requestCsrfCookie()
 
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  const csrfToken = readCsrfCookieToken()
   if (!csrfToken) {
     throw new EqpApiError(
       createEqpFailResponse({

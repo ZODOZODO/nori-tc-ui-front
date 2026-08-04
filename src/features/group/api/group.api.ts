@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import {
   createGroupFailResponse,
   defaultGroupErrorMessage,
@@ -28,33 +29,14 @@ import {
   type PermissionPageResponse,
 } from '../types/group.types'
 
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const groupListFallbackMessage = () => i18n.t('error.group.list')
 const groupMemberListFallbackMessage = () => i18n.t('error.group.memberList')
 
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const matchedCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!matchedCookie) {
-    return null
-  }
-
-  return decodeURIComponent(matchedCookie.substring(encodedName.length))
-}
-
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', { withCredentials: true })
+  await requestCsrfCookie()
 
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  const csrfToken = readCsrfCookieToken()
   if (!csrfToken) {
     throw new GroupApiError(
       createGroupFailResponse({

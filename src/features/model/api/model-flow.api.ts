@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import {
   createModelFailResponse,
   defaultModelErrorMessage,
@@ -17,8 +18,6 @@ import {
   isApiResponse,
 } from '../types/model.types'
 
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const flowListFallbackMessage = (): string => i18n.t('error.model.flowList')
 const flowDetailFallbackMessage = (): string => i18n.t('error.model.flowDetail')
@@ -27,32 +26,11 @@ const flowUpdateFallbackMessage = (): string => i18n.t('error.model.flowUpdate')
 const flowDeleteFallbackMessage = (): string => i18n.t('error.model.flowDelete')
 
 /**
- * document.cookie 에서 특정 쿠키 값을 추출합니다.
- * model.api.ts 의 동일 헬퍼와 같은 구현이지만, 모듈 경계 분리를 위해 로컬 복제합니다.
- */
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const matchedCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!matchedCookie) {
-    return null
-  }
-
-  return decodeURIComponent(matchedCookie.substring(encodedName.length))
-}
-
-/**
  * 상태 변경 요청 전에 CSRF 토큰을 발급합니다.
  */
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', { withCredentials: true })
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  await requestCsrfCookie()
+  const csrfToken = readCsrfCookieToken()
   if (!csrfToken) {
     throw new ModelApiError(
       createModelFailResponse({

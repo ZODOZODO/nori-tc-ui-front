@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import type {
   DeployCreateRequest,
   DeployCreateResult,
@@ -37,8 +38,6 @@ const fallbackRedeployError = () => i18n.t('error.deploy.redeploy')
 const fallbackDeleteError = () => i18n.t('error.deploy.delete')
 const fallbackScenarioError = () => i18n.t('error.deploy.scenarios')
 const fallbackScenarioPreviewError = () => i18n.t('error.deploy.scenarioPreview')
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 
 type DeployFailResponse = ApiResponse<null> & {
   success: false
@@ -107,23 +106,6 @@ const isDeployExecutionPolicy = (
     value as (typeof DEPLOY_EXECUTION_POLICY_VALUES)[number],
   )
 
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const targetCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!targetCookie) {
-    return null
-  }
-
-  return decodeURIComponent(targetCookie.substring(encodedName.length))
-}
-
 const createDeployFailResponse = (
   payload: unknown,
   fallbackMessage = fallbackRegisterTargetsError(),
@@ -152,11 +134,9 @@ const createDeployFailResponse = (
 }
 
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', {
-    withCredentials: true,
-  })
+  await requestCsrfCookie()
 
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  const csrfToken = readCsrfCookieToken()
   if (!csrfToken) {
     throw new DeployApiError(
       createDeployFailResponse(

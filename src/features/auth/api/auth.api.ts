@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import {
   AuthApiError,
   defaultAuthErrorMessage,
@@ -12,8 +13,6 @@ import {
   type LoginSuccessResponse,
 } from '../types/auth.types'
 
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const defaultLogoutErrorMessage = () => i18n.t('error.auth.logout')
 const loginCsrfForbiddenMessage = () => i18n.t('error.auth.loginCsrfBlocked')
@@ -23,26 +22,6 @@ const logoutForbiddenMessage = () => i18n.t('error.auth.logoutCsrfFailed')
 
 type AuthErrorContext = 'login-csrf' | 'login-submit' | 'logout-csrf' | 'logout-submit'
 type CsrfRequestPurpose = 'login' | 'logout'
-
-/**
- * document.cookie에서 쿠키 값을 읽어 옵니다.
- */
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-
-  const encodedName = `${encodeURIComponent(name)}=`
-  const targetCookie = document.cookie
-    .split('; ')
-    .find((cookieEntry) => cookieEntry.startsWith(encodedName))
-
-  if (!targetCookie) {
-    return null
-  }
-
-  return decodeURIComponent(targetCookie.substring(encodedName.length))
-}
 
 /**
  * 403 Forbidden 응답을 요청 문맥별 사용자 안내 메시지로 변환합니다.
@@ -103,9 +82,7 @@ const createContextualAuthFailResponse = (
  */
 const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
   try {
-    await apiClient.get('/auth/csrf', {
-      withCredentials: true,
-    })
+    await requestCsrfCookie()
   } catch (error) {
     const fallbackMessage =
       purpose === 'login' ? defaultAuthErrorMessage() : defaultLogoutErrorMessage()
@@ -113,7 +90,7 @@ const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
     throw normalizeAuthError(error, fallbackMessage, errorContext)
   }
 
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
+  const csrfToken = readCsrfCookieToken()
 
   if (!csrfToken) {
     throw new AuthApiError(

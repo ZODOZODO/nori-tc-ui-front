@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
+import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
 import type {
   CanvasJson,
   LiveMapObjectKind,
@@ -52,21 +53,9 @@ const failMessage = 'live-map layout request failed'
 
 // CSRF — 백엔드(Spring Security)는 쓰기 요청에 X-XSRF-TOKEN 헤더를 요구한다(Double Submit Cookie).
 // 다른 feature API(user/deploy/eqp/model…)와 동일하게 GET /auth/csrf 선호출 → 쿠키 토큰을 헤더로 수동 부착.
-const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
-const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
-
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined' || !document.cookie) {
-    return null
-  }
-  const encodedName = `${encodeURIComponent(name)}=`
-  const matched = document.cookie.split('; ').find((entry) => entry.startsWith(encodedName))
-  return matched ? decodeURIComponent(matched.substring(encodedName.length)) : null
-}
-
 const issueCsrfToken = async (): Promise<string> => {
-  await apiClient.get('/auth/csrf', { withCredentials: true })
-  const token = getCookieValue(CSRF_COOKIE_NAME)
+  await requestCsrfCookie()
+  const token = readCsrfCookieToken()
   if (!token) {
     throw new Error('CSRF token missing')
   }
