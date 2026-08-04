@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { AppProvider } from '@/app/providers/AppProvider'
 import App from '@/app/App'
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import { i18nReady } from '@/i18n'
 // 모듈 import 만으로 저장된 테마(.dark)를 첫 페인트 전에 적용한다.
 import '@/shared/stores/theme.store'
@@ -13,11 +14,14 @@ import '@/index.css'
 void i18nReady.then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <BrowserRouter>
-        <AppProvider>
-          <App />
-        </AppProvider>
-      </BrowserRouter>
+      {/* provider(Query persist / I18nProvider) 자체의 throw 까지 잡으려면 경계가 그 위에 있어야 한다. */}
+      <ErrorBoundary scope="root">
+        <BrowserRouter>
+          <AppProvider>
+            <App />
+          </AppProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </StrictMode>,
   )
 })

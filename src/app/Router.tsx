@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useI18n } from '@/i18n/i18n-context'
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 
 const LoginPage = lazy(async () => {
   const module = await import('@/features/auth/components/LoginPage')
@@ -59,25 +60,29 @@ function RouteLoadingFallback() {
 }
 
 export function Router() {
+  const location = useLocation()
   return (
-    <Suspense fallback={<RouteLoadingFallback />}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/eqp" element={<EqpPage />} />
-        <Route path="/eqp/live-map" element={<LiveMapPage />} />
-        <Route path="/model" element={<ModelPage />} />
-        <Route path="/deploy" element={<DeployPage />} />
-        <Route path="/dlq" element={<DlqPage />} />
-        <Route path="/user" element={<UserManagementPage />} />
-        {import.meta.env.DEV ? (
-          <Route path="/__fixtures/selectable-table" element={<SelectableTableFixture />} />
-        ) : null}
-        {import.meta.env.DEV ? (
-          <Route path="/__fixtures/layout-shell" element={<LayoutShellFixture />} />
-        ) : null}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Suspense>
+    // 라우트가 바뀌면 경계를 초기화한다 — 한 화면의 청크 404 가 다른 화면까지 계속 막지 않게.
+    <ErrorBoundary key={location.pathname} scope="route">
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/eqp" element={<EqpPage />} />
+          <Route path="/eqp/live-map" element={<LiveMapPage />} />
+          <Route path="/model" element={<ModelPage />} />
+          <Route path="/deploy" element={<DeployPage />} />
+          <Route path="/dlq" element={<DlqPage />} />
+          <Route path="/user" element={<UserManagementPage />} />
+          {import.meta.env.DEV ? (
+            <Route path="/__fixtures/selectable-table" element={<SelectableTableFixture />} />
+          ) : null}
+          {import.meta.env.DEV ? (
+            <Route path="/__fixtures/layout-shell" element={<LayoutShellFixture />} />
+          ) : null}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   )
 }

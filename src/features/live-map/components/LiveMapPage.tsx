@@ -6,6 +6,7 @@ import { UserProfileModal } from '@/features/profile/components/UserProfileModal
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppPageShell } from '@/shared/components/AppPageShell'
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import {
   hasPermission,
   LIVE_MAP_LAYOUT_READ_PERMISSION,
@@ -314,15 +315,18 @@ export function LiveMapPage() {
               <LiveMapObjectEditor />
             </Suspense>
           ) : isScene3dMode ? (
-            <Suspense
-              fallback={
-                <div className="rounded-[18px] border border-border bg-card px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
-                  {t('livemap.loading')}
-                </div>
-              }
-            >
-              <LiveMap3DScene lineKey={lineKey} />
-            </Suspense>
+            // WebGL context 생성 실패·three 청크 404 가 페이지 전체를 언마운트하지 않게 캔버스를 격리한다.
+            <ErrorBoundary scope="live-map-3d">
+              <Suspense
+                fallback={
+                  <div className="rounded-[18px] border border-border bg-card px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
+                    {t('livemap.loading')}
+                  </div>
+                }
+              >
+                <LiveMap3DScene lineKey={lineKey} />
+              </Suspense>
+            </ErrorBoundary>
           ) : (
             <LiveMapBoard
               backgroundLayer={<LiveMapStructureLayer lineKey={lineKey} />}
