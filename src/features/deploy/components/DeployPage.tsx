@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo } from 'react'
+import { Navigate } from 'react-router-dom'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
+import { useMe } from '@/features/profile/hooks/useProfile'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
+import { DEPLOY_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { DeployHistoryPanel } from './DeployHistoryPanel'
 import { DeployMonitorPanel } from './DeployMonitorPanel'
@@ -9,6 +12,8 @@ import { DeployRegisterPanel } from './DeployRegisterPanel'
 import { DeploySidebar } from './DeploySidebar'
 import { clearDeployUiSessionState, useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployMode } from '../types/deploy.types'
+
+const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 const renderPanel = (mode: DeployMode) => {
   switch (mode) {
@@ -22,6 +27,7 @@ const renderPanel = (mode: DeployMode) => {
 }
 
 export function DeployPage() {
+  const meQuery = useMe(true)
   const mode = useDeployUiStore((state) => state.mode)
   const isProfileModalOpen = useDeployUiStore((state) => state.isProfileModalOpen)
   const setMode = useDeployUiStore((state) => state.setMode)
@@ -48,6 +54,11 @@ export function DeployPage() {
       clearDeployUiSessionState()
     }
   }, [])
+
+  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
+  if (!hasPermission(meQuery.data?.permissionCodes, DEPLOY_READ_PERMISSION)) {
+    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
+  }
 
   return (
     <AppPageShell

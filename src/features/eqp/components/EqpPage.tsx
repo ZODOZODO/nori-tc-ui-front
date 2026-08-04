@@ -1,10 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
+import { EQP_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
@@ -120,6 +122,7 @@ const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
 const EQP_ASYNC_POLL_INTERVAL_MS = 1000
 const EQP_ASYNC_MAX_ATTEMPTS = 60
 const PASSIVE_LIFECYCLE_UNSUPPORTED_KEY = 'eqp.lifecycle.passiveUnsupported'
+const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -314,7 +317,8 @@ export function EqpPage() {
 
   // selection에서 현재 선택된 eqpId 파생 (eqp 타입일 때만 유효)
   const selectedEqpId = selection.type === 'eqp' ? selection.eqpId : null
-  const meQuery = useMe(Boolean(selectedEqpId))
+  // 권한 게이팅이 항상 판정해야 하므로 상시 활성 — RequireAuth 와 같은 query key 라 요청은 dedup 된다.
+  const meQuery = useMe(true)
   const currentUserId = meQuery.data?.userId ?? null
 
   const eqpListQuery = useEqpList()
@@ -1354,6 +1358,12 @@ export function EqpPage() {
   const selectedGroupIndex = selection.type === 'gateway_group' ? selection.groupIndex : null
   const selectedBusinessGroupIndex = selection.type === 'business_group' ? selection.groupIndex : null
   const isGatewaySelected = selection.type === 'gateway_all'
+
+  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
+  if (!hasPermission(meQuery.data?.permissionCodes, EQP_READ_PERMISSION)) {
+    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
+  }
+
   return (
     <AppPageShell
       currentMenu="eqp"

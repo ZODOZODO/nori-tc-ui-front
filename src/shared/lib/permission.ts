@@ -10,6 +10,24 @@ export const DASH_READ_PERMISSION = 'LIVE_MAP_READ'
 export const USER_READ_PERMISSION = 'USER_READ'
 
 /**
+ * 설비(Eqp) 페이지 조회 권한 코드입니다.
+ * exec 시드는 PREFIX `/api/eqp` + `http_method='GET'`, ADMIN/DEVELOPER/OPERATOR 전 그룹 grant.
+ */
+export const EQP_READ_PERMISSION = 'EQP_READ'
+
+/**
+ * Model 페이지 조회 권한 코드입니다.
+ * exec 시드는 PREFIX `/api/model` + `http_method='GET'`, ADMIN/DEVELOPER/OPERATOR 전 그룹 grant.
+ */
+export const MODEL_READ_PERMISSION = 'MODEL_READ'
+
+/**
+ * Deploy 페이지 조회 권한 코드입니다.
+ * exec 시드는 PREFIX `/api/deploys` + `http_method='GET'`, ADMIN/DEVELOPER/OPERATOR 전 그룹 grant.
+ */
+export const DEPLOY_READ_PERMISSION = 'DEPLOY_READ'
+
+/**
  * DLQ / Quarantine / Repair Task 모니터링 페이지 조회 권한 코드입니다.
  * DB seed 의 PREFIX `/api/dlq` 매칭이 신규 endpoint 도 자동 커버.
  */

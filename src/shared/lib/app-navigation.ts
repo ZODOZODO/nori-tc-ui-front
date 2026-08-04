@@ -1,7 +1,10 @@
 import {
   DASH_READ_PERMISSION,
+  DEPLOY_READ_PERMISSION,
   DLQ_READ_PERMISSION,
+  EQP_READ_PERMISSION,
   hasPermission,
+  MODEL_READ_PERMISSION,
   USER_READ_PERMISSION,
 } from './permission'
 
@@ -16,9 +19,9 @@ export interface AppTopNavigationItem {
 
 export const APP_TOP_NAVIGATION_ITEMS: readonly AppTopNavigationItem[] = [
   { key: 'dash', label: 'Dash', route: '/eqp/live-map', requiredPermission: DASH_READ_PERMISSION },
-  { key: 'eqp', label: 'Eqp', route: '/eqp' },
-  { key: 'model', label: 'Model', route: '/model' },
-  { key: 'deploy', label: 'Deploy', route: '/deploy' },
+  { key: 'eqp', label: 'Eqp', route: '/eqp', requiredPermission: EQP_READ_PERMISSION },
+  { key: 'model', label: 'Model', route: '/model', requiredPermission: MODEL_READ_PERMISSION },
+  { key: 'deploy', label: 'Deploy', route: '/deploy', requiredPermission: DEPLOY_READ_PERMISSION },
   { key: 'dlq', label: 'Dlq', route: '/dlq', requiredPermission: DLQ_READ_PERMISSION },
   { key: 'user', label: 'User', route: '/user', requiredPermission: USER_READ_PERMISSION },
 ] as const

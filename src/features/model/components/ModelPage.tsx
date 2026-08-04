@@ -1,10 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
+import { hasPermission, MODEL_READ_PERMISSION } from '@/shared/lib/permission'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { useI18n } from '@/i18n/i18n-context'
 import { useModelDetail } from '../hooks/useModelDetail'
@@ -49,6 +51,7 @@ const ModelDetailPanel = lazy(() =>
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
 const PANEL_MAX_PERCENT = 85
+const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 /**
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
@@ -1273,6 +1276,11 @@ export function ModelPage() {
     : null
 
   const isVersionFrame = activeTab !== null && openedTabs.length > 0
+
+  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
+  if (!hasPermission(meQuery.data?.permissionCodes, MODEL_READ_PERMISSION)) {
+    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
+  }
 
   return (
     <AppPageShell
