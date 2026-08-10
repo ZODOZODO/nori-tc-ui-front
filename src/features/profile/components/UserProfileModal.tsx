@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Loader2, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,32 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
   const resetPasswordMutation = useResetPassword()
 
   const isBusy = updateUserMutation.isPending || resetPasswordMutation.isPending
+
+  /**
+   * 모달 열린 상태에서 ESC 로 닫기.
+   *
+   * 이 모달은 Dialog 프리미티브를 쓰지 않고 `role="dialog"` 를 직접 달아서 Radix 가 기본으로 주는
+   * ESC 닫기가 없다. 그대로 두면 나머지 오버레이 36 건과 달리 이 하나만 키보드로 빠져나갈 수 없다.
+   * `LoginPage` 의 RecoveryModal 도 같은 수기 구현이고 같은 방식으로 처리한다.
+   *
+   * 저장/비밀번호 변경 중에는 닫지 않는다 — 진행 중인 요청을 화면만 먼저 사라지게 만들지 않는다.
+   */
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isBusy) {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscapeKey)
+    return () => {
+      window.removeEventListener('keydown', handleEscapeKey)
+    }
+  }, [open, isBusy, onClose])
 
   /**
    * 서버 원본 데이터 + 사용자가 수정 중인 draft 값을 합쳐 현재 폼 값을 만듭니다.
