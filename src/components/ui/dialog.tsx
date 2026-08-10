@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
+import { useBodyPointerEventsRepair } from '@/shared/hooks/useBodyPointerEventsRepair'
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -44,6 +45,7 @@ function DialogContent({
   showCloseButton?: boolean
 }) {
   const { t } = useI18n()
+  useBodyPointerEventsRepair()
   return (
     <DialogPortal>
       <DialogOverlay />

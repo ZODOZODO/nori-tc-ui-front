@@ -4,6 +4,7 @@ import { AlertDialog as AlertDialogPrimitive } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
+import { useBodyPointerEventsRepair } from '@/shared/hooks/useBodyPointerEventsRepair'
 
 function ConfirmDialogRoot({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="confirm-dialog" {...props} />
@@ -39,6 +40,7 @@ function ConfirmDialogContent({
   className,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+  useBodyPointerEventsRepair()
   return (
     <ConfirmDialogPortal>
       <ConfirmDialogOverlay />
