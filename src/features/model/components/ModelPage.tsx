@@ -216,6 +216,16 @@ export function ModelPage() {
     targetModel: null,
   })
   const [rootModalErrorMessage, setRootModalErrorMessage] = useState<string | null>(null)
+  /**
+   * 모달을 열 때마다 1 씩 오르는 회차 번호. 폼 초기화용 React key 의 재료다.
+   *
+   * 왜 `open` 이 아니라 이것인가 — key 에 `open` 을 넣으면 **닫는 순간에도** key 가 바뀌어
+   * React 가 Dialog 서브트리를 통째로 교체한다. 그러면 Radix 가 열 때 `document.body` 에 건
+   * `pointer-events: none` 을 되돌리지 못하고, 그 뒤 페이지 전체가 클릭을 받지 못한다
+   * (2026-08-10 실측 — 모달을 닫으면 사이드바가 먹통). 여는 순간에만 올리면 폼 초기화는
+   * 그대로 유지되면서 닫을 때의 교체가 사라진다.
+   */
+  const [modalOpenSeq, setModalOpenSeq] = useState(0)
   const [branchCreateTargetModel, setBranchCreateTargetModel] = useState<ModelInfo | null>(null)
   const [isBranchCreateModalOpen, setIsBranchCreateModalOpen] = useState(false)
   const [branchCreateErrorMessage, setBranchCreateErrorMessage] = useState<string | null>(null)
@@ -780,6 +790,7 @@ export function ModelPage() {
    */
   const handleOpenRootCreate = (interfaceType: ProtocolType) => {
     setRootModalErrorMessage(null)
+    setModalOpenSeq((previousSeq) => previousSeq + 1)
     setRootModalState({
       open: true,
       mode: 'create',
@@ -790,6 +801,7 @@ export function ModelPage() {
 
   const handleOpenRootUpdate = (model: ModelInfo) => {
     setRootModalErrorMessage(null)
+    setModalOpenSeq((previousSeq) => previousSeq + 1)
     setRootModalState({
       open: true,
       mode: 'update',
@@ -849,6 +861,7 @@ export function ModelPage() {
   const handleOpenBranchCreate = (model: ModelInfo) => {
     setBranchCreateTargetModel(model)
     setBranchCreateErrorMessage(null)
+    setModalOpenSeq((previousSeq) => previousSeq + 1)
     setIsBranchCreateModalOpen(true)
   }
 
@@ -906,6 +919,7 @@ export function ModelPage() {
     setParentCommitTargetModel(model)
     setParentCommitPreviewResult(null)
     setParentCommitErrorMessage(null)
+    setModalOpenSeq((previousSeq) => previousSeq + 1)
     setIsParentCommitModalOpen(true)
     void loadParentCommitPreview(model.modelKey)
   }
@@ -1438,7 +1452,7 @@ export function ModelPage() {
       />
 
       <ModelCreateOrUpdateModal
-        key={`${rootModalState.mode}-${rootModalState.interfaceType}-${rootModalState.targetModel?.modelKey ?? 'new'}-${rootModalState.open ? 'open' : 'closed'}`}
+        key={`${rootModalState.mode}-${rootModalState.interfaceType}-${rootModalState.targetModel?.modelKey ?? 'new'}-${modalOpenSeq}`}
         open={rootModalState.open}
         mode={rootModalState.mode}
         interfaceType={rootModalState.interfaceType}
@@ -1454,7 +1468,7 @@ export function ModelPage() {
       />
 
       <BranchModelCreateModal
-        key={`branch-create-${branchCreateTargetModel?.modelKey ?? 'none'}-${isBranchCreateModalOpen ? 'open' : 'closed'}`}
+        key={`branch-create-${branchCreateTargetModel?.modelKey ?? 'none'}-${modalOpenSeq}`}
         open={isBranchCreateModalOpen}
         parentModel={branchCreateTargetModel}
         sourceVersions={branchCreateSourceVersions}
@@ -1467,7 +1481,7 @@ export function ModelPage() {
       />
 
       <ParentModelCommitModal
-        key={`parent-commit-${parentCommitTargetModel?.modelKey ?? 'none'}-${isParentCommitModalOpen ? 'open' : 'closed'}`}
+        key={`parent-commit-${parentCommitTargetModel?.modelKey ?? 'none'}-${modalOpenSeq}`}
         open={isParentCommitModalOpen}
         branchModel={parentCommitTargetModel}
         parentVersions={parentCommitParentVersions}
