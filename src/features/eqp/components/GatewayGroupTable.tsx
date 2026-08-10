@@ -28,6 +28,7 @@ import { useI18n } from '@/i18n/i18n-context'
 import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
 import type { EqpInfo, EqpManageDetail } from '../types/eqp.types'
+import { isClientRequestError } from '../utils/eqp-error.util'
 import { resolveBusinessAppName } from '../utils/eqp-group.util'
 import {
   type EquipmentVisualState,
@@ -228,9 +229,14 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
 
   // 그룹 화면은 N대의 설비 상세를 한 번에 보여줘야 합니다.
   // 과거에는 useQueries로 N개 HTTP 호출을 fan-out 했고, 일부가 일시 실패하면 그 행만 '—'로 박혔습니다.
-  // 단일 batch 엔드포인트(GET /eqp/manage?eqpIds=...)로 1회 호출하여 부분 실패 자체를 제거하고,
+  // 단일 batch 엔드포인트(GET /eqp/manage-batch?eqpIds=...)로 1회 호출하여 부분 실패 자체를 제거하고,
   // 호출 전체가 실패하면 지수 백오프로 자동 재시도합니다.
-  const eqpIdList = useMemo(() => sortedEqpItems.map((eqp) => eqp.eqpId), [sortedEqpItems])
+  //
+  // 상세를 요청하는 대상은 화면에 실제로 그리는 현재 페이지뿐입니다. 그룹 전체를 넘기면
+  // 25행을 그리려고 200대 넘는 상세를 끌어오고, 그룹이 백엔드 한도(200건)를 넘는 순간
+  // 요청이 통째로 400 이 되어 표가 비어 버립니다(2026-08-10 실측 22회).
+  // 페이지 크기는 최대 100이라(PagePagination 기본 옵션) 이 방식에서는 한도에 닿지 않습니다.
+  const eqpIdList = useMemo(() => pagedEqpItems.map((eqp) => eqp.eqpId), [pagedEqpItems])
 
   const detailBatchQuery = useQuery({
     queryKey: eqpQueryKeys.manageBatch(eqpIdList),
@@ -238,7 +244,10 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
     enabled: eqpIdList.length > 0,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
-    retry: 3,
+    // 4xx 는 같은 요청을 다시 보내도 같은 답이 옵니다. 재시도는 서버 부하만 4배로 늘리고
+    // 사용자에게는 오류 표시만 늦춥니다. 재시도는 5xx / 네트워크 실패에만 겁니다.
+    retry: (failureCount: number, error: unknown) =>
+      !isClientRequestError(error) && failureCount < 3,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
 
