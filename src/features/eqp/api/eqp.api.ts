@@ -45,6 +45,18 @@ import {
 const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
 
 /**
+ * 설비 생성 / 수정 / 삭제 전용 요청 타임아웃(ms).
+ *
+ * 이 3 개만 gateway + business 양쪽 응답을 서버가 동기로 기다린다
+ * (`EqpController#create|update|delete` 의 `DeferredResult`,
+ * `tc.ui.backend.async.dual-request-timeout-ms` = 10s). 공용 `apiClient` 기본값도 10s 라
+ * 두 타임아웃이 같아서, 서버가 9 초대에 성공(200)해도 브라우저가 먼저 끊는 경합이 생긴다
+ * — 설비는 실제로 만들어졌는데 화면은 실패로 남는다(2026-08-11 실측 9.594s).
+ * 클라이언트 타임아웃은 서버 상한보다 반드시 커야 한다.
+ */
+const EQP_DUAL_COMMAND_TIMEOUT_MS = 20_000
+
+/**
  * 상태 변경 요청 이전에 CSRF 토큰을 발급하고 헤더 값을 반환합니다.
  */
 const issueCsrfToken = async (): Promise<string> => {
@@ -568,6 +580,7 @@ export const eqpApi = {
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
+          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )
@@ -589,6 +602,7 @@ export const eqpApi = {
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
+          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )
@@ -610,6 +624,7 @@ export const eqpApi = {
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
+          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )

@@ -270,7 +270,11 @@ export function ParentModelCommitModal({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!isPreviewLoading && !isCommitPending) {
+        // commit 중에만 막는다. diff preview 는 읽기라서 도중에 닫아도 안전하고(늦게 온 응답은
+        // ModelPage 의 preview modelKey ref 가 걸러낸다), 여기서 preview 까지 막으면 그 사이의
+        // ESC / 닫기가 되돌려주는 것 없이 삼켜진다 — Radix 는 삼킨 의도를 다시 보내지 않으므로
+        // 사용자는 "한 번은 안 먹힌다"를 겪는다(2026-08-11 실측).
+        if (!isCommitPending) {
           onOpenChange(nextOpen)
         }
       }}
@@ -424,7 +428,7 @@ export function ParentModelCommitModal({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isPreviewLoading || isCommitPending}
+              disabled={isCommitPending}
             >
               Cancel
             </Button>
