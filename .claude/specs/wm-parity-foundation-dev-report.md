@@ -352,6 +352,7 @@
 | C8 | `a21d0f9` | ui-front | 7개 — group 4(`GroupAddMembersModal` · `GroupUpsertModal` · `GroupPermissionsModal` · `GroupDeleteConfirmDialog`) · user 3(`UserUpsertModal` · `UserDeleteConfirmDialog` · `UserPasswordResetModal`) | **AC13** + AC1 AC2 AC3 | ✅ 완료 |
 | C9 | `776bdca` | ui-front | 3개 — 신설 `components/ui/control-styles.ts`(wm 무수정) + 수정 `components/ui/input.tsx` · `components/ui/select.tsx` | (AC 없음 — R4 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 | C10 | `08899d3` | ui-front | 3개 — 신설 `components/ui/checkbox.tsx`(Plan §3.6-C 전문) · `components/ui/switch.tsx`(wm 무수정) + 수정 `components/ui/select.tsx`(`SELECT_EMPTY_VALUE`) | (AC 없음 — R5 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
+| C11 | `dea29f9` | ui-front | 4개 — `shared/components/SelectableTable/SelectableTable.tsx` · 신설 `.../sort.ts` · `features/user/components/UserListTable.tsx` · 신설 `tests/unit/selectable-table-sort.test.ts` | **AC12** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -372,6 +373,7 @@
 | C8 | 80 | 15 | 10 | (에러 처리만 변경) |
 | C9 | 80 | 15 | 10 | (프리미티브 시각만 변경) |
 | C10 | 80 | 15 | 10 | (프리미티브 신설만 — 소비는 C13~C16) |
+| C11 | 80 | 15 | 10 | (테이블 로딩/정렬만 변경) |
 
 ---
 
@@ -777,6 +779,40 @@ src/index.css:65 --color-brand-primary / :129 --brand-primary  (신규 토큰 0)
 ```
 → 실패 0. **회귀 0**.
 
+### C11 — AC grep / build / lint / test:unit(신규 2건) / 회귀 e2e
+
+AC12 grep — 둘 다 충족
+```
+$ grep -n "isLoading" src/shared/components/SelectableTable/SelectableTable.tsx
+47:  isLoading?: boolean
+140:  isLoading,
+571:          {isLoading ? (
+$ grep -rn -B8 "isLoading={" src/features --include="*.tsx" | grep -c "<SelectableTable"
+1
+```
+
+`npm run build` / `npm run lint` PASS + `npm run test:unit` **209 → 211**(numeric 정렬 단위 테스트 2건 추가)
+```
+✓ built in 36.13s
+> nori-tc-ui@0.0.0 lint
+> eslint .
+# tests 211
+# pass 211
+# fail 0
+```
+신규 테스트는 `['9','10','2']` 를 `2,9,10` 으로 단언하고, **같은 입력에 대해 옵션 없는 `localeCompare`
+결과와 다름**(`notDeepEqual`)까지 단언한다 — 종전 비교기였다면 깨지는 형태다(RED 조건 내장).
+
+회귀 e2e — Plan 이 지정한 `selectable-table-*` 전체 + `user-page.spec.ts`
+```
+  25 failed
+  16 passed (3.4m)
+```
+→ 25 = §2.3 의 baseline FAIL 합계와 정확히 일치(check-in 2 · deploy-monitor 2 · gateway-group 2 ·
+group-list 3 · model-check-in-diff 2 · model-info 3 · model-parameter 3 · model-workflow 3 ·
+parent-model-commit 2 · user-list 3). 16 = 같은 파일군의 baseline PASS 합계.
+baseline PASS 부분집합만 따로 돌린 결과도 **16 passed / 0 failed**. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -991,3 +1027,19 @@ src/index.css:65 --color-brand-primary / :129 --brand-primary  (신규 토큰 0)
   **C13~C16 에서 배선**되기 전까지 소비처가 없다(글로벌 룰 11 의 미사용 추상화 구간).
 - Plan 이 "C10 과 C13 사이에 세션을 끊지 않는다" 로 봉인했고, 이 세션이 그대로 이어서 진행한다.
   부득이 끊길 경우 다음 세션의 첫 작업은 **C11 이 아니라 C13 까지 완주**하는 것이다.
+
+### C11-결함-1 — `user-row-skeleton` testid 가 사라진다
+
+- `UserListTable` 의 로딩 전용 `<Table>` 을 지우면서 `data-testid="user-row-skeleton"` 도 함께 없어지고,
+  공용 `data-testid="selectable-table-skeleton-row"` 로 바뀐다. Plan 은 이 testid 를 언급하지 않았다.
+- **참조처 0건 확인 후 진행**: `grep -rn "user-row-skeleton" src tests` → 선언 1곳뿐(소비 0).
+  `skeletonRowCount={USER_PAGE_SIZE}` 로 넘겨 **행 수(20)는 종전과 동일**하게 유지했다.
+- 함께 미사용이 된 `USER_TABLE_COLUMN_COUNT` 상수와 import 5개(`Skeleton`/`Table`/`TableBody`/
+  `TableCell`/`TableHead`/`TableHeader`)를 제거했다(내 변경이 만든 미사용 — 글로벌 룰 4).
+
+### C11-결함-2 — 비교기를 별도 모듈로 뽑은 이유
+
+- Plan 은 "`SORT_COLLATOR` 를 export 하거나 별도 모듈로 뽑는다" 로 두 갈래를 열어 뒀다.
+  **별도 모듈(`SelectableTable/sort.ts`)을 택했다** — 단위 테스트 러너가
+  `node --experimental-strip-types` 라 `.tsx`(JSX 포함) 파일은 import 할 수 없기 때문이다.
+- 소비처는 컴포넌트 + 단위 테스트 2곳이라 룰 11 의 조기 추상화에 해당하지 않는다(Plan 명시).
