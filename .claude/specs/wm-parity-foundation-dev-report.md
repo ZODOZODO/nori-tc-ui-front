@@ -354,6 +354,7 @@
 | C10 | `08899d3` | ui-front | 3개 — 신설 `components/ui/checkbox.tsx`(Plan §3.6-C 전문) · `components/ui/switch.tsx`(wm 무수정) + 수정 `components/ui/select.tsx`(`SELECT_EMPTY_VALUE`) | (AC 없음 — R5 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 | C11 | `dea29f9` | ui-front | 4개 — `shared/components/SelectableTable/SelectableTable.tsx` · 신설 `.../sort.ts` · `features/user/components/UserListTable.tsx` · 신설 `tests/unit/selectable-table-sort.test.ts` | **AC12** + AC1 AC2 AC3 | ✅ 완료 |
 | C12 | `2b0e544` | ui-front | 1개 — `features/deploy/components/DeployMonitorPanel.tsx` | **AC15** + AC1 AC2 AC3 | ✅ 완료 |
+| C13 | `5ec69b6` | ui-front | 8개 — `auth/LoginPage` · `eqp/EqpPage` · `eqp/EqpManageFormModal` · `deploy/DeployRegisterPanel` · `group/GroupAddMembersModal` · `group/GroupPermissionsModal` · `group/GroupUpsertModal` · `model/DcopItemPickerModal` (+ git 미추적 e2e 3파일 셀렉터) | AC4 AC5 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 
 ---
 
@@ -376,6 +377,7 @@
 | C10 | 80 | 15 | 10 | (프리미티브 신설만 — 소비는 C13~C16) |
 | C11 | 80 | 15 | 10 | (테이블 로딩/정렬만 변경) |
 | C12 | 80 | 15 | 10 | (확인 흐름만 변경 — raw 요소 무관) |
+| C13 | **71** | **14** | **2** | Plan §5.C13 의 예정 수치(71 / 14 / 2)와 정확히 일치 |
 
 ---
 
@@ -846,6 +848,49 @@ $ grep -rn "window.confirm" src | wc -l
 → 2 FAIL 은 §2.3 의 `selectable-table-deploy-monitor.spec.ts` baseline FAIL 2건과 동일 제목이고,
 baseline PASS 인 `deploy/deploy-monitor-view-modal.spec.ts` 1건은 PASS. **회귀 0**.
 
+### C13 — 폼·모달 계열 raw control 수렴 (`5ec69b6`)
+
+**부분 판정(잔여 수치)**
+```
+$ echo "button=$(grep -rn "<button" src/features --include="*.tsx" | wc -l) select=... checkbox=..."
+button=71 select=14 checkbox=2
+```
+→ Plan §5.C13 의 예정치와 동일. AC4/AC5/AC6 **최종 판정은 C16**.
+
+빌드 / lint / 단위
+```
+✓ built in 16.35s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+# tests 211
+# pass 211
+# fail 0
+```
+
+회귀 e2e — 변경 8파일이 걸리는 spec 9개(login smoke · group-page · modal-visual-sweep-group ·
+modal-visual-sweep-eqp · eqp-line-select · deploy-register-bulk-guard ·
+deploy-register-scenario-modal · overlays-deploy · plc-eqp-form)
+```
+  6 failed
+    [chromium] › eqp-line-select.spec.ts:125:1 › eqp 폼 라인 드롭다운이 GET /api/line 으로 채워지고 선택된다
+    [chromium] › group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › group-page.spec.ts:478:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시
+    [chromium] › plc\plc-eqp-form.spec.ts:126:1 › PLC Eqp Create 진입점 → PLC 폼 오픈 + PLC Settings 섹션 렌더
+    [chromium] › plc\plc-eqp-form.spec.ts:148:1 › PLC 폼 제출 body 에 plcSettings 포함 AND socketSettings/hsmsSettings null
+    [chromium] › verify-ui\overlays-deploy.spec.ts:60:1 › DeployRegisterPanel(결과 다이얼로그) — 변경 없음 분기
+  2 did not run
+  17 passed (1.5m)
+```
+→ FAIL 6건은 §2.3 baseline FAIL 과 **제목까지 동일**(eqp-line-select 1 · group-page 2 ·
+plc-eqp-form 2 · overlays-deploy 1). PASS 17 = 같은 파일군의 baseline PASS 합계
+(1+8+3+2+1+1+1). **회귀 0**.
+
+W12(ToggleField→Switch) 검증 spec 로 Plan 이 지정한 `plc/plc-eqp-form.spec.ts` 는 baseline 부터
+2건 FAIL 이라 판정력이 없어 `modal/modal-visual-sweep-eqp.spec.ts`(baseline PASS 2, EqpManageFormModal
+SECS/Socket create 모달을 실제로 여는 spec)로 대체 판정했다 — 둘 다 PASS.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -1091,3 +1136,32 @@ baseline PASS 인 `deploy/deploy-monitor-view-modal.spec.ts` 1건은 PASS. **회
 - `handleRedeploy` 가 `async` 를 벗으면서 `onSelect={() => void handleRedeploy(...)}`(`:1392`, `:1455`)
   의 `void` 가 무의미해져 함께 제거했다. 내 변경이 만든 잔재라 글로벌 룰 4 의 정리 대상이다.
   `handleConfirmRedeploy` 는 여전히 `async` 라 `onConfirm={() => void handleConfirmRedeploy()}` 로 둔다.
+
+### C13-결함-1 — 규칙 A 가 `justify-*` 를 다루지 않는다
+
+- `DeployRegisterPanel` 의 설비 자동완성 항목(`w-full ... text-left`)은 `<Button>` 의 기본
+  `justify-center` 때문에 글자가 가운데로 몰린다. `text-left` 는 `text-align` 이라 `justify-content`
+  를 이기지 못해 twMerge 로도 해소되지 않는다.
+- **`justify-start` 1개를 className 에 덧붙여 종전 좌측 정렬을 보존**했다(S-19 의 보존적 선택).
+  규칙 A 가 금지한 것은 `scale-*` / `translate-*` 신규 투입이라 저촉되지 않는다.
+
+### C13-결함-2 — LoginPage 취소 버튼이 규칙 A 로는 `default` 가 된다
+
+- `:73` 취소 버튼의 className 은 `border border-border bg-card` 라, 규칙 A 의 우선순위상
+  "`bg-` 배경 클래스 포함"(→ `default`)이 "`border` 포함"(→ `outline`)보다 먼저 걸린다.
+  의미상으로는 outline 버튼이지만 **규칙표를 그대로 적용해 `default`** 로 두었다.
+- 외형은 className 의 `bg-card` / `text-muted-foreground` 가 twMerge 로 이겨 종전과 같다.
+  variant 를 재량으로 고르지 않는 것이 §3.5 의 봉인 취지라 규칙을 우선했다.
+
+### C13-결함-3 — `<Input>` 변환 규칙이 §3.6 에 없다
+
+- §3.6 은 button / select / checkbox 만 규칙화했고 LoginPage 의 인풋 3곳(`:63`, `:185`, `:211`)은
+  "`<Input>` 화" 지시만 있다. **기존 className 을 그대로 넘기는 보존적 형태**로 변환했다 —
+  `Input` 이 얹는 `h-10 px-3` 은 className 의 `h-11` / `h-13` 이 twMerge 로 이겨 높이가 유지된다.
+
+### C13-결함-4 — EqpPage 버전 select 는 e2e 판정 근거가 없다
+
+- Plan §5.C13 이 실측해 둔 대로 이 select 에 의존하는 `selectOption` e2e 가 없다. 따라서 이 1건은
+  빌드 / lint / grep 수치로만 확인했고 회귀 e2e 로는 검증되지 않는다.
+- 대신 상태 불변식을 코드로 확인했다: `appliedVersion` 이 빈 문자열이 되는 경로는
+  `EqpPage.tsx:755-757` 의 `versionOptions.length === 0` 분기뿐이라, 센티널 항목이 항상 존재한다.
