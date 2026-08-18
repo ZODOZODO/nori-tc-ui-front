@@ -4,6 +4,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { I18nProvider } from '@/i18n/I18nProvider'
 import { isPersistableQueryHead, QUERY_CACHE_STORAGE_KEY } from '@/shared/lib/query-persistence'
+import { Toaster } from '@/shared/components/Toaster'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,7 +46,10 @@ export function AppProvider({ children }: AppProviderProps) {
         dehydrateOptions: { shouldDehydrateQuery },
       }}
     >
-      <I18nProvider>{children}</I18nProvider>
+      <I18nProvider>
+        {children}
+        <Toaster />
+      </I18nProvider>
       {/* 개발 환경에서만 쿼리 상태 확인 패널 표시 */}
       <ReactQueryDevtools initialIsOpen={false} />
     </PersistQueryClientProvider>
