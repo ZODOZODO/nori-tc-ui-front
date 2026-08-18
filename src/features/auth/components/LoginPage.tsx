@@ -1,6 +1,9 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Eye, EyeOff, LogIn, Lock, Loader2, User } from 'lucide-react'
 import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
 import { LanguageToggle } from '@/i18n/LanguageToggle'
 import { useLogin } from '../hooks/useLogin'
@@ -60,7 +63,7 @@ function RecoveryModal({ type, onClose }: RecoveryModalProps) {
                 <label htmlFor={field.id} className="text-[13px] font-medium text-muted-foreground">
                   {field.label}
                 </label>
-                <input
+                <Input
                   id={field.id}
                   type={field.type}
                   placeholder={field.label}
@@ -70,20 +73,24 @@ function RecoveryModal({ type, onClose }: RecoveryModalProps) {
             ))}
 
             <div className="mt-1 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="default"
+                size="sm"
                 onClick={onClose}
                 className="rounded-[10px] border border-border bg-card px-4 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {t('login.cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="default"
+                size="sm"
                 onClick={onClose}
                 className="rounded-[10px] bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {t('login.confirm')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -182,7 +189,7 @@ export function LoginPage() {
                 className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground/70"
                 aria-hidden="true"
               />
-              <input
+              <Input
                 id="userId"
                 type="text"
                 autoComplete="username"
@@ -208,7 +215,7 @@ export function LoginPage() {
                 className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground/70"
                 aria-hidden="true"
               />
-              <input
+              <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
@@ -217,14 +224,16 @@ export function LoginPage() {
                 className="h-13 w-full rounded-[10px] border border-border bg-card pl-11 pr-12 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/60 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-primary/15 aria-invalid:border-danger"
                 {...passwordField}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? t('login.pwHide') : t('login.pwShow')}
                 className="absolute right-2 top-1/2 flex size-7.5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {showPassword ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
-              </button>
+              </Button>
             </div>
             {errors.password && (
               <p role="alert" className="mt-1.5 text-xs text-danger">
@@ -235,33 +244,41 @@ export function LoginPage() {
 
           <div className="mb-7 mt-5 flex items-center justify-between">
             <label className="inline-flex cursor-pointer select-none items-center gap-2 text-[13px] text-muted-foreground">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={rememberId}
-                onChange={(event) => setRememberId(event.target.checked)}
-                className="size-4 rounded accent-brand-primary"
+                onCheckedChange={(next) => setRememberId(next === true)}
               />
               <span>{t('login.rememberId')}</span>
             </label>
             <div className="flex items-center gap-2.5">
-              <button type="button" onClick={() => setActiveModal('forgotId')} className={forgotLinkClass}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveModal('forgotId')}
+                className={forgotLinkClass}
+              >
                 {t('login.findId')}
-              </button>
+              </Button>
               <span className="text-xs text-muted-foreground/40" aria-hidden="true">
                 ·
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setActiveModal('forgotPassword')}
                 className={forgotLinkClass}
               >
                 {t('login.findPw')}
-              </button>
+              </Button>
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="default"
+            size="sm"
             disabled={isPending}
             className="flex h-13 w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
           >
@@ -271,7 +288,7 @@ export function LoginPage() {
               <LogIn className="size-4.5" aria-hidden="true" />
             )}
             <span>{t('login.submit')}</span>
-          </button>
+          </Button>
 
           <div className="text-center" aria-live="polite">
             {serverErrorMessage ? (

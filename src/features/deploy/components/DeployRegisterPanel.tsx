@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -116,7 +117,6 @@ export function DeployRegisterPanel() {
   const [eqpDropdownOpen, setEqpDropdownOpen] = useState(false)
   const eqpSearchContainerRef = useRef<HTMLDivElement>(null)
   const [searchSelectionIds, setSearchSelectionIds] = useState<string[]>([])
-  const searchSelectAllRef = useRef<HTMLInputElement>(null)
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const [deployDialogState, setDeployDialogState] = useState<DeployDialogState | null>(null)
   const [scenarioDialogState, setScenarioDialogState] = useState<ScenarioDialogState>({
@@ -295,14 +295,6 @@ export function DeployRegisterPanel() {
 
     syncSelectedEqpTargets(registerTargetItems.filter((item) => selectedEqpIdSet.has(item.eqpId)))
   }, [registerTargetItems, selectedEqpIds, selectedEqpIdSet, syncSelectedEqpTargets])
-
-  useEffect(() => {
-    if (!searchSelectAllRef.current) {
-      return
-    }
-
-    searchSelectAllRef.current.indeterminate = isPartiallySearchSelected
-  }, [isPartiallySearchSelected])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -844,13 +836,10 @@ export function DeployRegisterPanel() {
       width: '3.5rem',
       header: (
         <div className="flex justify-center">
-          <input
-            ref={searchSelectAllRef}
-            type="checkbox"
-            checked={isAllSearchSelected}
-            onChange={handleToggleAllSearchSelections}
+          <Checkbox
+            checked={isPartiallySearchSelected ? 'indeterminate' : isAllSearchSelected}
+            onCheckedChange={handleToggleAllSearchSelections}
             disabled={selectableSearchItemIds.length === 0}
-            className="size-4 accent-brand-primary"
             aria-label={
               isAllSearchSelected ? t('deploy.register.deselectAll') : t('deploy.register.selectAll')
             }
@@ -860,12 +849,10 @@ export function DeployRegisterPanel() {
       accessor: () => '',
       renderCell: (item) => (
         <div className="flex w-full justify-center">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={!item.blockedByActiveDeploy && selectedSearchItemIdSet.has(item.eqpId)}
-            onChange={() => handleToggleSearchSelection(item.eqpId)}
+            onCheckedChange={() => handleToggleSearchSelection(item.eqpId)}
             disabled={item.blockedByActiveDeploy}
-            className="size-4 accent-brand-primary"
             aria-label={t('deploy.register.eqpSelectAria', { eqpId: item.eqpId })}
           />
         </div>
@@ -1295,10 +1282,12 @@ export function DeployRegisterPanel() {
               {eqpDropdownOpen && filteredEqpSuggestions.length > 0 && (
                 <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-card shadow-md">
                   {filteredEqpSuggestions.map((item) => (
-                    <button
+                    <Button
                       key={item.eqpId}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
                       onMouseDown={(e) => {
                         e.preventDefault()
                         setDraftEqpId(item.eqpId)
@@ -1306,7 +1295,7 @@ export function DeployRegisterPanel() {
                       }}
                     >
                       {item.eqpId}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}

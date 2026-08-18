@@ -3,6 +3,14 @@ import { Navigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SELECT_EMPTY_VALUE,
+} from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
 import { AppPageShell } from '@/shared/components/AppPageShell'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
@@ -1481,22 +1489,30 @@ export function EqpPage() {
                   <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex h-8.5 items-center gap-1.5">
-                        <select
-                          value={appliedVersion}
-                          onChange={(event) => setAppliedVersion(event.target.value)}
+                        <Select
+                          value={
+                            appliedVersion === EMPTY_VERSION_VALUE ? SELECT_EMPTY_VALUE : appliedVersion
+                          }
+                          onValueChange={(next) =>
+                            setAppliedVersion(next === SELECT_EMPTY_VALUE ? EMPTY_VERSION_VALUE : next)
+                          }
                           disabled={isEditMode || versionOptions.length === 0 || eqpParamVersionsQuery.isLoading}
-                          className="h-8 min-w-58 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                         >
-                          {versionOptions.length === 0 ? (
-                            <option value={EMPTY_VERSION_VALUE}>{t('eqp.version.noOption')}</option>
-                          ) : (
-                            versionOptions.map((version) => (
-                              <option key={version} value={version}>
-                                {version}
-                              </option>
-                            ))
-                          )}
-                        </select>
+                          <SelectTrigger className="h-8 min-w-58 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {versionOptions.length === 0 ? (
+                              <SelectItem value={SELECT_EMPTY_VALUE}>{t('eqp.version.noOption')}</SelectItem>
+                            ) : (
+                              versionOptions.map((version) => (
+                                <SelectItem key={version} value={version}>
+                                  {version}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="flex items-center gap-2">

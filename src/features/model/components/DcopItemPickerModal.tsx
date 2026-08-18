@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Search, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -258,11 +259,10 @@ export function DcopItemPickerModal({
                             (isAlreadyBound ? ' cursor-not-allowed opacity-50 hover:bg-transparent' : '')
                           }
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={isChecked}
                             disabled={isAlreadyBound}
-                            onChange={() => toggleLeftSelection(key)}
+                            onCheckedChange={() => toggleLeftSelection(key)}
                             aria-label={t('model.dcop.selectAria', { name: item.dcopItemName })}
                           />
                           <span className="min-w-0 flex-1 truncate font-medium text-foreground">
@@ -331,14 +331,16 @@ export function DcopItemPickerModal({
                 width: '4.375rem',
                 render: (item) => (
                   <div className="flex justify-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => removeFromRight(item.dcopItemKey)}
                       className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/5 hover:text-danger"
                       aria-label={t('model.dcop.unmapAria', { name: item.dcopItemName })}
                     >
                       <Trash2 className="size-4" />
-                    </button>
+                    </Button>
                   </div>
                 ),
               }}

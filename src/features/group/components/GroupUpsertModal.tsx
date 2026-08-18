@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -168,13 +169,11 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
             />
           </div>
           <div className="flex items-center gap-2 md:col-span-2">
-            <input
+            <Checkbox
               id="group-upsert-is-active"
-              type="checkbox"
               checked={resolvedFormState.isActive}
-              onChange={(event) => handleChange('isActive', event.target.checked)}
+              onCheckedChange={(next) => handleChange('isActive', next === true)}
               disabled={isBusy}
-              className="size-4 rounded border-input"
             />
             <label htmlFor="group-upsert-is-active" className="text-xs text-muted-foreground">
               {t('group.form.isActive')}

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import {
   buildEqpUpdateRequest,
@@ -424,37 +425,23 @@ function ReadOnlyField({ label, value, hint }: ReadOnlyFieldProps) {
 
 function ToggleField({ label, checked, disabled, hint, onChange }: ToggleFieldProps) {
   const { t } = useI18n()
+  // 감싸는 label 대신 htmlFor 로 명시 결합한다 — Switch 를 직접 눌렀을 때 label 이 클릭을
+  // 한 번 더 전달해 이중 토글되는 것을 원천 차단한다.
+  const switchId = useId()
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold text-foreground">{label}</span>
-      <label
+      <div
         className={cn(
           'flex min-h-11 items-center justify-between rounded-xl border border-input px-3 transition-colors',
           disabled ? 'bg-muted opacity-70' : 'bg-card',
         )}
       >
-        <span className="text-sm text-foreground">{checked ? t('eqp.form.toggleOn') : t('eqp.form.toggleOff')}</span>
-        <span
-          className={cn(
-            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-            checked ? 'bg-brand-primary' : 'bg-muted-foreground/40',
-          )}
-        >
-          <span
-            className={cn(
-              'inline-block size-5 rounded-full bg-white transition-transform',
-              checked ? 'translate-x-5.5' : 'translate-x-0.5',
-            )}
-          />
-        </span>
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={checked}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-      </label>
+        <label htmlFor={switchId} className="text-sm text-foreground">
+          {checked ? t('eqp.form.toggleOn') : t('eqp.form.toggleOff')}
+        </label>
+        <Switch id={switchId} checked={checked} disabled={disabled} onCheckedChange={onChange} />
+      </div>
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
   )

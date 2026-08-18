@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -246,12 +247,11 @@ export function GroupPermissionsModal({ open, groupId, groupCode, onClose }: Gro
                       className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                       data-testid={`group-permissions-row-${permission.permId}`}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         className="mt-1"
                         checked={isGranted(permission.permId)}
                         disabled={isSaving}
-                        onChange={() => toggle(permission)}
+                        onCheckedChange={() => toggle(permission)}
                         data-testid={`group-permissions-checkbox-${permission.permId}`}
                       />
                       <span className="flex min-w-0 flex-1 flex-col">

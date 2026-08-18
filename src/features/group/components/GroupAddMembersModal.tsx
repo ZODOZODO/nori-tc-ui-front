@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -206,11 +207,10 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
                     }`}
                     data-testid={`group-add-members-row-${user.userPk}`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isAlreadyMember || isSelected}
                       disabled={isAlreadyMember || isBusy}
-                      onChange={() => toggleSelection(user.userPk)}
+                      onCheckedChange={() => toggleSelection(user.userPk)}
                       data-testid={`group-add-members-checkbox-${user.userPk}`}
                     />
                     <span className="flex-1">
@@ -220,15 +220,17 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
                       </span>
                     </span>
                     {isAlreadyMember ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => void handleRemove(user.userPk)}
                         disabled={isBusy}
                         className="rounded-md border border-danger/40 px-2 py-0.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         data-testid={`group-member-remove-${user.userPk}`}
                       >
                         {t('group.members.removeMember')}
-                      </button>
+                      </Button>
                     ) : null}
                   </label>
                 )
