@@ -1,12 +1,12 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
-import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
+import type { ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import type { LiveMapDemoTestType } from '../types/live-map.types'
 
 // simulator orchestrator Run 경로(R-1) API. 응답 형상은 run 1개 + targets[](progress%/stage 없음).
-// 에러 헬퍼는 이 모듈에 자체 보유하고, CSRF 는 공통 `@/shared/lib/csrf` 를 쓴다.
+// 에러 정규화는 공통 `@/shared/lib/api-error`, CSRF 는 공통 `@/shared/lib/csrf` 를 쓴다.
 
 export interface SimulatorRunScenarioItem {
   scenarioId: string
@@ -46,44 +46,6 @@ export interface SimulatorRunCreateRequest {
 
 const defaultErrorMessage = () => i18n.t('error.livemap.demoDefault')
 
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new Error(i18n.t('error.livemap.csrf'))
-  }
-
-  return csrfToken
-}
-
-const resolveSuccessPayload = <TData>(payload: unknown, fallbackMessage: string): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true || payload.data === null) {
-    const apiPayload = isApiResponse(payload) ? payload : null
-    throw new Error(apiPayload?.errorMsg || fallbackMessage)
-  }
-
-  return payload.data
-}
-
-const normalizeError = (error: unknown, fallbackMessage: string): Error => {
-  // axios 에러도 Error 인스턴스라 instanceof 를 먼저 검사하면 백엔드 errorMsg("설비가 이미 다른 Run 에 점유...")를
-  // 버리고 "Request failed with status code 409" 원문을 노출한다 — isAxiosError 를 먼저 본다.
-  if (isAxiosError(error)) {
-    const payload = error.response?.data
-    if (isApiResponse(payload) && payload.success === false) {
-      return new Error(payload.errorMsg || fallbackMessage)
-    }
-    return new Error(fallbackMessage)
-  }
-
-  if (error instanceof Error) {
-    return error
-  }
-
-  return new Error(fallbackMessage)
-}
-
 export const liveMapDemoRunApi = {
   async getScenarios(mode?: string): Promise<SimulatorRunScenarioItem[]> {
     try {
@@ -96,10 +58,11 @@ export const liveMapDemoRunApi = {
       )
       return resolveSuccessPayload<SimulatorRunScenarioItem[]>(
         response.data,
+        response.status,
         i18n.t('error.livemap.demoScenarios'),
       )
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.demoScenarios'))
+      throw normalizeApiError(error, i18n.t('error.livemap.demoScenarios'))
     }
   },
 
@@ -116,10 +79,11 @@ export const liveMapDemoRunApi = {
       )
       return resolveSuccessPayload<SimulatorRunResponse>(
         response.data,
+        response.status,
         i18n.t('error.livemap.demoStart'),
       )
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.demoStart'))
+      throw normalizeApiError(error, i18n.t('error.livemap.demoStart'))
     }
   },
 
@@ -129,9 +93,13 @@ export const liveMapDemoRunApi = {
         `/live-map/demo-runs/${encodeURIComponent(runId)}`,
         { withCredentials: true },
       )
-      return resolveSuccessPayload<SimulatorRunResponse>(response.data, defaultErrorMessage())
+      return resolveSuccessPayload<SimulatorRunResponse>(
+        response.data,
+        response.status,
+        defaultErrorMessage(),
+      )
     } catch (error) {
-      throw normalizeError(error, defaultErrorMessage())
+      throw normalizeApiError(error, defaultErrorMessage())
     }
   },
 
@@ -142,9 +110,13 @@ export const liveMapDemoRunApi = {
         '/live-map/demo-runs',
         { withCredentials: true },
       )
-      return resolveSuccessPayload<SimulatorRunResponse[]>(response.data, defaultErrorMessage())
+      return resolveSuccessPayload<SimulatorRunResponse[]>(
+        response.data,
+        response.status,
+        defaultErrorMessage(),
+      )
     } catch (error) {
-      throw normalizeError(error, defaultErrorMessage())
+      throw normalizeApiError(error, defaultErrorMessage())
     }
   },
 
@@ -161,10 +133,11 @@ export const liveMapDemoRunApi = {
       )
       return resolveSuccessPayload<SimulatorRunResponse>(
         response.data,
+        response.status,
         i18n.t('error.livemap.demoStop'),
       )
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.demoStop'))
+      throw normalizeApiError(error, i18n.t('error.livemap.demoStop'))
     }
   },
 
@@ -189,10 +162,11 @@ export const liveMapDemoRunApi = {
       )
       return resolveSuccessPayload<SimulatorRunScenarioItem>(
         response.data,
+        response.status,
         i18n.t('error.livemap.scenarioUpload'),
       )
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.scenarioUpload'))
+      throw normalizeApiError(error, i18n.t('error.livemap.scenarioUpload'))
     }
   },
 
@@ -205,7 +179,7 @@ export const liveMapDemoRunApi = {
         headers: { [CSRF_HEADER_NAME]: csrfToken },
       })
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.scenarioDelete'))
+      throw normalizeApiError(error, i18n.t('error.livemap.scenarioDelete'))
     }
   },
 
@@ -223,10 +197,11 @@ export const liveMapDemoRunApi = {
       )
       return resolveSuccessPayload<SimulatorRunResponse>(
         response.data,
+        response.status,
         i18n.t('error.livemap.demoStop'),
       )
     } catch (error) {
-      throw normalizeError(error, i18n.t('error.livemap.demoStop'))
+      throw normalizeApiError(error, i18n.t('error.livemap.demoStop'))
     }
   },
 }

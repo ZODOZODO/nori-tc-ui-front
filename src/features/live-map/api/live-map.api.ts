@@ -1,7 +1,7 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
+import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 
 export interface LiveMapPortResponse {
   id: string
@@ -37,29 +37,6 @@ type LiveMapApiResponse = ApiResponse<LiveMapResponse>
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const liveMapErrorMessage = () => i18n.t('livemap.error')
 
-const resolveSuccessPayload = <TData>(payload: ApiResponse<TData>): TData => {
-  if (!payload.success || payload.data === null) {
-    throw new Error(payload.errorMsg || liveMapErrorMessage())
-  }
-  return payload.data
-}
-
-const normalizeError = (error: unknown): Error => {
-  if (error instanceof Error) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    const errorMessage =
-      typeof error.response?.data?.errorMsg === 'string'
-        ? error.response.data.errorMsg
-        : liveMapErrorMessage()
-    return new Error(errorMessage)
-  }
-
-  return new Error(liveMapErrorMessage())
-}
-
 export const liveMapApi = {
   getLiveMap: async (): Promise<LiveMapResponse> => {
     try {
@@ -67,9 +44,9 @@ export const liveMapApi = {
         withCredentials: true,
       })
 
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, liveMapErrorMessage())
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, liveMapErrorMessage())
     }
   },
 }

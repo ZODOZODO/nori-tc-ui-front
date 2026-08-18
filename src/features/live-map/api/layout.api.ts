@@ -1,7 +1,7 @@
-import { isAxiosError } from 'axios'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import type {
   CanvasJson,
   LiveMapObjectKind,
@@ -51,36 +51,6 @@ export interface LiveMapObjectSaveBody {
 
 const failMessage = 'live-map layout request failed'
 
-// CSRF — 백엔드(Spring Security)는 쓰기 요청에 X-XSRF-TOKEN 헤더를 요구한다(Double Submit Cookie).
-// 다른 feature API(user/deploy/eqp/model…)와 동일하게 GET /auth/csrf 선호출 → 쿠키 토큰을 헤더로 수동 부착.
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-  const token = readCsrfCookieToken()
-  if (!token) {
-    throw new Error('CSRF token missing')
-  }
-  return token
-}
-
-const resolveSuccessPayload = <TData>(payload: ApiResponse<TData>): TData => {
-  if (!payload.success || payload.data === null) {
-    throw new Error(payload.errorMsg || failMessage)
-  }
-  return payload.data
-}
-
-const normalizeError = (error: unknown): Error => {
-  if (error instanceof Error) {
-    return error
-  }
-  if (isAxiosError(error)) {
-    const errorMessage =
-      typeof error.response?.data?.errorMsg === 'string' ? error.response.data.errorMsg : failMessage
-    return new Error(errorMessage)
-  }
-  return new Error(failMessage)
-}
-
 export const layoutApi = {
   getLayout: async (lineKey: number): Promise<LiveMapLayoutResponse> => {
     try {
@@ -88,9 +58,9 @@ export const layoutApi = {
         params: { lineKey },
         withCredentials: true,
       })
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 
@@ -102,9 +72,9 @@ export const layoutApi = {
         withCredentials: true,
         headers: { [CSRF_HEADER_NAME]: csrfToken },
       })
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 
@@ -114,9 +84,9 @@ export const layoutApi = {
         '/live-map/layout/objects',
         { withCredentials: true },
       )
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 
@@ -128,9 +98,9 @@ export const layoutApi = {
         body,
         { withCredentials: true, headers: { [CSRF_HEADER_NAME]: csrfToken } },
       )
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 
@@ -142,9 +112,9 @@ export const layoutApi = {
         body,
         { withCredentials: true, headers: { [CSRF_HEADER_NAME]: csrfToken } },
       )
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 
@@ -156,7 +126,7 @@ export const layoutApi = {
         headers: { [CSRF_HEADER_NAME]: csrfToken },
       })
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 }

@@ -1,6 +1,6 @@
-import { isAxiosError } from 'axios'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
+import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 
 /**
  * GET /api/line 응답 1행. 백엔드 LineResponse 와 동일 형태입니다.
@@ -13,26 +13,7 @@ export interface LineResponse {
 
 type LineListApiResponse = ApiResponse<LineResponse[]>
 
-const resolveSuccessPayload = <TData>(payload: ApiResponse<TData>): TData => {
-  if (!payload.success || payload.data === null) {
-    throw new Error(payload.errorMsg || 'line list request failed')
-  }
-  return payload.data
-}
-
-const normalizeError = (error: unknown): Error => {
-  if (error instanceof Error) {
-    return error
-  }
-  if (isAxiosError(error)) {
-    const errorMessage =
-      typeof error.response?.data?.errorMsg === 'string'
-        ? error.response.data.errorMsg
-        : 'line list request failed'
-    return new Error(errorMessage)
-  }
-  return new Error('line list request failed')
-}
+const failMessage = 'line list request failed'
 
 export const lineApi = {
   /**
@@ -43,9 +24,9 @@ export const lineApi = {
       const response = await apiClient.get<LineListApiResponse>('/line', {
         withCredentials: true,
       })
-      return resolveSuccessPayload(response.data)
+      return resolveSuccessPayload<LineResponse[]>(response.data, response.status, failMessage)
     } catch (error) {
-      throw normalizeError(error)
+      throw normalizeApiError(error, failMessage)
     }
   },
 }

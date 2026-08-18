@@ -1,5 +1,6 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
+import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
 import type {
   BusinessDlqEntry,
   GatewayDlqEntry,
@@ -8,22 +9,8 @@ import type {
 } from '../types/dlq.types'
 
 /**
- * 백엔드 표준 응답 래퍼.
  * `success=true` + `data` 가 배열인 케이스만 허용. 그 외는 던져서 react-query 가 error 상태로 전이.
  */
-interface ApiResponse<TData> {
-  success: boolean
-  data: TData | null
-  errorCode: string | null
-  errorMsg: string | null
-}
-
-const isApiResponse = <TData>(value: unknown): value is ApiResponse<TData> =>
-  typeof value === 'object' &&
-  value !== null &&
-  'success' in value &&
-  typeof (value as { success: unknown }).success === 'boolean'
-
 const unwrapArrayPayload = <TItem>(payload: unknown, fallbackMessage: string): TItem[] => {
   if (!isApiResponse<TItem[]>(payload) || payload.success !== true) {
     throw new Error(
