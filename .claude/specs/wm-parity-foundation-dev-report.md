@@ -353,6 +353,7 @@
 | C9 | `776bdca` | ui-front | 3개 — 신설 `components/ui/control-styles.ts`(wm 무수정) + 수정 `components/ui/input.tsx` · `components/ui/select.tsx` | (AC 없음 — R4 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 | C10 | `08899d3` | ui-front | 3개 — 신설 `components/ui/checkbox.tsx`(Plan §3.6-C 전문) · `components/ui/switch.tsx`(wm 무수정) + 수정 `components/ui/select.tsx`(`SELECT_EMPTY_VALUE`) | (AC 없음 — R5 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 | C11 | `dea29f9` | ui-front | 4개 — `shared/components/SelectableTable/SelectableTable.tsx` · 신설 `.../sort.ts` · `features/user/components/UserListTable.tsx` · 신설 `tests/unit/selectable-table-sort.test.ts` | **AC12** + AC1 AC2 AC3 | ✅ 완료 |
+| C12 | `2b0e544` | ui-front | 1개 — `features/deploy/components/DeployMonitorPanel.tsx` | **AC15** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -374,6 +375,7 @@
 | C9 | 80 | 15 | 10 | (프리미티브 시각만 변경) |
 | C10 | 80 | 15 | 10 | (프리미티브 신설만 — 소비는 C13~C16) |
 | C11 | 80 | 15 | 10 | (테이블 로딩/정렬만 변경) |
+| C12 | 80 | 15 | 10 | (확인 흐름만 변경 — raw 요소 무관) |
 
 ---
 
@@ -813,6 +815,37 @@ group-list 3 · model-check-in-diff 2 · model-info 3 · model-parameter 3 · mo
 parent-model-commit 2 · user-list 3). 16 = 같은 파일군의 baseline PASS 합계.
 baseline PASS 부분집합만 따로 돌린 결과도 **16 passed / 0 failed**. **회귀 0**.
 
+### C12 — window.confirm 제거 (`2b0e544`)
+
+**AC15 판정**
+```
+$ grep -rn "window.confirm" src | wc -l
+0
+```
+(주석 문구도 "네이티브 확인창"으로 적어 리터럴이 남지 않게 했다 — 최초 작성 시 주석 때문에 1건이 잡혔다.)
+
+빌드 / lint / 단위
+```
+✓ built in 17.92s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+# tests 211
+# pass 211
+# fail 0
+```
+
+회귀 e2e — Plan 이 지정한 2파일
+```
+  2 failed
+    [chromium] › selectable-table-deploy-monitor.spec.ts:163:1 › Selectable-Table-R2-AC-2: DeployMonitorPanel 2x2 영역 Ctrl+C → 클립보드 TSV
+    [chromium] › selectable-table-deploy-monitor.spec.ts:213:1 › Selectable-Table-R2-AC-2 회귀: DeployMonitorPanel 우클릭 ContextMenu (View) 가 wrapRow 적용 후에도 노출
+  1 passed (40.2s)
+```
+→ 2 FAIL 은 §2.3 의 `selectable-table-deploy-monitor.spec.ts` baseline FAIL 2건과 동일 제목이고,
+baseline PASS 인 `deploy/deploy-monitor-view-modal.spec.ts` 1건은 PASS. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -1043,3 +1076,18 @@ baseline PASS 부분집합만 따로 돌린 결과도 **16 passed / 0 failed**. 
   **별도 모듈(`SelectableTable/sort.ts`)을 택했다** — 단위 테스트 러너가
   `node --experimental-strip-types` 라 `.tsx`(JSX 포함) 파일은 import 할 수 없기 때문이다.
 - 소비처는 컴포넌트 + 단위 테스트 2곳이라 룰 11 의 조기 추상화에 해당하지 않는다(Plan 명시).
+
+### C12-결함-1 — 확인 직후 다이얼로그를 닫을지 Plan 이 정하지 않았다
+
+- Plan §5.C12 는 "① state 설정 ② 다이얼로그 confirm 시 실행" 까지만 정하고, 요청이 도는 동안
+  다이얼로그를 열어 둘지(`isConfirming` 스피너) 여부는 비워 뒀다.
+- **종전 동작 보존 쪽을 택했다** — 확인 즉시 닫고 요청을 보낸다. 네이티브 확인창은 true 반환과
+  동시에 사라졌고 실패 메시지는 패널 피드백 영역에 떴다. 다이얼로그를 열어 두면 그 메시지가
+  가려져 동작이 바뀐다. 같은 파일의 삭제 흐름(`handleDelete`)은 실패 시 열어 두지만,
+  그건 종전부터 그랬던 별개 흐름이라 건드리지 않았다.
+
+### C12-결함-2 — 호출부 `void` 제거
+
+- `handleRedeploy` 가 `async` 를 벗으면서 `onSelect={() => void handleRedeploy(...)}`(`:1392`, `:1455`)
+  의 `void` 가 무의미해져 함께 제거했다. 내 변경이 만든 잔재라 글로벌 룰 4 의 정리 대상이다.
+  `handleConfirmRedeploy` 는 여전히 `async` 라 `onConfirm={() => void handleConfirmRedeploy()}` 로 둔다.
