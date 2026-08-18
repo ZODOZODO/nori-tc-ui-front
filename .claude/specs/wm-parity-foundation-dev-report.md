@@ -345,6 +345,7 @@
 | C2 | `3411e34` | ui-front | 13개 — Plan §5.C2 의 12파일(`deploy.api` · `deploy.types` · `eqp.types` · `group.types` · `comm-log.api` · `layout.api` · `live-map-demo-run.api` · `live-map.api` · `model.types` · `profile.types` · `user.types` · `shared/api/line.api`) + `auth/types/auth.types.ts` | **AC17** + AC1 AC2 AC3 | ✅ 완료 |
 | C3 | `ae4e85b` | ui-front | 8개 — 삭제 6(`live-map/components/LiveMap3DEquipment.tsx` · `deploy/components/DeployStatusChart.tsx` · `live-map/components/LiveMapToolbar.tsx` · `shared/layout/PageFooter.tsx` · `live-map/components/LiveMapLegend.tsx` · `group/types/index.ts`) + `package.json`(recharts 제거) + `package-lock.json` | **AC10 AC11** + AC1 AC2 AC3 | ✅ 완료 |
 | C4 | `c9f1f72` | ui-front | 2개 — `.claude/specs/live-map-3d.md`(3곳) · `.claude/specs/live-map-layout-builder-phase1-plan.md`(1곳) | (AC 없음 — R10 문서) | ✅ 완료 |
+| C5-a | `fe78343` | **nori-tc-common** | 3개 — `.claude/specs/port-carrier-id-lifecycle{,-plan,-dev-report}.md` 각 1곳 | (AC 없음 — R10 문서) | ✅ 완료 |
 
 ---
 
@@ -358,6 +359,7 @@
 | C2 | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 | C3 | 80 | 15 | 10 | (죽은 파일 6개 삭제 후 재측정 — 삭제 파일에 raw 요소가 없어 수치 변동 0) |
 | C4 | 80 | 15 | 10 | (문서만 변경) |
+| C5-a | 80 | 15 | 10 | (타 레포 문서만 변경) |
 
 ---
 
@@ -566,6 +568,23 @@ $ grep -n "LiveMapToolbar" .claude/specs/live-map-layout-builder-phase1-plan.md
 # duration_ms 2797.1695
 ```
 
+### C5-a — nori-tc-common 문서 정정 확인
+
+정정 후 잔존 확인 (레포 `c:\workspace_nori\nori-tc-common`, 커밋 `fe78343`)
+```
+$ grep -rn "LiveMap3DEquipment\b" .claude/specs/port-carrier-id-lifecycle.md \
+    .claude/specs/port-carrier-id-lifecycle-plan.md .claude/specs/port-carrier-id-lifecycle-dev-report.md
+(출력 없음 — 3곳 전부 LiveMap3DEquipmentField 로 교체)
+
+$ git diff --stat
+ .claude/specs/port-carrier-id-lifecycle-dev-report.md | 2 +-
+ .claude/specs/port-carrier-id-lifecycle-plan.md       | 2 +-
+ .claude/specs/port-carrier-id-lifecycle.md            | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+```
+빌드 게이트 미수행 — 변경이 `.claude/specs/*.md` 3개뿐이라 nori-tc-common 의 Gradle 산출물과
+무관하다(코드 변경 0). ui-front 코드도 건드리지 않았으므로 회귀 e2e 도 없다.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -703,3 +722,9 @@ $ grep -n "LiveMapToolbar" .claude/specs/live-map-layout-builder-phase1-plan.md
 - **보존적 선택(S-19)**: 손대지 않았다. 이 문서는 **이 6파일을 dead 로 판정한 감사 자체의 실행 기록**이라
   당시 사실이 맞고(=`nori-client-forked-migration-*` 과 같은 성격), 오히려 C3 의 판정 근거 문서다.
 - Plan 이 명시적으로 열거한 2파일 4곳만 고쳤다.
+
+### C5-a-결함-1 — nori-tc-common 의 `nori-tc-refactor-campaign-dev-report.md` 도 정정 대상 밖이다
+
+- `:636`, `:645`, `:647`, `:705`, `:706` 에 제거된 5컴포넌트 서술이 있으나 Plan §5.C5-a 표에 없다.
+- C4-결함-1 과 같은 이유로 손대지 않았다 — 이 문서는 dead 판정을 수행한 **캠페인의 실행 기록**이고,
+  `:647` 은 오히려 "제거 시 문서 동시 정정 필요" 라는 **이번 C4/C5-a/C6 의 지시 근거**다.
