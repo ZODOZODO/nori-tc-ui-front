@@ -347,6 +347,7 @@
 | C4 | `c9f1f72` | ui-front | 2개 — `.claude/specs/live-map-3d.md`(3곳) · `.claude/specs/live-map-layout-builder-phase1-plan.md`(1곳) | (AC 없음 — R10 문서) | ✅ 완료 |
 | C5-a | `fe78343` | **nori-tc-common** | 3개 — `.claude/specs/port-carrier-id-lifecycle{,-plan,-dev-report}.md` 각 1곳 | (AC 없음 — R10 문서) | ✅ 완료 |
 | C5-b | `99f4347` | **nori-tc-common** | 1개 — `.claude/specs/refactor-backlog.md` 4행(284·285 완료 전환 / 287·293 각주) | (AC 없음 — D-5 ledger) | ✅ 완료 |
+| C6 | `b45f54f` | **nori-tc-exec** | 1개 — `docs/Architecture/ui/front/10-live-map-dashboard-and-demo-control.md:15-16` | (AC 없음 — R10 문서) | ✅ 완료 |
 
 ---
 
@@ -362,6 +363,7 @@
 | C4 | 80 | 15 | 10 | (문서만 변경) |
 | C5-a | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C5-b | 80 | 15 | 10 | (타 레포 문서만 변경) |
+| C6 | 80 | 15 | 10 | (타 레포 문서만 변경) |
 
 ---
 
@@ -605,6 +607,24 @@ $ git diff --stat →  .claude/specs/refactor-backlog.md | 8 ++++----
 `상태` 값 `완료` 는 §0.5(`:84`)의 허용값 3종에 포함된다. 기계 검증기는 이 레포에
 스크립트로 존재하지 않아(`c:\workspace_nori` 전역 grep 0건) 실행하지 못했다.
 
+### C6 — nori-tc-exec 아키텍처 문서 정정 확인
+
+레포 `c:\workspace_nori\nori-tc-exec`, 커밋 `b45f54f`. `LiveMapToolbar` 항목을 지우고 그 기능의 현
+소재를 `LiveMapBoard` 항목에 합쳤다.
+```
+$ grep -rn "LiveMapToolbar" docs
+(출력 없음)
+
+- `LiveMapBoard`
+  - cluster와 설비 node를 지도 형태로 배치하고 zoom/layout edit를 처리하며, 보드 헤더에서 검색어와 status filter를 제공합니다.
+  - line filter는 이 화면 전용이 아니라 상단 navigation의 공용 `LineScopeSelector`가 담당하고, `LiveMapPage`가 `line-scope.store`의 선택 라인을 읽어 설비를 걸러 냅니다.
+
+$ git diff --stat
+ docs/Architecture/ui/front/10-live-map-dashboard-and-demo-control.md | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+```
+빌드 게이트 미수행 — `docs/` 문서 1개만 바뀌어 exec 의 Gradle 산출물과 무관하다.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -761,3 +781,10 @@ $ git diff --stat →  .claude/specs/refactor-backlog.md | 8 ++++----
 - 284/285 의 `보류 사유` 칸에는 이관 당시의 실측 근거가 길게 들어 있고, Plan 은 이 칸을 어떻게 할지
   적지 않았다. 완료 행의 관례(`순서 4` 등)는 `-` 지만, 지우면 실측 기록이 소실된다.
 - **보존적 선택(S-19)**: 본문을 그대로 두고 앞에 `(이관 당시 기록)` 만 붙여 시점을 명시했다.
+
+### C6-결함-1 — Plan 이 인용한 `LiveMapPage.tsx:88-89,155-157` 은 라인 드리프트다
+
+- Plan §5.C6 은 line 필터 소비처를 `LiveMapPage.tsx:88-89,155-157` 로 적었으나 현 HEAD 실측은
+  `:16`(store import) · `:105`(`selectedLineValue` 구독) · `:139`(설비 필터) · `:157`(필터 인자) 이다.
+- 커밋 메시지와 문서에는 **실측한 줄**만 인용했다(`LiveMapBoard.tsx:571,579` 는 Plan 표기와 일치 확인).
+  렌더 지점은 `AppTopBar.tsx:191` 로 추가 확인했다.
