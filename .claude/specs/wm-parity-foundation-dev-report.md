@@ -339,7 +339,8 @@
 
 | C 단위 | 커밋 SHA | 레포 | 변경 파일 | 해당 AC | 상태 |
 |---|---|---|---|---|---|
-| C0 | (커밋 없음 — 게이트) | — | — | AC16 전제 | ✅ 완료 |
+| C0 | (커밋 없음 — 게이트) `0c95833` 는 dev-report 신설 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | AC16 전제 | ✅ 완료 |
+| C1-a | `21fda50` | ui-front | 9개 — 신설 `src/shared/types/api.types.ts` · `src/shared/lib/api-error.ts`, 수정 `src/shared/lib/csrf.ts` · `src/shared/api/line.api.ts` · `live-map/api/{comm-log,layout,live-map,live-map-demo-run}.api.ts` · `dlq/api/dlq.api.ts` | AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -348,6 +349,7 @@
 | 시점 | raw `<button>` (src/features) | raw `<select>` | raw `type="checkbox"` |
 |---|---|---|---|
 | C0 (착수 전) | 80 | 15 | 10 |
+| C1-a | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 
 ---
 
@@ -366,6 +368,42 @@
   14 did not run
   90 passed (16.1m)
 ```
+
+### C1-a — build / lint / test:unit / 회귀 e2e
+
+`npm run build` PASS
+```
+dist/assets/react-vendor-VH1en6bk.js            228.56 kB │ gzip:  73.23 kB
+dist/assets/konva-vendor-Dp7wt_BH.js            312.33 kB │ gzip:  95.73 kB
+dist/assets/three-vendor-D0YZ_Sa2.js            906.27 kB │ gzip: 244.45 kB
+(!) Some chunks are larger than 500 kB after minification. Consider:
+✓ built in 33.38s
+```
+
+`npm run lint` PASS (출력 0줄 — eslint 무경고)
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+`npm run test:unit` PASS
+```
+1..209
+# tests 209
+# suites 0
+# pass 209
+# fail 0
+# duration_ms 3819.4936
+```
+
+회귀 e2e (변경 API 를 소비하는 baseline PASS spec 6개) — 14 passed / 1 failed(사전 실패)
+```
+  1 failed
+    [chromium] › tests\e2e\eqp-line-select.spec.ts:125:1 › eqp 폼 라인 드롭다운이 GET /api/line 으로 채워지고 선택된다 (console/pageerror 0)
+  14 passed (46.4s)
+```
+→ 이 1건은 §2.3 의 baseline FAIL 과 동일 테스트(같은 파일의 baseline PASS 테스트는 `:​...` 라인이 다른
+"라인 미선택 시 저장이 차단된다" 로, 이번 실행에서 PASS). **회귀 0**.
 
 ---
 
@@ -405,4 +443,24 @@
   - C9 게이트 5 spec 중 `modal/modal-overflow-guard-extra.spec.ts` 는 2건 FAIL → 판정 제외.
     나머지 4 spec(`layout-overflow-guard` 6, `modal-visual-sweep-eqp` 2, `-group` 3, `-livemap` 1)은 전부 PASS 라 게이트 유효
   - C13 게이트 관련: `plc/plc-eqp-form.spec.ts` 2건 FAIL(W12 검증용) → `modal/modal-visual-sweep-eqp.spec.ts`(PASS 2) 로 판정
+
+### C1-a-결함-1 — CSRF 실패 문구가 도메인 키에서 공용 키로 바뀐다
+
+- **사실**: 제거된 로컬 `issueCsrfToken` 중 `live-map-demo-run.api.ts` 는 `i18n.t('error.livemap.csrf')`,
+  `layout.api.ts` 는 영문 리터럴 `'CSRF token missing'` 을 던졌다. 공용 정의는 Plan R1 지시대로
+  `error.auth.csrf` 를 쓴다 → 이 두 경로의 사용자 문구가 바뀐다.
+- **택한 선택**: Plan/SPEC 이 공용 정의의 문구를 `error.auth.csrf` 로 명시했으므로 그대로 따랐다
+  (신규 i18n 키 0 = S-16 도 충족). 코드 변경 없음.
+- **부수 관찰(수정하지 않음)**: `error.livemap.csrf` 키가 이 전환으로 참조 0이 된다. 미사용 i18n 키 정리는
+  본 SPEC 범위 밖이라 삭제하지 않았다(글로벌 룰 4 — 무관한 죽은 코드는 언급만).
+
+### C1-a-결함-2 — dlq `isApiResponse` 가 느슨한 가드에서 엄격한 가드로 바뀐다
+
+- **사실**: dlq 로컬 가드는 `success` 가 boolean 인지만 봤고, 공용 가드는 `errorCode`/`errorMsg` 의
+  `null | string` 까지 검사한다. 봉투가 불완전한 응답이 오면 이전엔 통과하던 것이 이제 fallback 문구로 던져진다.
+- **택한 선택**: D-4 가 "전환한다"로 봉인돼 있어 공용 가드를 썼다. 다만 회귀 위험을 실측으로 확인 —
+  `tests/e2e/dlq-page.spec.ts` 의 mock 은 4 endpoint 모두 `success/data/errorCode/errorMsg` 전 필드를
+  채우고 있고(`:73-82`), 해당 spec 7건은 이번 실행에서 전부 PASS 했다.
+- `unwrapArrayPayload` 의 "data 가 배열이 아니면 `[]` 반환" 동작은 **그대로 보존**했다
+  (공용 `resolveSuccessPayload` 로 갈아타면 throw 로 바뀌므로 전환하지 않음 — 기존 동작 보존, S-19).
 </content>
