@@ -343,6 +343,7 @@
 | C1-a | `21fda50` | ui-front | 9개 — 신설 `src/shared/types/api.types.ts` · `src/shared/lib/api-error.ts`, 수정 `src/shared/lib/csrf.ts` · `src/shared/api/line.api.ts` · `live-map/api/{comm-log,layout,live-map,live-map-demo-run}.api.ts` · `dlq/api/dlq.api.ts` | AC1 AC2 AC3 | ✅ 완료 |
 | C1-b | `1b429c4` | ui-front | 31개 — types 5(auth/eqp/group/model/user) · api 7(auth/deploy/eqp/group/model/model-flow/user/profile) · 소비처 13 · shared 2 · 단위테스트 1 | **AC7 AC8 AC9** + AC1 AC2 AC3 | ✅ 완료 |
 | C2 | `3411e34` | ui-front | 13개 — Plan §5.C2 의 12파일(`deploy.api` · `deploy.types` · `eqp.types` · `group.types` · `comm-log.api` · `layout.api` · `live-map-demo-run.api` · `live-map.api` · `model.types` · `profile.types` · `user.types` · `shared/api/line.api`) + `auth/types/auth.types.ts` | **AC17** + AC1 AC2 AC3 | ✅ 완료 |
+| C3 | `ae4e85b` | ui-front | 8개 — 삭제 6(`live-map/components/LiveMap3DEquipment.tsx` · `deploy/components/DeployStatusChart.tsx` · `live-map/components/LiveMapToolbar.tsx` · `shared/layout/PageFooter.tsx` · `live-map/components/LiveMapLegend.tsx` · `group/types/index.ts`) + `package.json`(recharts 제거) + `package-lock.json` | **AC10 AC11** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -354,6 +355,7 @@
 | C1-a | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 | C1-b | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 | C2 | 80 | 15 | 10 | (raw 요소 미변환 단계) |
+| C3 | 80 | 15 | 10 | (죽은 파일 6개 삭제 후 재측정 — 삭제 파일에 raw 요소가 없어 수치 변동 0) |
 
 ---
 
@@ -493,6 +495,55 @@ $ grep -rn "features/auth/types/auth.types" src | wc -l
 → 3건 모두 §2.3 의 baseline FAIL(`eqp-line-select.spec.ts` 1 + `group-page.spec.ts` 2)과 **정확히 동일**.
 **회귀 0**.
 
+### C3 — dead 재확인 / AC grep / build / lint / test:unit / 회귀 e2e
+
+dead 재확인 (삭제 직전 실측) — 5개 컴포넌트 전부 **자기 파일 선언 외 참조 0건**, group 배럴 재export 0건
+```
+$ grep -rn "LiveMap3DEquipment" src tests | grep -v LiveMap3DEquipmentField
+src/features/live-map/components/LiveMap3DEquipment.tsx:174:export const LiveMap3DEquipment = memo(...)
+$ grep -rn "from './types'|from '../types'|from '@/features/group/types'" src tests
+src/shared/components/SelectableTable/index.ts:10:} from './types'        ← SelectableTable 자체 types (group 무관)
+src/shared/components/SelectableTable/SelectableTable.tsx:27:} from './types'
+```
+
+AC10 / AC11 grep
+```
+AC10: grep -rn "recharts" src package.json | wc -l   → 0
+AC11: git ls-files <6경로> | wc -l                    → 0
+```
+
+`npm run build` PASS
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking
+✓ built in 17.02s
+```
+
+`npm run lint` PASS (경고 0)
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+`npm run test:unit` PASS
+```
+1..209
+# tests 209
+# pass 209
+# fail 0
+# duration_ms 2937.4364
+```
+
+회귀 e2e (deploy 3 · layout-overflow-guard · live-map viewer/readonly/3d-viewer · group-page · login smoke) — 22 passed / 2 failed(사전 실패)
+```
+  2 failed
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:475:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+  22 passed (1.2m)
+```
+→ 2건 모두 §2.3 의 `group-page.spec.ts` baseline FAIL 과 **정확히 동일**. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -616,3 +667,9 @@ $ grep -rn "features/auth/types/auth.types" src | wc -l
   가져오게 바뀐 상태였고, C2 의 경로 치환으로 `type ApiResponse` 도 같은 모듈을 가리키게 됐다.
 - `import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'` 한 줄로 병합했다
   (`model.types` 는 기존 별칭 `as BaseApiResponse` 유지).
+
+### C3-결함-1 — 삭제 6파일에 raw 요소가 없어 §4 누적표가 움직이지 않는다
+
+- Plan §5.C3 은 죽은 파일 삭제를 R10 으로만 분류했고 raw 요소 감소를 약속하지 않았다. 삭제 후
+  재측정 결과 `<button>` 80 / `<select>` 15 / `type="checkbox"` 10 으로 **C2 와 동일**하다.
+- 즉 AC4/AC5/AC6 의 잔여 수치는 C13~C16 이 전부 감당한다. C3 은 AC10/AC11 전용 단계다.
