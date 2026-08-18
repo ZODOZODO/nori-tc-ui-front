@@ -342,6 +342,7 @@
 | C0 | (커밋 없음 — 게이트) `0c95833` 는 dev-report 신설 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | AC16 전제 | ✅ 완료 |
 | C1-a | `21fda50` | ui-front | 9개 — 신설 `src/shared/types/api.types.ts` · `src/shared/lib/api-error.ts`, 수정 `src/shared/lib/csrf.ts` · `src/shared/api/line.api.ts` · `live-map/api/{comm-log,layout,live-map,live-map-demo-run}.api.ts` · `dlq/api/dlq.api.ts` | AC1 AC2 AC3 | ✅ 완료 |
 | C1-b | `1b429c4` | ui-front | 31개 — types 5(auth/eqp/group/model/user) · api 7(auth/deploy/eqp/group/model/model-flow/user/profile) · 소비처 13 · shared 2 · 단위테스트 1 | **AC7 AC8 AC9** + AC1 AC2 AC3 | ✅ 완료 |
+| C2 | `3411e34` | ui-front | 13개 — Plan §5.C2 의 12파일(`deploy.api` · `deploy.types` · `eqp.types` · `group.types` · `comm-log.api` · `layout.api` · `live-map-demo-run.api` · `live-map.api` · `model.types` · `profile.types` · `user.types` · `shared/api/line.api`) + `auth/types/auth.types.ts` | **AC17** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -352,6 +353,7 @@
 | C0 (착수 전) | 80 | 15 | 10 |
 | C1-a | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 | C1-b | 80 | 15 | 10 | (raw 요소 미변환 단계) |
+| C2 | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 
 ---
 
@@ -446,6 +448,50 @@ AC9: src/shared/lib/api-error.ts:49:export class ApiError extends Error {
   31 passed (1.1m)
 ```
 → 2건 모두 §2.3 의 `group-page.spec.ts` baseline FAIL 2건과 **정확히 동일**. **회귀 0**.
+
+### C2 — AC grep / build / lint / test:unit / 회귀 e2e
+
+AC17 grep — 0건
+```
+$ grep -rn "features/auth/types/auth.types" src
+(출력 없음)
+$ grep -rn "features/auth/types/auth.types" src | wc -l
+0
+```
+
+`npm run build` PASS
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking
+✓ built in 18.08s
+```
+
+`npm run lint` PASS (경고 0)
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+`npm run test:unit` PASS
+```
+1..209
+# tests 209
+# pass 209
+# fail 0
+# duration_ms 2799.6378
+```
+
+회귀 e2e (auth/user/group/eqp/dlq/deploy/model/live-map 소비 spec 15개) — 38 passed / 3 failed(사전 실패)
+```
+  3 failed
+    [chromium] › tests\e2e\eqp-line-select.spec.ts:125:1 › eqp 폼 라인 드롭다운이 GET /api/line 으로 채워지고 선택된다 (console/pageerror 0)
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:475:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+  38 passed (1.5m)
+```
+→ 3건 모두 §2.3 의 baseline FAIL(`eqp-line-select.spec.ts` 1 + `group-page.spec.ts` 2)과 **정확히 동일**.
+**회귀 0**.
 
 ---
 
@@ -549,4 +595,24 @@ AC9: src/shared/lib/api-error.ts:49:export class ApiError extends Error {
   `git show HEAD:<path> > <path>` 로 31파일을 전량 원복(`git diff` 0줄 · 클래스 6종 복원 확인) 후,
   JSDoc 을 `(?:\/\*\*(?:[^*]|\*(?!\/))*\*\/\n)?` 로 한정하고 **블록 45줄 초과 시 중단하는 가드**를 넣어 재실행했다.
 - 재실행 결과 삭제량 899줄로 정상화. 이 사고로 인한 잔존 영향은 없다(최종 diff 는 검증 게이트 전건 통과).
-</content>
+
+### C2-결함-1 — Plan §5.C2 의 "auth 내부 상대 경로 2건" 은 C1-b 에서 이미 해소됐다
+
+- Plan 은 `auth.api.ts:14` / `useLogin.ts:9` 를 C2 에서 함께 정리하라고 적었으나, 두 줄 모두 C1-b 의
+  `AuthApiError` → 공용 `ApiError` 통합 과정에서 이미 `@/shared/lib/api-error` 로 바뀌었다.
+- 현재 남은 `'../types/auth.types'` import 2건은 auth 고유 심볼(`LoginRequest` / `LoginSuccessResponse` /
+  `createLoginFailResponse` 등)이라 옮길 대상이 아니다 — 그대로 둔다(AC17 grep 대상 아님).
+
+### C2-결함-2 — Plan 12파일 외에 `auth/types/auth.types.ts` 자신을 1개 더 손댔다
+
+- 12파일의 import 만 옮기면 `auth.types.ts` 에 `ApiResponse` / `isRecord` / `isApiResponse` 로컬 정의가
+  공용 정의와 **완전히 같은 내용으로 중복 잔존**한다(R2 가 없애려던 중복 그 자체).
+- 보존적 선택(S-19)으로 **동작이 바뀌지 않는 범위** — 로컬 정의 3개를 지우고 공용 정의를 import 하는
+  것만 했다. auth 고유 타입/함수는 한 줄도 건드리지 않았다.
+
+### C2-결함-3 — 4파일에서 같은 모듈 import 가 2줄로 갈라져 1줄로 합쳤다
+
+- `eqp.types` / `user.types` / `group.types` / `model.types` 는 C1-b 에서 `isApiResponse` 를 공용에서
+  가져오게 바뀐 상태였고, C2 의 경로 치환으로 `type ApiResponse` 도 같은 모듈을 가리키게 됐다.
+- `import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'` 한 줄로 병합했다
+  (`model.types` 는 기존 별칭 `as BaseApiResponse` 유지).
