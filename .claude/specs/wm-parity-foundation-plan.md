@@ -127,40 +127,43 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 
 ## 3. Plan 단계에서 새로 필요해진 결정 (D-1 ~ D-5)
 
-> 아래 5건은 SPEC 본문만으로는 한 가지로 좁혀지지 않는다. 각 항목에 **권장안 + 실측 근거**를 달았다.
-> Implement 세션은 **D-1 · D-2 를 해당 커밋 착수 전에 확정**해야 한다(나머지는 권장안대로 진행 가능).
+> 아래 5건은 SPEC 본문만으로는 한 가지로 좁혀지지 않아 Plan 세션에서 사용자에게 제시했다.
+> **2026-08-18 사용자 확정: D-1 = A(wm 값 그대로), D-2 = A(wm switch.tsx 이식), D-5 = A(284/285 갱신).**
+> D-3 · D-4 는 권장안대로 진행한다. **미결 결정 없음 — Implement 는 추가 확인 없이 착수한다.**
 
-### D-1. control-styles 이식 범위 — Input/Select 전역 시각 변경을 수용할 것인가
+### D-1. control-styles 이식 범위 — Input/Select 전역 시각 변경을 수용할 것인가 · **확정: A**
 
 - **긴장 관계**: SPEC Constraints 첫 줄은 "시각/동작 회귀 금지"이나 그 목적어는
   "Button/Select/Checkbox **화**"(= raw 요소 변환 call-site)다. R4 본문은 별도로
   "Input/Select 가 `controlBaseClassName` 을 소비하도록 갱신"을 지시하며, 이는 §2.2 표대로
   **모든 Input/Select 의 높이·모서리·글자·배경을 바꾼다**.
-- **권장(A): wm 값 그대로 이식.**
+- **확정(A): wm 값 그대로 이식.**
   근거 — (1) R4 가 문자열로 지시한 작업이 정확히 이것이고, (2) SPEC Why 의 목표가 "nori-wm-ui-front 수준으로
   개선"이며, (3) 필요한 토큰이 tc `index.css` 에 전부 존재해 반쪽 이식할 기술적 이유가 없다.
-  **단 게이트 부착**: 커밋 전 Login / EqpManageFormModal / ModelDetailPanel 3화면의 before/after
+  **단 게이트 부착(확정 조건)**: 커밋 전 Login / EqpManageFormModal / ModelDetailPanel 3화면의 before/after
   스크린샷을 dev-report 에 첨부하고 사용자 확인을 받는다(글로벌 메모리
   `feedback_3d_visual_verify_screenshot` / `feedback_visual_e2e_real_env_verify` — "지오메트리만 쌓고 통과 단정 금지").
-- 대안(B): 상수 파일만 만들고 값은 tc 현행 클래스 문자열로 채운다(시각 변경 0, 단일 출처화 이득만).
-  R4 문언과 어긋나므로 사용자가 시각 변경을 원치 않을 때만 선택.
+- (기각된 대안 B: 상수 파일만 만들고 값은 tc 현행 클래스로 채우기 — 시각 변경 0 이나 R4 문언과 어긋남)
 
-### D-2. `EqpManageFormModal.ToggleField` — SPEC 내부 모순
+### D-2. `EqpManageFormModal.ToggleField` — SPEC 내부 모순 · **확정: A**
 
 - **사실**: `EqpManageFormModal.tsx:449-455` 의 `<input type="checkbox" className="sr-only">` 는
   체크박스가 아니라 **수제 토글 스위치**다(`:437-447` 에 트랙 `h-6 w-11 rounded-full` + 썸 `size-5` +
   `translate-x-5.5/0.5`). AC5 는 `type="checkbox"` 0건을 요구하므로 이 파일은 반드시 손대야 한다.
 - **모순**: SPEC Out of Scope 는 "switch 이식 안 함 — **현재 tc 에 소비처 없음**"이라 적었으나,
   이 ToggleField 가 바로 그 소비처다. 전제가 실측으로 반증됐다.
-- **권장(A): wm `src/components/ui/switch.tsx`(33줄, radix `Switch`) 를 이식하고 ToggleField 를
+- **확정(A): wm `src/components/ui/switch.tsx`(33줄, radix `Switch`) 를 이식하고 ToggleField 를
   `<Switch>` 로 교체한다.**
   근거 — (1) radix-ui 모노패키지에 이미 포함이라 **신규 의존성 0**(Constraints 준수),
   (2) wm switch 의 시각(`h-6 w-11`, 썸 `size-5`, checked=`bg-brand-primary`, unchecked=`bg-muted-foreground/35`)이
   tc ToggleField 의 수제 시각(`h-6 w-11`, `size-5`, `bg-brand-primary` / `bg-muted-foreground/40`)과
   **거의 동일** → 시각 보존이 가장 잘 된다,
   (3) Checkbox 로 바꾸면 토글이 네모 체크로 바뀌어 시각·의미 모두 회귀한다.
-- 대안(B): ToggleField 마크업을 유지한 채 `<input>` 만 `<button role="switch">` 로 수제 교체
-  (새 프리미티브 0). Out of Scope 문언은 지키지만 같은 코드가 tc 안에 남는다.
+- (기각된 대안 B: `<button role="switch">` 수제 교체 / C: 공용 Checkbox 통일 — C 는 토글이 네모
+  체크로 바뀌어 시각·의미 회귀)
+- **SPEC 정합성 처리**: 이 확정으로 SPEC Out of Scope 의 "switch — 현재 tc 에 소비처 없음" 항목은
+  사실과 다르다. Validate 세션이 SPEC 을 갱신할 때 해당 줄을 "switch — ToggleField 소비처 실재,
+  wm-parity-foundation D-2 로 이식 완료"로 정정한다(Plan 이 SPEC 을 직접 고치지 않는다).
 
 ### D-3. `AuthApiError` 통합 범위
 
@@ -186,14 +189,15 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 - **권장**: 전환한다(C1 에 포함). AC 로 측정되지 않으므로 dev-report 에 별도 항목으로 명시하고,
   Validate 세션이 대조할 수 있게 `grep -rn "interface ApiResponse" src` = 1건을 보조 증거로 남긴다.
 
-### D-5. `nori-tc-common/.claude/specs/refactor-backlog.md` 갱신 여부 (SPEC R10 목록 밖)
+### D-5. `nori-tc-common/.claude/specs/refactor-backlog.md` 갱신 여부 (SPEC R10 목록 밖) · **확정: 갱신함**
 
 - **사실**: `refactor-backlog.md` 행 **284(S09 A-1)/285(A-2)/287(A-5)/293(C-10)** 이 이 6파일·recharts 를
   "부채 이관"으로 등록해 두고, 재평가 조건에 **"(a) `LiveMapToolbar` 를 제거할지 통합할지 사용자 결정이
   났는가"** 를 명시하고 있다. SPEC 결정 2 가 바로 그 답(제거 + 통합 계획 폐기)이다.
   `nori-tc-refactor-campaign-dev-report.md:645-648,706,718` 도 같은 6파일을 서술한다.
 - SPEC R10 의 문서 정정 목록에는 이 2파일이 **없다**.
-- **권장**: `refactor-backlog.md` 의 284/285 행 상태를 "부채 이관"→"완료"로 갱신하고 근거 커밋 SHA 를 채운다.
+- **확정**: `refactor-backlog.md` 의 284/285 행 상태를 "부채 이관"→"완료"로 갱신하고 근거 커밋 SHA 를 채운다
+  (**C5-b 별도 커밋**).
   근거 — 그 표는 스스로 "제거 실행 시 문서 동시 정정 필요"를 게이트로 걸어 뒀으므로, 제거를 하고도
   표를 두면 **표가 거짓**이 된다(R10 이 문서 정정을 필수로 건 것과 같은 이유).
   `nori-tc-refactor-campaign-dev-report.md` 는 **완료된 SDD 사이클의 실행 기록**이라 정정 대상이 아니다
@@ -272,12 +276,13 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 | C2 | `refactor(api): auth.types cross-feature import 해소` | ui-front | R2 | **AC17** + AC1~3 | C1 | — | S1 |
 | C3 | `chore(cleanup): 죽은 코드 6파일 + recharts 제거` | ui-front | R10(코드) | **AC10 AC11** + AC1~3 | 없음 | ✅ | S2 |
 | C4 | `docs(specs): live-map 문서에서 제거 파일 서술 정정` | ui-front | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
-| C5 | `docs(specs): port-carrier-id-lifecycle 3파일 정정` | **common** | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
+| C5-a | `docs(specs): port-carrier-id-lifecycle 3파일 정정` | **common** | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
+| C5-b | `docs(specs): refactor-backlog 284/285 행 완료 처리` | **common** | D-5 | 수동 대조 | C3 | ✅ | S2 |
 | C6 | `docs(arch): live-map 구성요소 서술 정정` | **exec** | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
 | C7 | `feat(shared): 토스트 시스템 이식 + AppProvider 마운트` | ui-front | R3(인프라) | **AC14** + AC1~3 | 없음 | ✅ | S2 |
 | C8 | `feat(user,group): 실패 알림을 토스트로 배선` | ui-front | R3(소비) | **AC13** + AC1~3 | C7 | — | S2 |
-| C9 | `feat(ui): control-styles 이식 + Input/Select 갱신` | ui-front | R4(프리미티브) | AC1~3 + **스크린샷 게이트** | **D-1** | ✅ | S3 |
-| C10 | `feat(ui): 공용 Checkbox 신설 (+Switch)` | ui-front | R5(프리미티브) | AC1~3 | **D-2** | ✅ | S3 |
+| C9 | `feat(ui): control-styles 이식 + Input/Select 갱신` | ui-front | R4(프리미티브) | AC1~3 + **스크린샷 게이트** | 없음 (D-1 확정) | ✅ | S3 |
+| C10 | `feat(ui): 공용 Checkbox 신설 + wm Switch 이식` | ui-front | R5(프리미티브) | AC1~3 | 없음 (D-2 확정) | ✅ | S3 |
 | C11 | `feat(table): SelectableTable isLoading + numeric 정렬 백포트` | ui-front | R7 | **AC12** + AC1~3 | 없음 | ✅ | S3 |
 | C12 | `fix(deploy): window.confirm 을 ConfirmDialog 로 전환` | ui-front | R11 | **AC15** + AC1~3 | 없음 | ✅ | S3 |
 | C13 | `refactor(ui): 폼·모달 계열 raw control 수렴` | ui-front | R4/5/6 부분 | 부분(§5.13) | C9,C10 | — | S4 |
@@ -290,6 +295,7 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 **병렬 가능 관계 요약**
 - **직렬 필수 사슬**: `C0 → C1 → C2` (shared 정의가 없으면 R2 가 성립 불가)
 - **완전 독립(어느 시점에든 착수 가능)**: C3(+C4~C6), C7(+C8), C9, C10, C11, C12
+  (D-1·D-2 가 Plan 단계에서 확정돼 C9/C10 의 결정 대기 선행이 사라졌다)
 - **수렴 4종(C13~C16)** 은 C9·C10 이후. C13/C14 는 서로 파일이 겹치지 않아 병렬 가능.
   C15·C16 은 같은 live-map 디렉터리라 직렬.
 - C16 이 AC4/AC5/AC6 을 동시에 green 으로 만드는 **유일한 지점**이다.
@@ -452,7 +458,7 @@ npm run build && npm run lint && npm run test:unit
 
 ---
 
-### 5.C5 — nori-tc-common 문서 정정 (R10 문서, **별 레포 별 커밋**)
+### 5.C5-a / C5-b — nori-tc-common 문서 정정 (R10 문서 + D-5, **별 레포 별 커밋 2건**)
 
 레포: `c:\workspace_nori\nori-tc-common` (현재 main, clean)
 
@@ -462,10 +468,17 @@ npm run build && npm run lint && npm run test:unit
 | `.claude/specs/port-carrier-id-lifecycle-plan.md:119` | "기존 portItems 소비처([LiveMap3DEquipment], …" | 동 |
 | `.claude/specs/port-carrier-id-lifecycle-dev-report.md:196` | "front 의 `LiveMap3DEquipment`, …" | 동 |
 
-**D-5 승인 시 추가**: `.claude/specs/refactor-backlog.md` 행 284(A-1)/285(A-2) 상태를
-"부채 이관"→"완료"로, 증거 칸에 C3 커밋 SHA. **별도 커밋으로 분리**(문서 정정과 백로그 정산은 성격이 다름).
+**C5-a 커밋 메시지**: `docs(specs): 제거된 LiveMap3DEquipment 서술을 현역 컴포넌트명으로 정정`
 
-커밋 메시지: `docs(specs): 제거된 LiveMap3DEquipment 서술을 현역 컴포넌트명으로 정정`
+**C5-b (D-5 확정 — 별도 커밋)**: `.claude/specs/refactor-backlog.md`
+- 행 **284(S09 A-1, 죽은 파일 6개)** / **285(S09 A-2, recharts)** 상태를 "부채 이관"→"완료"로,
+  증거 칸에 C3 커밋 SHA 를 채운다. 재평가 조건 (a)(b)(c) 는 **해소 근거**(SPEC 결정 2 = LiveMapToolbar
+  제거 확정 / 문서 5건 정정 완료 = C4·C5-a·C6)로 대체 서술한다.
+- 행 **287(A-5, `live-map-3d.model.ts` 중복 export)** / **293(C-10, 배럴 재export)** 은 본 SPEC 이
+  손대지 않으므로 **상태 유지**. 단 "순서 284·286 에 종속" 서술 중 284 종속이 해소됐음을 각주로 남긴다.
+- 행 **286(A-4, 미사용 export 24건)** 은 확신도 분리가 선행 조건이라 본 SPEC 밖 — **무변경**.
+
+**C5-b 커밋 메시지**: `docs(specs): refactor-backlog 284/285 행을 wm-parity-foundation 제거 실행으로 완료 처리`
 
 ---
 
@@ -530,7 +543,7 @@ import 줄(`import { Toaster } from …`)은 `<Toaster` 를 포함하지 않아 
 
 ### 5.C9 — control-styles 이식 + Input/Select 갱신 (R4 프리미티브)
 
-**선행: D-1 확정.**
+**D-1 확정(A) 반영 — wm 값을 그대로 가져온다(시각 변경 수용).**
 
 - 신설 `src/components/ui/control-styles.ts` (wm 원본 3상수)
 - 수정 `src/components/ui/input.tsx` — `controlBaseClassName` + `'h-10 px-3'`
@@ -550,10 +563,13 @@ before/after 스크린샷을 dev-report 에 첨부 → 사용자 확인 후 커�
 
 ---
 
-### 5.C10 — 공용 Checkbox 신설 (R5 프리미티브)
+### 5.C10 — 공용 Checkbox 신설 + wm Switch 이식 (R5 프리미티브)
 
-**선행: D-2 확정.**
+**D-2 확정(A) 반영 — `switch.tsx` 이식이 이 커밋에 포함된다.**
 
+- 신설 `src/components/ui/switch.tsx` — wm 원본(33줄) **무수정 이식**. radix-ui 모노패키지의
+  `Switch` 사용이라 신규 의존성 0. 소비처는 C13 의 `EqpManageFormModal.ToggleField` 1곳
+  (미사용 프리미티브가 되지 않도록 **C13 과 같은 세션(S3→S4 연속)에서 소비 배선까지 마친다**).
 - 신설 `src/components/ui/checkbox.tsx` — **wm 에 원본 없음**(wm `components/ui` 18파일 실측: checkbox 부재).
   radix-ui 모노패키지 `Checkbox` 기반으로 tc 가 새로 작성한다.
   스타일 기준은 wm `switch.tsx` 의 톤(`data-[state=checked]:bg-brand-primary`, `focus-visible:ring-[3px] ring-ring`,
@@ -562,9 +578,12 @@ before/after 스크린샷을 dev-report 에 첨부 → 사용자 확인 후 커�
 - **`indeterminate` 지원 필수** — 실측 소비처 2곳이 tri-state 다:
   `LiveMapDemoModal.tsx:87`(`inputRef.current.indeterminate`), `DeployRegisterPanel.tsx:304`(`searchSelectAllRef`).
   radix 는 `checked="indeterminate"` 로 표현하므로 **명령형 ref 조작(useEffect)이 통째로 사라진다**.
-- D-2 권장안 A 채택 시 `src/components/ui/switch.tsx`(wm 원본 무수정) 도 이 커밋에 포함.
-
 **미이식 확정**: combobox / searchable-select / tooltip (SPEC Out of Scope, tc 소비처 0).
+
+> **주의 — 미사용 프리미티브 방지(글로벌 룰 11)**: C9(control-styles)는 기존 Input/Select 가 즉시
+> 소비하므로 단독 커밋으로 안전하다. 그러나 C10 의 `checkbox.tsx`/`switch.tsx` 는 C13 전까지
+> 소비처가 0이다. **C10 과 C13 사이에 세션을 끊지 않는다**(§8 의 S3→S4 를 한 흐름으로 본다).
+> 부득이 끊긴다면 dev-report 에 "C10 단독 상태 = 소비처 0, C13 에서 해소 예정"을 명시한다.
 
 ---
 
@@ -630,7 +649,7 @@ if (!window.confirm(t('deploy.monitor.redeployConfirm'))) { return }
 | `group/components/GroupAddMembersModal.tsx` | 1 | 0 | 1 (`:211`) | e2e `group-page:459` 가 testid 로 `.check()` |
 | `group/components/GroupPermissionsModal.tsx` | 0 | 0 | 1 (`:252`) | |
 | `group/components/GroupUpsertModal.tsx` | 0 | 0 | 1 (`:177`) | `id="group-upsert-is-active"` label 연결 보존 |
-| `eqp/components/EqpManageFormModal.tsx` | 0 | 0 | 1 (`:451`) | **D-2 대상 — 토글 스위치** |
+| `eqp/components/EqpManageFormModal.tsx` | 0 | 0 | 1 (`:451`) | **D-2 확정 — `ToggleField`(`:425-459`) 를 wm `<Switch>` 로 교체**. 트랙/썸 수제 span 2개(`:437-447`)도 함께 제거되고 라벨 텍스트(`toggleOn`/`toggleOff`)·`disabled` 배경은 보존 |
 | `model/components/DcopItemPickerModal.tsx` | 1 | 0 | 1 (`:262`) | e2e `model-flow:939` 가 `getByLabel().check()` |
 
 **동반 e2e 수정 3파일**: `deploy/deploy-register-bulk-guard.spec.ts:105`,
@@ -793,7 +812,9 @@ npm run test:e2e   # AC16
 | W7 | 신규 한글 리터럴로 eslint i18next 에러 | 중 | 낮음 | 신규 사용자 문구는 ko/en/vi 3파일 동시 추가. 다만 **본 계획상 신규 키는 0건**(csrf/redeploy/confirm/cancel 전부 기존 키 재사용) |
 | W8 | e2e baseline 이 백엔드 유무에 따라 달라져 대조 무효 | 중 | 높음 | C0 와 C18 을 **동일 조건**에서 측정. 조건을 dev-report 첫 줄에 명시 |
 | W9 | 컨텍스트 소진으로 세션 중단 | 높 | 중 | §5 표의 `세션` 칼럼대로 S1~S6 분할. 각 세션 끝에 dev-report 갱신 후 커밋 |
-| W10 | D-2 미결정 상태로 C10/C13 착수 → EqpManageFormModal 토글이 체크박스로 회귀 | 중 | 중 | C10 착수 전 D-2 확정 필수. 표의 `선행` 칼럼에 명시 |
+| W10 | ~~D-2 미결정 상태로 착수~~ → **Plan 단계에서 해소**(D-1/D-2/D-5 확정) | — | — | 잔여 위험 없음 |
+| W11 | C10 의 checkbox/switch 가 C13 전까지 소비처 0 (미사용 코드) | 중 | 낮음 | C10→C13 사이 세션 미분할. 부득이 끊기면 dev-report 에 명시(§5.C10 주의) |
+| W12 | EqpManageFormModal 토글의 `<label>` 감싸기 → `<Switch>` 전환 시 클릭 영역 변화 | 중 | 낮음 | radix Switch 는 자체 `<button>` 이라 label 클릭 위임이 필요하다 — `<label htmlFor>` + `id` 로 명시 연결하거나 label 을 유지하고 Switch 를 자식으로 둔다. `modal-visual-sweep-eqp.spec.ts` + `plc/plc-eqp-form.spec.ts` 로 검증 |
 
 ---
 
@@ -824,9 +845,9 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 | 세션 | 범위 | 진입 시 읽을 것 | 종료 조건 |
 |---|---|---|---|
 | **S1** | C0 → C1 → C2 | SPEC + 이 Plan §5.C0~C2 | AC7/8/9/17 green + dev-report 에 baseline 기록 |
-| **S2** | C3 → C4/C5/C6 → C7 → C8 | Plan §5.C3~C8 + D-5 | AC10/11/13/14 green |
-| **S3** | C9 → C10 → C11 → C12 | Plan §5.C9~C12 + **D-1/D-2 확정 결과** | AC12/15 green + C9 스크린샷 승인 |
-| **S4** | C13 → C14 | Plan §5.C13~C14 + §4 | 해당 e2e green, 잔여 수치 기록 |
+| **S2** | C3 → C4/C5-a/C5-b/C6 → C7 → C8 | Plan §5.C3~C8 + D-5 | AC10/11/13/14 green |
+| **S3** | C9 → C10 → C11 → C12 | Plan §5.C9~C12 (D-1/D-2 확정 완료) | AC12/15 green + C9 스크린샷 승인 |
+| **S4** | C13 → C14 | Plan §5.C13~C14 + §4 | 해당 e2e green, 잔여 수치 기록. **C10 의 switch/checkbox 소비처가 여기서 생긴다** |
 | **S5** | C15 → C16 | Plan §5.C15~C16 + §4.1 | **AC4/5/6 green** |
 | **S6** | C17 → C18 | Plan 전체 + dev-report | **AC16 green**, dev-report 완성 |
 
@@ -841,8 +862,8 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 - 전역 LNB 사이드바 전환 · 도메인 사이드바 5파일의 raw button 18건 → `wm-parity-sidebar.md`
 - **사이드바 프리미티브(wm `sidebar.tsx` / `sidebar-context.ts`) 이식** — 본 SPEC 범위 아님(Constraints).
   wm `components/ui` 18파일 중 tc 미보유 7종(combobox / control-styles / searchable-select /
-  sidebar / sidebar-context / switch / tooltip) 가운데 **본 Plan 이 가져오는 것은 `control-styles`
-  1종 + (D-2 승인 시) `switch` 1종뿐**이다.
+  sidebar / sidebar-context / switch / tooltip) 가운데 **본 Plan 이 가져오는 것은 `control-styles` +
+  `switch` 2종**이다(D-2 확정). 나머지 5종은 소비처 0으로 미이식.
 - `@tanstack/react-table` 도입(결정 1 기각) · 신규 의존성 일체
 - 거대 파일 4개 분해 · `deploy-ui.store` 순수함수 분리 → `ui-front-refactor` 스킬 트랙
 - user/group 7파일 외 catch 전면 전환 · live-map 고정 hex 60건 · `as unknown` 6건
@@ -857,8 +878,10 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 ```
 @.claude/specs/wm-parity-foundation.md @.claude/specs/wm-parity-foundation-plan.md 둘 다 읽고 구현.
 SPEC 의 Acceptance Criteria 모두 만족하도록 각 AC 당 실패 테스트 먼저.
-Plan 의 결정 (D-1 control-styles 시각 변경 / D-2 ToggleField→Switch / D-3 ApiError 단일화 /
-D-4 dlq 로컬 ApiResponse / D-5 refactor-backlog) 엄수.
+Plan 의 확정 결정 5건 엄수 — D-1 control-styles wm 값 그대로 이식(시각 변경 수용, 스크린샷 게이트) /
+D-2 EqpManageFormModal ToggleField 를 wm switch.tsx 이식으로 교체 / D-3 ApiError 6->1 단일화 /
+D-4 dlq 로컬 ApiResponse 도 전환 / D-5 refactor-backlog 284,285 행 완료 처리(C5-b 별도 커밋).
+추가 확인 없이 착수한다 (미결 결정 없음).
 Plan §5.C0 의 e2e baseline 기록을 첫 단계로 반드시 수행.
 Plan §4 의 e2e 스펙 동반 수정(select 16호출 9파일 / checkbox 3파일)을 변환 커밋과 같은 커밋에.
 산출물: .claude/specs/wm-parity-foundation-dev-report.md 에 변경 파일 / 테스트 결과 / 결정 기록.
