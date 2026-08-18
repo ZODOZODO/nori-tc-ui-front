@@ -346,6 +346,7 @@
 | C3 | `ae4e85b` | ui-front | 8개 — 삭제 6(`live-map/components/LiveMap3DEquipment.tsx` · `deploy/components/DeployStatusChart.tsx` · `live-map/components/LiveMapToolbar.tsx` · `shared/layout/PageFooter.tsx` · `live-map/components/LiveMapLegend.tsx` · `group/types/index.ts`) + `package.json`(recharts 제거) + `package-lock.json` | **AC10 AC11** + AC1 AC2 AC3 | ✅ 완료 |
 | C4 | `c9f1f72` | ui-front | 2개 — `.claude/specs/live-map-3d.md`(3곳) · `.claude/specs/live-map-layout-builder-phase1-plan.md`(1곳) | (AC 없음 — R10 문서) | ✅ 완료 |
 | C5-a | `fe78343` | **nori-tc-common** | 3개 — `.claude/specs/port-carrier-id-lifecycle{,-plan,-dev-report}.md` 각 1곳 | (AC 없음 — R10 문서) | ✅ 완료 |
+| C5-b | `99f4347` | **nori-tc-common** | 1개 — `.claude/specs/refactor-backlog.md` 4행(284·285 완료 전환 / 287·293 각주) | (AC 없음 — D-5 ledger) | ✅ 완료 |
 
 ---
 
@@ -360,6 +361,7 @@
 | C3 | 80 | 15 | 10 | (죽은 파일 6개 삭제 후 재측정 — 삭제 파일에 raw 요소가 없어 수치 변동 0) |
 | C4 | 80 | 15 | 10 | (문서만 변경) |
 | C5-a | 80 | 15 | 10 | (타 레포 문서만 변경) |
+| C5-b | 80 | 15 | 10 | (타 레포 문서만 변경) |
 
 ---
 
@@ -585,6 +587,24 @@ $ git diff --stat
 빌드 게이트 미수행 — 변경이 `.claude/specs/*.md` 3개뿐이라 nori-tc-common 의 Gradle 산출물과
 무관하다(코드 변경 0). ui-front 코드도 건드리지 않았으므로 회귀 e2e 도 없다.
 
+### C5-b — refactor-backlog ledger 갱신 확인
+
+레포 `c:\workspace_nori\nori-tc-common`, 커밋 `99f4347`. 스키마 자기 검사(셀 18개 / 상태 칸이
+`부채 이관` 인지 / 증거 칸 원문 일치)를 통과하지 못하면 스크립트가 중단하도록 하고 실행했다.
+```
+행 284: 부채 이관 -> 완료
+행 285: 부채 이관 -> 완료
+행 287: 각주 추가 (상태 유지)
+행 293: 각주 추가 (상태 유지)
+
+$ grep "^| 284 |" … → 상태= 완료  / 세션= P3 처분-4 → wm-parity-foundation C3
+$ grep "^| 285 |" … → 상태= 완료  / 세션= P3 처분-4 → wm-parity-foundation C3
+$ grep "^| 286 |" … → 상태= 부채 이관 (무변경)
+$ git diff --stat →  .claude/specs/refactor-backlog.md | 8 ++++----
+```
+`상태` 값 `완료` 는 §0.5(`:84`)의 허용값 3종에 포함된다. 기계 검증기는 이 레포에
+스크립트로 존재하지 않아(`c:\workspace_nori` 전역 grep 0건) 실행하지 못했다.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -728,3 +748,16 @@ $ git diff --stat
 - `:636`, `:645`, `:647`, `:705`, `:706` 에 제거된 5컴포넌트 서술이 있으나 Plan §5.C5-a 표에 없다.
 - C4-결함-1 과 같은 이유로 손대지 않았다 — 이 문서는 dead 판정을 수행한 **캠페인의 실행 기록**이고,
   `:647` 은 오히려 "제거 시 문서 동시 정정 필요" 라는 **이번 C4/C5-a/C6 의 지시 근거**다.
+
+### C5-b-결함-1 — Plan 이 C5-b 에게 아직 실행되지 않은 C6 을 완료로 적으라고 지시한다
+
+- Plan §5.C5-b 는 재평가 조건 (b)(c) 를 "문서 5건 정정 완료 = C4·C5-a·**C6**" 로 대체하라고 적었는데,
+  실행 순서(§5)는 C5-b 가 C6 보다 **앞**이다. 그대로 쓰면 아직 없는 사실을 ledger 에 적게 된다.
+- **보존적 선택(S-19)**: 실행된 것만 SHA 로 적고(C4 `c9f1f72` / C5-a `fe78343`), exec 문서는
+  "같은 사이클의 C6 단위가 담당" 으로 표기했다. C6 완료 후에도 이 문장은 참이라 재수정이 필요 없다.
+
+### C5-b-결함-2 — `보류 사유` 칸 처리 지침이 Plan 에 없다
+
+- 284/285 의 `보류 사유` 칸에는 이관 당시의 실측 근거가 길게 들어 있고, Plan 은 이 칸을 어떻게 할지
+  적지 않았다. 완료 행의 관례(`순서 4` 등)는 `-` 지만, 지우면 실측 기록이 소실된다.
+- **보존적 선택(S-19)**: 본문을 그대로 두고 앞에 `(이관 당시 기록)` 만 붙여 시점을 명시했다.
