@@ -2,15 +2,7 @@ import { useMemo } from 'react'
 import { KeyRound, Pencil, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableRow } from '@/components/ui/table'
 import {
   SelectableTable,
   type ColumnDef,
@@ -21,8 +13,6 @@ import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
 import type { UserListItem } from '../types/user.types'
-
-const USER_TABLE_COLUMN_COUNT = 6
 
 export const USER_PAGE_SIZE = 20
 
@@ -150,50 +140,26 @@ export function UserListTable() {
         className="px-4 pt-4"
       />
       <div className="overflow-x-auto" data-testid="user-list-table">
-        {isInitialLoading ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>userId</TableHead>
-                <TableHead>userName</TableHead>
-                <TableHead>group</TableHead>
-                <TableHead>company</TableHead>
-                <TableHead>department</TableHead>
-                <TableHead className="text-right">{t('user.table.action')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: USER_PAGE_SIZE }).map((_, rowIndex) => (
-                <TableRow key={`user-skeleton-${rowIndex}`} data-testid="user-row-skeleton">
-                  {Array.from({ length: USER_TABLE_COLUMN_COUNT }).map((_, cellIndex) => (
-                    <TableCell key={cellIndex}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <SelectableTable
-            columns={columns}
-            rows={items}
-            rowKey={(row) => row.userPk}
-            actionColumn={actionColumn}
-            features={{ rangeCopy: true }}
-            testId="selectable-table-user-list"
-            emptyState={t('user.table.empty')}
-            wrapRow={(user, _rowIdx, children) => (
-              <TableRow
-                data-testid={`user-row-${user.userPk}`}
-                onDoubleClick={() => openEditModal(user.userPk)}
-                className="cursor-pointer"
-              >
-                {children}
-              </TableRow>
-            )}
-          />
-        )}
+        <SelectableTable
+          columns={columns}
+          rows={items}
+          rowKey={(row) => row.userPk}
+          actionColumn={actionColumn}
+          features={{ rangeCopy: true }}
+          testId="selectable-table-user-list"
+          emptyState={t('user.table.empty')}
+          isLoading={isInitialLoading}
+          skeletonRowCount={USER_PAGE_SIZE}
+          wrapRow={(user, _rowIdx, children) => (
+            <TableRow
+              data-testid={`user-row-${user.userPk}`}
+              onDoubleClick={() => openEditModal(user.userPk)}
+              className="cursor-pointer"
+            >
+              {children}
+            </TableRow>
+          )}
+        />
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border px-6 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">

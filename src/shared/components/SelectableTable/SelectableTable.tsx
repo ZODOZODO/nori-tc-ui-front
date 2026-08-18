@@ -11,6 +11,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
@@ -25,6 +26,9 @@ import type {
   SelectableTableFeatures,
   SelectableTablePasteHandler,
 } from './types'
+import { SORT_COLLATOR } from './sort'
+
+const DEFAULT_SKELETON_ROW_COUNT = 10
 
 interface SelectableTableProps<TRow> {
   columns: readonly ColumnDef<TRow>[]
@@ -34,6 +38,15 @@ interface SelectableTableProps<TRow> {
   actionColumn?: SelectableTableActionColumn<TRow>
   onCellPaste?: SelectableTablePasteHandler<TRow>
   emptyState?: ReactNode
+  /**
+   * 최초 로딩 중이면 본문을 같은 `columns` 기준의 skeleton 행으로 채운다.
+   *
+   * 페이지가 자기 `<Table>` 로 로딩 표를 따로 만들면 헤더를 두 번 정의하게 되고(컬럼 추가 시 한쪽만
+   * 고쳐져 어긋난다) 헤더 배경·셀 높이가 로딩 전후로 달라진다 — 로딩도 같은 테이블이 맡는다.
+   */
+  isLoading?: boolean
+  /** skeleton 행 수. 미지정 시 {@link DEFAULT_SKELETON_ROW_COUNT}. */
+  skeletonRowCount?: number
   testId?: string
   containerClassName?: string
   tableClassName?: string
@@ -124,6 +137,8 @@ export const SelectableTable = <TRow,>({
   actionColumn,
   onCellPaste,
   emptyState,
+  isLoading,
+  skeletonRowCount = DEFAULT_SKELETON_ROW_COUNT,
   testId,
   containerClassName,
   tableClassName,
@@ -195,7 +210,7 @@ export const SelectableTable = <TRow,>({
       return rows
     }
     const sorted = [...rows].sort((a, b) =>
-      column.accessor(a).localeCompare(column.accessor(b)),
+      SORT_COLLATOR.compare(column.accessor(a), column.accessor(b)),
     )
     return sort.direction === 'desc' ? sorted.reverse() : sorted
   }, [sortEnabled, sort.columnKey, sort.direction, columns, rows])
@@ -378,6 +393,34 @@ export const SelectableTable = <TRow,>({
     }
   }, [virtualEnabled, isSelecting, extendSelection])
 
+  // 로딩 행은 실제 행과 같은 셀 박스(TableCell p-1 + inner min-h-8 px-2 py-1)와 같은 컬럼 폭을 쓴다 —
+  // 로딩이 끝나는 순간 행 높이·컬럼 경계가 튀지 않게 한다.
+  const renderSkeletonRow = (rowIdx: number): ReactNode => (
+    <TableRow key={`skeleton-${rowIdx}`} data-testid="selectable-table-skeleton-row">
+      {columns.map((column) => (
+        <TableCell
+          key={column.key}
+          className="whitespace-nowrap p-1"
+          style={columnSizeStyle(column)}
+        >
+          <div className="flex min-h-8 items-center rounded-md border border-transparent px-2 py-1">
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </TableCell>
+      ))}
+      {showActionColumn ? (
+        <TableCell
+          className="whitespace-nowrap p-1"
+          style={{ width: actionColumn?.width, minWidth: actionColumn?.width }}
+        >
+          <div className="flex min-h-8 items-center justify-end rounded-md border border-transparent px-2 py-1">
+            <Skeleton className="h-4 w-16" />
+          </div>
+        </TableCell>
+      ) : null}
+    </TableRow>
+  )
+
   const renderRow = (row: TRow, rowIdx: number): ReactNode => {
     const rowChildren = (
       <>
@@ -525,7 +568,9 @@ export const SelectableTable = <TRow,>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {displayedRows.length === 0 ? (
+          {isLoading ? (
+            Array.from({ length: skeletonRowCount }).map((_, rowIdx) => renderSkeletonRow(rowIdx))
+          ) : displayedRows.length === 0 ? (
             <TableRow>
               <TableCell
                 colSpan={totalColSpan}
