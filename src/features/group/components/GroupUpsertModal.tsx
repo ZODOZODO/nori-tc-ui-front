@@ -14,7 +14,7 @@ import { useI18n } from '@/i18n/i18n-context'
 import { useCreateGroup, useUpdateGroup } from '../hooks/useGroupMutations'
 import { useGroupDetail } from '../hooks/useGroups'
 import type { GroupUpsertRequest } from '../types/group.types'
-import { ApiError } from '@/shared/lib/api-error'
+import { notifyFailure } from '@/shared/lib/notify'
 
 interface GroupUpsertModalProps {
   open: boolean
@@ -118,11 +118,7 @@ export function GroupUpsertModal({ open, mode, targetGroupId, onClose }: GroupUp
       setDraftFormState({})
       onClose()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setErrorMessage(error.payload.errorMsg)
-        return
-      }
-      setErrorMessage(t('group.upsert.saveError'))
+      setErrorMessage(notifyFailure(error, t('group.upsert.saveError')))
     }
   }
 

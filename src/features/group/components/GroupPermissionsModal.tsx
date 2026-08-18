@@ -18,7 +18,7 @@ import {
   resolvePermissionCategory,
 } from '../lib/permission-category'
 import { type PermissionInfo } from '../types/group.types'
-import { ApiError } from '@/shared/lib/api-error'
+import { notifyFailure } from '@/shared/lib/notify'
 
 interface GroupPermissionsModalProps {
   open: boolean
@@ -163,23 +163,20 @@ export function GroupPermissionsModal({ open, groupId, groupCode, onClose }: Gro
 
     // 실패한 변경분만 draft 에 남기고, 성공분은 제거(서버 상태에 반영됨).
     const stillPending = new Map<number, boolean>()
-    let firstErrorMessage: string | null = null
+    let firstError: unknown = null
     results.forEach((result, index) => {
       const [permId, desired] = operations[index]
       if (result.status === 'rejected') {
         stillPending.set(permId, desired)
-        if (firstErrorMessage === null) {
-          firstErrorMessage =
-            result.reason instanceof ApiError
-              ? result.reason.payload.errorMsg
-              : t('error.group.default')
+        if (firstError === null) {
+          firstError = result.reason
         }
       }
     })
     setPendingChanges(stillPending)
 
-    if (firstErrorMessage !== null) {
-      setErrorMessage(firstErrorMessage)
+    if (stillPending.size > 0) {
+      setErrorMessage(notifyFailure(firstError, t('error.group.default')))
       return
     }
     onClose()

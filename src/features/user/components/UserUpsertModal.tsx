@@ -21,7 +21,7 @@ import { useI18n } from '@/i18n/i18n-context'
 import { useCreateUser, useUpdateUser } from '../hooks/useUserMutations'
 import { useUserDetail } from '../hooks/useUsers'
 import type { UiUserStatusLiteral, UserCreateRequest, UserUpdateRequest } from '../types/user.types'
-import { ApiError } from '@/shared/lib/api-error'
+import { notifyFailure } from '@/shared/lib/notify'
 
 interface UserUpsertModalProps {
   open: boolean
@@ -173,11 +173,7 @@ export function UserUpsertModal({ open, mode, targetUserPk, onClose }: UserUpser
       setDraftFormState({})
       onClose()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setErrorMessage(error.payload.errorMsg)
-        return
-      }
-      setErrorMessage(t('user.upsert.saveError'))
+      setErrorMessage(notifyFailure(error, t('user.upsert.saveError')))
     }
   }
 

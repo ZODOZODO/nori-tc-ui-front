@@ -12,7 +12,7 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import { useResetPassword } from '../hooks/useUserMutations'
 import { generateTemporaryPassword } from '../lib/password-generator'
-import { ApiError } from '@/shared/lib/api-error'
+import { notifyFailure } from '@/shared/lib/notify'
 
 interface UserPasswordResetModalProps {
   open: boolean
@@ -90,11 +90,7 @@ function PasswordResetDialogBody({
           return
         }
         setResetStatus('error')
-        if (error instanceof ApiError) {
-          setErrorMessage(error.payload.errorMsg)
-        } else {
-          setErrorMessage(t('user.passwordReset.error'))
-        }
+        setErrorMessage(notifyFailure(error, t('user.passwordReset.error')))
       }
     }
 

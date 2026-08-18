@@ -15,6 +15,7 @@ import { useAllUsers } from '@/features/user/hooks/useUsers'
 import { useAddGroupMember, useRemoveGroupMember } from '../hooks/useGroupMutations'
 import { useGroupMembers } from '../hooks/useGroups'
 import { ApiError } from '@/shared/lib/api-error'
+import { notifyFailure } from '@/shared/lib/notify'
 
 interface GroupAddMembersModalProps {
   open: boolean
@@ -105,9 +106,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
     try {
       await removeMemberMutation.mutateAsync({ userPk, groupId })
     } catch (error) {
-      setErrorMessage(
-        error instanceof ApiError ? error.payload.errorMsg : t('error.group.removeMember'),
-      )
+      setErrorMessage(notifyFailure(error, t('error.group.removeMember')))
     }
   }
 
