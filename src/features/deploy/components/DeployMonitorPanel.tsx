@@ -267,6 +267,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>('info')
   const [commentDeployKey, setCommentDeployKey] = useState<number | null>(null)
   const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState>(null)
+  const [redeployDialogKey, setRedeployDialogKey] = useState<number | null>(null)
 
   const modelOptions = useMemo(() => {
     const mergedModelVersionOptions = mergeModelOptions(
@@ -709,44 +710,15 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setFeedbackTone('info')
   }
 
-  const handleRedeploy = async (deployKey: number) => {
-    const isServerBacked = isServerBackedRow(deployKey)
-    const sourceHistoryItem = resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
-
-    if (isServerBacked) {
+  const handleRedeploy = (deployKey: number) => {
+    if (isServerBackedRow(deployKey)) {
       if (!historyOnly) {
         setFeedbackMessage(t('deploy.monitor.redeployRunningBlocked'))
         setFeedbackTone('error')
         return
       }
 
-      if (!window.confirm(t('deploy.monitor.redeployConfirm'))) {
-        return
-      }
-
-      try {
-        const result = await redeployDeployMutation.mutateAsync(deployKey)
-        createServerDeployBridge({
-          deployKey: result.deployKey,
-          deployStatus: result.deployStatus,
-          requestedBy: meQuery.data?.userId?.trim() || sourceHistoryItem?.requestedBy || 'SYSTEM',
-          selectedModelName: sourceHistoryItem?.selectedModelName ?? null,
-          selectedModelVersion: sourceHistoryItem?.selectedModelVersion ?? null,
-          selectedBusinessJarName: sourceHistoryItem?.selectedBusinessJarName ?? null,
-          interfaceType: sourceHistoryItem?.interfaceType ?? null,
-          targetCount: sourceHistoryItem?.targetSummary.total ?? 0,
-        })
-        setMode('deploy')
-        setFeedbackMessage(
-          result.resultMessage?.message || t('deploy.monitor.redeployServerSuccess'),
-        )
-        setFeedbackTone('success')
-      } catch (error) {
-        setFeedbackMessage(
-          error instanceof Error ? error.message : t('error.deploy.redeploy'),
-        )
-        setFeedbackTone('error')
-      }
+      setRedeployDialogKey(deployKey)
       return
     }
 
@@ -761,6 +733,42 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     setMode('deploy')
     setFeedbackMessage(t('deploy.monitor.redeployLocalSuccess', { key: nextDeployKey }))
     setFeedbackTone('success')
+  }
+
+  const handleConfirmRedeploy = async () => {
+    if (redeployDialogKey === null) {
+      return
+    }
+
+    const deployKey = redeployDialogKey
+    const sourceHistoryItem = resolvedHistoryItems.find((item) => item.deployKey === deployKey) ?? null
+
+    // 네이티브 확인창이 즉시 닫힌 뒤 요청이 나가던 종전 흐름을 유지한다 (피드백 메시지는 패널에 표시된다).
+    setRedeployDialogKey(null)
+
+    try {
+      const result = await redeployDeployMutation.mutateAsync(deployKey)
+      createServerDeployBridge({
+        deployKey: result.deployKey,
+        deployStatus: result.deployStatus,
+        requestedBy: meQuery.data?.userId?.trim() || sourceHistoryItem?.requestedBy || 'SYSTEM',
+        selectedModelName: sourceHistoryItem?.selectedModelName ?? null,
+        selectedModelVersion: sourceHistoryItem?.selectedModelVersion ?? null,
+        selectedBusinessJarName: sourceHistoryItem?.selectedBusinessJarName ?? null,
+        interfaceType: sourceHistoryItem?.interfaceType ?? null,
+        targetCount: sourceHistoryItem?.targetSummary.total ?? 0,
+      })
+      setMode('deploy')
+      setFeedbackMessage(
+        result.resultMessage?.message || t('deploy.monitor.redeployServerSuccess'),
+      )
+      setFeedbackTone('success')
+    } catch (error) {
+      setFeedbackMessage(
+        error instanceof Error ? error.message : t('error.deploy.redeploy'),
+      )
+      setFeedbackTone('error')
+    }
   }
 
   const handleRequestDelete = (deployKey: number) => {
@@ -986,6 +994,17 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         confirmVariant="destructive"
         isConfirming={deleteDeployMutation.isPending}
         onConfirm={() => void handleDelete()}
+      />
+
+      <ConfirmDialog
+        open={redeployDialogKey !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRedeployDialogKey(null)
+          }
+        }}
+        title={t('deploy.monitor.redeployConfirm')}
+        onConfirm={() => void handleConfirmRedeploy()}
       />
 
       <Dialog
@@ -1381,7 +1400,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                         <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
                           View
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
+                        <ContextMenuItem onSelect={() => handleRedeploy(item.deployKey)}>
                           Redeploy
                         </ContextMenuItem>
                         <ContextMenuItem
@@ -1444,7 +1463,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                         <ContextMenuItem onSelect={() => handleOpenComment(item.deployKey)}>
                           View
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => void handleRedeploy(item.deployKey)}>
+                        <ContextMenuItem onSelect={() => handleRedeploy(item.deployKey)}>
                           Deploy
                         </ContextMenuItem>
                         <ContextMenuItem
