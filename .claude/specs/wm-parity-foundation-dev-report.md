@@ -355,6 +355,7 @@
 | C11 | `dea29f9` | ui-front | 4개 — `shared/components/SelectableTable/SelectableTable.tsx` · 신설 `.../sort.ts` · `features/user/components/UserListTable.tsx` · 신설 `tests/unit/selectable-table-sort.test.ts` | **AC12** + AC1 AC2 AC3 | ✅ 완료 |
 | C12 | `2b0e544` | ui-front | 1개 — `features/deploy/components/DeployMonitorPanel.tsx` | **AC15** + AC1 AC2 AC3 | ✅ 완료 |
 | C13 | `5ec69b6` | ui-front | 8개 — `auth/LoginPage` · `eqp/EqpPage` · `eqp/EqpManageFormModal` · `deploy/DeployRegisterPanel` · `group/GroupAddMembersModal` · `group/GroupPermissionsModal` · `group/GroupUpsertModal` · `model/DcopItemPickerModal` (+ git 미추적 e2e 3파일 셀렉터) | AC4 AC5 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
+| C14 | `5a9d497` | ui-front | 5개 — `model/modelDetailColumnDefs` · `model/ModelDetailPanel` · `model/ModelFlowSidebar` · `model/FlowFilterEditorModal` · `model/ActionDataIndexEditorModal` | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 
 ---
 
@@ -378,6 +379,7 @@
 | C11 | 80 | 15 | 10 | (테이블 로딩/정렬만 변경) |
 | C12 | 80 | 15 | 10 | (확인 흐름만 변경 — raw 요소 무관) |
 | C13 | **71** | **14** | **2** | Plan §5.C13 의 예정 수치(71 / 14 / 2)와 정확히 일치 |
+| C14 | **65** | **5** | 2 | Plan §5.C14 의 예정 수치(65 / 5 / 2)와 정확히 일치 |
 
 ---
 
@@ -891,6 +893,38 @@ W12(ToggleField→Switch) 검증 spec 로 Plan 이 지정한 `plc/plc-eqp-form.s
 2건 FAIL 이라 판정력이 없어 `modal/modal-visual-sweep-eqp.spec.ts`(baseline PASS 2, EqpManageFormModal
 SECS/Socket create 모달을 실제로 여는 spec)로 대체 판정했다 — 둘 다 PASS.
 
+### C14 — model 계열 raw control 수렴 (`5a9d497`)
+
+**부분 판정(잔여 수치)**
+```
+button=65 select=5 checkbox=2
+```
+→ Plan §5.C14 의 예정치와 동일(button 6 / select 9 변환). AC4/AC6 **최종 판정은 C16**.
+
+빌드 / lint / 단위
+```
+✓ built in 17.45s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+# pass 211
+# fail 0
+```
+
+회귀 e2e — Plan 이 지정한 6 spec(model-check-in-diff-overflow · model-flow ·
+selectable-table-model-check-in-diff / -info / -parameter / -workflow)
+```
+  31 failed
+  1 passed (4.9m)
+```
+→ 31 = §2.3 baseline FAIL 합계와 정확히 일치(model-flow 20 · model-check-in-diff 2 ·
+model-info 3 · model-parameter 3 · model-workflow 3). 1 passed = 이 파일군의 유일한
+baseline PASS(`model-check-in-diff-overflow`). **회귀 0**.
+
+Plan 이 C14 게이트로 지정한 6 spec 중 5개는 baseline 부터 전건 FAIL 이라 판정력이 없다.
+실질 판정은 `model-check-in-diff-overflow` 1건 + 빌드 / lint / grep 수치에 의존한다.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -1165,3 +1199,28 @@ SECS/Socket create 모달을 실제로 여는 spec)로 대체 판정했다 — �
   빌드 / lint / grep 수치로만 확인했고 회귀 e2e 로는 검증되지 않는다.
 - 대신 상태 불변식을 코드로 확인했다: `appliedVersion` 이 빈 문자열이 되는 경로는
   `EqpPage.tsx:755-757` 의 `versionOptions.length === 0` 분기뿐이라, 센티널 항목이 항상 존재한다.
+
+### C14-결함-1 — 조건부 className 의 `bg-*` 를 규칙 A 가 오분류한다
+
+- `ModelDetailPanel.tsx` 의 Reference 노드 버튼과 `ModelFlowSidebar.tsx` 의 flow leaf 버튼은
+  className 이 `cn(base, isSelected ? 'bg-muted …' : 'text-muted-foreground hover:bg-muted')` 형태다.
+  규칙 A 를 문자열 검사 그대로 적용하면 `bg-muted` 때문에 `default` variant 가 되는데,
+  **선택되지 않은 상태의 className 에는 배경이 없어** 목록 전체가 primary 배경으로 칠해진다.
+- **선택 분기(`bg-*`)가 twMerge 로 이기도록 `ghost` 를 택했다**(S-19 보존적 선택). 선택 상태는
+  className 의 `bg-muted` 가, 비선택 상태는 `ghost` 의 배경 없음이 그대로 유지된다.
+- 규칙 A 는 className 이 단일 문자열인 경우만 상정하고 조건부 표현식을 다루지 않는다.
+
+### C14-결함-2 — `justify-start` 보강 3곳 (C13-결함-1 과 같은 사유)
+
+- `ModelDetailPanel` Reference 노드, `ModelFlowSidebar` 의 group 헤더 / flow leaf 는
+  `w-full … text-left` 목록 항목이라 `<Button>` 의 `justify-center` 로 글자가 가운데로 몰린다.
+  C13-결함-1 과 같은 처리로 `justify-start` 를 1개씩 덧붙여 좌측 정렬을 보존했다.
+
+### C14-결함-3 — C14 게이트 e2e 6개 중 5개가 baseline 전건 FAIL
+
+- Plan §5.C14 가 지정한 `model/model-flow.spec.ts`(20) 와 `selectable-table-model-*` 4 spec(11)
+  은 baseline 부터 전부 FAIL 이라 회귀를 잡아내지 못한다. 실제 판정은
+  `model/model-check-in-diff-overflow.spec.ts`(baseline PASS 1) 1건뿐이다.
+- 이 커밋이 손댄 5파일 중 `FlowFilterEditorModal` / `ActionDataIndexEditorModal` /
+  `ModelFlowSidebar` 는 **baseline PASS spec 이 하나도 없다**. C18 전체 실행에서도
+  같은 상태이므로 이 3파일의 회귀는 e2e 로 증명되지 않는다(빌드·lint·수치 검산까지가 한계).
