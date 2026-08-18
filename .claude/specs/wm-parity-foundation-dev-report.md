@@ -341,6 +341,7 @@
 |---|---|---|---|---|---|
 | C0 | (커밋 없음 — 게이트) `0c95833` 는 dev-report 신설 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | AC16 전제 | ✅ 완료 |
 | C1-a | `21fda50` | ui-front | 9개 — 신설 `src/shared/types/api.types.ts` · `src/shared/lib/api-error.ts`, 수정 `src/shared/lib/csrf.ts` · `src/shared/api/line.api.ts` · `live-map/api/{comm-log,layout,live-map,live-map-demo-run}.api.ts` · `dlq/api/dlq.api.ts` | AC1 AC2 AC3 | ✅ 완료 |
+| C1-b | `1b429c4` | ui-front | 31개 — types 5(auth/eqp/group/model/user) · api 7(auth/deploy/eqp/group/model/model-flow/user/profile) · 소비처 13 · shared 2 · 단위테스트 1 | **AC7 AC8 AC9** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -350,6 +351,7 @@
 |---|---|---|---|
 | C0 (착수 전) | 80 | 15 | 10 |
 | C1-a | 80 | 15 | 10 | (raw 요소 미변환 단계) |
+| C1-b | 80 | 15 | 10 | (raw 요소 미변환 단계) |
 
 ---
 
@@ -404,6 +406,46 @@ dist/assets/three-vendor-D0YZ_Sa2.js            906.27 kB │ gzip: 244.45 kB
 ```
 → 이 1건은 §2.3 의 baseline FAIL 과 동일 테스트(같은 파일의 baseline PASS 테스트는 `:​...` 라인이 다른
 "라인 미선택 시 저장이 차단된다" 로, 이번 실행에서 PASS). **회귀 0**.
+
+### C1-b — build / lint / test:unit / AC grep / 회귀 e2e
+
+AC grep (전부 1건 / 1파일)
+```
+AC7: src/shared/lib/api-error.ts:98:export const resolveSuccessPayload = <TData>(
+AC8: src/shared/lib/csrf.ts
+AC9: src/shared/lib/api-error.ts:49:export class ApiError extends Error {
+```
+
+`npm run build` PASS
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking
+✓ built in 16.21s
+```
+
+`npm run lint` PASS (경고 0)
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+`npm run test:unit` PASS
+```
+# tests 209
+# pass 209
+# fail 0
+# duration_ms 2657.7652
+```
+
+회귀 e2e (auth/user/group/deploy/eqp/model 소비 spec 14개) — 31 passed / 2 failed(사전 실패)
+```
+  2 failed
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:475:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+  31 passed (1.1m)
+```
+→ 2건 모두 §2.3 의 `group-page.spec.ts` baseline FAIL 2건과 **정확히 동일**. **회귀 0**.
 
 ---
 
@@ -463,4 +505,48 @@ dist/assets/three-vendor-D0YZ_Sa2.js            906.27 kB │ gzip: 244.45 kB
   채우고 있고(`:73-82`), 해당 spec 7건은 이번 실행에서 전부 PASS 했다.
 - `unwrapArrayPayload` 의 "data 가 배열이 아니면 `[]` 반환" 동작은 **그대로 보존**했다
   (공용 `resolveSuccessPayload` 로 갈아타면 throw 로 바뀌므로 전환하지 않음 — 기존 동작 보존, S-19).
+
+### C1-b-결함-1 — `allowNullData=true` 호출 7곳은 3-인자 `resolveSuccessPayload` 로 옮길 수 없다
+
+- **사실**: Plan 은 공용 `resolveSuccessPayload(payload, status, fallbackMessage)` 3-인자만 정의했으나,
+  eqp/group/model/user 의 로컬 정의에는 4번째 인자 `allowNullData` 가 있었고 **7곳이 `true` 로 호출**한다
+  (eqp 5 / group 3 / model 2 중 실제 4-인자 호출 7건 — `saveEditParams`, `checkin`, `undoCheckout`,
+  `group delete/addMember/removeMember`, `model` 2건). `data: null` 이 정상인 DELETE/checkin 응답들이다.
+  3-인자 공용 함수로 그대로 옮기면 **정상 응답을 실패로 오탐**한다.
+- **택한 선택(기존 동작 보존, S-19)**: 공용 `assertSuccessResponse(payload, status, fallbackMessage)` 를
+  `shared/lib/api-error.ts` 에 1개 신설하고 그 7곳만 이 함수로 바꿨다. 정의 1 · 소비 7 이라 룰 11 위반 아님.
+  AC7 은 `const resolveSuccessPayload` 만 세므로 영향 없다(실측 1건 유지).
+- **부수**: 이 4번째 인자는 `false` 로 넘기는 호출부가 0이었으므로 기본값 인자 자체는 소멸했다(글로벌 룰 6 부합).
+
+### C1-b-결함-2 — auth.api 의 CSRF 래핑을 "호출부 3곳 try/catch" 대신 헬퍼 1개로 했다
+
+- **Plan 문언**: "공용 `issueCsrfToken()` 을 호출하고 **호출부 3곳**을 `try { … } catch { throw normalizeAuthError(…) }` 로 감싼다".
+- **택한 형태**: 동일 try/catch 를 `requestAuthCsrfToken(purpose)` 헬퍼 1개로 두고 호출부 3곳
+  (`prepareCsrfToken` / `login` / `logout`)이 그것을 부른다. **동작은 문언과 동일** —
+  공용 정의가 던지는 `CSRF_TOKEN_MISSING` ApiError 는 `normalizeAuthError` 의 `instanceof ApiError` 분기로
+  그대로 통과하고, 쿠키 요청 403 만 `login-csrf`/`logout-csrf` 문맥으로 보정된다.
+- **사유**: 같은 try/catch 를 3번 복제하는 대신 1개로 묶었다(글로벌 룰 3). AC8 은 `issueCsrfToken\s*=` 를
+  세므로 이름이 다른 이 헬퍼는 판정에 영향이 없다(실측 1파일 유지).
+
+### C1-b-결함-3 — 도메인별 CSRF_TOKEN_MISSING 문구가 공용 문구로 통일된다
+
+- 제거된 로컬 `issueCsrfToken` 7개는 각각 `error.eqp.csrf` / `error.group.csrf` / `error.model.csrf` /
+  `error.user.csrf` / `error.deploy.csrf` / `error.auth.csrf` 를 던졌다. 공용 정의는 `error.auth.csrf` 하나다.
+- Plan R1 이 공용 정의의 문구를 `error.auth.csrf` 로 못박았으므로 그대로 따랐다(신규 키 0 = S-16).
+- **미사용이 된 i18n 키(삭제하지 않음)**: `error.eqp.csrf`, `error.group.csrf`, `error.model.csrf`,
+  `error.user.csrf`, `error.deploy.csrf`, `error.livemap.csrf`. 미사용 키 정리는 본 SPEC 범위 밖(룰 4).
+
+### C1-b-결함-4 — `data === null` 실패의 errorCode 가 `INVALID_RESPONSE` → `UNKNOWN_ERROR` 로 바뀐다
+
+- 도메인 로컬 `resolveSuccessPayload` 는 success=true·data=null 일 때 `INVALID_RESPONSE` 를 넣었고
+  공용 정의는 `UNKNOWN_ERROR` 를 넣는다. **errorMsg 는 양쪽 다 fallbackMessage 로 동일**하다.
+- `INVALID_RESPONSE` 를 분기 조건으로 읽는 소비처가 `src` 전체에 0건임을 grep 으로 확인하고 그대로 진행했다.
+
+### C1-b-작업 사고 기록 — 1차 스크립트의 정규식 과탐 (커밋 전 원복)
+
+- 블록 삭제용 정규식의 JSDoc 부분을 `(?:\/\*\*[\s\S]*?\*\/\n)?` 로 짜서 **파일 첫 주석부터 대상 직전까지
+  통째로 삼켰다**(auth/eqp/group/model/user types 등 5파일에서 2,424줄 삭제). 커밋 전이라
+  `git show HEAD:<path> > <path>` 로 31파일을 전량 원복(`git diff` 0줄 · 클래스 6종 복원 확인) 후,
+  JSDoc 을 `(?:\/\*\*(?:[^*]|\*(?!\/))*\*\/\n)?` 로 한정하고 **블록 45줄 초과 시 중단하는 가드**를 넣어 재실행했다.
+- 재실행 결과 삭제량 899줄로 정상화. 이 사고로 인한 잔존 영향은 없다(최종 diff 는 검증 게이트 전건 통과).
 </content>
