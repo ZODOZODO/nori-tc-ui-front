@@ -5,7 +5,7 @@ Phase 1~4 구현 완료 — 2026-06-05. 검증: tsc 0 / eslint 0 errors / unit 1
 (커밋: c1a810a SPEC, e707a34 P1, 3006fce P2+P3, + P4. 구 Konva 빌더 LiveMapLayoutCanvas 삭제 완료.)
 
 ### 후속 (2026-06-05~06, 미커밋)
-- **설비 3D 모델 = 반도체 클러스터 공정 장비**(`LiveMap3DEquipment`): 메인프레임(후방 본체) + 상단 챔버 클러스터(트랜스퍼 허브 + 프로세스 모듈 3) + EFEM(전면 모듈, 글래스 패널) + **로드 포트(전면 도크 + FOUP 캐리어)** + 시그널 타워(적/황/녹 안돈). EQUIPMENT placement 는 도형 대신 이 장비로 렌더.
+- **설비 3D 모델 = 반도체 클러스터 공정 장비**(`LiveMap3DEquipmentField`): 메인프레임(후방 본체) + 상단 챔버 클러스터(트랜스퍼 허브 + 프로세스 모듈 3) + EFEM(전면 모듈, 글래스 패널) + **로드 포트(전면 도크 + FOUP 캐리어)** + 시그널 타워(적/황/녹 안돈). EQUIPMENT placement 는 도형 대신 이 장비로 렌더.
   - **port = 로드 포트 입구**(도메인 정정): `portItems`(PORT 1·2·3…)는 상태 LED 점이 아니라 웨이퍼가 들어가는 FOUP 도킹 입구로 그린다. 캐리어 도어 밴드 색 = 포트 상태(RUN/IDLE/DOWN). 설비 status 는 시그널 타워.
 - **실설비 자동 표시(R1)**: 저장 placement 가 0 이어도 선택 라인 실설비(`equipmentItems`)를 장비 그리드로 자동 표시(`autoGridPx`, objectKey 0 sentinel). admin 이 편집(드래그/회전)하면 working 으로 승격, 저장 시 object_key NOT NULL FK 충족 위해 백킹 EQUIPMENT 객체 1회 자동 생성(`ensureEquipmentObjectKey`) 후 PUT. 백엔드/스키마 변경 0.
 - **반응형 높이**: 씬 컨테이너 `h-[calc(100dvh-16rem)] min-h-[440px]` — 창 높이에 맞춰 늘고 줄며(최소 440 바닥), r3f Canvas 가 ResizeObserver 로 따라 리사이즈.
@@ -43,8 +43,8 @@ Phase 1~4 구현 완료 — 2026-06-05. 검증: tsc 0 / eslint 0 errors / unit 1
 - e2e: `live-map-3d-floors.spec.ts`(공정별 1/2/3층 자동 배치 + 층 버튼 단일/전체 토글) 신설. 검증: tsc 0 / eslint 0 errors / unit 119 pass / live-map e2e 9 passed(floors+advanced 포함).
 
 ### 런타임 렌더 성능 — memo + visible 토글 + 폴리 감소 (2026-06-06, 미커밋)
-- 원인: 설비 1대 = 메시 ~16개(RoundedBox smoothness 4 고폴리) + drei Html 뱃지 1개 → 실설비 ~54대면 ~860 메시. `LiveMap3DEquipment` 미-memo 라 모든 부모 리렌더(층전환/선택/카메라)마다 트리 재조정. 층 전환을 list 필터로 해 메시 언마운트/재마운트.
-- **memo**: `LiveMap3DEquipment`/`LiveMap3DObject` 를 `React.memo` — equipment/shape ref 가 안정(TanStack structuralSharing + 메모 Map)이라 층전환/선택 시 메시 트리 재조정 스킵.
+- 원인: 설비 1대 = 메시 ~16개(RoundedBox smoothness 4 고폴리) + drei Html 뱃지 1개 → 실설비 ~54대면 ~860 메시. `LiveMap3DEquipmentField` 미-memo 라 모든 부모 리렌더(층전환/선택/카메라)마다 트리 재조정. 층 전환을 list 필터로 해 메시 언마운트/재마운트.
+- **memo**: `LiveMap3DEquipmentField`/`LiveMap3DObject` 를 `React.memo` — equipment/shape ref 가 안정(TanStack structuralSharing + 메모 Map)이라 층전환/선택 시 메시 트리 재조정 스킵.
 - **visible 토글**: 층 필터를 list 제거 → `<group visible={showFloor}>` 토글로(메시 1회 마운트 유지, 전환은 visible+위치만). 뱃지(drei Html)는 부모 invisible 로 안 숨겨져 `showFloor` 조건부 렌더로 게이팅. 단일층 보기는 안 보이는 층 draw call 도 스킵돼 더 가벼움.
 - **폴리 감소**: RoundedBox `smoothness` 4→2(메인프레임/EFEM), 3→2(FOUP) + 실린더 세그먼트 챔버 24→14·시그널타워 20→12/16→10 — 외형 차이 미미.
 - **번들 분리(진입 비용)**: prod `LiveMapPage` 청크가 1,308kB(three+drei 포함)였음 → vite manualChunks 에 `three-vendor` 추가로 분리(three-vendor 1,108kB gzip 308 / LiveMapPage 387kB gzip 119). 캐시 분리 + 병렬 다운로드.

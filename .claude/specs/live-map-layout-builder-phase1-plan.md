@@ -261,7 +261,10 @@ line_key 관통 체인 (전부 record 라 컴파일러가 누락 강제):
 
 - 현재 `live-map-ui.store.ts` 에 `selectedLine` 상태 **없음** → 추가. 선택 라인 = 전역 스코프, 선택 라인 설비만 표시.
 - `live-map.mock.ts` 의 하드코딩 `lineValue:'A_LINE'` 제거 — 실 API(`GET /live-map`)가 라인 반환(STAGE C4) → 셀렉터에서 라인 필터링.
-- ⚠ `LiveMapToolbar.tsx` 는 lineOptions prop 보유하나 현재 미연결 — 통합 필요.
+- ~~⚠ `LiveMapToolbar.tsx` 는 lineOptions prop 보유하나 현재 미연결 — 통합 필요.~~
+  → **통합 계획 폐기, 파일 제거됨**(wm-parity-foundation SPEC 결정 2). 검색/상태 필터는
+  [LiveMapBoard.tsx:571](../../src/features/live-map/components/LiveMapBoard.tsx#L571)(검색어) 와
+  [LiveMapBoard.tsx:579](../../src/features/live-map/components/LiveMapBoard.tsx#L579)(상태) 가 담당한다.
 
 **E5. eqp 폼 line Select (필수, 자유입력 금지)**
 
