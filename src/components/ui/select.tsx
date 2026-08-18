@@ -2,6 +2,11 @@ import * as React from 'react'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
+import {
+  controlBaseClassName,
+  controlOptionClassName,
+  controlPopupClassName,
+} from './control-styles'
 
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
@@ -11,8 +16,16 @@ function SelectGroup({ ...props }: React.ComponentProps<typeof SelectPrimitive.G
   return <SelectPrimitive.Group data-slot="select-group" {...props} />
 }
 
-function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />
+// 선택값은 trigger 안의 flex item 이라 기본 min-width:auto 로는 내용보다 좁아지지 않는다 — 공백 없는 긴 값
+// (예: 액션명 RAISE_OPERATION_CONTRACT_FAILURE)이 trigger 밖으로 삐져나온다. 줄이고 말줄임한다.
+function SelectValue({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
+  return (
+    <SelectPrimitive.Value
+      data-slot="select-value"
+      className={cn('min-w-0 truncate', className)}
+      {...props}
+    />
+  )
 }
 
 function SelectTrigger({
@@ -24,14 +37,15 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        'flex h-11 w-full items-center justify-between rounded-xl border border-border bg-background px-3 text-sm text-foreground transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-brand-accent focus-visible:ring-[3px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-foreground',
+        controlBaseClassName,
+        'flex h-10 items-center justify-between gap-2 overflow-hidden px-3 text-left data-placeholder:text-muted-foreground',
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className="size-4 text-muted-foreground" />
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-150" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -78,7 +92,8 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          'relative z-(--z-dropdown) max-h-96 min-w-32 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl data-[state=closed]:animate-out data-[state=open]:animate-in',
+          controlPopupClassName,
+          'relative z-(--z-dropdown) max-h-96 min-w-32 data-[state=closed]:animate-out data-[state=open]:animate-in',
           position === 'popper' &&
             'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
           className,
@@ -106,7 +121,7 @@ function SelectLabel({ className, ...props }: React.ComponentProps<typeof Select
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn('px-2 py-1.5 text-xs font-medium text-muted-foreground', className)}
+      className={cn('px-2.5 pb-1.5 pt-2 text-xs font-semibold text-muted-foreground', className)}
       {...props}
     />
   )
@@ -117,7 +132,8 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        'relative flex w-full cursor-default items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-brand-accent',
+        controlOptionClassName,
+        'pl-8 data-highlighted:bg-accent data-highlighted:text-brand-accent',
         className,
       )}
       {...props}
