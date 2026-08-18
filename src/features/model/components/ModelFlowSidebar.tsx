@@ -53,10 +53,12 @@ function FlowGroupSection({
 
   return (
     <div className="space-y-1">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => setExpanded((prev) => !prev)}
-        className="flex w-full items-center gap-1 rounded-sm px-1 py-1 text-left text-xs font-semibold text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+        className="flex w-full items-center justify-start gap-1 rounded-sm px-1 py-1 text-left text-xs font-semibold text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
         aria-expanded={expanded}
       >
         {expanded ? (
@@ -65,17 +67,19 @@ function FlowGroupSection({
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         )}
         <span className="truncate">{workflowName}</span>
-      </button>
+      </Button>
       {expanded ? (
         <div className="ml-3 space-y-0.5 border-l border-border pl-2">
           {flows.map((flow) => {
             const isSelected = selectedFlowId === flow.flowId
             const leafButton = (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => onSelectFlow(flow.flowId)}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
+                  'flex w-full items-center justify-start gap-2 rounded-md px-2 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
                   isSelected
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:bg-muted',
@@ -88,7 +92,7 @@ function FlowGroupSection({
                   )}
                 />
                 <span className="min-w-0 flex-1 truncate font-medium">{flow.messageName}</span>
-              </button>
+              </Button>
             )
             // 편집 가능(checkout) 상태에서만 우클릭 Delete 노출 — 그 외엔 일반 버튼.
             if (!isEditable) {

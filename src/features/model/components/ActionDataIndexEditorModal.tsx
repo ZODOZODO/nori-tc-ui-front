@@ -407,29 +407,33 @@ function ActionDataIndexEditorModalBody({
                               />
                             </TableCell>
                             <TableCell>
-                              <select
+                              <Select
                                 value={field.from}
-                                onChange={(event) =>
+                                onValueChange={(next) =>
                                   setDraft((previousDraft) => ({
                                     ...previousDraft,
                                     fields: updateActionDataIndexDraftRow(
                                       previousDraft.fields,
                                       field.id,
                                       {
-                                        from: event.target.value as FlowLookupSource,
+                                        from: next as FlowLookupSource,
                                       },
                                     ),
                                   }))
                                 }
-                                className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                                 disabled={readOnly}
                               >
-                                {LOOKUP_SOURCE_OPTIONS.map((source) => (
-                                  <option key={source} value={source}>
-                                    {source}
-                                  </option>
-                                ))}
-                              </select>
+                                <SelectTrigger className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LOOKUP_SOURCE_OPTIONS.map((source) => (
+                                    <SelectItem key={source} value={source}>
+                                      {source}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </TableCell>
                             <TableCell>
                               <Input

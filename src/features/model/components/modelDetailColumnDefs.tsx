@@ -2,10 +2,18 @@
  * 이 파일은 React 컴포넌트가 아니라 ColumnDef factory + 모듈 상수 (DCOP_COLLECTION_RULE_OPTIONS)
  * 만 export. JSX 사용을 위해 확장자만 .tsx 이며 fast-refresh 대상이 아니므로 룰 예외 처리.
  */
-import { type ChangeEvent } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import i18n from '@/i18n'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SELECT_EMPTY_VALUE,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { ModelDetailRow } from '../types/model.types'
@@ -261,8 +269,10 @@ export const createWorkflowColumns = ({
               >
                 {previewValue || '—'}
               </span>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => onOpenFlowTextEditor(row, rowIdx, columnIndex)}
                 className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                 aria-label={i18n.t('model.detail.editCellAria', {
@@ -271,7 +281,7 @@ export const createWorkflowColumns = ({
                 })}
               >
                 <MoreHorizontal className="size-3.5" />
-              </button>
+              </Button>
             </div>
           )
         }
@@ -310,46 +320,54 @@ export const createWorkflowColumns = ({
         // Message Name — secs-message / socket-message + MES dropdown
         if (isMessageName) {
           return (
-            <select
-              value={rawValue}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onChangeDetailValue(row.id, columnIndex, event.target.value)
+            <Select
+              value={rawValue === '' ? SELECT_EMPTY_VALUE : rawValue}
+              onValueChange={(next) =>
+                onChangeDetailValue(row.id, columnIndex, next === SELECT_EMPTY_VALUE ? '' : next)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
-              <option value="">—</option>
-              {rawValue && !messageOptions.some((option) => option.value === rawValue) ? (
-                <option value={rawValue}>{rawValue}</option>
-              ) : null}
-              {messageOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_EMPTY_VALUE}>—</SelectItem>
+                {rawValue && !messageOptions.some((option) => option.value === rawValue) ? (
+                  <SelectItem value={rawValue}>{rawValue}</SelectItem>
+                ) : null}
+                {messageOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )
         }
 
         // EventId — eventides dropdown (SECS 모델 전용; SOCKET 시 options 빈 배열)
         if (isEventId) {
           return (
-            <select
-              value={rawValue}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onChangeDetailValue(row.id, columnIndex, event.target.value)
+            <Select
+              value={rawValue === '' ? SELECT_EMPTY_VALUE : rawValue}
+              onValueChange={(next) =>
+                onChangeDetailValue(row.id, columnIndex, next === SELECT_EMPTY_VALUE ? '' : next)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
-              <option value="">—</option>
-              {rawValue && !eventIdOptions.includes(rawValue) ? (
-                <option value={rawValue}>{rawValue}</option>
-              ) : null}
-              {eventIdOptions.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_EMPTY_VALUE}>—</SelectItem>
+                {rawValue && !eventIdOptions.includes(rawValue) ? (
+                  <SelectItem value={rawValue}>{rawValue}</SelectItem>
+                ) : null}
+                {eventIdOptions.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )
         }
 
@@ -437,41 +455,47 @@ export const createDcopItemsColumns = ({
 
         if (isEventId) {
           return (
-            <select
-              value={rawValue}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onChangeDetailValue(row.id, columnIndex, event.target.value)
+            <Select
+              value={rawValue === '' ? SELECT_EMPTY_VALUE : rawValue}
+              onValueChange={(next) =>
+                onChangeDetailValue(row.id, columnIndex, next === SELECT_EMPTY_VALUE ? '' : next)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
-              <option value="">—</option>
-              {rawValue && !eventIdOptions.includes(rawValue) ? (
-                <option value={rawValue}>{rawValue}</option>
-              ) : null}
-              {eventIdOptions.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_EMPTY_VALUE}>—</SelectItem>
+                {rawValue && !eventIdOptions.includes(rawValue) ? (
+                  <SelectItem value={rawValue}>{rawValue}</SelectItem>
+                ) : null}
+                {eventIdOptions.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )
         }
 
         if (isCollectionRule) {
           return (
-            <select
+            <Select
               value={rawValue || 'LAST'}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onChangeDetailValue(row.id, columnIndex, event.target.value)
-              }
-              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+              onValueChange={(next) => onChangeDetailValue(row.id, columnIndex, next)}
             >
-              {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
-                <option key={rule} value={rule}>
-                  {rule}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DCOP_COLLECTION_RULE_OPTIONS.map((rule) => (
+                  <SelectItem key={rule} value={rule}>
+                    {rule}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )
         }
 
@@ -589,23 +613,27 @@ export const createPlcColumns = ({
         }
         if (options) {
           return (
-            <select
-              value={rawValue}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onChangeDetailValue(row.id, columnIndex, event.target.value)
+            <Select
+              value={rawValue === '' ? SELECT_EMPTY_VALUE : rawValue}
+              onValueChange={(next) =>
+                onChangeDetailValue(row.id, columnIndex, next === SELECT_EMPTY_VALUE ? '' : next)
               }
-              className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             >
-              <option value="">—</option>
-              {rawValue && !options.includes(rawValue) ? (
-                <option value={rawValue}>{rawValue}</option>
-              ) : null}
-              {options.map((optionValue) => (
-                <option key={optionValue} value={optionValue}>
-                  {optionValue}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_EMPTY_VALUE}>—</SelectItem>
+                {rawValue && !options.includes(rawValue) ? (
+                  <SelectItem value={rawValue}>{rawValue}</SelectItem>
+                ) : null}
+                {options.map((optionValue) => (
+                  <SelectItem key={optionValue} value={optionValue}>
+                    {optionValue}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )
         }
 

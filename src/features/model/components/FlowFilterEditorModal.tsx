@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
 import {
@@ -368,27 +375,31 @@ function FlowNodeEditor({
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground">from</label>
-            <select
+            <Select
               value={node.from}
-              onChange={(event) =>
+              onValueChange={(next) =>
                 onUpdateNode(node.id, (targetNode) =>
                   targetNode.nodeType === 'condition'
                     ? {
                         ...targetNode,
-                        from: event.target.value as FlowLookupSource,
+                        from: next as FlowLookupSource,
                       }
                     : targetNode,
                 )
               }
-              className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
               disabled={readOnly}
             >
-              {LOOKUP_SOURCE_OPTIONS.map((source) => (
-                <option key={source} value={source}>
-                  {source}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOOKUP_SOURCE_OPTIONS.map((source) => (
+                  <SelectItem key={source} value={source}>
+                    {source}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -412,27 +423,31 @@ function FlowNodeEditor({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground">comparison</label>
-            <select
+            <Select
               value={node.comparison}
-              onChange={(event) =>
+              onValueChange={(next) =>
                 onUpdateNode(node.id, (targetNode) =>
                   targetNode.nodeType === 'condition'
                     ? {
                         ...targetNode,
-                        comparison: event.target.value as FlowComparison,
+                        comparison: next as FlowComparison,
                       }
                     : targetNode,
                 )
               }
-              className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
               disabled={readOnly}
             >
-              {FLOW_COMPARISON_OPTIONS.map((comparison) => (
-                <option key={comparison} value={comparison}>
-                  {comparison}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FLOW_COMPARISON_OPTIONS.map((comparison) => (
+                  <SelectItem key={comparison} value={comparison}>
+                    {comparison}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -554,24 +569,28 @@ function FlowNodeEditor({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Select
             value={node.groupType}
-            onChange={(event) =>
+            onValueChange={(next) =>
               onUpdateNode(node.id, (targetNode) =>
                 targetNode.nodeType === 'group'
                   ? {
                       ...targetNode,
-                      groupType: event.target.value as FlowGroupDraft['groupType'],
+                      groupType: next as FlowGroupDraft['groupType'],
                     }
                   : targetNode,
               )
             }
-            className="h-9 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
             disabled={readOnly}
           >
-            <option value="and">and</option>
-            <option value="or">or</option>
-          </select>
+            <SelectTrigger className="h-9 rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="and">and</SelectItem>
+              <SelectItem value="or">or</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"

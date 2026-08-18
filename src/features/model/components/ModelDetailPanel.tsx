@@ -710,15 +710,19 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                       : 'border-border bg-card text-muted-foreground hover:bg-muted',
                   )}
                 >
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onSelectTab(tab.modelVersionKey)}
                     className="px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
                   >
                     {tab.modelName} / {tab.modelVersion}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={(event) => {
                       event.stopPropagation()
                       onCloseTab(tab.modelVersionKey)
@@ -732,7 +736,7 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                     aria-label={t('model.detail.tabCloseAria', { name: tab.modelName, version: tab.modelVersion })}
                   >
                     <X className="size-3.5" />
-                  </button>
+                  </Button>
                 </div>
               ))
             )}
@@ -855,23 +859,25 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
                 {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
                     MesMessage / Parameter — workflow 는 Message Flows 가 대체. */}
                 {detailNodes.filter((node) => node !== 'workflow').map((node) => (
-                  <button
+                  <Button
                     key={node}
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       // Reference 노드 선택은 Flow selection / draft 와 상호 배타.
                       setSelectedFlowId(null)
                       onSelectDetailNode(node)
                     }}
                     className={cn(
-                      'rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
+                      'justify-start rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
                       selectedFlowId === null && !isDraftMode && normalizedDetailNode === node
                         ? 'bg-muted font-semibold text-foreground'
                         : 'text-muted-foreground hover:bg-muted',
                     )}
                   >
                     {MODEL_DETAIL_NODE_LABELS[node]}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </section>
