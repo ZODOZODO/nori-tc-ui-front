@@ -351,6 +351,7 @@
 | C7 | `225db3e` | ui-front | 4개 — 신설 `shared/stores/toast.store.ts` · `shared/components/Toaster.tsx` · `shared/lib/notify.ts`(wm 무수정 이식) + 수정 `app/providers/AppProvider.tsx` | **AC14** + AC1 AC2 AC3 | ✅ 완료 |
 | C8 | `a21d0f9` | ui-front | 7개 — group 4(`GroupAddMembersModal` · `GroupUpsertModal` · `GroupPermissionsModal` · `GroupDeleteConfirmDialog`) · user 3(`UserUpsertModal` · `UserDeleteConfirmDialog` · `UserPasswordResetModal`) | **AC13** + AC1 AC2 AC3 | ✅ 완료 |
 | C9 | `776bdca` | ui-front | 3개 — 신설 `components/ui/control-styles.ts`(wm 무수정) + 수정 `components/ui/input.tsx` · `components/ui/select.tsx` | (AC 없음 — R4 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
+| C10 | `08899d3` | ui-front | 3개 — 신설 `components/ui/checkbox.tsx`(Plan §3.6-C 전문) · `components/ui/switch.tsx`(wm 무수정) + 수정 `components/ui/select.tsx`(`SELECT_EMPTY_VALUE`) | (AC 없음 — R5 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -370,6 +371,7 @@
 | C7 | 80 | 15 | 10 | (토스트 인프라만 추가 — raw 요소 무관) |
 | C8 | 80 | 15 | 10 | (에러 처리만 변경) |
 | C9 | 80 | 15 | 10 | (프리미티브 시각만 변경) |
+| C10 | 80 | 15 | 10 | (프리미티브 신설만 — 소비는 C13~C16) |
 
 ---
 
@@ -745,6 +747,36 @@ Plan §5.C9 의 판정 조건 2 — 레이아웃 회귀 5 spec
 → 실패 2건은 §2.3 baseline FAIL 의 `modal-overflow-guard-extra.spec.ts` **2건과 제목까지 동일**(Plan 이 미리
 판정 제외로 지정한 spec). 나머지 4 spec 12건은 전부 PASS. **판정 조건 2 충족**.
 
+### C10 — 이식 원본 대조 / build / lint / test:unit / 회귀 e2e
+
+원본 대조 + radix 전제 실측
+```
+$ diff ../nori-wm-ui-front/src/components/ui/switch.tsx src/components/ui/switch.tsx
+SWITCH IDENTICAL
+node_modules/radix-ui/dist/index.d.ts:12  export { reactCheckbox as Checkbox }
+node_modules/radix-ui/dist/index.d.ts:56  export { reactSwitch as Switch }
+node_modules/@radix-ui/react-checkbox/dist/index.d.ts:11  type CheckedState = boolean | 'indeterminate'   (1.3.3)
+src/index.css:65 --color-brand-primary / :129 --brand-primary  (신규 토큰 0)
+```
+`checkbox.tsx` 는 wm 에 원본이 없어 Plan §3.6-C 의 고정 전문을 그대로 옮겼다(디자인 재량 0).
+
+`npm run build` / `npm run lint` / `npm run test:unit` — 전부 PASS (신규 의존성 0)
+```
+✓ built in 35.24s
+> nori-tc-ui@0.0.0 lint
+> eslint .
+# fail 0
+# duration_ms 4427.4694
+```
+
+회귀 e2e (login smoke · layout-overflow-guard · modal-visual-sweep-eqp)
+```
+  ok 8 [chromium] › tests\e2e\modal\modal-visual-sweep-eqp.spec.ts:88:1 › EqpManageFormModal(SECS create) …
+  ok 9 [chromium] › tests\e2e\modal\modal-visual-sweep-eqp.spec.ts:113:1 › EqpManageFormModal(Socket create) …
+  9 passed (28.9s)
+```
+→ 실패 0. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -952,3 +984,10 @@ Plan §5.C9 의 판정 조건 2 — 레이아웃 회귀 5 spec
   같은 도메인의 baseline PASS spec(`model-check-in-diff-overflow`)으로 대체하고 그 사실을 §7 에 적었다.
 - 임시 캡처 spec(`tests/e2e/_c9-login-capture.spec.ts`)은 캡처 후 삭제했다. 증거 PNG 2장은
   `.claude/specs/assets/` 에 넣어 git 으로 추적한다(`test-results/` 는 실행마다 지워진다).
+
+### C10-상태 — 신설 프리미티브 3종의 소비처가 이 시점엔 0이다
+
+- Plan §5.C10 의 주의사항 그대로다: `checkbox.tsx` / `switch.tsx` / `SELECT_EMPTY_VALUE` 는
+  **C13~C16 에서 배선**되기 전까지 소비처가 없다(글로벌 룰 11 의 미사용 추상화 구간).
+- Plan 이 "C10 과 C13 사이에 세션을 끊지 않는다" 로 봉인했고, 이 세션이 그대로 이어서 진행한다.
+  부득이 끊길 경우 다음 세션의 첫 작업은 **C11 이 아니라 C13 까지 완주**하는 것이다.
