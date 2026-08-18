@@ -350,6 +350,7 @@
 | C6 | `b45f54f` | **nori-tc-exec** | 1개 — `docs/Architecture/ui/front/10-live-map-dashboard-and-demo-control.md:15-16` | (AC 없음 — R10 문서) | ✅ 완료 |
 | C7 | `225db3e` | ui-front | 4개 — 신설 `shared/stores/toast.store.ts` · `shared/components/Toaster.tsx` · `shared/lib/notify.ts`(wm 무수정 이식) + 수정 `app/providers/AppProvider.tsx` | **AC14** + AC1 AC2 AC3 | ✅ 완료 |
 | C8 | `a21d0f9` | ui-front | 7개 — group 4(`GroupAddMembersModal` · `GroupUpsertModal` · `GroupPermissionsModal` · `GroupDeleteConfirmDialog`) · user 3(`UserUpsertModal` · `UserDeleteConfirmDialog` · `UserPasswordResetModal`) | **AC13** + AC1 AC2 AC3 | ✅ 완료 |
+| C9 | `776bdca` | ui-front | 3개 — 신설 `components/ui/control-styles.ts`(wm 무수정) + 수정 `components/ui/input.tsx` · `components/ui/select.tsx` | (AC 없음 — R4 프리미티브) + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -368,6 +369,7 @@
 | C6 | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C7 | 80 | 15 | 10 | (토스트 인프라만 추가 — raw 요소 무관) |
 | C8 | 80 | 15 | 10 | (에러 처리만 변경) |
+| C9 | 80 | 15 | 10 | (프리미티브 시각만 변경) |
 
 ---
 
@@ -714,6 +716,35 @@ src/features/group/components/GroupUpsertModal.tsx
 → 5건 모두 §2.3 의 baseline FAIL 과 **테스트 제목이 동일**(`group-page.spec.ts` 2 + `selectable-table-group-list.spec.ts` 3).
 `:475`→`:478` 줄 이동은 아래 조사 기록의 spec 동기화 3줄 추가 때문이고 제목·판정은 그대로다. **회귀 0**.
 
+### C9 — build / lint / test:unit / 레이아웃 회귀 5 spec
+
+wm 원본 대조 — `select.tsx` 는 이식 후 wm 파일과 **완전 동일**(diff 0), `control-styles.ts` / `input.tsx` 도 무수정 복사
+```
+$ diff ../nori-wm-ui-front/src/components/ui/select.tsx src/components/ui/select.tsx
+SELECT IDENTICAL
+$ grep -n "color-input|color-card|shadow-soft-md|brand-accent|color-popover" src/index.css
+34: --color-card / 36: --color-popover / 48: --color-input / 66: --color-brand-accent / 87: --shadow-soft-md
+```
+
+`npm run build` / `npm run lint` / `npm run test:unit` — 전부 PASS
+```
+✓ built in 17.18s
+> nori-tc-ui@0.0.0 lint
+> eslint .
+# fail 0
+# duration_ms 2995.4007
+```
+
+Plan §5.C9 의 판정 조건 2 — 레이아웃 회귀 5 spec
+```
+  2 failed
+    [chromium] › tests\e2e\modal\modal-overflow-guard-extra.spec.ts:107:1 › eqp CheckInModal — 긴 Param Value/Description diff 가 모달 폭 밖으로 안 나간다
+    [chromium] › tests\e2e\modal\modal-overflow-guard-extra.spec.ts:183:1 › ParentModelCommitModal — 컬럼 多/긴 값 diff 가 모달 폭 밖으로 안 나간다
+  12 passed (1.4m)
+```
+→ 실패 2건은 §2.3 baseline FAIL 의 `modal-overflow-guard-extra.spec.ts` **2건과 제목까지 동일**(Plan 이 미리
+판정 제외로 지정한 spec). 나머지 4 spec 12건은 전부 PASS. **판정 조건 2 충족**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -724,7 +755,18 @@ src/features/group/components/GroupUpsertModal.tsx
 
 ## 7. 스크린샷
 
-(C9 에서 첨부)
+**C9 — control-styles 이식 전/후** (증거이지 게이트가 아니다. Plan §5.C9)
+
+| 화면 | before | after | 판정 |
+|---|---|---|---|
+| EQP 관리 폼 모달(SECS create) | [c9-before-eqp-form.png](assets/c9-before-eqp-form.png) | [c9-after-eqp-form.png](assets/c9-after-eqp-form.png) | **의도한 변경** — 컨트롤 높이 44→40px, 모서리 덜 둥글게, 글자 15px, 테두리/배경 톤 변화. 2열 필드 그리드 정렬·모달 폭·요소 잘림 **변화 없음** |
+| `/login` | — | — | **차이 0** — `LoginPage.tsx` 는 `Input` 프리미티브를 쓰지 않고 raw `<input>` 4곳(`:63,185,211,238`)을 직접 쓴다. 이 화면은 C9 의 영향 밖이다(캡처로 확인) |
+| 모델 변경사항 미리보기 모달 | — | — | **차이 0** — 화면 안에 Input/Select 가 없다(표·배지만). `model-check-in-diff-overflow` spec 캡처로 확인 |
+
+두 스크린샷을 직접 열어(Read) 비교했고, 잘림·겹침 같은 의도치 않은 깨짐은 없었다 → 그대로 커밋했다.
+`/login` 대신 **모델 상세 패널**을 찍으려 했으나 그 패널을 렌더하는 spec 4개(`model-flow`,
+`selectable-table-model-info`/`-workflow`/`-parent-model-commit`)가 전부 baseline FAIL 이라
+같은 model 도메인에서 baseline PASS 인 `model-check-in-diff-overflow` 로 대체했다.
 
 ---
 
@@ -900,3 +942,13 @@ src/features/group/components/GroupUpsertModal.tsx
   단정을 약화한 것이 아니라 **로드 완료 대기를 명시**한 것이다. 이후 4-spec 2/2 에서 비-baseline 실패 0.
 - `tests/e2e/` 는 `.gitignore:20` 으로 추적 대상이 아니라 이 spec 수정은 커밋에 포함되지 않는다
   (Plan §4 의 "같은 커밋" 요구는 추적되는 파일에만 적용 가능).
+
+### C9-결함-1 — Plan 이 지정한 스크린샷 3화면 중 2화면이 이 SPEC 의 영향 밖이다
+
+- Plan §5.C9 는 `/login` · EQP 관리 폼 모달 · 모델 상세 패널을 찍으라고 했다. 실제로 찍어 보니
+  `/login` 은 `Input` 프리미티브를 안 쓰고(raw `<input>` 4곳), 모델 쪽 캡처 화면에는 Input/Select 가 없다
+  → 전/후 차이 0. **컨트롤 시각 변화를 실제로 보여 주는 화면은 EQP 폼 모달 하나**다.
+- **모델 상세 패널**을 찍으려 했으나 그 패널을 렌더하는 spec 4개가 전부 baseline FAIL 이라 캡처 자체가 불가.
+  같은 도메인의 baseline PASS spec(`model-check-in-diff-overflow`)으로 대체하고 그 사실을 §7 에 적었다.
+- 임시 캡처 spec(`tests/e2e/_c9-login-capture.spec.ts`)은 캡처 후 삭제했다. 증거 PNG 2장은
+  `.claude/specs/assets/` 에 넣어 git 으로 추적한다(`test-results/` 는 실행마다 지워진다).
