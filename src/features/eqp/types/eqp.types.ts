@@ -1,5 +1,4 @@
-import type { ApiResponse } from '@/features/auth/types/auth.types'
-import { isApiResponse } from '@/shared/types/api.types'
+import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 import i18n from '@/i18n'
 

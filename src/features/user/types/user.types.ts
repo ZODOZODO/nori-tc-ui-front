@@ -1,6 +1,5 @@
 import i18n from '@/i18n'
-import { isApiResponse } from '@/shared/types/api.types'
-import type { ApiResponse } from '@/features/auth/types/auth.types'
+import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
 
 /**
  * UserController GET /api/user/{userPk} 응답 payload 타입입니다.

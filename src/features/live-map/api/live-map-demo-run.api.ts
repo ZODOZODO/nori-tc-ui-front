@@ -1,5 +1,5 @@
 import i18n from '@/i18n'
-import type { ApiResponse } from '@/features/auth/types/auth.types'
+import type { ApiResponse } from '@/shared/types/api.types'
 import { apiClient } from '@/shared/lib/api-client'
 import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'

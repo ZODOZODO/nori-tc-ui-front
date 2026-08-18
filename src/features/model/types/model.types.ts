@@ -1,6 +1,5 @@
 import i18n from '@/i18n'
-import { isApiResponse } from '@/shared/types/api.types'
-import type { ApiResponse as BaseApiResponse } from '@/features/auth/types/auth.types'
+import { isApiResponse, type ApiResponse as BaseApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
 export type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'

@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/features/auth/types/auth.types'
+import type { ApiResponse } from '@/shared/types/api.types'
 import {
   createUserFailResponse,
   defaultUserErrorMessage,

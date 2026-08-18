@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/features/auth/types/auth.types'
+import type { ApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
 export type DeployMode = 'register' | 'deploy' | 'history'
