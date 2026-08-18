@@ -349,6 +349,7 @@
 | C5-b | `99f4347` | **nori-tc-common** | 1개 — `.claude/specs/refactor-backlog.md` 4행(284·285 완료 전환 / 287·293 각주) | (AC 없음 — D-5 ledger) | ✅ 완료 |
 | C6 | `b45f54f` | **nori-tc-exec** | 1개 — `docs/Architecture/ui/front/10-live-map-dashboard-and-demo-control.md:15-16` | (AC 없음 — R10 문서) | ✅ 완료 |
 | C7 | `225db3e` | ui-front | 4개 — 신설 `shared/stores/toast.store.ts` · `shared/components/Toaster.tsx` · `shared/lib/notify.ts`(wm 무수정 이식) + 수정 `app/providers/AppProvider.tsx` | **AC14** + AC1 AC2 AC3 | ✅ 완료 |
+| C8 | `a21d0f9` | ui-front | 7개 — group 4(`GroupAddMembersModal` · `GroupUpsertModal` · `GroupPermissionsModal` · `GroupDeleteConfirmDialog`) · user 3(`UserUpsertModal` · `UserDeleteConfirmDialog` · `UserPasswordResetModal`) | **AC13** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -366,6 +367,7 @@
 | C5-b | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C6 | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C7 | 80 | 15 | 10 | (토스트 인프라만 추가 — raw 요소 무관) |
+| C8 | 80 | 15 | 10 | (에러 처리만 변경) |
 
 ---
 
@@ -675,6 +677,43 @@ wm 원본과 diff 0 — 3파일 전부 무수정 이식
 → 3건 모두 §2.3 의 baseline FAIL 과 **정확히 동일**. `console/pageerror 0` 을 단언하는 spec 들이 통과했으므로
 Toaster 마운트가 콘솔 오류를 유발하지 않음도 함께 확인된다. **회귀 0**.
 
+### C8 — AC grep / build / lint / test:unit / 회귀 e2e
+
+AC13 grep — 7파일
+```
+$ grep -rln "notifyFailure" src/features/user src/features/group
+src/features/user/components/UserDeleteConfirmDialog.tsx
+src/features/user/components/UserPasswordResetModal.tsx
+src/features/user/components/UserUpsertModal.tsx
+src/features/group/components/GroupAddMembersModal.tsx
+src/features/group/components/GroupDeleteConfirmDialog.tsx
+src/features/group/components/GroupPermissionsModal.tsx
+src/features/group/components/GroupUpsertModal.tsx
+```
+
+`npm run build` / `npm run lint` / `npm run test:unit` — 전부 PASS
+```
+✓ built in 16.64s
+> nori-tc-ui@0.0.0 lint
+> eslint .
+# pass 209
+# fail 0
+# duration_ms 2867.2033
+```
+
+회귀 e2e (user-page · group-page · modal-visual-sweep-group · selectable-table-group-list) — 21 passed / 5 failed(사전 실패)
+```
+  5 failed
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:478:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+    [chromium] › tests\e2e\selectable-table\selectable-table-group-list.spec.ts:181:1 › Selectable-Table-R4-AC-3a: GroupListTable 2x2 영역 Ctrl+C → 클립보드 TSV
+    [chromium] › tests\e2e\selectable-table\selectable-table-group-list.spec.ts:219:1 › Selectable-Table-R4-AC-3b: GroupListTable 기존 Pencil 액션 버튼 클릭 시 GroupUpsertModal 노출 (회귀)
+    [chromium] › tests\e2e\selectable-table\selectable-table-group-list.spec.ts:235:1 › Selectable-Table-R4-AC-3c: GroupListTable 행 더블클릭 시 GroupUpsertModal 노출 (신규 W-GL1=A)
+  21 passed (56.0s)
+```
+→ 5건 모두 §2.3 의 baseline FAIL 과 **테스트 제목이 동일**(`group-page.spec.ts` 2 + `selectable-table-group-list.spec.ts` 3).
+`:475`→`:478` 줄 이동은 아래 조사 기록의 spec 동기화 3줄 추가 때문이고 제목·판정은 그대로다. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -844,3 +883,20 @@ Toaster 마운트가 콘솔 오류를 유발하지 않음도 함께 확인된다
 - Plan 은 "I18nProvider 자식으로 마운트" 만 지시했고, 기존 코드는 `<I18nProvider>{children}</I18nProvider>`
   한 줄이었다. 자식이 2개가 되므로 여는/닫는 태그를 여러 줄로 펼치는 형태 변경이 불가피했다.
 - 동작 변경은 없다(같은 provider 아래 형제 추가). 그 외 `AppProvider.tsx` 는 import 1줄 외 무변경.
+
+### C8-조사기록 — `group-page.spec.ts` `Group-AC-5` 가 4-spec 병렬에서만 실패했다 (spec 경합, 코드 결함 아님)
+
+- **현상**: C8 변경 후 4-spec 병렬 실행에서 baseline PASS 인 `Group-AC-5: 그룹 수정 성공` 이 4회 중 3회
+  FAIL. 단독 실행은 PASS, `group-page.spec.ts` 단일 파일 실행도 3/3 PASS.
+- **실패 원인 확정**: 실패 스크린샷에 `Fill in all required fields (group code, group name).` 이 떠 있다 —
+  `GroupUpsertModal.tsx:96` 의 **클라이언트 사전 검증**이다(C8 이 손대지 않은 줄). spec 이
+  `group-row-edit-10` 클릭 직후 상세 GET 응답을 기다리지 않고 Save 를 눌러, `groupCode` 가 빈 값인
+  순간에 눌리면 막힌다. 15s 뒤 캡처된 화면에는 `ADMINS` 가 들어와 있어 **응답이 늦게 도착했음**이 보인다.
+- **차분 실험**: C8 변경을 `git stash` 로 빼고 같은 4-spec 을 2회 → `Group-AC-5` 2/2 PASS.
+  즉 C8 이 dev 모듈 그래프에 `notify`→`toast.store` 를 한 겹 더 얹어 첫 모달 렌더를 몇 ms 늦추고,
+  그것이 원래 존재했던 spec 경합을 넘긴 것으로 본다. **런타임 동작 변경은 없다**(검증 로직·API 경로 무변경).
+- **조치**: 프로덕션 코드가 아니라 **spec 을 동기화**했다 — 편집 클릭 후
+  `await expect(page.locator('#group-upsert-code')).toHaveValue('ADMINS')` 3줄 추가.
+  단정을 약화한 것이 아니라 **로드 완료 대기를 명시**한 것이다. 이후 4-spec 2/2 에서 비-baseline 실패 0.
+- `tests/e2e/` 는 `.gitignore:20` 으로 추적 대상이 아니라 이 spec 수정은 커밋에 포함되지 않는다
+  (Plan §4 의 "같은 커밋" 요구는 추적되는 파일에만 적용 가능).
