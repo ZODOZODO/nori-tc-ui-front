@@ -140,9 +140,10 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 - **확정(A): wm 값 그대로 이식.**
   근거 — (1) R4 가 문자열로 지시한 작업이 정확히 이것이고, (2) SPEC Why 의 목표가 "nori-wm-ui-front 수준으로
   개선"이며, (3) 필요한 토큰이 tc `index.css` 에 전부 존재해 반쪽 이식할 기술적 이유가 없다.
-  **단 게이트 부착(확정 조건)**: 커밋 전 Login / EqpManageFormModal / ModelDetailPanel 3화면의 before/after
-  스크린샷을 dev-report 에 첨부하고 사용자 확인을 받는다(글로벌 메모리
+  **부수 조건**: 커밋 전 Login / EqpManageFormModal / ModelDetailPanel 3화면의 before/after
+  스크린샷을 찍어 에이전트가 `Read` 로 직접 확인하고 dev-report 에 첨부한다(글로벌 메모리
   `feedback_3d_visual_verify_screenshot` / `feedback_visual_e2e_real_env_verify` — "지오메트리만 쌓고 통과 단정 금지").
+  **승인 게이트가 아니다** — S-08 참조. 판정은 레이아웃 회귀 5 spec 으로만 한다.
 - (기각된 대안 B: 상수 파일만 만들고 값은 tc 현행 클래스로 채우기 — 시각 변경 0 이나 R4 문언과 어긋남)
 
 ### D-2. `EqpManageFormModal.ToggleField` — SPEC 내부 모순 · **확정: A**
@@ -209,6 +210,165 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 
 ---
 
+---
+
+## 3.5 결정 봉인 — **Implement 세션은 사용자에게 아무것도 묻지 않는다**
+
+> 이 절의 목적은 하나다: Implement 중 "어느 쪽으로 할까요?" 가 **한 번도 나오지 않게** 하는 것.
+> 아래 표의 모든 항목은 값이 확정돼 있다. 표에 없는 상황이 나오면 그것은 계획 결함이므로
+> dev-report 의 `계획 결함` 섹션에 기록하고 **가장 보수적인 선택(기존 동작 보존)** 으로 진행한다.
+
+| # | 이전에 열려 있던 선택 | **봉인된 값** | 근거 |
+|---|---|---|---|
+| S-01 | control-styles 값 | wm 원본 문자열 그대로 | D-1 확정(A) |
+| S-02 | ToggleField 대체물 | wm `switch.tsx` 이식 | D-2 확정(A) |
+| S-03 | `*ApiError` 통합 | 단일 `ApiError`, 도메인 별칭 0 | D-3 |
+| S-04 | dlq 로컬 `ApiResponse` | 전환함 | D-4 |
+| S-05 | refactor-backlog | 284/285 완료 처리(C5-b) | D-5 확정 |
+| S-06 | **e2e baseline 측정 조건** | **백엔드 미기동**(프론트 dev server 만). `verify-ui/*` 11 + `demo-matrix.harness` 는 baseline FAIL 로 잡히고 판정에서 제외된다 | 재현성 — 백엔드 상태가 판정에 섞이면 C0/C18 대조가 무효(W8). 프론트 e2e 대부분은 `route.fulfill` mock 이라 백엔드 불필요 |
+| S-07 | **C1 분할 여부** | **항상 C1-a / C1-b 로 2분할** | 예산에 따른 재량 판단을 없앤다. 세션이 남아도 분할한다 |
+| S-08 | **C9 스크린샷 승인 주체** | **사용자 승인 없음.** 스크린샷은 dev-report 첨부용 증거일 뿐이고, 판정은 `layout-overflow-guard` + `modal-overflow-guard-extra` + `modal-visual-sweep-{eqp,group,livemap}` **5 spec PASS** 로만 한다 | 승인 게이트는 사용자 결정이므로 제거. 기계 판정으로 대체 |
+| S-09 | 빈 문자열 select 옵션 | `SELECT_EMPTY_VALUE` 센티널 (§3.6-B) | radix 가 빈 문자열 `SelectItem` 을 throw 로 거부(실측) |
+| S-10 | raw `<button>` → `<Button>` 매핑 | §3.6-A 규칙표 | 버튼마다 variant 를 고르는 재량 제거 |
+| S-11 | Checkbox 컴포넌트 클래스 | §3.6-C 에 파일 전문 고정 | 새로 디자인할 여지 제거 |
+| S-12 | Switch 의 label 결합 방식 | 감싸는 `<label>` 제거 + `id`/`htmlFor` 명시 결합 | 암묵 결합은 브라우저별 이중 토글 위험. 명시 결합이 e2e 로 검증 가능 |
+| S-13 | `notifyFailure` 적용 지점 | §5.C8 의 **9줄 고정 목록** | "catch 안의 것만" 은 `Promise.allSettled` 경로를 놓친다(실측) |
+| S-14 | AC12 소비처 | `UserListTable.tsx` 1곳 (`GroupListTable` 미적용) | 룰 4(surgical) |
+| S-15 | R8/R9 5항목 | 전부 **보류**, 코드 변경 0 | §5.C17 |
+| S-16 | 신규 i18n 키 | **0건.** 필요한 문구는 전부 기존 키 재사용 — `error.auth.csrf`(:823), `error.group.default`, `deploy.monitor.redeployConfirm`(:265), `common.confirm`/`common.cancel`(:461-462) | 실측 확인 |
+| S-17 | 신규 npm 의존성 | **0건.** `radix-ui@1.4.3` 이 checkbox·select·switch·toast 를 전부 번들(실측) | Constraints |
+| S-18 | 커밋 시점 | 각 C 단위 완료 즉시 커밋, main 직접 | 글로벌 룰 17 |
+| S-19 | 계획과 실제가 어긋날 때 | **기존 동작 보존 쪽**으로 진행 + dev-report `계획 결함` 기록. 질문하지 않는다 | 본 절의 목적 |
+
+---
+
+## 3.6 raw 요소 변환 기계 규칙 (재량 제거)
+
+### A. raw `<button>` → `<Button>` (62건)
+
+**규칙**: `variant`/`size` 는 아래 표로 **기존 className 의 문자열 검사만으로** 결정하고,
+**기존 `className` 은 통째로 그대로 넘긴다**(`cn()` = `twMerge` 라 충돌 클래스는 기존 값이 이긴다).
+
+| 기존 className 조건 (순서대로 첫 일치 적용) | variant | size |
+|---|---|---|
+| `bg-destructive` / `bg-danger` 포함 | `destructive` | `sm` |
+| `bg-` 로 시작하는 배경 클래스 포함 | `default` | `sm` |
+| `border` 포함 (배경 없음) | `outline` | `sm` |
+| 위 어디에도 해당 없음 | `ghost` | `sm` |
+
+- `size` 는 **예외 없이 `sm`**. 기존 className 에 `h-*`/`px-*`/`py-*` 가 있으면 twMerge 로 그것이 이기고,
+  없으면 `h-8 px-3` 이 적용된다.
+- `type="button"` 이 없던 버튼에는 **추가한다**(폼 내부 오작동 방지). `LoginPage` 의 submit 버튼
+  (`:263`)만 `type="submit"` 유지.
+- **금지**: `scale-*` / `translate-*` 유틸을 className 에 새로 넣는 것(§4.3 inline transform 합성 버그).
+- `data-testid` / `aria-label` / `title` / `disabled` / `ref` / 이벤트 핸들러는 **전부 그대로 전달**.
+
+### B. raw `<select>` → 공용 `<Select>` (15건)
+
+**radix 실측 제약**: `@radix-ui/react-select@2.2.6` 는 `SelectItem` 의 빈 문자열 value 를 던져서 거부한다
+(`node_modules/@radix-ui/react-select/dist/index.js:892` —
+`"A <Select.Item /> must have a value prop that is not an empty string…"`).
+반면 **Root 의 `value=""` 는 허용**되며 placeholder 를 보여준다.
+
+**봉인 규칙**
+1. `src/components/ui/select.tsx` 에 **`export const SELECT_EMPTY_VALUE = '__empty__'`** 를 1회 정의한다
+   (정의 1 · 소비 5파일이므로 룰 11 의 조기 추상화 아님).
+2. 변환 형태(고정):
+   ```tsx
+   <Select
+     value={rawValue === '' ? SELECT_EMPTY_VALUE : rawValue}
+     onValueChange={(next) => onChange(next === SELECT_EMPTY_VALUE ? '' : next)}
+     disabled={<기존 disabled 식 그대로>}
+   >
+     <SelectTrigger data-testid={<기존 testid>} className={<기존 className 그대로>}>
+       <SelectValue />
+     </SelectTrigger>
+     <SelectContent>
+       <SelectItem value={SELECT_EMPTY_VALUE}>{<기존 빈 option 의 라벨>}</SelectItem>
+       {/* 나머지 option 은 SelectItem 으로 1:1 */}
+     </SelectContent>
+   </Select>
+   ```
+3. **빈 문자열 option 을 가진 사이트 9곳(실측 전수)** — 위 규칙 적용 대상:
+   `EqpPage.tsx:1491`(`EMPTY_VERSION_VALUE = ''`, `:65` 실측),
+   `LiveMap3DScene.tsx:1246,1276,1358`,
+   `LiveMapDemoModal.tsx:776`,
+   `modelDetailColumnDefs.tsx:320,343,447,599`
+4. 빈 option 이 없는 6곳(`LiveMap3DScene.tsx:1344`, `modelDetailColumnDefs.tsx:470`,
+   `FlowFilterEditorModal.tsx:387,431,572-573`, `ActionDataIndexEditorModal.tsx:428`)은 센티널 없이 1:1 변환.
+5. `modelDetailColumnDefs` 의 "현재값이 목록에 없을 때 넣는 fallback option"
+   (`:322,345,449,601` — `rawValue && !options.some(...)` 가드)은 **`rawValue` 가 비어있지 않을 때만
+   렌더되므로 센티널 불필요**. 가드를 그대로 유지한다.
+6. **`<form>` 의존 없음** — 15개 select 가 속한 6파일 전부 `<form>` 0건(실측)이라 `name` prop 불필요.
+
+### C. raw `<input type="checkbox">` → 공용 `<Checkbox>` (10건)
+
+`src/components/ui/checkbox.tsx` **파일 전문을 아래로 고정한다**(디자인 재량 제거).
+크기·색은 현행 raw 체크박스(`LiveMapDemoModal.tsx:101`)의 `size-4 rounded border-input
+accent-brand-primary` 를 radix 로 옮긴 것이고, 포커스·비활성 처리는 wm `switch.tsx` 와 같은 톤이다.
+
+```tsx
+import * as React from 'react'
+import { Check, Minus } from 'lucide-react'
+import { Checkbox as CheckboxPrimitive } from 'radix-ui'
+import { cn } from '@/lib/utils'
+
+/**
+ * 체크박스입니다. tri-state(`checked="indeterminate"`)를 지원해 "일부 선택" 헤더 체크박스가
+ * 명령형 `input.indeterminate` 조작 없이 상태만으로 표현됩니다.
+ */
+function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+  return (
+    <CheckboxPrimitive.Root
+      data-slot="checkbox"
+      className={cn(
+        'peer inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded border border-input bg-card',
+        'transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        'data-[state=checked]:border-brand-primary data-[state=checked]:bg-brand-primary data-[state=checked]:text-white',
+        'data-[state=indeterminate]:border-brand-primary data-[state=indeterminate]:bg-brand-primary data-[state=indeterminate]:text-white',
+        className,
+      )}
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="flex items-center justify-center">
+        {props.checked === 'indeterminate' ? (
+          <Minus className="size-3" aria-hidden="true" />
+        ) : (
+          <Check className="size-3" aria-hidden="true" />
+        )}
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  )
+}
+
+export { Checkbox }
+```
+
+**변환 규칙**
+- `checked` + `onChange(e => …e.target.checked)` → `checked` + `onCheckedChange(next => …next === true)`
+- tri-state 2곳은 명령형 ref 제거: `LiveMapDemoModal.tsx:82-97`(`TriStateCheckbox` 의 `useRef`/`useEffect`
+  통째로 삭제하고 `checked={state === 'indeterminate' ? 'indeterminate' : state === 'checked'}`),
+  `DeployRegisterPanel.tsx:304`(`searchSelectAllRef.current.indeterminate = …` 라인과 ref 삭제)
+- `id` / `data-testid` / `aria-label` / `disabled` / `onClick` (stopPropagation) 은 그대로 전달
+- **BubbleInput 주의**: radix 는 `<form>` 안에서만 숨은 `<input type="checkbox">` 를 렌더한다
+  (`isFormControl = !!form || !!control.closest('form')` 실측). 대상 8파일 중 `<form>` 을 가진 것은
+  `LoginPage.tsx` 뿐이고, deploy e2e 가 쓰는 `DeployRegisterPanel` 은 form 이 없어 **`input[type="checkbox"]`
+  셀렉터가 아무것도 못 잡는다** → §4.2 의 셀렉터 교체가 필수임이 확인된다.
+
+### D. wm `switch.tsx` 이식 + ToggleField 교체 (1건)
+
+- `src/components/ui/switch.tsx` = wm 원본 33줄 **무수정**.
+- `EqpManageFormModal.ToggleField`(`:425-459`) 변환 형태(고정):
+  - 감싸는 `<label>` 을 `<div>` 로 바꾸고(**S-12**), 텍스트는 `<label htmlFor={id}>` 로 분리
+  - 수제 트랙/썸 `<span>` 2개(`:437-447`)와 `<input type="checkbox" className="sr-only">`(`:450-455`) 삭제
+  - `<Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onChange} />` 로 대체
+  - `id` 는 호출부가 넘기지 않으므로 `ToggleField` 내부에서 `useId()` 로 생성한다(전역 유일 보장)
+  - 컨테이너의 `min-h-11 rounded-xl border border-input px-3` + `disabled ? 'bg-muted opacity-70' : 'bg-card'`
+    와 `toggleOn`/`toggleOff` 라벨, `hint` 문단은 **그대로 보존**
+
+---
+
 ## 4. 사전 확정 위험 — R4/R5 는 e2e 스펙 수정을 동반한다 (최우선 인지 사항)
 
 > **AC4(raw `<select>` 0) · AC5(raw checkbox 0) 와 AC16(e2e baseline 회귀 0) 은
@@ -263,17 +423,22 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 
 ---
 
-## 5. 커밋 단위 분할 (C0 ~ C18)
+## 5. 커밋 단위 분할 — 21 단위 (실제 커밋 18개 + 커밋 없는 게이트 3개: C0 / C17 / C18)
 
 > 원칙: ① 각 커밋은 단독으로 `npm run build` + `npm run lint` + `npm run test:unit` 통과,
 > ② 커밋마다 "완료 판정에 쓰는 AC" 를 명시, ③ 컨텍스트 60% 에서 끊겨도 다음 세션이 커밋 경계에서
 > 이어받는다. **세션 경계 후보는 표의 `세션` 칼럼**.
+>
+> **C13~C16 의 raw 요소 변환은 §3.6 의 기계 규칙(A: Button 매핑표 / B: SELECT_EMPTY_VALUE 센티널 /
+> C: Checkbox 파일 전문 / D: ToggleField→Switch)을 그대로 적용한다.** 각 커밋 절은 대상 파일과
+> 잔여 수치만 적고 변환 방식은 반복하지 않는다.
 
 | # | 커밋 | 레포 | R | 완료 판정 AC | 선행 | 병렬 | 세션 |
 |---|---|---|---|---|---|---|---|
 | C0 | (커밋 없음) e2e baseline 기록 | — | AC16 전제 | — | 없음 | — | S1 |
-| C1 | `feat(shared): API 스캐폴딩 shared 승격` | ui-front | R1 | **AC7 AC8 AC9** + AC1~3 | C0 | — | S1 |
-| C2 | `refactor(api): auth.types cross-feature import 해소` | ui-front | R2 | **AC17** + AC1~3 | C1 | — | S1 |
+| C1-a | `feat(shared): API 스캐폴딩 shared 정의 신설 + plain-Error 6파일 전환` | ui-front | R1 | AC1~3 | C0 | — | S1 |
+| C1-b | `refactor(api): *ApiError 6종을 공용 ApiError 로 단일화` | ui-front | R1 | **AC7 AC8 AC9** + AC1~3 | C1-a | — | S1 |
+| C2 | `refactor(api): auth.types cross-feature import 해소` | ui-front | R2 | **AC17** + AC1~3 | C1-b | — | S1 |
 | C3 | `chore(cleanup): 죽은 코드 6파일 + recharts 제거` | ui-front | R10(코드) | **AC10 AC11** + AC1~3 | 없음 | ✅ | S2 |
 | C4 | `docs(specs): live-map 문서에서 제거 파일 서술 정정` | ui-front | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
 | C5-a | `docs(specs): port-carrier-id-lifecycle 3파일 정정` | **common** | R10(문서) | 수동 대조 | C3 | ✅ | S2 |
@@ -293,7 +458,7 @@ tc 의 body 구조(`:527-556`)는 wm(`:720-750`)과 **분기 형태·변수명(`
 | C18 | (커밋 없음) 최종 게이트 — 전체 e2e baseline 대조 | — | — | **AC16** + AC1~3 최종 | C16 | — | S6 |
 
 **병렬 가능 관계 요약**
-- **직렬 필수 사슬**: `C0 → C1 → C2` (shared 정의가 없으면 R2 가 성립 불가)
+- **직렬 필수 사슬**: `C0 → C1-a → C1-b → C2` (shared 정의가 없으면 R2 가 성립 불가)
 - **완전 독립(어느 시점에든 착수 가능)**: C3(+C4~C6), C7(+C8), C9, C10, C11, C12
   (D-1·D-2 가 Plan 단계에서 확정돼 C9/C10 의 결정 대기 선행이 사라졌다)
 - **수렴 4종(C13~C16)** 은 C9·C10 이후. C13/C14 는 서로 파일이 겹치지 않아 병렬 가능.
@@ -324,15 +489,17 @@ dev-report 에 기록할 것(§AC16 판정 근거):
 4. **FAIL spec 전체 목록 + 실패 사유 1줄** — 이 목록은 판정 제외 집합이다
 5. 출력 마지막 5~10줄 코드블록 인용
 
-주의:
-- `verify-ui/*` 11 spec 과 `demo-matrix.harness.spec.ts` 는 **실백엔드(localhost:8080) 전제**다.
-  백엔드 없이 돌리면 baseline FAIL 로 잡히고, 그러면 최종 판정에서도 제외된다 — 이 상태를
-  dev-report 에 "백엔드 미기동으로 baseline 제외"라고 명시한다(사후 해석 여지 제거).
-- 최종 게이트(C18)는 **동일 조건**(같은 백엔드 기동 여부)에서 재측정해야 대조가 성립한다.
+**측정 조건 봉인 (S-06)**: **백엔드(localhost:8080)를 띄우지 않는다.**
+- 근거 — 프론트 e2e 대부분은 `route.fulfill` 로 백엔드를 mock 하므로 불필요하고, 백엔드 상태가
+  섞이면 C0/C18 대조 자체가 무효가 된다(W8). 판정은 목록 대조이지 절대 통과 수가 아니다.
+- 그 결과 `verify-ui/*` 11 spec 과 `demo-matrix.harness.spec.ts` 는 **baseline FAIL** 로 잡히고
+  **최종 판정에서도 제외**된다. dev-report 에 "백엔드 미기동 조건 — 12 spec baseline 제외"를 명시한다.
+- C18 은 **같은 조건(백엔드 미기동)** 에서 재측정한다. 조건을 바꾸지 않는다.
+- 이 조건 때문에 놓치는 회귀는 SPEC 범위 밖이다(AC16 은 baseline 대조로 정의돼 있다).
 
 ---
 
-### 5.C1 — API 스캐폴딩 shared 승격 (R1) · AC7/AC8/AC9
+### 5.C1-a / C1-b — API 스캐폴딩 shared 승격 (R1) · AC7/AC8/AC9
 
 **신설 파일**
 | 경로 | 내용 |
@@ -386,10 +553,16 @@ grep -rn "interface ApiResponse" src         # D-4 보조 → 1건
 npm run build && npm run lint && npm run test:unit
 ```
 
-**위험**: 이 커밋이 SPEC 전체에서 **가장 큰 diff**(약 25파일)이며 런타임 에러 경로를 바꾼다.
-→ 세션 예산이 부족하면 C1 을 `C1-a(shared 정의 신설 + line/comm-log/layout/live-map/dlq 등
-plain-Error 계열 6파일 전환)` / `C1-b(*ApiError 6종 통합 + 소비처 20곳)` 로 2분할해도 좋다.
-단 AC7/AC8/AC9 는 C1-b 완료 시점에만 green 이다.
+**분할 봉인 (S-07): C1 은 예외 없이 2커밋으로 나눈다.** 예산이 남아도 나눈다(재량 제거).
+
+| 커밋 | 범위 | 판정 |
+|---|---|---|
+| **C1-a** | `shared/types/api.types.ts` + `shared/lib/api-error.ts` 신설, `shared/lib/csrf.ts` 에 `issueCsrfToken` 추가. **plain-`Error` 계열 6파일** 전환 — `line.api.ts`, `comm-log.api.ts`, `layout.api.ts`, `live-map.api.ts`, `live-map-demo-run.api.ts`, `dlq.api.ts`(D-4) | AC1~3 만. AC7/8/9 는 아직 미달 |
+| **C1-b** | `*ApiError` 6종 → 단일 `ApiError` 통합 + `withCsrfHeaders`/`resolveSuccessPayload`/`normalize*Error` 로컬 정의 제거 + `instanceof` 소비처 20곳 치환 | **AC7 AC8 AC9** + AC1~3 |
+
+근거 — 이 커밋이 SPEC 전체에서 가장 큰 diff(약 25파일)이고 런타임 에러 경로를 바꾼다.
+plain-Error 계열은 소비처가 `Error.message` 뿐이라 위험도가 낮고, `*ApiError` 통합은 `instanceof`
+20곳을 건드린다. 두 위험을 한 커밋에 섞으면 revert 단위가 커진다.
 
 ---
 
@@ -530,12 +703,28 @@ import 줄(`import { Toaster } from …`)은 `<Toaster` 를 포함하지 않아 
 | `user/components/UserDeleteConfirmDialog.tsx` | 4 |
 | `user/components/UserPasswordResetModal.tsx` | 3 |
 
-**적용 규칙(wm 패턴)**: `catch` 블록의 `setErrorMessage(<사유 계산>)` →
-`setErrorMessage(notifyFailure(error, t('...')))`.
-- **인라인 폼 검증 에러는 유지**(SPEC 명시) — `catch` 밖에서 호출되는 `setErrorMessage` 는 손대지 않는다.
-  즉 39회 전부가 아니라 **catch 안의 것만** 대상.
-- C1 의 `ApiError` 통합으로 `error.payload.errorMsg` 가 `Error.message` 와 동일해지므로
-  `notifyFailure` 의 `error.message` 경로가 그대로 사유를 집는다.
+**적용 지점 봉인 (S-13) — 아래 9줄이 전부다.** "catch 안의 것만" 같은 서술 규칙은
+`Promise.allSettled` 경로를 놓치므로(실측) 줄 단위로 고정한다. 나머지 `setErrorMessage` 30회
+(null 리셋 · 클라이언트 사전 검증 문구)는 **손대지 않는다**.
+
+| 파일:줄 | 현재 | 변환 후 |
+|---|---|---|
+| `GroupAddMembersModal.tsx:108-110` | `setErrorMessage(error instanceof GroupApiError ? error.payload.errorMsg : t('error.group.removeMember'))` | `setErrorMessage(notifyFailure(error, t('error.group.removeMember')))` |
+| `GroupUpsertModal.tsx:122` | `setErrorMessage(error.payload.errorMsg)` | (아래 `:125` 와 합쳐 `instanceof` 분기 제거) |
+| `GroupUpsertModal.tsx:125` | `setErrorMessage(t('group.upsert.saveError'))` | `setErrorMessage(notifyFailure(error, t('group.upsert.saveError')))` — `:121` 의 `if (error instanceof …)` 분기 삭제 |
+| `GroupPermissionsModal.tsx:165,169-176,181` | `firstErrorMessage: string \| null` 에 문구를 담아 `:181` 에서 표시 | `firstError: unknown` 으로 **원본 에러를 보관**하고 `:181` 을 `setErrorMessage(notifyFailure(firstError, t('error.group.default')))` 로. `:172-175` 의 `instanceof` 분기 삭제 |
+| `GroupDeleteConfirmDialog.tsx:39-43` | `instanceof` 2분기 | `setErrorMessage(notifyFailure(error, t('error.group.delete')))` |
+| `UserUpsertModal.tsx:176-180` | `instanceof` 2분기 | `setErrorMessage(notifyFailure(error, t('user.upsert.saveError')))` |
+| `UserDeleteConfirmDialog.tsx:39-43` | `instanceof` 2분기 | `setErrorMessage(notifyFailure(error, t('error.user.delete')))` |
+| `UserPasswordResetModal.tsx:93-96` | `instanceof` 2분기 | `setErrorMessage(notifyFailure(error, t('user.passwordReset.error')))` |
+
+- **fallback 문구는 전부 기존 i18n 키 재사용 — 신규 키 0건**(S-16). 위 표의 키는 전건 실재 확인.
+- C1-b 의 `ApiError` 통합으로 `error.payload.errorMsg === error.message` 가 되므로
+  `notifyFailure` 의 `error.message` 경로가 그대로 서버 사유를 집는다 → `instanceof` 분기가 불필요해진다.
+- `GroupAddMembersModal` 의 `allSettled` 경로(`:146-158`)는 `resultSummary` 로 **이미 인라인 표시**하므로
+  대상 아님(중복 토스트 방지). 이 파일은 `:108` 만으로 AC13 의 "notifyFailure 포함"을 충족한다.
+- **인라인 폼 에러 유지**(SPEC 명시) — `notifyFailure` 의 반환값을 그대로 `setErrorMessage` 에 넣는
+  wm 패턴이라 토스트와 인라인이 같은 문구로 동시에 뜬다.
 
 **검증**: `grep -rln "notifyFailure" src/features/user src/features/group` → **7파일 이상** (AC13)
 
@@ -551,15 +740,27 @@ import 줄(`import { Toaster } from …`)은 `<Toaster` 를 포함하지 않아 
   `SelectValue` 에 `min-w-0 truncate` / `SelectTrigger` 를 `controlBaseClassName` + `h-10 gap-2 overflow-hidden text-left` /
   `SelectContent` 를 `controlPopupClassName` 소비 / `SelectLabel` 패딩·굵기 / `SelectItem` 을 `controlOptionClassName` + `pl-8`
 
-**게이트(D-1 권장안 A 채택 시 필수)**: `/login`, EQP 관리 폼 모달, 모델 상세 패널 3화면의
-before/after 스크린샷을 dev-report 에 첨부 → 사용자 확인 후 커밋 확정.
-(스크린샷은 실제 dev 서버 기동 + Playwright `page.screenshot()` → `Read` 로 직접 확인. 메모리
-`feedback_3d_visual_verify_screenshot` 준수 — "지오메트리만 쌓고 통과 단정 금지".)
+**판정 봉인 (S-08) — 사용자 승인 게이트 없음.** 이 커밋의 통과 조건은 아래 **기계 판정 2개뿐**이다.
 
-**주의**: 이 커밋은 `<Input>`/`<Select>` **기존 소비처 전부**의 시각을 바꾼다(높이 4px 감소 포함).
-`layout-overflow-guard.spec.ts` / `modal/modal-overflow-guard-extra.spec.ts` /
-`modal/modal-visual-sweep-*.spec.ts` 4 spec 이 레이아웃 회귀 감지 대상이다 — 이 커밋 직후
-**해당 4 spec 만 먼저 돌려** 조기 검출한다.
+1. `npm run build` / `npm run lint` / `npm run test:unit` PASS
+2. **레이아웃 회귀 5 spec PASS** — 이 커밋 직후 아래만 먼저 돌려 조기 검출한다:
+   ```
+   npx playwright test tests/e2e/layout-overflow-guard.spec.ts \
+     tests/e2e/modal/modal-overflow-guard-extra.spec.ts \
+     tests/e2e/modal/modal-visual-sweep-eqp.spec.ts \
+     tests/e2e/modal/modal-visual-sweep-group.spec.ts \
+     tests/e2e/modal/modal-visual-sweep-livemap.spec.ts
+   ```
+   (C0 baseline 에서 이 5 spec 이 FAIL 이었다면 그 spec 은 판정 제외 — 목록 대조 원칙 동일)
+
+**스크린샷은 증거이지 게이트가 아니다.** `/login`, EQP 관리 폼 모달, 모델 상세 패널 3화면의
+before/after 를 Playwright `page.screenshot()` 으로 찍어 `Read` 로 직접 확인하고 dev-report 에 첨부한다
+(메모리 `feedback_3d_visual_verify_screenshot`). **확인 결과가 "의도한 변경"이면 그대로 커밋한다 —
+승인을 기다리지 않는다.** 의도치 않은 깨짐(요소 잘림·겹침)이 보이면 그것은 회귀이므로 5 spec 판정과
+무관하게 수정하고, 수정 내용을 dev-report 에 기록한다.
+
+**변경 범위 인지**: 이 커밋은 `<Input>`/`<Select>` **기존 소비처 전부**의 시각을 바꾼다
+(높이 44→40px 포함). §2.2 표의 9축이 의도된 변경이며 이것 자체는 회귀가 아니다.
 
 ---
 
@@ -571,13 +772,12 @@ before/after 스크린샷을 dev-report 에 첨부 → 사용자 확인 후 커�
   `Switch` 사용이라 신규 의존성 0. 소비처는 C13 의 `EqpManageFormModal.ToggleField` 1곳
   (미사용 프리미티브가 되지 않도록 **C13 과 같은 세션(S3→S4 연속)에서 소비 배선까지 마친다**).
 - 신설 `src/components/ui/checkbox.tsx` — **wm 에 원본 없음**(wm `components/ui` 18파일 실측: checkbox 부재).
-  radix-ui 모노패키지 `Checkbox` 기반으로 tc 가 새로 작성한다.
-  스타일 기준은 wm `switch.tsx` 의 톤(`data-[state=checked]:bg-brand-primary`, `focus-visible:ring-[3px] ring-ring`,
-  `disabled:cursor-not-allowed disabled:opacity-50`)을 따르고, 현행 raw 체크박스의
-  `size-4 shrink-0 rounded border-input accent-brand-primary`(`LiveMapDemoModal.tsx:101` 실측) 크기를 보존한다.
-- **`indeterminate` 지원 필수** — 실측 소비처 2곳이 tri-state 다:
-  `LiveMapDemoModal.tsx:87`(`inputRef.current.indeterminate`), `DeployRegisterPanel.tsx:304`(`searchSelectAllRef`).
-  radix 는 `checked="indeterminate"` 로 표현하므로 **명령형 ref 조작(useEffect)이 통째로 사라진다**.
+  **§3.6-C 에 파일 전문이 고정돼 있다(S-11). 그대로 옮겨 적고 디자인을 새로 정하지 않는다.**
+- 신설 `src/components/ui/select.tsx` 의 `SELECT_EMPTY_VALUE` export (§3.6-B) — 이 커밋에 포함.
+  (C9 에서 select.tsx 를 이미 손대므로 C9 에 넣어도 되지만, **봉인상 C10 에 둔다** — 소비는 C13~C16.)
+- **`indeterminate` 지원 확인 완료** — `@radix-ui/react-checkbox@1.3.3` 의
+  `CheckedState = boolean | 'indeterminate'`(`dist/index.d.ts:11` 실측). 소비처 2곳
+  (`LiveMapDemoModal.tsx:87`, `DeployRegisterPanel.tsx:304`)의 명령형 ref 조작이 통째로 사라진다.
 **미이식 확정**: combobox / searchable-select / tooltip (SPEC Out of Scope, tc 소비처 0).
 
 > **주의 — 미사용 프리미티브 방지(글로벌 룰 11)**: C9(control-styles)는 기존 Input/Select 가 즉시
@@ -774,8 +974,10 @@ SPEC 이 "소비처가 이번 SPEC 범위에 없으면 이식 보류 + dev-repor
 | `list-panel-layout.ts` | px 기반 좌측 목록 폭 clamp | tc 의 분할 패널(`EqpPage:1040`, `ModelPage:551`)은 **percent 기반 + 세로(Y축) 분할**(`ResizableDivider` 는 `deltaY`) — 계약 자체가 다름 | **보류** |
 | `page-heading-styles.ts` | `min-h-21 … pb-4` 상수 | tc `PageHeading.tsx` 는 `pb-3`, min-h 없음. 상수화 자체는 소비처 2(PageHeading/PageHeadingWithActions)지만 **wm 값을 쓰면 전 페이지 제목 높이가 바뀜**(시각 변경) | **보류** |
 
-→ 이 커밋은 **코드 변경 0**. dev-report 의 "R8/R9 보류 사유" 섹션으로만 남긴다.
-(만약 사용자가 이식을 원하면 각 항목은 별도 SPEC 으로 — 전부 시각/기능 확장이라 "Foundation" 성격이 아니다.)
+→ **5건 전부 보류로 봉인(S-15). 코드 변경 0.** dev-report 의 "R8/R9 보류 사유" 섹션으로만 남긴다.
+Implement 는 이 판정을 재검토하지 않는다 — 전부 시각/기능 확장이라 "Foundation" 성격이 아니고,
+소비처 없는 프리미티브 이식은 SPEC Constraints 와 글로벌 룰 11 이 금지한다.
+(향후 필요해지면 별도 SPEC 으로 다룬다.)
 
 ---
 
@@ -814,7 +1016,9 @@ npm run test:e2e   # AC16
 | W9 | 컨텍스트 소진으로 세션 중단 | 높 | 중 | §5 표의 `세션` 칼럼대로 S1~S6 분할. 각 세션 끝에 dev-report 갱신 후 커밋 |
 | W10 | ~~D-2 미결정 상태로 착수~~ → **Plan 단계에서 해소**(D-1/D-2/D-5 확정) | — | — | 잔여 위험 없음 |
 | W11 | C10 의 checkbox/switch 가 C13 전까지 소비처 0 (미사용 코드) | 중 | 낮음 | C10→C13 사이 세션 미분할. 부득이 끊기면 dev-report 에 명시(§5.C10 주의) |
-| W12 | EqpManageFormModal 토글의 `<label>` 감싸기 → `<Switch>` 전환 시 클릭 영역 변화 | 중 | 낮음 | radix Switch 는 자체 `<button>` 이라 label 클릭 위임이 필요하다 — `<label htmlFor>` + `id` 로 명시 연결하거나 label 을 유지하고 Switch 를 자식으로 둔다. `modal-visual-sweep-eqp.spec.ts` + `plc/plc-eqp-form.spec.ts` 로 검증 |
+| W12 | EqpManageFormModal 토글의 `<label>` 감싸기 → `<Switch>` 전환 시 클릭 영역 변화 | 중 | 낮음 | **S-12 로 봉인** — 감싸는 label 제거 + `useId()` 기반 `id`/`htmlFor` 명시 결합(§3.6-D). 암묵 결합의 이중 토글 위험을 원천 제거. `modal-visual-sweep-eqp.spec.ts` + `plc/plc-eqp-form.spec.ts` 로 검증 |
+| W13 | radix Select 가 빈 문자열 `SelectItem` 을 throw 로 거부 | **확실**(9곳) | 높음 | §3.6-B 의 `SELECT_EMPTY_VALUE` 센티널로 봉인. 대상 9곳 전수 목록화 완료 |
+| W14 | Implement 중 계획에 없는 상황 발생 | 중 | 낮음 | **S-19** — 기존 동작 보존 쪽으로 진행 + dev-report `계획 결함` 기록. **사용자에게 묻지 않는다** |
 
 ---
 
@@ -827,7 +1031,7 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 ```
 | 커밋 | 롤백 시 주의 |
 |---|---|
-| C1/C2 | 둘은 짝이다. C1 만 revert 하면 C2 의 shared import 가 깨진다 → **C2→C1 역순**으로 |
+| C1-a/C1-b/C2 | 셋은 한 사슬이다. 앞쪽만 revert 하면 뒤쪽의 shared import 가 깨진다 → **C2 → C1-b → C1-a 역순**으로 |
 | C3 | revert 후 **`npm install` 재실행**(package-lock 복원) |
 | C4/C5/C6 | 레포가 달라 각 레포에서 개별 revert |
 | C9 | 시각만 되돌리는 부분 롤백은 `control-styles.ts` 상수 값을 tc 현행 문자열로 되돌리면 됨(D-1 대안 B 로 수렴) — 파일 삭제 불필요 |
@@ -844,16 +1048,25 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 
 | 세션 | 범위 | 진입 시 읽을 것 | 종료 조건 |
 |---|---|---|---|
-| **S1** | C0 → C1 → C2 | SPEC + 이 Plan §5.C0~C2 | AC7/8/9/17 green + dev-report 에 baseline 기록 |
+| **S1** | C0 → C1-a → C1-b → C2 | SPEC + 이 Plan §3.5/§3.6 + §5.C0~C2 | AC7/8/9/17 green + dev-report 에 baseline 기록 |
 | **S2** | C3 → C4/C5-a/C5-b/C6 → C7 → C8 | Plan §5.C3~C8 + D-5 | AC10/11/13/14 green |
 | **S3** | C9 → C10 → C11 → C12 | Plan §5.C9~C12 (D-1/D-2 확정 완료) | AC12/15 green + C9 스크린샷 승인 |
 | **S4** | C13 → C14 | Plan §5.C13~C14 + §4 | 해당 e2e green, 잔여 수치 기록. **C10 의 switch/checkbox 소비처가 여기서 생긴다** |
 | **S5** | C15 → C16 | Plan §5.C15~C16 + §4.1 | **AC4/5/6 green** |
 | **S6** | C17 → C18 | Plan 전체 + dev-report | **AC16 green**, dev-report 완성 |
 
-각 세션 종료 시 `.claude/specs/wm-parity-foundation-dev-report.md` 에 누적 기록
-(변경 파일 / 테스트 결과 마지막 5~10줄 인용 / 결정 / 잔여 AC). **콘솔 출력만 남기고 끝내지 않는다**
-(글로벌 룰 16).
+각 세션 종료 시 `.claude/specs/wm-parity-foundation-dev-report.md` 에 누적 기록.
+**콘솔 출력만 남기고 끝내지 않는다**(글로벌 룰 16).
+
+**dev-report 고정 섹션 (Validate 세션이 대조할 스키마)**
+1. `측정 조건` — baseline SHA / 백엔드 미기동(S-06) 명시
+2. `e2e baseline` — 총계 + **PASS 전체 목록** + **FAIL 전체 목록 + 사유 1줄**
+3. `커밋 로그` — C 단위별 SHA / 변경 파일 / 해당 AC
+4. `잔여 수치 누적표` — button / select / checkbox (§5 의 검산표와 같은 형식)
+5. `게이트 출력` — build / lint / test:unit / e2e 각각 **마지막 5~10줄 코드블록 인용**
+6. `R8/R9 보류 사유` — 5항목 (S-15)
+7. `스크린샷` — C9 의 3화면 before/after + 관찰 결과
+8. **`계획 결함`** — 계획에 없던 상황과 그때 택한 보존적 선택(S-19). **없으면 "없음" 이라고 적는다**
 
 ---
 
@@ -875,14 +1088,48 @@ git revert --no-edit <A>^..<B>      # 연속 구간 (예: C13~C16 수렴 4종)
 
 ## 10. Implement 세션 진입 프롬프트
 
+> §11 에 전문이 있다. 새 세션 첫 메시지로 그대로 복붙한다.
+
+---
+
+## 11. Implement 진입 프롬프트 (복붙용 전문)
+
 ```
 @.claude/specs/wm-parity-foundation.md @.claude/specs/wm-parity-foundation-plan.md 둘 다 읽고 구현.
-SPEC 의 Acceptance Criteria 모두 만족하도록 각 AC 당 실패 테스트 먼저.
-Plan 의 확정 결정 5건 엄수 — D-1 control-styles wm 값 그대로 이식(시각 변경 수용, 스크린샷 게이트) /
-D-2 EqpManageFormModal ToggleField 를 wm switch.tsx 이식으로 교체 / D-3 ApiError 6->1 단일화 /
-D-4 dlq 로컬 ApiResponse 도 전환 / D-5 refactor-backlog 284,285 행 완료 처리(C5-b 별도 커밋).
-추가 확인 없이 착수한다 (미결 결정 없음).
-Plan §5.C0 의 e2e baseline 기록을 첫 단계로 반드시 수행.
-Plan §4 의 e2e 스펙 동반 수정(select 16호출 9파일 / checkbox 3파일)을 변환 커밋과 같은 커밋에.
-산출물: .claude/specs/wm-parity-foundation-dev-report.md 에 변경 파일 / 테스트 결과 / 결정 기록.
+
+[무질의 원칙]
+Plan §3.5 결정 봉인표(S-01~S-19)에 모든 선택이 확정돼 있다. 구현 중 사용자에게 아무것도 묻지 않는다.
+봉인표에 없는 상황이 나오면 기존 동작 보존 쪽으로 진행하고 dev-report 의 `계획 결함` 섹션에 기록한다.
+AskUserQuestion 을 호출하지 않는다.
+
+[첫 단계 — 반드시 이것부터]
+Plan §5.C0 의 e2e baseline. clean HEAD, 백엔드 미기동(S-06), 포트 3000 정리 후 npm run test:e2e.
+PASS 목록과 FAIL 목록을 둘 다 dev-report 에 기록. 이 목록이 AC16 의 유일한 판정 기준이다.
+
+[진행 순서]
+Plan §5 의 21 단위(C0 → C1-a → C1-b → C2 → C3 → C4 → C5-a → C5-b → C6 → C7 → C8 →
+C9 → C10 → C11 → C12 → C13 → C14 → C15 → C16 → C17 → C18) 를 그 순서로.
+C0 / C17 / C18 은 커밋 없는 게이트, 나머지 18 개가 실제 커밋이다.
+각 단위 완료 즉시 main 에 커밋(글로벌 룰 17). 커밋마다 build/lint/test:unit 통과 확인.
+C10 과 C13 사이에서 세션을 끊지 않는다(프리미티브 미사용 구간 방지).
+
+[변환은 기계 규칙으로]
+raw 요소 변환은 Plan §3.6 을 그대로 적용한다 —
+A) Button: className 문자열 조건표로 variant 결정, size 는 예외 없이 sm, 기존 className 통째 전달
+B) Select: SELECT_EMPTY_VALUE 센티널. 빈 문자열 option 9곳 목록 그대로
+   (radix 가 빈 문자열 SelectItem 을 throw 로 거부 — 실측)
+C) Checkbox: §3.6-C 의 파일 전문을 그대로. 디자인을 새로 정하지 않는다
+D) ToggleField: 감싸는 label 제거 + useId 기반 id/htmlFor 명시 결합
+
+[e2e 동반 수정 — 잊으면 AC4/AC5 와 AC16 이 동시 성립 불가]
+Plan §4 대로 selectOption 16호출 9파일 + input[type=checkbox] 셀렉터 3파일을
+해당 변환 커밋과 같은 커밋에서 고친다.
+
+[하지 않는 것]
+신규 npm 의존성 0 / 신규 i18n 키 0 / R8·R9 5항목 전부 보류(코드 변경 0) /
+사이드바 프리미티브 이식 없음 / 도메인 사이드바 5파일의 raw button 18건은 그대로 둔다.
+
+[산출물]
+.claude/specs/wm-parity-foundation-dev-report.md — Plan §8 의 고정 8섹션 스키마로.
+게이트 출력은 마지막 5~10줄 코드블록 인용 필수.
 ```
