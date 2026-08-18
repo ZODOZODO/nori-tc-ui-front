@@ -8,6 +8,16 @@ import {
   controlPopupClassName,
 } from './control-styles'
 
+/**
+ * "선택 안 함" 옵션의 값입니다.
+ *
+ * radix 는 빈 문자열 value 를 가진 `SelectItem` 을 throw 로 거부한다
+ * (`A <Select.Item /> must have a value prop that is not an empty string…`).
+ * 반면 Root 의 `value=""` 는 placeholder 표시로 허용되므로, 빈 값을 실제로 고를 수 있어야 하는
+ * 곳에서는 이 센티널을 넣고 호출부가 `''` 와 상호 변환한다.
+ */
+export const SELECT_EMPTY_VALUE = '__empty__'
+
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }
