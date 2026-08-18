@@ -348,6 +348,7 @@
 | C5-a | `fe78343` | **nori-tc-common** | 3개 — `.claude/specs/port-carrier-id-lifecycle{,-plan,-dev-report}.md` 각 1곳 | (AC 없음 — R10 문서) | ✅ 완료 |
 | C5-b | `99f4347` | **nori-tc-common** | 1개 — `.claude/specs/refactor-backlog.md` 4행(284·285 완료 전환 / 287·293 각주) | (AC 없음 — D-5 ledger) | ✅ 완료 |
 | C6 | `b45f54f` | **nori-tc-exec** | 1개 — `docs/Architecture/ui/front/10-live-map-dashboard-and-demo-control.md:15-16` | (AC 없음 — R10 문서) | ✅ 완료 |
+| C7 | `225db3e` | ui-front | 4개 — 신설 `shared/stores/toast.store.ts` · `shared/components/Toaster.tsx` · `shared/lib/notify.ts`(wm 무수정 이식) + 수정 `app/providers/AppProvider.tsx` | **AC14** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -364,6 +365,7 @@
 | C5-a | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C5-b | 80 | 15 | 10 | (타 레포 문서만 변경) |
 | C6 | 80 | 15 | 10 | (타 레포 문서만 변경) |
+| C7 | 80 | 15 | 10 | (토스트 인프라만 추가 — raw 요소 무관) |
 
 ---
 
@@ -625,6 +627,54 @@ $ git diff --stat
 ```
 빌드 게이트 미수행 — `docs/` 문서 1개만 바뀌어 exec 의 Gradle 산출물과 무관하다.
 
+### C7 — AC grep / build / lint / test:unit / 회귀 e2e
+
+AC14 grep — 1건
+```
+$ grep -c "<Toaster" src/app/providers/AppProvider.tsx
+1
+```
+
+이식 전제 실측 (전부 tc 에 존재 확인)
+```
+package.json:32 "lucide-react": "^0.576.0" / :34 "radix-ui": "^1.4.3" / :46 "zustand": "^5.0.11"
+node_modules/radix-ui/dist/index.d.ts:60  export { reactToast as Toast }
+src/lib/utils.ts (cn) 존재 / src/index.css:137 --danger 존재
+wm 원본과 diff 0 — 3파일 전부 무수정 이식
+```
+
+`npm run build` PASS
+```
+- Use build.rollupOptions.output.manualChunks to improve chunking
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 16.07s
+```
+
+`npm run lint` PASS (경고 0)
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+`npm run test:unit` PASS (신규 의존성 0 — `dependency-declaration.test.ts` 포함 통과)
+```
+# tests 209
+# pass 209
+# fail 0
+# duration_ms 2804.8394
+```
+
+회귀 e2e (앱 루트 마운트라 전 화면 영향 — login/layout/user/group/dlq/eqp/live-map/i18n 8 spec) — 35 passed / 3 failed(사전 실패)
+```
+  3 failed
+    [chromium] › tests\e2e\eqp-line-select.spec.ts:125:1 › eqp 폼 라인 드롭다운이 GET /api/line 으로 채워지고 선택된다 (console/pageerror 0)
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:475:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+  35 passed (1.3m)
+```
+→ 3건 모두 §2.3 의 baseline FAIL 과 **정확히 동일**. `console/pageerror 0` 을 단언하는 spec 들이 통과했으므로
+Toaster 마운트가 콘솔 오류를 유발하지 않음도 함께 확인된다. **회귀 0**.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -788,3 +838,9 @@ $ git diff --stat
   `:16`(store import) · `:105`(`selectedLineValue` 구독) · `:139`(설비 필터) · `:157`(필터 인자) 이다.
 - 커밋 메시지와 문서에는 **실측한 줄**만 인용했다(`LiveMapBoard.tsx:571,579` 는 Plan 표기와 일치 확인).
   렌더 지점은 `AppTopBar.tsx:191` 로 추가 확인했다.
+
+### C7-결함-1 — `<Toaster />` 를 넣으며 `I18nProvider` 의 children 형태가 바뀐다
+
+- Plan 은 "I18nProvider 자식으로 마운트" 만 지시했고, 기존 코드는 `<I18nProvider>{children}</I18nProvider>`
+  한 줄이었다. 자식이 2개가 되므로 여는/닫는 태그를 여러 줄로 펼치는 형태 변경이 불가피했다.
+- 동작 변경은 없다(같은 provider 아래 형제 추가). 그 외 `AppProvider.tsx` 는 import 1줄 외 무변경.
