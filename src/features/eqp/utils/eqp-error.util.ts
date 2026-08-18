@@ -1,4 +1,4 @@
-import { EqpApiError } from '../types/eqp.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 /**
  * 재시도해도 같은 결과가 돌아오는 실패인지 판별합니다.
@@ -11,7 +11,7 @@ import { EqpApiError } from '../types/eqp.types'
  * status 를 모르는 실패(네트워크 단절 등)는 재시도 대상이므로 false 를 돌려줍니다.
  */
 export const isClientRequestError = (error: unknown): boolean =>
-  error instanceof EqpApiError &&
+  error instanceof ApiError &&
   error.status !== undefined &&
   error.status >= 400 &&
   error.status < 500

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe, useResetPassword, useUpdateUser, useUserDetail } from '../hooks/useProfile'
-import { ProfileApiError } from '../types/profile.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 interface UserProfileModalProps {
   open: boolean
@@ -84,11 +84,11 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
   )
 
   const modalErrorMessage = useMemo(() => {
-    if (meQuery.error instanceof ProfileApiError) {
+    if (meQuery.error instanceof ApiError) {
       return meQuery.error.payload.errorMsg
     }
 
-    if (userDetailQuery.error instanceof ProfileApiError) {
+    if (userDetailQuery.error instanceof ApiError) {
       return userDetailQuery.error.payload.errorMsg
     }
 
@@ -141,7 +141,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
       })
       closeModal()
     } catch (error) {
-      if (error instanceof ProfileApiError) {
+      if (error instanceof ApiError) {
         setFeedbackMessage(error.payload.errorMsg)
         return
       }
@@ -175,7 +175,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
       setShowPasswordEditor(false)
       setFeedbackMessage(t('profile.feedback.pwChanged'))
     } catch (error) {
-      if (error instanceof ProfileApiError) {
+      if (error instanceof ApiError) {
         setFeedbackMessage(error.payload.errorMsg)
         return
       }

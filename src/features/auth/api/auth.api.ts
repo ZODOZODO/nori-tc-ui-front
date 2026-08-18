@@ -1,9 +1,8 @@
 import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import {
-  AuthApiError,
   defaultAuthErrorMessage,
   createLoginFailResponse,
   isLoginSuccessResponse,
@@ -12,6 +11,7 @@ import {
   type LoginResponse,
   type LoginSuccessResponse,
 } from '../types/auth.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const defaultLogoutErrorMessage = () => i18n.t('error.auth.logout')
@@ -78,54 +78,41 @@ const createContextualAuthFailResponse = (
 }
 
 /**
- * 로그인/로그아웃 전에 필요한 CSRF 쿠키를 발급받고, 헤더에 사용할 토큰 값을 반환합니다.
+ * 공용 CSRF 토큰 발급을 auth 문맥(login / logout)으로 감쌉니다.
+ * 공용 정의가 던지는 CSRF_TOKEN_MISSING(ApiError)은 그대로 통과하고,
+ * 쿠키 요청 자체가 403 으로 막힌 경우만 문맥별 안내 문구로 보정됩니다.
  */
-const issueCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
+const requestAuthCsrfToken = async (purpose: CsrfRequestPurpose): Promise<string> => {
   try {
-    await requestCsrfCookie()
+    return await issueCsrfToken()
   } catch (error) {
     const fallbackMessage =
       purpose === 'login' ? defaultAuthErrorMessage() : defaultLogoutErrorMessage()
     const errorContext: AuthErrorContext = purpose === 'login' ? 'login-csrf' : 'logout-csrf'
     throw normalizeAuthError(error, fallbackMessage, errorContext)
   }
-
-  const csrfToken = readCsrfCookieToken()
-
-  if (!csrfToken) {
-    throw new AuthApiError(
-      createLoginFailResponse({
-        success: false,
-        data: null,
-        errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: i18n.t('error.auth.csrf'),
-      })
-    )
-  }
-
-  return csrfToken
 }
 
 /**
- * 알 수 없는 예외를 AuthApiError로 정규화합니다.
+ * 알 수 없는 예외를 ApiError로 정규화합니다.
  */
 const normalizeAuthError = (
   error: unknown,
   fallbackMessage = defaultAuthErrorMessage(),
   context: AuthErrorContext = 'login-submit'
-): AuthApiError => {
-  if (error instanceof AuthApiError) {
+): ApiError => {
+  if (error instanceof ApiError) {
     return error
   }
 
   if (isAxiosError(error)) {
-    return new AuthApiError(
+    return new ApiError(
       createContextualAuthFailResponse(error.response?.data, error.response?.status, fallbackMessage, context),
       error.response?.status
     )
   }
 
-  return new AuthApiError(createContextualAuthFailResponse(error, undefined, fallbackMessage, context))
+  return new ApiError(createContextualAuthFailResponse(error, undefined, fallbackMessage, context))
 }
 
 export const authApi = {
@@ -133,7 +120,7 @@ export const authApi = {
    * 로그인 요청에서 사용할 CSRF 토큰을 미리 확보합니다.
    * 이후 다른 상태 변경 API(POST/PUT/PATCH/DELETE)에서도 같은 규칙으로 재사용할 수 있습니다.
    */
-  prepareCsrfToken: () => issueCsrfToken('login'),
+  prepareCsrfToken: () => requestAuthCsrfToken('login'),
 
   /**
    * 로그인 API를 호출합니다.
@@ -142,7 +129,7 @@ export const authApi = {
    * - token 본문 의존 없이 쿠키 기반 인증만 사용
   */
   login: async (credentials: LoginRequest): Promise<LoginSuccessResponse> => {
-    const csrfToken = await issueCsrfToken('login')
+    const csrfToken = await requestAuthCsrfToken('login')
 
     try {
       const response = await apiClient.post<LoginResponse>('/auth/login', credentials, {
@@ -164,7 +151,7 @@ export const authApi = {
         return parsedResponse
       }
 
-      throw new AuthApiError(
+      throw new ApiError(
         createContextualAuthFailResponse(
           parsedResponse,
           response.status,
@@ -189,7 +176,7 @@ export const authApi = {
    * - 401은 이미 인증이 만료된 상태일 수 있으므로 로그아웃 완료로 간주합니다.
   */
   logout: async (): Promise<void> => {
-    const csrfToken = await issueCsrfToken('logout')
+    const csrfToken = await requestAuthCsrfToken('logout')
 
     try {
       const response = await apiClient.post('/auth/logout', null, {
@@ -206,7 +193,7 @@ export const authApi = {
       }
 
       if (response.status >= 400) {
-        throw new AuthApiError(
+        throw new ApiError(
           createContextualAuthFailResponse(
             response.data,
             response.status,

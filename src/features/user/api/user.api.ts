@@ -1,13 +1,9 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
   createUserFailResponse,
-  defaultUserErrorMessage,
-  isApiResponse,
-  isRecord,
-  UserApiError,
   type UserCreateRequest,
   type UserCreateResponse,
   type UserDeleteResponse,
@@ -22,73 +18,10 @@ import {
   type UserUpdateRequest,
   type UserUpdateResponse,
 } from '../types/user.types'
+import { isRecord } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const userListFallbackMessage = () => i18n.t('error.user.list')
-
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new UserApiError(
-      createUserFailResponse({
-        success: false,
-        data: null,
-        errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: i18n.t('error.user.csrf'),
-      }),
-    )
-  }
-
-  return csrfToken
-}
-
-const normalizeUserError = (
-  error: unknown,
-  fallbackMessage = defaultUserErrorMessage(),
-): UserApiError => {
-  if (error instanceof UserApiError) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    return new UserApiError(
-      createUserFailResponse(error.response?.data, fallbackMessage),
-      error.response?.status,
-    )
-  }
-
-  return new UserApiError(createUserFailResponse(error, fallbackMessage))
-}
-
-const resolveSuccessPayload = <TData>(
-  payload: unknown,
-  status: number,
-  fallbackMessage: string,
-  allowNullData = false,
-): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true) {
-    throw new UserApiError(createUserFailResponse(payload, fallbackMessage), status)
-  }
-
-  if (payload.data === null && !allowNullData) {
-    throw new UserApiError(
-      createUserFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'INVALID_RESPONSE',
-          errorMsg: fallbackMessage,
-        },
-        fallbackMessage,
-      ),
-      status,
-    )
-  }
-
-  return payload.data as TData
-}
 
 const isUserGroupSummaryItem = (value: unknown): value is UserGroupSummary =>
   isRecord(value) &&
@@ -130,7 +63,7 @@ const normalizeUserPagePayload = (
   }
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new UserApiError(
+    throw new ApiError(
       createUserFailResponse(
         {
           success: false,
@@ -152,13 +85,6 @@ const normalizeUserPagePayload = (
   return { items, offset, limit, count }
 }
 
-const withCsrfHeaders = async <TResponse>(
-  requestFn: (csrfToken: string) => Promise<TResponse>,
-): Promise<TResponse> => {
-  const csrfToken = await issueCsrfToken()
-  return requestFn(csrfToken)
-}
-
 export const userApi = {
   /**
    * 사용자 상세 정보를 조회합니다.
@@ -175,7 +101,7 @@ export const userApi = {
         i18n.t('error.user.detail'),
       )
     } catch (error) {
-      throw normalizeUserError(error, i18n.t('error.user.detail'))
+      throw normalizeApiError(error, i18n.t('error.user.detail'))
     }
   },
 
@@ -199,7 +125,7 @@ export const userApi = {
         limit,
       )
     } catch (error) {
-      throw normalizeUserError(error, userListFallbackMessage())
+      throw normalizeApiError(error, userListFallbackMessage())
     }
   },
 
@@ -250,7 +176,7 @@ export const userApi = {
         i18n.t('error.user.create'),
       )
     } catch (error) {
-      throw normalizeUserError(error, i18n.t('error.user.create'))
+      throw normalizeApiError(error, i18n.t('error.user.create'))
     }
   },
 
@@ -273,7 +199,7 @@ export const userApi = {
         i18n.t('error.user.save'),
       )
     } catch (error) {
-      throw normalizeUserError(error, i18n.t('error.user.save'))
+      throw normalizeApiError(error, i18n.t('error.user.save'))
     }
   },
 
@@ -290,14 +216,13 @@ export const userApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(
+      assertSuccessResponse(
         response.data,
         response.status,
         i18n.t('error.user.delete'),
-        true,
       )
     } catch (error) {
-      throw normalizeUserError(error, i18n.t('error.user.delete'))
+      throw normalizeApiError(error, i18n.t('error.user.delete'))
     }
   },
 
@@ -318,14 +243,13 @@ export const userApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(
+      assertSuccessResponse(
         response.data,
         response.status,
         i18n.t('error.user.password'),
-        true,
       )
     } catch (error) {
-      throw normalizeUserError(error, i18n.t('error.user.password'))
+      throw normalizeApiError(error, i18n.t('error.user.password'))
     }
   },
 

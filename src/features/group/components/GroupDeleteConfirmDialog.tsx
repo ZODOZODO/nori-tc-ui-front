@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useI18n } from '@/i18n/i18n-context'
 import { useDeleteGroup } from '../hooks/useGroupMutations'
-import { GroupApiError } from '../types/group.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 interface GroupDeleteConfirmDialogProps {
   open: boolean
@@ -36,7 +36,7 @@ export function GroupDeleteConfirmDialog({
       onDeleted?.()
       onClose()
     } catch (error) {
-      if (error instanceof GroupApiError) {
+      if (error instanceof ApiError) {
         setErrorMessage(error.payload.errorMsg)
         return
       }

@@ -1,4 +1,5 @@
 import i18n from '@/i18n'
+import { isApiResponse } from '@/shared/types/api.types'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 
 /**
@@ -134,25 +135,6 @@ export type GroupFailResponse = ApiResponse<null> & {
  */
 export const defaultGroupErrorMessage = () => i18n.t('error.group.default')
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-/**
- * ApiResponse 런타임 구조 검사기입니다.
- */
-export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResponse<TData> => {
-  if (!isRecord(value)) {
-    return false
-  }
-
-  const hasSuccess = typeof value.success === 'boolean'
-  const hasData = 'data' in value
-  const hasErrorCode = value.errorCode === null || typeof value.errorCode === 'string'
-  const hasErrorMsg = value.errorMsg === null || typeof value.errorMsg === 'string'
-
-  return hasSuccess && hasData && hasErrorCode && hasErrorMsg
-}
-
 /**
  * 실패 payload 를 GroupFailResponse 형태로 정규화합니다.
  */
@@ -183,17 +165,3 @@ export const createGroupFailResponse = (
   }
 }
 
-/**
- * Group API 레이어 전용 에러 객체입니다.
- */
-export class GroupApiError extends Error {
-  public readonly payload: GroupFailResponse
-  public readonly status?: number
-
-  constructor(payload: GroupFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'GroupApiError'
-    this.payload = payload
-    this.status = status
-  }
-}

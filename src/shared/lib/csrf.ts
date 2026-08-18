@@ -64,3 +64,13 @@ export const issueCsrfToken = async (): Promise<string> => {
 
   return csrfToken
 }
+
+/**
+ * CSRF 헤더가 필요한 요청을 공통 처리한다 — 토큰 발급 후 요청 함수에 넘긴다.
+ */
+export const withCsrfHeaders = async <TResponse>(
+  requestFn: (csrfToken: string) => Promise<TResponse>,
+): Promise<TResponse> => {
+  const csrfToken = await issueCsrfToken()
+  return requestFn(csrfToken)
+}

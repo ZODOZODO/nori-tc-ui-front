@@ -1,4 +1,5 @@
 import type { ApiResponse } from '@/features/auth/types/auth.types'
+import { isApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 import i18n from '@/i18n'
 
@@ -452,25 +453,6 @@ export type EqpFailResponse = ApiResponse<null> & {
  */
 export const defaultEqpErrorMessage = (): string => i18n.t('error.eqp.default')
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-/**
- * 런타임 응답 구조가 ApiResponse 계약인지 검사합니다.
- */
-export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResponse<TData> => {
-  if (!isRecord(value)) {
-    return false
-  }
-
-  const hasSuccess = typeof value.success === 'boolean'
-  const hasData = 'data' in value
-  const hasErrorCode = value.errorCode === null || typeof value.errorCode === 'string'
-  const hasErrorMsg = value.errorMsg === null || typeof value.errorMsg === 'string'
-
-  return hasSuccess && hasData && hasErrorCode && hasErrorMsg
-}
-
 /**
  * 알 수 없는 실패 payload를 EqpFailResponse 형태로 정규화합니다.
  */
@@ -498,22 +480,6 @@ export const createEqpFailResponse = (
     data: null,
     errorCode: 'UNKNOWN_ERROR',
     errorMsg: fallbackMessage,
-  }
-}
-
-/**
- * EQP API 레이어 전용 에러 객체입니다.
- * status가 있으면 HTTP 상태코드를 함께 전달합니다.
- */
-export class EqpApiError extends Error {
-  public readonly payload: EqpFailResponse
-  public readonly status?: number
-
-  constructor(payload: EqpFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'EqpApiError'
-    this.payload = payload
-    this.status = status
   }
 }
 

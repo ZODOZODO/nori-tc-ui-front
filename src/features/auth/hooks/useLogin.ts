@@ -6,7 +6,8 @@ import { useNavigate } from 'react-router'
 import { z } from 'zod'
 import { useI18n } from '@/i18n/i18n-context'
 import { authApi } from '../api/auth.api'
-import { AuthApiError, type LoginRequest, type LoginSuccessResponse } from '../types/auth.types'
+import { type LoginRequest, type LoginSuccessResponse } from '../types/auth.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 /**
  * 로그인 폼 유효성 스키마를 만든다.
@@ -50,7 +51,7 @@ export function useLogin() {
     },
   })
 
-  const loginMutation = useMutation<LoginSuccessResponse, AuthApiError, LoginRequest>({
+  const loginMutation = useMutation<LoginSuccessResponse, ApiError, LoginRequest>({
     mutationFn: (credentials) => authApi.login(credentials),
     onSuccess: (result) => {
       console.info('[useLogin] login flow completed', {

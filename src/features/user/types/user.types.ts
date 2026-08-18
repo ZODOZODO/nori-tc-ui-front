@@ -1,4 +1,5 @@
 import i18n from '@/i18n'
+import { isApiResponse } from '@/shared/types/api.types'
 import type { ApiResponse } from '@/features/auth/types/auth.types'
 
 /**
@@ -130,25 +131,6 @@ export type UserFailResponse = ApiResponse<null> & {
  */
 export const defaultUserErrorMessage = () => i18n.t('error.user.default')
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-/**
- * ApiResponse 런타임 구조 검사기입니다.
- */
-export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResponse<TData> => {
-  if (!isRecord(value)) {
-    return false
-  }
-
-  const hasSuccess = typeof value.success === 'boolean'
-  const hasData = 'data' in value
-  const hasErrorCode = value.errorCode === null || typeof value.errorCode === 'string'
-  const hasErrorMsg = value.errorMsg === null || typeof value.errorMsg === 'string'
-
-  return hasSuccess && hasData && hasErrorCode && hasErrorMsg
-}
-
 /**
  * 실패 payload 를 UserFailResponse 형태로 정규화합니다.
  */
@@ -179,17 +161,3 @@ export const createUserFailResponse = (
   }
 }
 
-/**
- * User API 레이어 전용 에러 객체입니다. `ProfileApiError` 와 같은 형상을 갖습니다.
- */
-export class UserApiError extends Error {
-  public readonly payload: UserFailResponse
-  public readonly status?: number
-
-  constructor(payload: UserFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'UserApiError'
-    this.payload = payload
-    this.status = status
-  }
-}

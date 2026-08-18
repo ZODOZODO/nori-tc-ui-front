@@ -80,6 +80,19 @@ export const normalizeApiError = (error: unknown, fallbackMessage: string): ApiE
 }
 
 /**
+ * data 없이 성공 여부만 검증합니다. DELETE 처럼 `data: null` 이 정상인 응답에서 씁니다.
+ */
+export const assertSuccessResponse = (
+  payload: unknown,
+  status: number,
+  fallbackMessage: string,
+): void => {
+  if (!isApiResponse(payload) || payload.success !== true) {
+    throw new ApiError(createFailResponse(payload, fallbackMessage), status)
+  }
+}
+
+/**
  * 성공 응답의 data 를 꺼냅니다. 성공 형태가 아니면 ApiError 로 던집니다.
  */
 export const resolveSuccessPayload = <TData>(

@@ -17,7 +17,8 @@ import {
   PERMISSION_CATEGORY_ORDER,
   resolvePermissionCategory,
 } from '../lib/permission-category'
-import { GroupApiError, type PermissionInfo } from '../types/group.types'
+import { type PermissionInfo } from '../types/group.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 interface GroupPermissionsModalProps {
   open: boolean
@@ -169,7 +170,7 @@ export function GroupPermissionsModal({ open, groupId, groupCode, onClose }: Gro
         stillPending.set(permId, desired)
         if (firstErrorMessage === null) {
           firstErrorMessage =
-            result.reason instanceof GroupApiError
+            result.reason instanceof ApiError
               ? result.reason.payload.errorMsg
               : t('error.group.default')
         }

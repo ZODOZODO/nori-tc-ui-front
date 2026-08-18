@@ -1,4 +1,5 @@
 import i18n from '@/i18n'
+import { isApiResponse } from '@/shared/types/api.types'
 import type { ApiResponse as BaseApiResponse } from '@/features/auth/types/auth.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
@@ -336,25 +337,6 @@ export type ModelFailResponse = ApiResponse<null> & {
  */
 export const defaultModelErrorMessage = (): string => i18n.t('error.model.default')
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-/**
- * 런타임 응답 구조가 ApiResponse 계약인지 검사합니다.
- */
-export const isApiResponse = <TData = unknown>(value: unknown): value is ApiResponse<TData> => {
-  if (!isRecord(value)) {
-    return false
-  }
-
-  const hasSuccess = typeof value.success === 'boolean'
-  const hasData = 'data' in value
-  const hasErrorCode = value.errorCode === null || typeof value.errorCode === 'string'
-  const hasErrorMsg = value.errorMsg === null || typeof value.errorMsg === 'string'
-
-  return hasSuccess && hasData && hasErrorCode && hasErrorMsg
-}
-
 /**
  * 알 수 없는 실패 payload를 ModelFailResponse 형태로 정규화합니다.
  */
@@ -496,17 +478,3 @@ export type ModelFlowListResponse = ApiResponse<ModelFlowListPayload>
 export type ModelFlowDetailResponse = ApiResponse<ModelFlow>
 export type ModelFlowCreatedResponse = ApiResponse<ModelFlowCreatedData>
 
-/**
- * Model API 레이어 전용 오류 객체입니다.
- */
-export class ModelApiError extends Error {
-  public readonly payload: ModelFailResponse
-  public readonly status?: number
-
-  constructor(payload: ModelFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'ModelApiError'
-    this.payload = payload
-    this.status = status
-  }
-}

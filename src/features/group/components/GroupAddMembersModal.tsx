@@ -14,7 +14,7 @@ import { useI18n } from '@/i18n/i18n-context'
 import { useAllUsers } from '@/features/user/hooks/useUsers'
 import { useAddGroupMember, useRemoveGroupMember } from '../hooks/useGroupMutations'
 import { useGroupMembers } from '../hooks/useGroups'
-import { GroupApiError } from '../types/group.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 interface GroupAddMembersModalProps {
   open: boolean
@@ -106,7 +106,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
       await removeMemberMutation.mutateAsync({ userPk, groupId })
     } catch (error) {
       setErrorMessage(
-        error instanceof GroupApiError ? error.payload.errorMsg : t('error.group.removeMember'),
+        error instanceof ApiError ? error.payload.errorMsg : t('error.group.removeMember'),
       )
     }
   }
@@ -148,7 +148,7 @@ export function GroupAddMembersModal({ open, groupId, groupCode, onClose }: Grou
         failed += 1
         if (firstErrorMessage === null) {
           firstErrorMessage =
-            result.reason instanceof GroupApiError
+            result.reason instanceof ApiError
               ? result.reason.payload.errorMsg
               : t('error.group.addMember')
         }

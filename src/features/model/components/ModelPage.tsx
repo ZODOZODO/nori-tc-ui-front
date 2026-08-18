@@ -18,7 +18,6 @@ import { useModelMutations } from '../hooks/useModelMutations'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { computeNodeDiff } from '../lib/model-diff.util'
 import {
-  ModelApiError,
   PLC_DETAIL_NODES,
   SECS_DETAIL_NODES,
   SOCKET_DETAIL_NODES,
@@ -42,6 +41,7 @@ import {
 import { ModelInfoTable } from './ModelInfoTable'
 import { ModelSidebar } from './ModelSidebar'
 import { ParentModelCommitModal } from './ParentModelCommitModal'
+import { ApiError } from '@/shared/lib/api-error'
 
 // 사용자가 모델 버전 frame 진입 시에만 mount. 2007 LOC 패널이라 페이지 초기 청크에서 제외.
 const ModelDetailPanel = lazy(() =>
@@ -57,7 +57,7 @@ const FORBIDDEN_FALLBACK_ROUTE = '/login'
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
  */
 const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
-  if (error instanceof ModelApiError) {
+  if (error instanceof ApiError) {
     return error.payload.errorMsg
   }
 

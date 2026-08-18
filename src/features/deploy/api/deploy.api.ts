@@ -1,8 +1,8 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { isApiResponse, type ApiResponse } from '@/features/auth/types/auth.types'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { ApiError, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import type {
   DeployCreateRequest,
   DeployCreateResult,
@@ -131,76 +131,6 @@ const createDeployFailResponse = (
     errorCode: 'UNKNOWN_ERROR',
     errorMsg: fallbackMessage,
   }
-}
-
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new DeployApiError(
-      createDeployFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'CSRF_TOKEN_MISSING',
-          errorMsg: i18n.t('error.deploy.csrf'),
-        },
-        fallbackCreateError(),
-      ),
-    )
-  }
-
-  return csrfToken
-}
-
-export class DeployApiError extends Error {
-  public readonly payload: DeployFailResponse
-  public readonly status?: number
-
-  constructor(payload: DeployFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'DeployApiError'
-    this.payload = payload
-    this.status = status
-  }
-}
-
-const normalizeDeployError = (
-  error: unknown,
-  fallbackMessage = fallbackRegisterTargetsError(),
-): DeployApiError => {
-  if (error instanceof DeployApiError) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    return new DeployApiError(
-      createDeployFailResponse(error.response?.data, fallbackMessage),
-      error.response?.status,
-    )
-  }
-
-  return new DeployApiError(createDeployFailResponse(error, fallbackMessage))
-}
-
-const resolveSuccessPayload = <TData>(
-  payload: unknown,
-  status: number,
-  fallbackMessage: string,
-): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true || payload.data === null) {
-    throw new DeployApiError(createDeployFailResponse(payload, fallbackMessage), status)
-  }
-
-  return payload.data
-}
-
-const withCsrfHeaders = async <TResponse>(
-  requestFn: (csrfToken: string) => Promise<TResponse>,
-): Promise<TResponse> => {
-  const csrfToken = await issueCsrfToken()
-  return requestFn(csrfToken)
 }
 
 const isDeployRegisterTargetItem = (value: unknown): value is DeployRegisterTargetItem =>
@@ -379,7 +309,7 @@ const normalizeRegisterTargetPage = (
   requestedLimit: number,
 ): DeployRegisterTargetPage => {
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new DeployApiError(createDeployFailResponse(payload))
+    throw new ApiError(createDeployFailResponse(payload))
   }
 
   const items = payload.items
@@ -403,7 +333,7 @@ const normalizeDeployHistoryPage = (
   requestedLimit: number,
 ): DeployHistoryPage => {
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new DeployApiError(
+    throw new ApiError(
       createDeployFailResponse(payload, fallbackHistoryError()),
     )
   }
@@ -429,7 +359,7 @@ const normalizeDeployTargetPage = (
   requestedSize: number,
 ): DeployTargetPage => {
   if (!isRecord(payload) || !Array.isArray(payload.targets)) {
-    throw new DeployApiError(createDeployFailResponse(payload, fallbackTargetsError()))
+    throw new ApiError(createDeployFailResponse(payload, fallbackTargetsError()))
   }
 
   return {
@@ -452,7 +382,7 @@ const normalizeDeployActionResult = (
   fallbackMessage = fallbackCancelError(),
 ): DeployActionResult => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number') {
-    throw new DeployApiError(createDeployFailResponse(payload, fallbackMessage))
+    throw new ApiError(createDeployFailResponse(payload, fallbackMessage))
   }
 
   return {
@@ -477,7 +407,7 @@ const normalizeDeployActionResult = (
 
 const normalizeDeploySummary = (payload: unknown): DeploySummary => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number' || typeof payload.deployName !== 'string') {
-    throw new DeployApiError(createDeployFailResponse(payload, fallbackSummaryError()))
+    throw new ApiError(createDeployFailResponse(payload, fallbackSummaryError()))
   }
 
   return {
@@ -566,7 +496,7 @@ const normalizeDeploySummary = (payload: unknown): DeploySummary => {
 
 const normalizeDeployScenarioCatalog = (payload: unknown): DeployScenarioCatalogResponse => {
   if (!isRecord(payload) || !Array.isArray(payload.scenarios) || typeof payload.scenarioCount !== 'number') {
-    throw new DeployApiError(createDeployFailResponse(payload, fallbackScenarioError()))
+    throw new ApiError(createDeployFailResponse(payload, fallbackScenarioError()))
   }
 
   const scenarios = payload.scenarios.filter(isDeployScenarioSummary)
@@ -592,7 +522,7 @@ const normalizeDeployRegisterScenarioPreview = (
     !Array.isArray(payload.unionChangeKinds) ||
     !Array.isArray(payload.scenarios)
   ) {
-    throw new DeployApiError(
+    throw new ApiError(
       createDeployFailResponse(payload, fallbackScenarioPreviewError()),
     )
   }
@@ -641,7 +571,7 @@ export const deployApi = {
         limit,
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackRegisterTargetsError())
+      throw normalizeApiError(error, fallbackRegisterTargetsError())
     }
   },
 
@@ -663,7 +593,7 @@ export const deployApi = {
         fallbackCreateError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackCreateError())
+      throw normalizeApiError(error, fallbackCreateError())
     }
   },
 
@@ -688,7 +618,7 @@ export const deployApi = {
         fallbackStartError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackStartError())
+      throw normalizeApiError(error, fallbackStartError())
     }
   },
 
@@ -713,7 +643,7 @@ export const deployApi = {
         fallbackHoldError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackHoldError())
+      throw normalizeApiError(error, fallbackHoldError())
     }
   },
 
@@ -738,7 +668,7 @@ export const deployApi = {
         fallbackCancelError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackCancelError())
+      throw normalizeApiError(error, fallbackCancelError())
     }
   },
 
@@ -760,7 +690,7 @@ export const deployApi = {
         fallbackRedeployError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackRedeployError())
+      throw normalizeApiError(error, fallbackRedeployError())
     }
   },
 
@@ -785,7 +715,7 @@ export const deployApi = {
         fallbackDeleteError(),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackDeleteError())
+      throw normalizeApiError(error, fallbackDeleteError())
     }
   },
 
@@ -804,7 +734,7 @@ export const deployApi = {
         ),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackScenarioError())
+      throw normalizeApiError(error, fallbackScenarioError())
     }
   },
 
@@ -830,7 +760,7 @@ export const deployApi = {
         ),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackScenarioPreviewError())
+      throw normalizeApiError(error, fallbackScenarioPreviewError())
     }
   },
 
@@ -864,7 +794,7 @@ export const deployApi = {
         limit,
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackHistoryError())
+      throw normalizeApiError(error, fallbackHistoryError())
     }
   },
 
@@ -878,7 +808,7 @@ export const deployApi = {
         resolveSuccessPayload<unknown>(response.data, response.status, fallbackSummaryError()),
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackSummaryError())
+      throw normalizeApiError(error, fallbackSummaryError())
     }
   },
 
@@ -910,7 +840,7 @@ export const deployApi = {
         size,
       )
     } catch (error) {
-      throw normalizeDeployError(error, fallbackTargetsError())
+      throw normalizeApiError(error, fallbackTargetsError())
     }
   },
 }

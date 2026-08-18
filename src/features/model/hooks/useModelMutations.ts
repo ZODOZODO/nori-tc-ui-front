@@ -9,11 +9,11 @@ import {
 } from '../lib/model-query-keys'
 import {
   createModelFailResponse,
-  ModelApiError,
   type ModelInfo,
   type ModelPageResponse,
   type ModelUpsertRequest,
 } from '../types/model.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 const EDIT_MODEL_VERSION = 'EDIT'
 
@@ -63,8 +63,8 @@ const resolveLockOwner = (model: ModelInfo): string | null => {
 /**
  * 다른 사용자가 EDIT 잠금을 점유한 경우를 표현하는 전용 에러를 생성합니다.
  */
-const createCheckoutConflictError = (owner: string | null): ModelApiError =>
-  new ModelApiError(
+const createCheckoutConflictError = (owner: string | null): ApiError =>
+  new ApiError(
     createModelFailResponse({
       success: false,
       data: null,
@@ -139,7 +139,7 @@ export function useModelMutations() {
       try {
         return await modelApi.checkoutModelVersion(model.modelVersionKey)
       } catch (error) {
-        if (error instanceof ModelApiError && error.status === 409) {
+        if (error instanceof ApiError && error.status === 409) {
           const latestModelItems = await refreshModelItems()
           const conflictingEditModel = findEditModel(latestModelItems, model.modelKey)
 

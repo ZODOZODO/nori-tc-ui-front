@@ -1,11 +1,9 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
   createEqpFailResponse,
-  defaultEqpErrorMessage,
-  EqpApiError,
   type AsyncAcceptResponse,
   type AsyncResultData,
   type AsyncResultResponse,
@@ -37,9 +35,8 @@ import {
   type EqpRuntimeState,
   type EqpRuntimeStateResponse,
   type EqpUpdateRequest,
-  isApiResponse,
-  isRecord,
 } from '../types/eqp.types'
+import { isRecord } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
@@ -55,80 +52,6 @@ const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
  * 클라이언트 타임아웃은 서버 상한보다 반드시 커야 한다.
  */
 const EQP_DUAL_COMMAND_TIMEOUT_MS = 20_000
-
-/**
- * 상태 변경 요청 이전에 CSRF 토큰을 발급하고 헤더 값을 반환합니다.
- */
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new EqpApiError(
-      createEqpFailResponse({
-        success: false,
-        data: null,
-        errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: i18n.t('error.eqp.csrf'),
-      }),
-    )
-  }
-
-  return csrfToken
-}
-
-/**
- * 알 수 없는 예외를 EqpApiError로 정규화합니다.
- */
-const normalizeEqpError = (
-  error: unknown,
-  fallbackMessage = defaultEqpErrorMessage(),
-): EqpApiError => {
-  if (error instanceof EqpApiError) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    return new EqpApiError(
-      createEqpFailResponse(error.response?.data, fallbackMessage),
-      error.response?.status,
-    )
-  }
-
-  return new EqpApiError(createEqpFailResponse(error, fallbackMessage))
-}
-
-/**
- * ApiResponse 계약을 검증하고 성공 payload(data)를 반환합니다.
- * allowNullData=true인 경우 success=true + data=null도 성공으로 허용합니다.
- */
-const resolveSuccessPayload = <TData>(
-  payload: unknown,
-  status: number,
-  fallbackMessage: string,
-  allowNullData = false,
-): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true) {
-    throw new EqpApiError(createEqpFailResponse(payload, fallbackMessage), status)
-  }
-
-  if (payload.data === null && !allowNullData) {
-    throw new EqpApiError(
-      createEqpFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'INVALID_RESPONSE',
-          errorMsg: fallbackMessage,
-        },
-        fallbackMessage,
-      ),
-      status,
-    )
-  }
-
-  return payload.data as TData
-}
 
 
 /**
@@ -159,7 +82,7 @@ const normalizeEqpListPayload = (
   }
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new EqpApiError(
+    throw new ApiError(
       createEqpFailResponse(
         {
           success: false,
@@ -188,16 +111,6 @@ const normalizeEqpListPayload = (
   }
 }
 
-/**
- * CSRF 헤더가 필요한 요청을 공통 처리합니다.
- */
-const withCsrfHeaders = async <TResponse>(
-  requestFn: (csrfToken: string) => Promise<TResponse>,
-): Promise<TResponse> => {
-  const csrfToken = await issueCsrfToken()
-  return requestFn(csrfToken)
-}
-
 export const eqpApi = {
   /**
    * 설비 목록을 조회합니다.
@@ -217,7 +130,7 @@ export const eqpApi = {
 
       return normalizeEqpListPayload(successPayload, offset, limit)
     } catch (error) {
-      throw normalizeEqpError(error, eqpListFallbackMessage())
+      throw normalizeApiError(error, eqpListFallbackMessage())
     }
   },
 
@@ -241,7 +154,7 @@ export const eqpApi = {
       )
 
       if (!Array.isArray(payload)) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse(
             {
               success: false,
@@ -257,7 +170,7 @@ export const eqpApi = {
 
       return payload as GatewayShardLease[]
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.shardLeases'))
+      throw normalizeApiError(error, i18n.t('error.eqp.shardLeases'))
     }
   },
 
@@ -276,7 +189,7 @@ export const eqpApi = {
         i18n.t('error.eqp.detail'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.detail'))
+      throw normalizeApiError(error, i18n.t('error.eqp.detail'))
     }
   },
 
@@ -298,7 +211,7 @@ export const eqpApi = {
         i18n.t('error.eqp.manageDetail'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.manageDetail'))
+      throw normalizeApiError(error, i18n.t('error.eqp.manageDetail'))
     }
   },
 
@@ -332,7 +245,7 @@ export const eqpApi = {
         i18n.t('error.eqp.manageBatch'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.manageBatch'))
+      throw normalizeApiError(error, i18n.t('error.eqp.manageBatch'))
     }
   },
 
@@ -351,7 +264,7 @@ export const eqpApi = {
         i18n.t('error.eqp.manageOptions'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.manageOptions'))
+      throw normalizeApiError(error, i18n.t('error.eqp.manageOptions'))
     }
   },
 
@@ -375,7 +288,7 @@ export const eqpApi = {
 
       return versions.filter((version) => typeof version === 'string' && version.trim().length > 0)
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.paramVersions'))
+      throw normalizeApiError(error, i18n.t('error.eqp.paramVersions'))
     }
   },
 
@@ -394,7 +307,7 @@ export const eqpApi = {
         i18n.t('error.eqp.modelInfo'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.modelInfo'))
+      throw normalizeApiError(error, i18n.t('error.eqp.modelInfo'))
     }
   },
 
@@ -416,7 +329,7 @@ export const eqpApi = {
         i18n.t('error.eqp.runtimeState'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.runtimeState'))
+      throw normalizeApiError(error, i18n.t('error.eqp.runtimeState'))
     }
   },
 
@@ -441,7 +354,7 @@ export const eqpApi = {
         checkedOutBy: payload.checkedOutBy,
       }
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.checkoutStatus'))
+      throw normalizeApiError(error, i18n.t('error.eqp.checkoutStatus'))
     }
   },
 
@@ -464,13 +377,13 @@ export const eqpApi = {
         i18n.t('error.eqp.params'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.params'))
+      throw normalizeApiError(error, i18n.t('error.eqp.params'))
     }
   },
 
   /**
    * 설비 파라미터를 체크아웃합니다.
-   * 이미 체크아웃 중이면 EqpApiError(status=409)를 던집니다.
+   * 이미 체크아웃 중이면 ApiError(status=409)를 던집니다.
    */
   checkoutEqp: async (eqpId: string, request: EqpCheckoutRequest): Promise<EqpParam[]> => {
     try {
@@ -492,7 +405,7 @@ export const eqpApi = {
         i18n.t('error.eqp.checkout'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.checkout'))
+      throw normalizeApiError(error, i18n.t('error.eqp.checkout'))
     }
   },
 
@@ -513,9 +426,9 @@ export const eqpApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.saveEditParams'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.saveEditParams'))
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.saveEditParams'))
+      throw normalizeApiError(error, i18n.t('error.eqp.saveEditParams'))
     }
   },
 
@@ -539,10 +452,9 @@ export const eqpApi = {
         response.data,
         response.status,
         i18n.t('error.eqp.undoCheckout'),
-        true,
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.undoCheckout'))
+      throw normalizeApiError(error, i18n.t('error.eqp.undoCheckout'))
     }
   },
 
@@ -563,9 +475,9 @@ export const eqpApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.checkin'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.checkin'))
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.checkin'))
+      throw normalizeApiError(error, i18n.t('error.eqp.checkin'))
     }
   },
 
@@ -585,9 +497,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.create'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.create'))
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.create'))
+      throw normalizeApiError(error, i18n.t('error.eqp.create'))
     }
   },
 
@@ -607,9 +519,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.update'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.update'))
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.update'))
+      throw normalizeApiError(error, i18n.t('error.eqp.update'))
     }
   },
 
@@ -629,9 +541,9 @@ export const eqpApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.eqp.delete'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.delete'))
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.delete'))
+      throw normalizeApiError(error, i18n.t('error.eqp.delete'))
     }
   },
 
@@ -657,7 +569,7 @@ export const eqpApi = {
       )
 
       if (!payload.traceId) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -670,7 +582,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.startRequest'))
+      throw normalizeApiError(error, i18n.t('error.eqp.startRequest'))
     }
   },
 
@@ -696,7 +608,7 @@ export const eqpApi = {
       )
 
       if (!payload.traceId) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -709,7 +621,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.endRequest'))
+      throw normalizeApiError(error, i18n.t('error.eqp.endRequest'))
     }
   },
 
@@ -738,7 +650,7 @@ export const eqpApi = {
       )
 
       if (!payload.traceId) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -751,7 +663,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.endRequest'))
+      throw normalizeApiError(error, i18n.t('error.eqp.endRequest'))
     }
   },
 
@@ -782,7 +694,7 @@ export const eqpApi = {
       )
 
       if (!payload.traceId) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -795,7 +707,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.startPollingGroup'))
+      throw normalizeApiError(error, i18n.t('error.eqp.startPollingGroup'))
     }
   },
 
@@ -825,7 +737,7 @@ export const eqpApi = {
       )
 
       if (!payload.traceId) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -838,7 +750,7 @@ export const eqpApi = {
 
       return payload.traceId
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.endPollingGroup'))
+      throw normalizeApiError(error, i18n.t('error.eqp.endPollingGroup'))
     }
   },
 
@@ -854,7 +766,7 @@ export const eqpApi = {
       })
 
       if (response.status === 404) {
-        throw new EqpApiError(
+        throw new ApiError(
           createEqpFailResponse({
             success: false,
             data: null,
@@ -871,7 +783,7 @@ export const eqpApi = {
         i18n.t('error.eqp.asyncResult'),
       )
     } catch (error) {
-      throw normalizeEqpError(error, i18n.t('error.eqp.asyncResult'))
+      throw normalizeApiError(error, i18n.t('error.eqp.asyncResult'))
     }
   },
 }

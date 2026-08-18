@@ -1,11 +1,9 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { ApiError, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
   createModelFailResponse,
-  defaultModelErrorMessage,
-  ModelApiError,
   type ApiResponse,
   type ModelFlow,
   type ModelFlowCreateRequest,
@@ -15,8 +13,8 @@ import {
   type ModelFlowListPayload,
   type ModelFlowListResponse,
   type ModelFlowUpdateRequest,
-  isApiResponse,
 } from '../types/model.types'
+import { isApiResponse } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const flowListFallbackMessage = (): string => i18n.t('error.model.flowList')
@@ -24,86 +22,6 @@ const flowDetailFallbackMessage = (): string => i18n.t('error.model.flowDetail')
 const flowCreateFallbackMessage = (): string => i18n.t('error.model.flowCreate')
 const flowUpdateFallbackMessage = (): string => i18n.t('error.model.flowUpdate')
 const flowDeleteFallbackMessage = (): string => i18n.t('error.model.flowDelete')
-
-/**
- * 상태 변경 요청 전에 CSRF 토큰을 발급합니다.
- */
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new ModelApiError(
-      createModelFailResponse({
-        success: false,
-        data: null,
-        errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: i18n.t('error.model.csrf'),
-      }),
-    )
-  }
-  return csrfToken
-}
-
-/**
- * 알 수 없는 예외를 ModelApiError 로 정규화합니다.
- */
-const normalizeModelError = (
-  error: unknown,
-  fallbackMessage = defaultModelErrorMessage(),
-): ModelApiError => {
-  if (error instanceof ModelApiError) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    return new ModelApiError(
-      createModelFailResponse(error.response?.data, fallbackMessage),
-      error.response?.status,
-    )
-  }
-
-  return new ModelApiError(createModelFailResponse(error, fallbackMessage))
-}
-
-/**
- * ApiResponse 계약을 검증하고 성공 payload(data) 를 반환합니다.
- */
-const resolveSuccessPayload = <TData>(
-  payload: unknown,
-  status: number,
-  fallbackMessage: string,
-): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true) {
-    throw new ModelApiError(createModelFailResponse(payload, fallbackMessage), status)
-  }
-
-  if (payload.data === null) {
-    throw new ModelApiError(
-      createModelFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'INVALID_RESPONSE',
-          errorMsg: fallbackMessage,
-        },
-        fallbackMessage,
-      ),
-      status,
-    )
-  }
-
-  return payload.data as TData
-}
-
-/**
- * CSRF 헤더가 필요한 요청을 공통 처리합니다.
- */
-const withCsrfHeaders = async <TResponse>(
-  requestFn: (csrfToken: string) => Promise<TResponse>,
-): Promise<TResponse> => {
-  const csrfToken = await issueCsrfToken()
-  return requestFn(csrfToken)
-}
 
 export const modelFlowApi = {
   /**
@@ -122,7 +40,7 @@ export const modelFlowApi = {
         flowListFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, flowListFallbackMessage())
+      throw normalizeApiError(error, flowListFallbackMessage())
     }
   },
 
@@ -142,7 +60,7 @@ export const modelFlowApi = {
         flowDetailFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, flowDetailFallbackMessage())
+      throw normalizeApiError(error, flowDetailFallbackMessage())
     }
   },
 
@@ -172,7 +90,7 @@ export const modelFlowApi = {
         flowCreateFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, flowCreateFallbackMessage())
+      throw normalizeApiError(error, flowCreateFallbackMessage())
     }
   },
 
@@ -204,7 +122,7 @@ export const modelFlowApi = {
         flowUpdateFallbackMessage(),
       )
     } catch (error) {
-      throw normalizeModelError(error, flowUpdateFallbackMessage())
+      throw normalizeApiError(error, flowUpdateFallbackMessage())
     }
   },
 
@@ -225,13 +143,13 @@ export const modelFlowApi = {
       )
 
       if (!isApiResponse(response.data) || response.data.success !== true) {
-        throw new ModelApiError(
+        throw new ApiError(
           createModelFailResponse(response.data, flowDeleteFallbackMessage()),
           response.status,
         )
       }
     } catch (error) {
-      throw normalizeModelError(error, flowDeleteFallbackMessage())
+      throw normalizeApiError(error, flowDeleteFallbackMessage())
     }
   },
 }

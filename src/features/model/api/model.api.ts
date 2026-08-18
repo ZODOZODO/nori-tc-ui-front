@@ -1,12 +1,10 @@
-import { isAxiosError } from 'axios'
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { CSRF_HEADER_NAME, readCsrfCookieToken, requestCsrfCookie } from '@/shared/lib/csrf'
+import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
   type ApiResponse,
   createModelFailResponse,
-  defaultModelErrorMessage,
-  ModelApiError,
   type ModelBranchCreateRequest,
   type ModelDeleteBatchResult,
   type ModelDeleteBatchResponse,
@@ -30,87 +28,13 @@ import {
   type ModelDetailRow,
   type ModelRootCreateRequest,
   type ModelUpsertRequest,
-  isApiResponse,
-  isRecord,
 } from '../types/model.types'
+import { isRecord } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const modelListFallbackMessage = (): string => i18n.t('error.model.list')
 const modelDetailNodeFallbackMessage = (): string => i18n.t('error.model.detailNode')
 
-
-/**
- * 상태 변경 요청 이전에 CSRF 토큰을 발급하고 헤더 값을 반환합니다.
- */
-const issueCsrfToken = async (): Promise<string> => {
-  await requestCsrfCookie()
-
-  const csrfToken = readCsrfCookieToken()
-  if (!csrfToken) {
-    throw new ModelApiError(
-      createModelFailResponse({
-        success: false,
-        data: null,
-        errorCode: 'CSRF_TOKEN_MISSING',
-        errorMsg: i18n.t('error.model.csrf'),
-      }),
-    )
-  }
-
-  return csrfToken
-}
-
-/**
- * 알 수 없는 예외를 ModelApiError로 정규화합니다.
- */
-const normalizeModelError = (
-  error: unknown,
-  fallbackMessage = defaultModelErrorMessage(),
-): ModelApiError => {
-  if (error instanceof ModelApiError) {
-    return error
-  }
-
-  if (isAxiosError(error)) {
-    return new ModelApiError(
-      createModelFailResponse(error.response?.data, fallbackMessage),
-      error.response?.status,
-    )
-  }
-
-  return new ModelApiError(createModelFailResponse(error, fallbackMessage))
-}
-
-/**
- * ApiResponse 계약을 검증하고 성공 payload(data)를 반환합니다.
- */
-const resolveSuccessPayload = <TData>(
-  payload: unknown,
-  status: number,
-  fallbackMessage: string,
-  allowNullData = false,
-): TData => {
-  if (!isApiResponse<TData>(payload) || payload.success !== true) {
-    throw new ModelApiError(createModelFailResponse(payload, fallbackMessage), status)
-  }
-
-  if (payload.data === null && !allowNullData) {
-    throw new ModelApiError(
-      createModelFailResponse(
-        {
-          success: false,
-          data: null,
-          errorCode: 'INVALID_RESPONSE',
-          errorMsg: fallbackMessage,
-        },
-        fallbackMessage,
-      ),
-      status,
-    )
-  }
-
-  return payload.data as TData
-}
 
 /**
  * 모델 목록 항목 최소 계약을 검사합니다.
@@ -149,7 +73,7 @@ const normalizeModelListPayload = (
   }
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new ModelApiError(
+    throw new ApiError(
       createModelFailResponse(
         {
           success: false,
@@ -206,7 +130,7 @@ const normalizeModelNodeDetailPayload = (
   node: ModelDetailNode,
 ): ModelNodeDetailData => {
   if (!isRecord(payload)) {
-    throw new ModelApiError(
+    throw new ApiError(
       createModelFailResponse(
         {
           success: false,
@@ -246,16 +170,6 @@ const normalizeModelNodeDetailPayload = (
   return { columns, rows, mdfContents }
 }
 
-/**
- * CSRF 헤더가 필요한 요청을 공통 처리합니다.
- */
-const withCsrfHeaders = async <TResponse>(
-  requestFn: (csrfToken: string) => Promise<TResponse>,
-): Promise<TResponse> => {
-  const csrfToken = await issueCsrfToken()
-  return requestFn(csrfToken)
-}
-
 export const modelApi = {
   /**
    * 모델 목록을 조회합니다.
@@ -275,7 +189,7 @@ export const modelApi = {
 
       return normalizeModelListPayload(successPayload, offset, limit)
     } catch (error) {
-      throw normalizeModelError(error, modelListFallbackMessage())
+      throw normalizeApiError(error, modelListFallbackMessage())
     }
   },
 
@@ -294,7 +208,7 @@ export const modelApi = {
         i18n.t('error.model.detail'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.detail'))
+      throw normalizeApiError(error, i18n.t('error.model.detail'))
     }
   },
 
@@ -321,7 +235,7 @@ export const modelApi = {
 
       return normalizeModelNodeDetailPayload(successPayload, node)
     } catch (error) {
-      throw normalizeModelError(error, modelDetailNodeFallbackMessage())
+      throw normalizeApiError(error, modelDetailNodeFallbackMessage())
     }
   },
 
@@ -346,7 +260,7 @@ export const modelApi = {
         i18n.t('error.model.checkout'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.checkout'))
+      throw normalizeApiError(error, i18n.t('error.model.checkout'))
     }
   },
 
@@ -374,7 +288,7 @@ export const modelApi = {
         i18n.t('error.model.checkin'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.checkin'))
+      throw normalizeApiError(error, i18n.t('error.model.checkin'))
     }
   },
 
@@ -414,7 +328,7 @@ export const modelApi = {
 
       return normalizeModelNodeDetailPayload(successPayload, node)
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.saveRows'))
+      throw normalizeApiError(error, i18n.t('error.model.saveRows'))
     }
   },
 
@@ -463,7 +377,7 @@ export const modelApi = {
         xml: successPayload.xml,
       }
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.mdfUpload'))
+      throw normalizeApiError(error, i18n.t('error.model.mdfUpload'))
     }
   },
 
@@ -488,7 +402,7 @@ export const modelApi = {
         i18n.t('error.model.rootCreate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.rootCreate'))
+      throw normalizeApiError(error, i18n.t('error.model.rootCreate'))
     }
   },
 
@@ -516,7 +430,7 @@ export const modelApi = {
         i18n.t('error.model.rootUpdate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.rootUpdate'))
+      throw normalizeApiError(error, i18n.t('error.model.rootUpdate'))
     }
   },
 
@@ -544,7 +458,7 @@ export const modelApi = {
         i18n.t('error.model.branchCreate'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.branchCreate'))
+      throw normalizeApiError(error, i18n.t('error.model.branchCreate'))
     }
   },
 
@@ -569,7 +483,7 @@ export const modelApi = {
         i18n.t('error.model.parentDiff'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.parentDiff'))
+      throw normalizeApiError(error, i18n.t('error.model.parentDiff'))
     }
   },
 
@@ -597,7 +511,7 @@ export const modelApi = {
         i18n.t('error.model.parentCommit'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.parentCommit'))
+      throw normalizeApiError(error, i18n.t('error.model.parentCommit'))
     }
   },
 
@@ -622,7 +536,7 @@ export const modelApi = {
         i18n.t('error.model.deprecatedDelete'),
       )
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.deprecatedDelete'))
+      throw normalizeApiError(error, i18n.t('error.model.deprecatedDelete'))
     }
   },
 
@@ -643,7 +557,7 @@ export const modelApi = {
 
       return resolveSuccessPayload<ModelInfo>(response.data, response.status, i18n.t('error.model.create'))
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.create'))
+      throw normalizeApiError(error, i18n.t('error.model.create'))
     }
   },
 
@@ -664,7 +578,7 @@ export const modelApi = {
 
       return resolveSuccessPayload<ModelInfo>(response.data, response.status, i18n.t('error.model.update'))
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.update'))
+      throw normalizeApiError(error, i18n.t('error.model.update'))
     }
   },
 
@@ -683,9 +597,9 @@ export const modelApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.model.delete'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.model.delete'))
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.delete'))
+      throw normalizeApiError(error, i18n.t('error.model.delete'))
     }
   },
 
@@ -707,9 +621,9 @@ export const modelApi = {
         }),
       )
 
-      resolveSuccessPayload<null>(response.data, response.status, i18n.t('error.model.delete'), true)
+      assertSuccessResponse(response.data, response.status, i18n.t('error.model.delete'))
     } catch (error) {
-      throw normalizeModelError(error, i18n.t('error.model.delete'))
+      throw normalizeApiError(error, i18n.t('error.model.delete'))
     }
   },
 

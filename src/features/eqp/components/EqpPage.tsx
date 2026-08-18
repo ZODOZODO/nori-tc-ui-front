@@ -19,6 +19,7 @@ import { EqpPollingGroupControl } from './EqpPollingGroupControl'
 import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
 import { EqpLifecycleResultDialog } from './EqpLifecycleResultDialog'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
+import { ApiError } from '@/shared/lib/api-error'
 
 // 사용자가 "등록 / 정보" 누른 시점에만 mount. 1275 LOC 모달이라 페이지 초기 청크에서 제외.
 const EqpManageFormModal = lazy(() =>
@@ -45,7 +46,6 @@ import { useEqpParamMutations } from '../hooks/useEqpParamMutations'
 import { eqpQueryKeys, invalidateEqpSelectionQueries } from '../lib/eqp-query-keys'
 import { useEqpUiStore } from '../stores/eqp-ui.store'
 import {
-  EqpApiError,
   type EqpCreateRequest,
   type EqpInfo,
   type EqpParamRow,
@@ -148,7 +148,7 @@ const toEditableParamRow = (row: EqpParamRow): EditableEqpParamRow => ({
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
  */
 const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
-  if (error instanceof EqpApiError) {
+  if (error instanceof ApiError) {
     return error.payload.errorMsg
   }
 

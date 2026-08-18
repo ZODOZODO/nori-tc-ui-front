@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useI18n } from '@/i18n/i18n-context'
 import { useDeleteUser } from '../hooks/useUserMutations'
-import { UserApiError } from '../types/user.types'
+import { ApiError } from '@/shared/lib/api-error'
 
 interface UserDeleteConfirmDialogProps {
   open: boolean
@@ -36,7 +36,7 @@ export function UserDeleteConfirmDialog({
       onDeleted?.()
       onClose()
     } catch (error) {
-      if (error instanceof UserApiError) {
+      if (error instanceof ApiError) {
         setErrorMessage(error.payload.errorMsg)
         return
       }

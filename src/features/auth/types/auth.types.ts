@@ -155,18 +155,3 @@ export const createLoginFailResponse = (
   }
 }
 
-/**
- * 로그인 API 계층에서 사용하는 도메인 에러 타입입니다.
- * status는 HTTP 상태코드가 있을 때만 채워집니다.
- */
-export class AuthApiError extends Error {
-  public readonly payload: LoginFailResponse
-  public readonly status?: number
-
-  constructor(payload: LoginFailResponse, status?: number) {
-    super(payload.errorMsg)
-    this.name = 'AuthApiError'
-    this.payload = payload
-    this.status = status
-  }
-}
