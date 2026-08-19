@@ -16,8 +16,8 @@
 | C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | `c5b8928` |
 | C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | `b7d6223` |
 | C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | `2000a6c` |
-| C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | (이 커밋) |
-| C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 대기 | — |
+| C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | `2b08643` |
+| C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 완료 | (이 커밋) |
 | C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 대기 | — |
 | C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 대기 | — |
 
@@ -396,5 +396,92 @@ $ npm run test:unit
 현상을 겪었다(`/src/features/dlq/api/dlq.api.ts` 같은 경로가 `**/api/**` 에 걸려 JSON 이 돌아오고
 `Failed to load module script … MIME type "application/json"` 로 모듈 로드 실패). 기존 spec 들이
 엔드포인트를 하나씩 route 하는 이유다 — **catch-all `**/api/**` 금지**.
+
+---
+
+## C5 — `refactor(sidebar): 도메인 사이드바 재편 (R9)`
+
+### 변경 파일
+- 삭제 `DeploySidebar.tsx` / `DlqSidebar.tsx` / `UserManagementSidebar.tsx` (AC8)
+- `DlqPage` / `UserManagementPage` / `DeployPage` — 사이드바 제거에 따라
+  `useSharedLayoutStore` 4 구독 + `handleSidebarDrag` 소비 제거(store 자체는 Eqp/Model 이 계속 사용)
+- `EqpSidebar.tsx` — Business/Gateway 아코디언 헤더와 `businessOpen`/`gatewayOpen` state 제거,
+  `scope` prop 으로 해당 스코프 트리만 렌더. **Eqp Create ContextMenu 를 gateway 트리 컨테이너로 이설**
+- `ModelSidebar.tsx` — SECS/Socket/PLC 섹션 헤더와 3 open state 제거, `scope` prop 으로 해당
+  인터페이스 root 트리만 렌더. **Model Create ContextMenu 를 트리 컨테이너로 이설**
+- `src/shared/layout/lnb-sidebar.ts` — `lnbFlatNavClass` 제거(F6 고아), `LNB_BUTTON_RESET` 추가
+- `src/i18n/locales/{ko,en,vi}.json` — 고아 키 17개 ×3 언어 제거 (1096 → 1079)
+- `tests/unit/i18n-vi-parity.test.ts` — F2 키 치환 + vacuous pass 차단 단언 추가
+
+### AC7 — raw `<button>` 0 수렴 방법
+
+foundation 이 남긴 18건은 전부 5 개 도메인 사이드바 안에 있었다. 3 사이드바 파일 제거로 6건,
+Eqp/Model 헤더 제거로 3건이 사라지고, **남은 9건을 `<Button>` 으로 수렴**했다
+(Eqp: 트리 노드 / 접기·펼치기 2 / business 하위 링크 / gateway 그룹 토글,
+Model: branch / root / 접기·펼치기 2).
+
+수렴 시 시각이 바뀌지 않게 `lnb-sidebar.ts` 의 3 헬퍼에 `LNB_BUTTON_RESET = 'h-auto justify-start'`
+를 넣었다 — `<Button>` 의 `size` 가 `h-9` 를, base 가 `justify-center` 를 걸어 패딩 기반 높이와
+좌측 정렬이 깨지기 때문이다(twMerge 는 나중 클래스가 이긴다). 접기/펼치기 아이콘 버튼은
+`variant="ghost"` + 기존 className 유지 + `p-0` 로 원래 32px 정사각을 지켰다.
+
+### 자율 확정 (Plan 밖 발견)
+
+| # | 항목 | 결정 |
+|---|---|---|
+| I13 | **`DeployPage` 언마운트 정리가 모드 전환마다 발화** — 모드가 라우트로 갈리고 `Router` 가 `ErrorBoundary key={pathname}` 라서 `/deploy/register` → `/deploy/deploy` 이동이 remount 다. 구 구조(`/deploy` 단일 라우트 + store mode)에서는 deploy 구역을 **떠날 때만** 발화하던 `clearDeployUiSessionState()` 가 이제 구역 안 이동에도 돌아 방금 만든 배포의 `activeDeployKey`/`localHistory` 를 지운다(C4a 가 들여온 회귀) | cleanup 에서 `window.location.pathname.startsWith('/deploy')` 로 **구역을 벗어날 때만** 정리. cleanup 시점의 `window.location` 은 이미 다음 경로다(history 갱신 → 리렌더 → cleanup) |
+| I14 | 같은 remount 특성 때문에 `ModelPage` 의 store 선택이 스코프를 건너 살아남음 — SECS 에서 모델을 고르고 Socket 으로 가면 Socket 트리에 없는 모델의 버전 목록이 그려진다 | `scope` 변경 effect 로 store 선택만 정리(구 섹션 헤더 클릭이 하던 것과 동일). React 로컬 상태는 remount 로 이미 초기화되므로 건드리지 않는다 — 처음엔 `setCheckInErrorMessage(null)` 도 넣었다가 `react-hooks/set-state-in-effect` 경고 + 중복이라 제거했다 |
+| I15 | ModelSidebar 우클릭 메뉴 문안 | `scope` 는 `'SOCKET'` 대문자라 그대로 쓰면 `SOCKET Model Create` 가 된다. `SCOPE_TITLE` 표로 표기를 `Socket` 으로 유지 — `verify-ui/overlays-model-tree.spec.ts:53` 이 `'Socket Model Create'` 문자열로 집는다 |
+| I16 | `i18n-vi-parity.test.ts` AC2 의 vacuous pass | 키를 `navigation.item.*` 로 치환하는 데 그치지 않고 `assert.ok(enMap[key])` 존재 단언을 추가했다 — 다음에 또 키가 사라지면 `undefined === undefined` 로 조용히 통과하지 않고 실패한다(F2 의 근본 원인) |
+
+### L7 게이트 — i18n 키 제거 전 소비처 0건 확인
+
+```
+$ grep -rn "deploy\.sidebar\." src tests | grep -v locales/   →  0건
+$ grep -rn "userMgmt\.sidebar\." src tests | grep -v locales/ →  0건
+$ grep -rn "dlq\.sidebar\." src tests | grep -v locales/      →  i18n-vi-parity.test.ts 3건(=F2, 같은 커밋에서 치환)
+```
+
+`eqp.sidebar.*` / `model.sidebar.*` 는 타이틀 바·검색·접기가 존치하므로 유지했다.
+
+### AC 판정 (C5 소관 2건)
+
+```
+=== AC7  grep -rn "<button" src/features ===
+(0건)
+=== AC8  git ls-files <3 사이드바 파일> ===
+lines=0
+=== 부수 확인: lnbFlatNavClass 잔존 ===
+0건
+```
+
+### 게이트
+
+```
+$ npm run build
+✓ built in 16.48s
+
+$ npm run lint
+> eslint .            (무출력 — 통과)
+
+$ npm run test:unit
+# tests 241
+# pass 241
+# fail 0
+```
+
+### 실화면 확인
+
+임시 spec + mock 으로 `/eqp/gateway` 와 `/model/secs` 를 촬영해 확인했다(확인 후 삭제).
+
+- **EqpSidebar**: Business/Gateway 헤더가 사라지고 타이틀 바 + 검색 + gateway 트리만 남았다.
+  `gateway_app1` 그룹 노드가 좌측 정렬·소형 타이포로 정상 렌더되고, 선택 시 coral 좌측 액센트 +
+  `bg-muted` 가 그대로 적용된다 — `<Button>` 수렴이 시각을 바꾸지 않았음을 확인
+- **ModelSidebar**: SECS/Socket/PLC 섹션 헤더가 사라지고 타이틀 바 + 검색 + 스코프 트리만 남았다
+- 두 화면 모두 `console.error` / `pageerror` 0건
+- **미확인 남음**: leaf 노드(`lnbLeafClass`) 는 mock 그룹핑이 설비를 붙이지 못해 이 스냅샷에
+  나오지 않았다. 같은 `LNB_BUTTON_RESET` 을 쓰는 sub-link 가 정상임을 확인했고, leaf 를 실제로
+  클릭하는 e2e(`selectable-table-gateway-group` / `plc-model-tree` / `model-flow`)가 C7 스윕에서
+  판정한다
 
 (커밋 진행에 따라 계속 추가)

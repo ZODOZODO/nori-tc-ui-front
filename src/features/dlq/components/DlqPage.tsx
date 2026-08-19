@@ -1,12 +1,8 @@
-import { useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router'
+import { useMemo } from 'react'
 import { AppShellPage } from '@/shared/components/AppShellPage'
-import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
-import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import type { DlqMode } from '../types/dlq.types'
 import { BusinessDlqPanel } from './BusinessDlqPanel'
 import { DashboardPanel } from './DashboardPanel'
-import { DlqSidebar } from './DlqSidebar'
 import { GatewayDlqPanel } from './GatewayDlqPanel'
 import { QuarantinePanel } from './QuarantinePanel'
 import { RepairTaskPanel } from './RepairTaskPanel'
@@ -33,43 +29,17 @@ const renderPanel = (mode: DlqMode) => {
 
 /**
  * `/dlq/*` 라우트의 통합 페이지입니다. 인증·DLQ_READ 권한 검사는 라우트 가드
- * (RequireAuth / RequirePermission)가 담당한다. 모드는 URL 세그먼트가 정하며, 모드 전환은
- * navigate 다(새로고침·딥링크가 그대로 복원된다).
+ * (RequireAuth / RequirePermission)가 담당한다.
+ *
+ * 5 모드 전환은 전역 LNB 가 맡는다 — 같은 항목을 in-page 사이드바로 한 번 더 보여주지 않는다.
  */
 export function DlqPage({ mode }: DlqPageProps) {
-  const navigate = useNavigate()
-  const sidebarOpen = useSharedLayoutStore((state) => state.sidebarOpen)
-  const sidebarWidth = useSharedLayoutStore((state) => state.sidebarWidth)
-  const toggleSidebar = useSharedLayoutStore((state) => state.toggleSidebar)
-  const setSidebarWidth = useSharedLayoutStore((state) => state.setSidebarWidth)
-
-  const handleSidebarDrag = useCallback(
-    (deltaX: number) => {
-      if (!sidebarOpen) {
-        return
-      }
-      setSidebarWidth(clampSidebarWidth(sidebarWidth + deltaX))
-    },
-    [setSidebarWidth, sidebarOpen, sidebarWidth],
-  )
-
   const activePanel = useMemo(() => renderPanel(mode), [mode])
 
   return (
     <AppShellPage>
-      <main className="flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
-        <DlqSidebar
-          mode={mode}
-          onChangeMode={(nextMode) => navigate(`/dlq/${nextMode}`)}
-          sidebarOpen={sidebarOpen}
-          sidebarWidth={sidebarWidth}
-          onToggleSidebar={toggleSidebar}
-          onResizeSidebar={handleSidebarDrag}
-        />
-
-        <section className="flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-          {activePanel}
-        </section>
+      <main className="flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {activePanel}
       </main>
     </AppShellPage>
   )

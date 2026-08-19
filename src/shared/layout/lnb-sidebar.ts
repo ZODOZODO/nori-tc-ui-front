@@ -15,10 +15,20 @@ import { cn } from '@/lib/utils'
 export const LNB_FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
+/**
+ * `<Button>` 기본 크기/정렬 무력화.
+ *
+ * 아래 헬퍼들은 전부 `<Button>` 에 붙는다(사이드바 raw `<button>` 수렴 이후). Button 의
+ * `size` 는 `h-9` 를, base 는 `justify-center` 를 걸어 두므로 패딩 기반 높이와 좌측 정렬이
+ * 깨진다 — 헬퍼가 뒤에 오므로 여기서 되돌린다(twMerge 는 나중 클래스가 이긴다).
+ */
+const LNB_BUTTON_RESET = 'h-auto justify-start'
+
 /** sidebar__top — 최상위 그룹 헤더. 선택(is-expanded) = 중립 surface + coral 좌측 액센트. */
 export const lnbGroupClass = (selected: boolean) =>
   cn(
     'flex w-full items-center gap-2.5 rounded-lg py-2.5 text-left text-[13px] font-bold transition-colors',
+    LNB_BUTTON_RESET,
     LNB_FOCUS_RING,
     selected
       ? 'border-l-2 border-brand-primary bg-muted pl-2.5 pr-3 text-foreground'
@@ -29,6 +39,7 @@ export const lnbGroupClass = (selected: boolean) =>
 export const lnbSubLinkClass = (selected: boolean) =>
   cn(
     'block w-full rounded-md py-1.5 pr-3 text-left text-xs font-medium transition-colors',
+    LNB_BUTTON_RESET,
     LNB_FOCUS_RING,
     selected
       ? 'border-l-2 border-brand-primary bg-muted pl-7.5 font-semibold text-foreground'
@@ -39,6 +50,7 @@ export const lnbSubLinkClass = (selected: boolean) =>
 export const lnbLeafClass = (selected: boolean) =>
   cn(
     'flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left text-xs transition-colors',
+    LNB_BUTTON_RESET,
     LNB_FOCUS_RING,
     selected
       ? 'border-l-2 border-brand-primary bg-muted pl-10.5 font-semibold text-foreground'
@@ -48,16 +60,3 @@ export const lnbLeafClass = (selected: boolean) =>
 /** 리프 노드 좌측 dot. */
 export const lnbLeafDotClass = (selected: boolean) =>
   cn('inline-block size-1.5 shrink-0 rounded-full', selected ? 'bg-brand-primary' : 'bg-muted-foreground/50')
-
-/**
- * flat nav — 아코디언 없는 단일 레벨 모드 전환 사이드바(deploy/dlq/user)의 항목 버튼.
- * eqp/model 의 아코디언과 active 시각 언어를 통일한다: 중립 surface(bg-muted) + 얇은 coral
- * 좌측 바(point). 이전엔 각 사이드바가 같은 문자열을 인라인 복붙해 lnb 변경 시 어긋났다.
- */
-export const lnbFlatNavClass = (selected: boolean) =>
-  cn(
-    'h-9 justify-start rounded-md text-sm font-medium transition-colors',
-    selected
-      ? 'border-l-2 border-brand-primary bg-muted pl-3.5 font-semibold text-foreground hover:bg-muted hover:text-foreground'
-      : 'pl-4 text-muted-foreground hover:bg-muted hover:text-foreground',
-  )

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { memo, useDeferredValue, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import {
   ContextMenu,
@@ -13,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
 import {
   LNB_FOCUS_RING,
-  lnbGroupClass,
   lnbLeafClass,
   lnbLeafDotClass,
   lnbSubLinkClass,
@@ -23,14 +23,14 @@ import { buildModelTreeGroups, type ModelTreeNode } from '../lib/model-tree.util
 import type { ModelInfo, ProtocolType } from '../types/model.types'
 
 interface ModelSidebarProps {
+  /** 현재 라우트 스코프. 이 인터페이스의 root 트리만 그린다(SECS/Socket/PLC 는 전역 LNB 소관). */
+  scope: ProtocolType
   modelItems: ModelInfo[]
   selectedModelVersionKey: number | null
-  selectedInterfaceGroup: ProtocolType | null
   sidebarOpen: boolean
   sidebarWidth: number
   isLoading: boolean
   errorMessage: string | null
-  onSelectInterfaceGroup: (interfaceType: ProtocolType) => void
   onSelectModel: (model: ModelInfo) => void
   onOpenRootCreate: (interfaceType: ProtocolType) => void
   onOpenRootUpdate: (model: ModelInfo) => void
@@ -64,24 +64,45 @@ const findOwningRootName = (roots: ModelTreeNode[], selectedKey: number | null):
 }
 
 /**
- * Model 페이지 좌측 Sidebar.
+ * 스코프의 화면 표기입니다 — 라벨은 승격 전 섹션 헤더와 같은 문자열을 유지한다
+ * ('Socket Model Create' 등 우클릭 메뉴 문안이 바뀌지 않게).
+ */
+const SCOPE_TITLE: Readonly<Record<string, string>> = {
+  SECS: 'SECS',
+  SOCKET: 'Socket',
+  PLC: 'PLC',
+}
+
+/** 라우트 스코프 → 트리 그룹 선택. */
+const resolveScopedRoots = (
+  scope: ProtocolType,
+  groups: ReturnType<typeof buildModelTreeGroups>,
+): ModelTreeNode[] => {
+  const normalized = scope.toUpperCase()
+  if (normalized === 'SOCKET') {
+    return groups.socketRoots
+  }
+  if (normalized === 'PLC') {
+    return groups.plcRoots
+  }
+  return groups.secsRoots
+}
+
+/**
+ * Model 페이지의 in-page 2차 내비입니다 — 현재 라우트 스코프의 root > branch 트리만 담당합니다.
  *
- * nori-client 리뉴얼 LNB 의 3단 클릭 아코디언을 EqpSidebar 와 동일 패턴으로 적용한다:
- *   SECS / Socket 섹션(그룹 헤더, 클릭 = 인터페이스 그룹 선택 + 펼침/접힘)
- *     → operator/root 모델(하위 링크, 클릭 = 선택 + 하위 branch 펼침/접힘)
- *       → branch 모델(리프, root 펼쳤을 때만 노출)
- * 시각 클래스는 `@/shared/layout/lnb-sidebar` 공용 헬퍼(eqp/model 공유). 선택/라우팅/
- * ContextMenu/검색/testId 불변(R4.1), R4.2(접기/리사이즈) 인프라 그대로.
+ * 1단계였던 SECS / Socket / PLC 섹션 헤더는 전역 LNB 의 menu-label 로 승격돼 여기서 사라졌다
+ * (`/model/secs` · `/model/socket` · `/model/plc`). 남은 것은 그 인터페이스의 root 목록,
+ * root 하위 branch 아코디언, 검색, 우클릭 CRUD 다. 시각 클래스는 eqp 와 공유한다.
  */
 export const ModelSidebar = memo(function ModelSidebar({
+  scope,
   modelItems,
   selectedModelVersionKey,
-  selectedInterfaceGroup,
   sidebarOpen,
   sidebarWidth,
   isLoading,
   errorMessage,
-  onSelectInterfaceGroup,
   onSelectModel,
   onOpenRootCreate,
   onOpenRootUpdate,
@@ -108,40 +129,18 @@ export const ModelSidebar = memo(function ModelSidebar({
   )
   const selectedModelName = selectedModel?.modelName ?? null
 
-  const { secsRoots, socketRoots, plcRoots } = useMemo(
-    () => buildModelTreeGroups(modelItems, deferredSearchKeyword),
-    [modelItems, deferredSearchKeyword],
+  const roots = useMemo(
+    () => resolveScopedRoots(scope, buildModelTreeGroups(modelItems, deferredSearchKeyword)),
+    [modelItems, deferredSearchKeyword, scope],
   )
+  const scopeTitle = SCOPE_TITLE[scope.toUpperCase()] ?? scope
 
-  // 섹션 펼침/접힘 (nori-client sidebar__top 아코디언). 초기값 = 선택 컨텍스트 기반.
-  const [secsOpen, setSecsOpen] = useState(
-    () =>
-      selectedInterfaceGroup === 'SECS' || findOwningRootName(secsRoots, selectedModelVersionKey) !== null,
-  )
-  const [socketOpen, setSocketOpen] = useState(
-    () =>
-      selectedInterfaceGroup === 'SOCKET' ||
-      findOwningRootName(socketRoots, selectedModelVersionKey) !== null,
-  )
-  const [plcOpen, setPlcOpen] = useState(
-    () =>
-      selectedInterfaceGroup === 'PLC' ||
-      findOwningRootName(plcRoots, selectedModelVersionKey) !== null,
-  )
-  // root 별 하위 branch 펼침/접힘 (2단계 아코디언). root 클릭으로 토글.
+  // root 별 하위 branch 펼침/접힘. root 클릭으로 토글.
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => {
     const initial = new Set<string>()
-    const secsOwner = findOwningRootName(secsRoots, selectedModelVersionKey)
-    const socketOwner = findOwningRootName(socketRoots, selectedModelVersionKey)
-    const plcOwner = findOwningRootName(plcRoots, selectedModelVersionKey)
-    if (secsOwner) {
-      initial.add(secsOwner)
-    }
-    if (socketOwner) {
-      initial.add(socketOwner)
-    }
-    if (plcOwner) {
-      initial.add(plcOwner)
+    const owner = findOwningRootName(roots, selectedModelVersionKey)
+    if (owner) {
+      initial.add(owner)
     }
     return initial
   })
@@ -170,8 +169,9 @@ export const ModelSidebar = memo(function ModelSidebar({
       >
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onSelectModel(node.representative)}
               className={lnbLeafClass(isSelected)}
             >
@@ -182,7 +182,7 @@ export const ModelSidebar = memo(function ModelSidebar({
                   DEPRECATED
                 </span>
               ) : null}
-            </button>
+            </Button>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56">
             <ContextMenuLabel>{node.representative.modelName}</ContextMenuLabel>
@@ -215,8 +215,9 @@ export const ModelSidebar = memo(function ModelSidebar({
       <div key={`${rootName}-${node.representative.modelVersionKey}`} className="flex flex-col gap-0.5">
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => {
                 onSelectModel(node.representative)
                 toggleRoot(rootName)
@@ -224,7 +225,7 @@ export const ModelSidebar = memo(function ModelSidebar({
               className={lnbSubLinkClass(isSelected)}
             >
               {rootName}
-            </button>
+            </Button>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56">
             <ContextMenuLabel>{rootName}</ContextMenuLabel>
@@ -257,46 +258,6 @@ export const ModelSidebar = memo(function ModelSidebar({
     )
   }
 
-  /** SECS / Socket 섹션 (그룹 헤더 아코디언 + root 목록). */
-  const renderSection = (
-    title: string,
-    interfaceType: ProtocolType,
-    roots: ModelTreeNode[],
-    isOpen: boolean,
-    onToggleOpen: () => void,
-  ) => (
-    <ContextMenu>
-      <div className="flex flex-col gap-0.5">
-        <ContextMenuTrigger asChild>
-          <button
-            type="button"
-            onClick={() => {
-              onSelectInterfaceGroup(interfaceType)
-              onToggleOpen()
-            }}
-            className={lnbGroupClass(selectedInterfaceGroup === interfaceType)}
-          >
-            <span className="flex-1 truncate">{title}</span>
-          </button>
-        </ContextMenuTrigger>
-        {isOpen || hasSearch ? (
-          roots.length === 0 ? (
-            <p className="py-1 pl-8 text-[11px] text-muted-foreground">{t('model.sidebar.empty')}</p>
-          ) : (
-            roots.map((root) => renderRoot(root))
-          )
-        ) : null}
-      </div>
-      <ContextMenuContent className="w-52">
-        <ContextMenuLabel>{title}</ContextMenuLabel>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => onOpenRootCreate(interfaceType)}>
-          {`${title} Model Create`}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  )
-
   if (!sidebarOpen) {
     return (
       <aside
@@ -304,17 +265,18 @@ export const ModelSidebar = memo(function ModelSidebar({
         style={{ width: `${sidebarWidth}px` }}
       >
         <div className="flex h-13 items-center justify-center border-b border-border">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onToggleSidebar}
             className={cn(
-              'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
+              'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
               LNB_FOCUS_RING,
             )}
             aria-label={t('model.sidebar.expand')}
           >
             <ChevronRight className="size-4" />
-          </button>
+          </Button>
         </div>
       </aside>
     )
@@ -329,17 +291,18 @@ export const ModelSidebar = memo(function ModelSidebar({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-13 items-center justify-between border-b border-border px-3">
             <span className="truncate text-sm font-semibold text-foreground">{t('model.sidebar.title')}</span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={onToggleSidebar}
               className={cn(
-                'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted',
+                'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
                 LNB_FOCUS_RING,
               )}
               aria-label={t('model.sidebar.collapse')}
             >
               <ChevronLeft className="size-4" />
-            </button>
+            </Button>
           </div>
 
           <div className="px-3 py-3">
@@ -354,22 +317,38 @@ export const ModelSidebar = memo(function ModelSidebar({
             </div>
           </div>
 
-          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
-            {renderSection('SECS', 'SECS', secsRoots, secsOpen, () => setSecsOpen((open) => !open))}
-            <div className="mt-2 flex flex-col gap-0.5">
-              {renderSection('Socket', 'SOCKET', socketRoots, socketOpen, () =>
-                setSocketOpen((open) => !open),
-              )}
-            </div>
-            <div className="mt-2 flex flex-col gap-0.5">
-              {renderSection('PLC', 'PLC', plcRoots, plcOpen, () => setPlcOpen((open) => !open))}
-            </div>
+          {/* Model Create 우클릭 메뉴는 승격된 섹션 헤더 대신 트리 컨테이너가 받는다
+              (생성 대상 인터페이스 = 현재 라우트 스코프). */}
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <nav
+                className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3"
+                data-testid="model-sidebar-tree"
+              >
+                {roots.length === 0 ? (
+                  <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                    {t('model.sidebar.empty')}
+                  </p>
+                ) : (
+                  roots.map((root) => renderRoot(root))
+                )}
 
-            {isLoading ? (
-              <p className="px-3 pt-1 text-xs text-muted-foreground">{t('model.sidebar.loading')}</p>
-            ) : null}
-            {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
-          </nav>
+                {isLoading ? (
+                  <p className="px-3 pt-1 text-xs text-muted-foreground">
+                    {t('model.sidebar.loading')}
+                  </p>
+                ) : null}
+                {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
+              </nav>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+              <ContextMenuLabel>{scopeTitle}</ContextMenuLabel>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={() => onOpenRootCreate(scope)}>
+                {`${scopeTitle} Model Create`}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </div>
 
         <SidebarResizeHandle onDrag={onResizeSidebar} />

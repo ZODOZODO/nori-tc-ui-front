@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
@@ -158,7 +157,6 @@ interface ModelPageProps {
  */
 export function ModelPage({ scope }: ModelPageProps) {
   const { t } = useI18n()
-  const navigate = useNavigate()
   const selectedModelVersionKey = useModelUiStore((state) => state.selectedModelVersionKey)
   const openedTabs = useModelUiStore((state) => state.openedTabs)
   const activeTab = useModelUiStore((state) => state.activeTab)
@@ -764,18 +762,22 @@ export function ModelPage({ scope }: ModelPageProps) {
     setCheckInErrorMessage(null)
   }
 
-  /** 인터페이스 스코프 전환 — URL 이 원천이므로 navigate 하고, 열려 있던 모델 선택은 정리한다. */
-  const handleSelectInterfaceGroup = useCallback(
-    (interfaceType: ProtocolType) => {
-      setSelectedModelVersionKey(null)
-      setActiveTab(null)
-      setEditMode(false)
-      setCheckInModalOpen(false)
-      setCheckInErrorMessage(null)
-      navigate(`/model/${interfaceType.toLowerCase()}`)
-    },
-    [navigate, setActiveTab, setCheckInModalOpen, setEditMode, setSelectedModelVersionKey],
-  )
+  /**
+   * 스코프 진입 시 이전 스코프에서 고른 모델 선택을 정리합니다.
+   *
+   * 선택(`selectedModelVersionKey`)은 store 에 남으므로 SECS 에서 모델을 고른 뒤 Socket 으로
+   * 옮기면 Socket 트리에 없는 모델의 버전 목록이 그려진다. 스코프는 URL 이 정하므로 어긋난
+   * 선택을 지우고 그 스코프의 목록에서 다시 시작한다 — 구 섹션 헤더 클릭이 하던 정리와 같다.
+   *
+   * store 상태만 지운다. 이 페이지는 경로가 바뀔 때마다 remount 되므로(`Router` 의
+   * `ErrorBoundary key={pathname}`) React 로컬 상태는 이미 초기값이다.
+   */
+  useEffect(() => {
+    setSelectedModelVersionKey(null)
+    setActiveTab(null)
+    setEditMode(false)
+    setCheckInModalOpen(false)
+  }, [scope, setActiveTab, setCheckInModalOpen, setEditMode, setSelectedModelVersionKey])
 
   const handleCloseTab = (modelVersionKey: number) => {
     closeModelTab(modelVersionKey)
@@ -1306,14 +1308,13 @@ export function ModelPage({ scope }: ModelPageProps) {
     >
       <main className="flex flex-1 min-h-0">
         <ModelSidebar
+          scope={scope}
           modelItems={modelItems}
           selectedModelVersionKey={selectedModelVersionKey}
-          selectedInterfaceGroup={scope}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           isLoading={modelListQuery.isLoading}
           errorMessage={listErrorMessage}
-          onSelectInterfaceGroup={handleSelectInterfaceGroup}
           onSelectModel={handleSelectModel}
           onOpenRootCreate={handleOpenRootCreate}
           onOpenRootUpdate={handleOpenRootUpdate}

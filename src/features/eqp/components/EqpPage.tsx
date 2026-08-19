@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -309,7 +308,6 @@ interface EqpPageProps {
  */
 export function EqpPage({ scope }: EqpPageProps) {
   const { t } = useI18n()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const selection = useEqpUiStore((state) => state.selection)
@@ -851,28 +849,6 @@ export function EqpPage({ scope }: EqpPageProps) {
     selectBusinessGroup(groupIndex)
   }, [queryClient, selectBusinessGroup])
 
-  /**
-   * Business 전체 선택 처리.
-   * 선택 시 eqp/model 목록 캐시를 무효화해 최신 데이터를 반영합니다.
-   */
-  const handleSelectBusinessAll = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
-    void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
-    // 스코프 전환은 URL 이 원천이다 — navigate 하면 위 보정 effect 가 selection 을 맞춘다.
-    navigate('/eqp/business')
-  }, [navigate, queryClient])
-
-  /**
-   * Gateway 전체 선택 처리.
-   * 선택 시 eqpList 캐시를 무효화해 최신 설비 목록을 반영합니다.
-   */
-  const handleSelectGatewayAll = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
-    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
-    // 스코프 전환은 URL 이 원천이다 — navigate 하면 위 보정 effect 가 selection 을 맞춘다.
-    navigate('/eqp/gateway')
-  }, [navigate, queryClient])
-
   const handleSaveCreateEqp = async (request: EqpCreateRequest) => {
     try {
       setManagementErrorMessage(null)
@@ -1403,7 +1379,6 @@ export function EqpPage({ scope }: EqpPageProps) {
   // 사이드바에 전달할 선택된 그룹 인덱스
   const selectedGroupIndex = selection.type === 'gateway_group' ? selection.groupIndex : null
   const selectedBusinessGroupIndex = selection.type === 'business_group' ? selection.groupIndex : null
-  const isGatewaySelected = selection.type === 'gateway_all'
 
   return (
     <AppShellPage
@@ -1416,11 +1391,10 @@ export function EqpPage({ scope }: EqpPageProps) {
       {/* main: flex-1로 남은 화면 전체 높이 차지, min-h-0으로 flex shrink 허용 */}
       <main className="flex flex-1 min-h-0">
         <EqpSidebar
+          scope={scope}
           eqpItems={eqpItems}
           shardLeases={gatewayShardLeasesQuery.data}
           selectedEqpId={selectedEqpId}
-          isGatewaySelected={isGatewaySelected}
-          isBusinessSelected={selection.type === 'business_all'}
           selectedBusinessGroupIndex={selectedBusinessGroupIndex}
           selectedGroupIndex={selectedGroupIndex}
           sidebarOpen={sidebarOpen}
@@ -1430,8 +1404,6 @@ export function EqpPage({ scope }: EqpPageProps) {
           }
           errorMessage={listErrorMessage ?? shardLeaseErrorMessage ?? lineListErrorMessage}
           onSelectEqp={handleSelectEqp}
-          onSelectGatewayAll={handleSelectGatewayAll}
-          onSelectBusinessAll={handleSelectBusinessAll}
           onSelectGatewayGroup={handleSelectGatewayGroup}
           onSelectBusinessGroup={handleSelectBusinessGroup}
           onOpenEqpInfoUpdate={openEqpInfoDialog}

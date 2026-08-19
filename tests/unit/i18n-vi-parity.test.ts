@@ -16,12 +16,16 @@ const enMap = en as Record<string, string>
 const koMap = ko as Record<string, string>
 
 // AC2 — ko==en 인 Layer1 키 중 Tier A jargon 으로 분류된 7개. vi 도 en 과 값 동일해야 한다.
+//
+// `dlq.sidebar.*` 3키는 wm-parity-sidebar 에서 DLQ 도메인 사이드바가 사라지며 제거됐고, 같은
+// 라벨이 전역 LNB 의 `navigation.item.*` 로 이관됐다. 없는 키를 그대로 두면
+// `assert.equal(undefined, undefined)` 로 조용히 통과해(vacuous pass) 검사가 무력화된다.
 const TIER_A_LAYER1_KEYS = [
-  'dlq.sidebar.gateway',
+  'navigation.item.dlqGateway',
   'dlq.panel.gateway',
-  'dlq.sidebar.business',
+  'navigation.item.dlqBusiness',
   'dlq.panel.business',
-  'dlq.sidebar.repairTask',
+  'navigation.item.dlqRepairTask',
   'dlq.panel.repairTask',
   'livemap.demo.colEqp',
 ]
@@ -79,6 +83,8 @@ test('AC1 — vi 와 en 의 키 집합이 동일하다 (parity)', () => {
 
 test('AC2 — Layer1 Tier A jargon 키는 vi[k] === en[k]', () => {
   for (const key of TIER_A_LAYER1_KEYS) {
+    // 키가 사라지면 undefined === undefined 로 조용히 통과한다 — 존재부터 단언해 무력화를 막는다.
+    assert.ok(enMap[key], `en 에 ${key} 가 없다 — 키 이름이 바뀌었으면 이 목록도 갱신해야 한다`)
     assert.equal(viMap[key], enMap[key], `${key}: vi="${viMap[key]}" en="${enMap[key]}"`)
   }
 })
