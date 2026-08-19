@@ -2,6 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SELECT_EMPTY_VALUE,
+} from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
@@ -1080,8 +1089,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           const isSelected = selectedIdSet.has(badge.localId)
           const color = LIVE_MAP_STATUS_COLOR[badge.status]
           return (
-            <button
+            <Button
               key={badge.localId}
+              variant="outline"
+              size="sm"
               ref={(element) => {
                 const map = badgeRefs.current
                 if (element) {
@@ -1109,7 +1120,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 handleDragStart(badge.localId)
                 beginDragRef.current?.(badge.localId, event.pointerId, floorView === 'all' ? (placement.floor - 1) * FLOOR_HEIGHT : 0)
               }}
-              className={`pointer-events-auto absolute left-0 top-0 flex cursor-grab items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md active:cursor-grabbing ${
+              className={`pointer-events-auto absolute left-0 top-0 flex h-auto cursor-grab transition-none items-center gap-1 whitespace-nowrap rounded-full border font-bold shadow-soft-md active:cursor-grabbing ${
                 isSelected ? 'z-1 border-2 px-3 py-1 text-[12px]' : 'px-2 py-0.5 text-[10px]'
               }`}
               style={{
@@ -1121,7 +1132,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             >
               <span className="size-1.5 rounded-full" style={{ background: isSelected ? '#ffffff' : color }} />
               {badge.eqpId} · {badge.statusLabel}
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -1159,8 +1170,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         </span>
         {canEdit ? (
           <>
-            <button
+            <Button
               type="button"
+              variant="default"
+              size="sm"
               data-testid="live-map-3d-edit-toggle"
               aria-pressed={editing}
               onClick={() => {
@@ -1173,10 +1186,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               }`}
             >
               {editing ? t('livemap.viewer3d.editExit') : t('livemap.viewer3d.edit')}
-            </button>
+            </Button>
             {editing ? (
-              <button
+              <Button
                 type="button"
+                variant="default"
+                size="sm"
                 data-testid="live-map-3d-undo"
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
@@ -1184,11 +1199,13 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 className="rounded-pill border border-border bg-card/90 px-4 py-1.5 text-[12px] font-bold text-foreground backdrop-blur transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('livemap.viewer3d.undo')}
-              </button>
+              </Button>
             ) : null}
             {editing ? (
-              <button
+              <Button
                 type="button"
+                variant="default"
+                size="sm"
                 data-testid="live-map-3d-save"
                 onClick={handleSave}
                 disabled={saveLayout.isPending || createObject.isPending}
@@ -1196,7 +1213,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 className="rounded-pill bg-primary px-4 py-1.5 text-[12px] font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('livemap.viewer3d.save')}
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}
@@ -1206,9 +1223,11 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       <div data-testid="live-map-3d-floors" className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-1 rounded-[14px] border border-border bg-card/90 p-1 shadow-soft-md backdrop-blur">
         {/* 위에서부터 3F·2F·1F (건물 은유) + 맨 아래 전체. */}
         {[...FLOOR_LEVELS].reverse().map((floor) => (
-          <button
+          <Button
             key={floor}
             type="button"
+            variant="ghost"
+            size="sm"
             data-testid={`live-map-3d-floor-${floor}`}
             aria-pressed={floorView === floor}
             onClick={() => setFloorView(floor)}
@@ -1218,10 +1237,12 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             }`}
           >
             {floor}F
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           data-testid="live-map-3d-floor-all"
           aria-pressed={floorView === 'all'}
           onClick={() => setFloorView('all')}
@@ -1231,31 +1252,39 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
           }`}
         >
           {t('livemap.viewer3d.all')}
-        </button>
+        </Button>
       </div>
 
       {/* 편집 — 추가 패널: 구조물(라이브러리 + 기본 구조) | 미배치 설비 */}
       {editing ? (
         <div className="absolute left-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-[14px] border border-border bg-card/90 px-3 py-2 shadow-soft-md backdrop-blur">
-          <select
-            data-testid="live-map-3d-add-select"
-            className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
-            value={addObjectKey}
-            onChange={(event) => setAddObjectKey(event.target.value)}
+          <Select
+            value={addObjectKey === '' ? SELECT_EMPTY_VALUE : addObjectKey}
+            onValueChange={(next) => setAddObjectKey(next === SELECT_EMPTY_VALUE ? '' : next)}
           >
-            <option value="">{t('livemap.viewer3d.optObject')}</option>
-            {libraryObjects.map((object) => (
-              <option key={object.objectKey} value={object.objectKey}>
-                {object.objectName} ({object.objectKind})
-              </option>
-            ))}
-          </select>
-          <button type="button" data-testid="live-map-3d-add" onClick={handleAdd} title={t('livemap.viewer3d.addToFloor', { floor: floorView === 'all' ? 1 : floorView })} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
+            <SelectTrigger
+              data-testid="live-map-3d-add-select"
+              className="h-auto w-auto cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SELECT_EMPTY_VALUE}>{t('livemap.viewer3d.optObject')}</SelectItem>
+              {libraryObjects.map((object) => (
+                <SelectItem key={object.objectKey} value={String(object.objectKey)}>
+                  {object.objectName} ({object.objectKind})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" size="sm" data-testid="live-map-3d-add" onClick={handleAdd} title={t('livemap.viewer3d.addToFloor', { floor: floorView === 'all' ? 1 : floorView })} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
             {t('livemap.viewer3d.add')}
-          </button>
+          </Button>
           <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             data-testid="live-map-3d-seed-structures"
             onClick={handleSeedStructures}
             disabled={seedFloorHasStructure}
@@ -1263,30 +1292,38 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('livemap.viewer3d.seedStructures')}
-          </button>
+          </Button>
           <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
           {/* 미배치 설비 — 골라서 추가해야만 3D 에 표시된다(자동 표시 없음). */}
-          <select
-            data-testid="live-map-3d-add-eqp-select"
-            className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
-            value={addEqpKey}
-            onChange={(event) => setAddEqpKey(event.target.value)}
+          <Select
+            value={addEqpKey === '' ? SELECT_EMPTY_VALUE : addEqpKey}
+            onValueChange={(next) => setAddEqpKey(next === SELECT_EMPTY_VALUE ? '' : next)}
             disabled={unplacedEquipments.length === 0}
           >
-            <option value="">
-              {unplacedEquipments.length === 0 ? t('livemap.viewer3d.optAllPlaced') : t('livemap.viewer3d.optUnplacedEqp')}
-            </option>
-            {unplacedEquipments.map((equipment) => (
-              <option key={equipment.eqpKey} value={equipment.eqpKey}>
-                {equipment.eqpName}
-              </option>
-            ))}
-          </select>
-          <button type="button" data-testid="live-map-3d-add-eqp" onClick={handleAddEquipment} title={t('livemap.viewer3d.addEquipmentTitle')} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
+            <SelectTrigger
+              data-testid="live-map-3d-add-eqp-select"
+              className="h-auto w-auto cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SELECT_EMPTY_VALUE}>
+                {unplacedEquipments.length === 0 ? t('livemap.viewer3d.optAllPlaced') : t('livemap.viewer3d.optUnplacedEqp')}
+              </SelectItem>
+              {unplacedEquipments.map((equipment) => (
+                <SelectItem key={equipment.eqpKey} value={String(equipment.eqpKey)}>
+                  {equipment.eqpName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" size="sm" data-testid="live-map-3d-add-eqp" onClick={handleAddEquipment} title={t('livemap.viewer3d.addEquipmentTitle')} className="rounded-md border border-primary px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
             {t('livemap.viewer3d.addEquipment')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="default"
+            size="sm"
             data-testid="live-map-3d-auto-place"
             onClick={handleAutoPlaceEquipment}
             disabled={lineEquipments.length === 0 || !gatewayDataReady}
@@ -1294,7 +1331,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
             className="rounded-md border border-primary bg-primary/5 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('livemap.viewer3d.autoPlace')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -1309,18 +1346,20 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               </span>
             ) : null}
           </span>
-          <button type="button" data-testid="live-map-3d-rotate-ccw" onClick={() => rotateSelected(-ROTATE_STEP)} title={t('livemap.viewer3d.rotateCcw')} aria-label={t('livemap.viewer3d.rotateCcw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
+          <Button type="button" variant="outline" size="sm" data-testid="live-map-3d-rotate-ccw" onClick={() => rotateSelected(-ROTATE_STEP)} title={t('livemap.viewer3d.rotateCcw')} aria-label={t('livemap.viewer3d.rotateCcw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
             ⟲
-          </button>
-          <button type="button" data-testid="live-map-3d-rotate-cw" onClick={() => rotateSelected(ROTATE_STEP)} title={t('livemap.viewer3d.rotateCw')} aria-label={t('livemap.viewer3d.rotateCw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
+          </Button>
+          <Button type="button" variant="outline" size="sm" data-testid="live-map-3d-rotate-cw" onClick={() => rotateSelected(ROTATE_STEP)} title={t('livemap.viewer3d.rotateCw')} aria-label={t('livemap.viewer3d.rotateCw')} className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted">
             ⟳
-          </button>
+          </Button>
           {/* 선택을 다른 층으로 이동 */}
           <div className="flex items-center gap-0.5" role="group" aria-label={t('livemap.viewer3d.floorMove')}>
             {FLOOR_LEVELS.map((floor) => (
-              <button
+              <Button
                 key={floor}
                 type="button"
+                variant="outline"
+                size="sm"
                 data-testid={`live-map-3d-set-floor-${floor}`}
                 onClick={() => setFloorForSelected(floor)}
                 title={t('livemap.viewer3d.moveToFloor', { floor })}
@@ -1329,43 +1368,55 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
                 }`}
               >
                 {floor}
-              </button>
+              </Button>
             ))}
           </div>
           {assignCandidates.length > 0 ? (
-            <select
-              data-testid="live-map-3d-assign-select"
-              title={t('livemap.viewer3d.replaceTemplate')}
-              className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
-              value={primary.objectKey}
-              onChange={(event) => assignTemplateToPrimary(Number(event.target.value))}
+            <Select
+              value={String(primary.objectKey)}
+              onValueChange={(next) => assignTemplateToPrimary(Number(next))}
             >
-              {assignCandidates.map((object) => (
-                <option key={object.objectKey} value={object.objectKey}>
-                  {object.objectName}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                data-testid="live-map-3d-assign-select"
+                title={t('livemap.viewer3d.replaceTemplate')}
+                className="h-auto w-auto cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {assignCandidates.map((object) => (
+                  <SelectItem key={object.objectKey} value={String(object.objectKey)}>
+                    {object.objectName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
           {isEquipmentPrimary ? (
-            <select
-              data-testid="live-map-3d-eqp-select"
-              title={t('livemap.viewer3d.bindEqp')}
-              className="cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
-              value={primary.eqpKey ?? ''}
-              onChange={(event) => bindEqpToPrimary(event.target.value === '' ? null : Number(event.target.value))}
+            <Select
+              value={primary.eqpKey === null ? SELECT_EMPTY_VALUE : String(primary.eqpKey)}
+              onValueChange={(next) => bindEqpToPrimary(next === SELECT_EMPTY_VALUE ? null : Number(next))}
             >
-              <option value="">{t('livemap.viewer3d.optEquipment')}</option>
-              {lineEquipments.map((equipment) => (
-                <option key={equipment.eqpKey} value={equipment.eqpKey}>
-                  {equipment.eqpName}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                data-testid="live-map-3d-eqp-select"
+                title={t('livemap.viewer3d.bindEqp')}
+                className="h-auto w-auto cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/50"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_EMPTY_VALUE}>{t('livemap.viewer3d.optEquipment')}</SelectItem>
+                {lineEquipments.map((equipment) => (
+                  <SelectItem key={equipment.eqpKey} value={String(equipment.eqpKey)}>
+                    {equipment.eqpName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
-          <button type="button" data-testid="live-map-3d-delete" onClick={deleteSelected} title={t('livemap.viewer3d.deleteTitle')} className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger transition-colors hover:bg-danger/10">
+          <Button type="button" variant="outline" size="sm" data-testid="live-map-3d-delete" onClick={deleteSelected} title={t('livemap.viewer3d.deleteTitle')} className="rounded-full border border-danger px-3 py-1 text-xs font-semibold text-danger transition-colors hover:bg-danger/10">
             {t('livemap.viewer3d.delete')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
