@@ -15,8 +15,8 @@
 | C1 | `feat(ui): LNB 사이드바 프리미티브 이식 (R1)` | 완료 | `484a2c1` |
 | C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | `c5b8928` |
 | C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | `b7d6223` |
-| C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | (이 커밋) |
-| C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 대기 | — |
+| C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | `2000a6c` |
+| C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | (이 커밋) |
 | C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 대기 | — |
 | C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 대기 | — |
 | C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 대기 | — |
@@ -309,5 +309,92 @@ $ npm run test:unit
 (`git ls-files tests/` = 40건, 전부 `tests/unit` + 헬퍼 2). 따라서 C7 의 신설
 `tests/e2e/wm-parity-sidebar.spec.ts` 와 §6 갱신분은 커밋 diff 에 나타나지 않는다.
 AC4 / AC11 은 로컬 실행 결과 인용으로만 판정 가능하다(Validate 세션도 로컬 재실행 필요).
+
+---
+
+## C4b — `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)`
+
+### 변경 파일
+- 신설 `src/shared/components/AccessDeniedNotice.tsx` (`data-testid="access-denied-notice"` 부여 —
+  AC4 의 권한 미보유 단언이 locale 무관하게 집도록)
+- 신설 `src/app/RequirePermission.tsx` — `meQuery.isPending` 로딩 분기 승계, 미보유 시
+  `AppShellPage > AccessDeniedNotice`
+- 신설 `src/shared/components/AppShellPage.tsx` — 프로필 모달 소유 + 로그아웃 체인 합성(D3/D4)
+- 교체 `src/shared/components/AppPageShell.tsx` — `SidebarProvider > AppLnbSidebar + SidebarInset >
+  (AppTopBar + content)`, `currentMenu` prop 소멸
+- 개편 `src/shared/components/AppTopBar.tsx` — 중앙 nav / 로고 / 구 prefetch switch 제거,
+  모바일 토글 + `PageLocation` breadcrumb 추가, 오프셋 상수 폐기
+- `src/shared/lib/app-navigation.ts` — 구 `APP_TOP_NAVIGATION_ITEMS` /
+  `resolveVisibleAppNavigationItems` / `AppTopNavigationKey` 제거
+- `src/app/Router.tsx` — 권한 그룹별 `RequirePermission` 5+1 블록 중첩
+- 6 페이지 → `AppShellPage` 전환 + 페이지 자체 권한 게이트 제거
+  (Dlq / UserManagement / Deploy / LiveMap / Eqp / Model)
+- 3 store 프로필 필드 제거 (`eqp-ui` / `deploy-ui` / `model-ui`) — D4
+- `tests/unit/eqp-model-deploy-permission-gating.test.ts`, `tests/unit/route-auth-guard.test.ts` 갱신
+
+### D3 로그아웃 체인 (순서·정리 항목 보존 확인)
+
+- `AppShellPage.onAfterLogout` = 페이지별 정리(prop) → `authApi.logout()`(try/catch 로 실패 무시)
+- `AppTopBar.handleLogout` = `onAfterLogout?.()` → finally { `queryClient.clear()` →
+  `clearPersistedQueryCache()` → `clearDeployUiSessionState()` → `clearCsrfCookie()` → navigate }
+- 정리 항목 4종과 순서가 구 구현과 동일하다 — `logout-client-state-cleanup.test.ts` 의
+  handleLogout 본문 정규식 단언 3건이 그대로 통과한다(무수정)
+
+### 자율 확정 (Plan 밖 발견)
+
+| # | 항목 | 결정 |
+|---|---|---|
+| I10 | `eqp-model-deploy-permission-gating.test.ts` 가 제거된 `resolveVisibleAppNavigationItems` 를 import 하고 페이지 내 `<Navigate to=` 를 단언 | 게이트 자리 이동에 맞춰 **이관**. 메뉴 필터는 `resolveVisibleAppNavigationGroups` 로, 본문 차단은 "Router 가 각 라우트를 올바른 권한 코드의 `RequirePermission` 블록 안에 두는지" 로 단언. 추가로 `RequirePermission` 이 `<Navigate` 를 쓰지 **않는지** 음성 단언해 "/login 튕김" 회귀를 막는다 |
+| I11 | `route-auth-guard.test.ts` 의 가드 블록 끝 탐색이 중첩 라우트에서 오작동 | `</Route>` 첫 등장으로 끝을 잡으면 안쪽 `RequirePermission` 블록에서 끊긴다. 여는 태그의 `>` 를 **JSX 중괄호 깊이를 세며** 찾는 스캐너로 교체(정규식 `[^>]*` 는 `element={<RequireAuth />}>` 에서 오판) |
+| I12 | AppTopBar 주석이 AC6 grep 을 오염 | 주석에 `APP_TOP_BAR_OFFSET_CLASS` 식별자를 적으면 `grep -rn ... src` 가 1건이 된다. 식별자 없이 서술로 바꿔 0건 유지 |
+
+### AC 판정 (C4b 소관 4건)
+
+```
+=== AC5  grep -c "navigationItems.map" src/shared/components/AppTopBar.tsx ===
+0
+=== AC6  grep -rc "APP_TOP_BAR_OFFSET_CLASS" src ===
+0건
+=== AC10 grep -c "AppLnbSidebar" src/shared/components/AppPageShell.tsx ===
+2
+=== AC12 grep -c "prefetchQuery\|preloadRouteModule" src/shared/components/AppLnbSidebar.tsx ===
+15
+```
+
+### 게이트
+
+```
+$ npm run build
+✓ built in 17.76s
+
+$ npm run lint
+> eslint .            (무출력 — 통과)
+
+$ npm run test:unit
+# tests 241
+# pass 241
+# fail 0
+```
+
+### 실화면 확인 (메모리 룰 — 시각 변경은 스크린샷으로 직접 본다)
+
+임시 spec 으로 `/dlq/dashboard` 를 mock 백엔드에 붙여 렌더하고 두 상태를 촬영해 확인했다
+(확인 후 spec·PNG 삭제).
+
+- **펼침 256px**: 6 그룹 아코디언 + 항목 아이콘, 현재 항목(`Failure Dashboard`) 활성 강조,
+  topbar 중앙 nav 소멸 + `Home › Processing Failures › Failure Dashboard` breadcrumb,
+  우측 유틸리티(Line / 테마 / 언어 / 로그아웃 / 프로필) 보존
+- **접힘 rail 56px + 플라이아웃**: 그룹 아이콘 6개만 남고, hover 시 body portal 플라이아웃이
+  caret 과 함께 그룹 5항목을 띄우며 현재 항목이 활성 표시된다
+- 콘솔 오류는 mock 하지 않은 `/api/eqp` prefetch 의 ECONNREFUSED 500 1건뿐 —
+  LNB hover prefetch 가 실제로 발화한다는 증거이기도 하다(백엔드 미기동 환경 특성)
+- 이 시점에는 DLQ 도메인 사이드바가 아직 함께 보인다 — **C5 에서 제거**한다
+
+### e2e mock 함정 (C7 신설 spec 작성 시 반드시 회피)
+
+진단 중 `page.route('**/api/**', …)` 가 **Vite dev 모듈 요청까지 가로채** 화면이 백지가 되는
+현상을 겪었다(`/src/features/dlq/api/dlq.api.ts` 같은 경로가 `**/api/**` 에 걸려 JSON 이 돌아오고
+`Failed to load module script … MIME type "application/json"` 로 모듈 로드 실패). 기존 spec 들이
+엔드포인트를 하나씩 route 하는 이유다 — **catch-all `**/api/**` 금지**.
 
 (커밋 진행에 따라 계속 추가)

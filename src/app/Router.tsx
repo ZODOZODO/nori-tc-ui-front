@@ -2,7 +2,16 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { useI18n } from '@/i18n/i18n-context'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
+import {
+  DASH_READ_PERMISSION,
+  DEPLOY_READ_PERMISSION,
+  DLQ_READ_PERMISSION,
+  EQP_READ_PERMISSION,
+  MODEL_READ_PERMISSION,
+  USER_READ_PERMISSION,
+} from '@/shared/lib/permission'
 import { RequireAuth } from './RequireAuth'
+import { RequirePermission } from './RequirePermission'
 import {
   loadDeployPage,
   loadDlqPage,
@@ -71,27 +80,41 @@ export function Router() {
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<RequireAuth />}>
-            <Route path="/live-map" element={<LiveMapPage />} />
+            {/* 권한 코드는 확정 메뉴 트리의 권한 칼럼 값이다 — 미보유 시 /login 튕김이 아니라
+                그 자리에 AccessDeniedNotice 를 렌더한다(세션 끊김 오해 방지). */}
+            <Route element={<RequirePermission permissionCode={DASH_READ_PERMISSION} />}>
+              <Route path="/live-map" element={<LiveMapPage />} />
+            </Route>
 
-            <Route path="/dlq/dashboard" element={<DlqPage mode="dashboard" />} />
-            <Route path="/dlq/gateway" element={<DlqPage mode="gateway" />} />
-            <Route path="/dlq/business" element={<DlqPage mode="business" />} />
-            <Route path="/dlq/quarantine" element={<DlqPage mode="quarantine" />} />
-            <Route path="/dlq/repair-task" element={<DlqPage mode="repair-task" />} />
+            <Route element={<RequirePermission permissionCode={DLQ_READ_PERMISSION} />}>
+              <Route path="/dlq/dashboard" element={<DlqPage mode="dashboard" />} />
+              <Route path="/dlq/gateway" element={<DlqPage mode="gateway" />} />
+              <Route path="/dlq/business" element={<DlqPage mode="business" />} />
+              <Route path="/dlq/quarantine" element={<DlqPage mode="quarantine" />} />
+              <Route path="/dlq/repair-task" element={<DlqPage mode="repair-task" />} />
+            </Route>
 
-            <Route path="/eqp/business" element={<EqpPage scope="business" />} />
-            <Route path="/eqp/gateway" element={<EqpPage scope="gateway" />} />
+            <Route element={<RequirePermission permissionCode={EQP_READ_PERMISSION} />}>
+              <Route path="/eqp/business" element={<EqpPage scope="business" />} />
+              <Route path="/eqp/gateway" element={<EqpPage scope="gateway" />} />
+            </Route>
 
-            <Route path="/model/secs" element={<ModelPage scope="SECS" />} />
-            <Route path="/model/socket" element={<ModelPage scope="SOCKET" />} />
-            <Route path="/model/plc" element={<ModelPage scope="PLC" />} />
+            <Route element={<RequirePermission permissionCode={MODEL_READ_PERMISSION} />}>
+              <Route path="/model/secs" element={<ModelPage scope="SECS" />} />
+              <Route path="/model/socket" element={<ModelPage scope="SOCKET" />} />
+              <Route path="/model/plc" element={<ModelPage scope="PLC" />} />
+            </Route>
 
-            <Route path="/deploy/register" element={<DeployPage mode="register" />} />
-            <Route path="/deploy/deploy" element={<DeployPage mode="deploy" />} />
-            <Route path="/deploy/history" element={<DeployPage mode="history" />} />
+            <Route element={<RequirePermission permissionCode={DEPLOY_READ_PERMISSION} />}>
+              <Route path="/deploy/register" element={<DeployPage mode="register" />} />
+              <Route path="/deploy/deploy" element={<DeployPage mode="deploy" />} />
+              <Route path="/deploy/history" element={<DeployPage mode="history" />} />
+            </Route>
 
-            <Route path="/user/users" element={<UserManagementPage mode="user" />} />
-            <Route path="/user/groups" element={<UserManagementPage mode="group" />} />
+            <Route element={<RequirePermission permissionCode={USER_READ_PERMISSION} />}>
+              <Route path="/user/users" element={<UserManagementPage mode="user" />} />
+              <Route path="/user/groups" element={<UserManagementPage mode="group" />} />
+            </Route>
           </Route>
 
           {/* 구 경로 — 북마크 보존. 목적지는 각 화면의 기존 초기 모드다. */}

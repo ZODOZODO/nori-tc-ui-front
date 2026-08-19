@@ -83,6 +83,59 @@ const PROTECTED_ROUTE_PATHS = [
   '/user/groups',
 ]
 
+/**
+ * `openIndex` 의 `<Route …>` 여는 태그와 짝이 되는 `</Route>` 위치를 찾습니다.
+ *
+ * 가드 블록 안에 권한 가드(`RequirePermission`) 블록이 중첩되므로 첫 `</Route>` 를 끝으로 보면
+ * 안쪽 블록에서 끊긴다 — 자기 닫힘(`/>`)이 아닌 여는 태그만 세어 균형을 맞춘다.
+ *
+ * @param source Router 소스
+ * @param openIndex 여는 `<Route` 의 시작 오프셋
+ * @returns 짝이 되는 `</Route>` 의 시작 오프셋
+ */
+function findMatchingRouteClose(source: string, openIndex: number): number {
+  let cursor = openIndex
+  let depth = 0
+
+  while (cursor < source.length) {
+    if (source.startsWith('</Route>', cursor)) {
+      depth -= 1
+      if (depth === 0) {
+        return cursor
+      }
+      cursor += '</Route>'.length
+      continue
+    }
+
+    if (source.startsWith('<Route', cursor)) {
+      // 여는 태그의 끝 '>' 를 찾되 JSX 표현식(`element={<X />}`) 중괄호 안의 '>' 는 세지 않는다 —
+      // 정규식으로 `[^>]*` 를 쓰면 `element={<RequireAuth />}>` 에서 첫 '>' 에 걸려 오판한다.
+      let scan = cursor + '<Route'.length
+      let braceDepth = 0
+      while (scan < source.length) {
+        const character = source[scan]
+        if (character === '{') {
+          braceDepth += 1
+        } else if (character === '}') {
+          braceDepth -= 1
+        } else if (character === '>' && braceDepth === 0) {
+          break
+        }
+        scan += 1
+      }
+      if (source[scan - 1] !== '/') {
+        depth += 1
+      }
+      cursor = scan + 1
+      continue
+    }
+
+    cursor += 1
+  }
+
+  return -1
+}
+
 test('로그인·픽스처·리다이렉트를 뺀 모든 라우트가 RequireAuth layout route 안에 있다', () => {
   const router = readSource('src/app/Router.tsx')
 
@@ -94,7 +147,7 @@ test('로그인·픽스처·리다이렉트를 뺀 모든 라우트가 RequireAu
     '인증 가드가 두 곳 이상에 배치됐다 — 가드 블록이 쪼개지면 누락을 눈으로 찾아야 한다',
   )
 
-  const guardClose = router.indexOf('</Route>', guardOpen)
+  const guardClose = findMatchingRouteClose(router, guardOpen)
   assert.notEqual(guardClose, -1, '인증 layout route 가 닫히지 않았다')
 
   for (const path of PROTECTED_ROUTE_PATHS) {

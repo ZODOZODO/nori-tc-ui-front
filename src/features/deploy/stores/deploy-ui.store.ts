@@ -38,7 +38,6 @@ interface DeployUiState {
   selectedModelName: string | null
   selectedModelVersionKey: number | null
   selectedBusinessJarRef: number | null
-  isProfileModalOpen: boolean
   submitRegisterSearch: (filters: DeployRegisterFilters) => void
   resetRegisterFilters: () => void
   setMonitorFilters: (historyOnly: boolean, filters: Partial<DeployMonitorFilters>) => void
@@ -81,7 +80,6 @@ interface DeployUiState {
   reconcileServerHistory: (serverDeployKeys: number[]) => void
   clearRegisterState: () => void
   resetPageState: () => void
-  setProfileModalOpen: (open: boolean) => void
 }
 
 const toDateInputValue = (date: Date): string => {
@@ -129,7 +127,6 @@ const createInitialDeployUiDataState = () => ({
   selectedModelName: null as string | null,
   selectedModelVersionKey: null as number | null,
   selectedBusinessJarRef: null as number | null,
-  isProfileModalOpen: false,
 })
 
 const nextDeployKey = (history: DeployHistoryItem[]): number =>
@@ -710,7 +707,6 @@ export const useDeployUiStore = create<DeployUiState>()(
           selectedBusinessJarRef: null,
         }),
       resetPageState: () => set(createInitialDeployUiDataState()),
-      setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
     }),
     {
       name: DEPLOY_UI_STORAGE_KEY,

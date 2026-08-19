@@ -1,12 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
-import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
-import { AppPageShell } from '@/shared/components/AppPageShell'
+import { AppShellPage } from '@/shared/components/AppShellPage'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
-import { hasPermission, MODEL_READ_PERMISSION } from '@/shared/lib/permission'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { useI18n } from '@/i18n/i18n-context'
 import { useModelDetail } from '../hooks/useModelDetail'
@@ -51,7 +49,6 @@ const ModelDetailPanel = lazy(() =>
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
 const PANEL_MAX_PERCENT = 85
-const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 /**
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
@@ -169,7 +166,6 @@ export function ModelPage({ scope }: ModelPageProps) {
   const detailNodeByTab = useModelUiStore((state) => state.detailNodeByTab)
   const isEditMode = useModelUiStore((state) => state.isEditMode)
   const isCheckInModalOpen = useModelUiStore((state) => state.isCheckInModalOpen)
-  const isProfileModalOpen = useModelUiStore((state) => state.isProfileModalOpen)
   const setSelectedModelVersionKey = useModelUiStore((state) => state.setSelectedModelVersionKey)
   const openModelTab = useModelUiStore((state) => state.openModelTab)
 
@@ -184,7 +180,6 @@ export function ModelPage({ scope }: ModelPageProps) {
   const setDetailNodeForTab = useModelUiStore((state) => state.setDetailNodeForTab)
   const setEditMode = useModelUiStore((state) => state.setEditMode)
   const setCheckInModalOpen = useModelUiStore((state) => state.setCheckInModalOpen)
-  const setProfileModalOpen = useModelUiStore((state) => state.setProfileModalOpen)
   const topPanelHeightPercent = useModelUiStore((state) => state.topPanelHeightPercent)
   const setTopPanelHeightPercent = useModelUiStore((state) => state.setTopPanelHeightPercent)
   const handleModelVersionsRemoved = useModelUiStore((state) => state.handleModelVersionsRemoved)
@@ -1297,15 +1292,8 @@ export function ModelPage({ scope }: ModelPageProps) {
 
   const isVersionFrame = activeTab !== null && openedTabs.length > 0
 
-  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
-  if (!hasPermission(meQuery.data?.permissionCodes, MODEL_READ_PERMISSION)) {
-    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
-  }
-
   return (
-    <AppPageShell
-      currentMenu="model"
-      onOpenProfile={() => setProfileModalOpen(true)}
+    <AppShellPage
       onAfterLogout={() => {
         clearDeployUiSessionState()
         resetUiState()
@@ -1314,7 +1302,6 @@ export function ModelPage({ scope }: ModelPageProps) {
         setDetailColumnsByContext({})
         setDetailRowsByContext({})
         setDetailMdfByContext({})
-        setProfileModalOpen(false)
       }}
     >
       <main className="flex flex-1 min-h-0">
@@ -1509,7 +1496,6 @@ export function ModelPage({ scope }: ModelPageProps) {
         onConfirm={() => void handleConfirmDelete()}
       />
 
-      <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </AppPageShell>
+    </AppShellPage>
   )
 }

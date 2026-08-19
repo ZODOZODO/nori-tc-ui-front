@@ -1,128 +1,47 @@
-import { useMemo, useState } from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { CircleUserRound, Loader2, LogOut } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { CircleUserRound, Loader2, LogOut, PanelLeft } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
-import noriTcLogoUrl from '@/assets/brand/nori-tc-logo.png'
+import { useSidebar } from '@/components/ui/sidebar-context'
 import { useI18n } from '@/i18n/i18n-context'
 import { LanguageToggle } from '@/i18n/LanguageToggle'
-import { authApi } from '@/features/auth/api/auth.api'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
-import { dlqApi } from '@/features/dlq/api/dlq.api'
-import { eqpApi } from '@/features/eqp/api/eqp.api'
-import { eqpQueryKeys } from '@/features/eqp/lib/eqp-query-keys'
-import { liveMapApi } from '@/features/live-map/api/live-map.api'
-import { modelApi } from '@/features/model/api/model.api'
-import { modelQueryKeys } from '@/features/model/lib/model-query-keys'
-import { useMe } from '@/features/profile/hooks/useProfile'
-import { userApi } from '@/features/user/api/user.api'
-import { userQueryKeys } from '@/features/user/lib/user-query-keys'
-import { USER_PAGE_SIZE } from '@/features/user/components/UserListTable'
-import { ThemeToggle } from './ThemeToggle'
-import { LineScopeSelector } from './LineScopeSelector'
-import type { AppTopNavigationKey } from '../lib/app-navigation'
-import { resolveVisibleAppNavigationItems } from '../lib/app-navigation'
+import { PageLocation } from '@/shared/layout/PageLocation'
+import { resolveAppNavigationLocation } from '../lib/app-navigation'
 import { clearPersistedQueryCache } from '../lib/query-persistence'
 import { clearCsrfCookie } from '../lib/session'
+import { ThemeToggle } from './ThemeToggle'
+import { LineScopeSelector } from './LineScopeSelector'
 
 interface AppTopBarProps {
-  currentMenu: AppTopNavigationKey
   onOpenProfile: () => void
   onAfterLogout?: () => void | Promise<void>
 }
 
 const LOGIN_ROUTE = '/login'
-export const APP_TOP_BAR_OFFSET_CLASS = 'pt-13.25'
 
 /**
- * 메뉴 hover 시 해당 페이지가 첫 mount 에서 자동 호출하는 query 를 미리 fetch.
- * queryKey / queryFn / staleTime 은 각 hook 정의와 정확히 일치해야 cache hit 발생.
- * deploy 는 mode/filter 분기로 정적 query 가 없어 제외.
- * user 의 listOffset 은 0 가정 — 사용자가 페이지를 넘긴 상태에서는 prefetch miss.
+ * 주요 페이지들이 공유하는 얇은 상단 헤더입니다(SPEC R6).
+ *
+ * <p>1차 내비게이션은 좌측 LNB({@link AppLnbSidebar})가 담당하므로 이 헤더에는 중앙 nav 링크가 없다 —
+ * 모바일 off-canvas 토글, 현재 위치 breadcrumb, 우측 유틸리티(라인 스코프 / 테마 / 언어 /
+ * 로그아웃 / 프로필)만 둔다.</p>
+ *
+ * <p>breadcrumb 은 현재 경로에서 LNB 정의로 유도한다 — 페이지가 각자 적어 넣지 않으므로 모든 화면에
+ * 같은 규칙으로 나타난다. LNB 에 없는 경로는 표시하지 않는다.</p>
+ *
+ * <p>헤더가 `fixed` 가 아니라 정상 흐름이므로 본문 상단에 오프셋 패딩을 덧대던 상수가 필요 없다 —
+ * 셸이 LNB + 본문 2열 구조가 되면서 폐기했다.</p>
  */
-const prefetchByMenuKey = (queryClient: QueryClient, key: AppTopNavigationKey): void => {
-  switch (key) {
-    case 'eqp':
-      void queryClient.prefetchQuery({
-        queryKey: eqpQueryKeys.list(),
-        queryFn: () => eqpApi.getEqpList(0, 500),
-        staleTime: 60_000,
-      })
-      return
-    case 'model':
-      void queryClient.prefetchQuery({
-        queryKey: modelQueryKeys.list(),
-        queryFn: () => modelApi.getModelList(0, 500),
-        staleTime: 60_000,
-      })
-      return
-    case 'dash':
-      void queryClient.prefetchQuery({
-        queryKey: ['live-map'],
-        queryFn: () => liveMapApi.getLiveMap(),
-        staleTime: 5_000,
-      })
-      return
-    case 'dlq':
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'business'],
-        queryFn: dlqApi.fetchBusinessDlq,
-        staleTime: 30_000,
-      })
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'gateway'],
-        queryFn: dlqApi.fetchGatewayDlq,
-        staleTime: 30_000,
-      })
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'quarantine'],
-        queryFn: dlqApi.fetchQuarantine,
-        staleTime: 30_000,
-      })
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'repair-task'],
-        queryFn: dlqApi.fetchRepairTasks,
-        staleTime: 30_000,
-      })
-      return
-    case 'user':
-      void queryClient.prefetchQuery({
-        queryKey: userQueryKeys.list(0, USER_PAGE_SIZE),
-        queryFn: () => userApi.getUserList(0, USER_PAGE_SIZE),
-        staleTime: 30_000,
-      })
-      return
-    case 'deploy':
-      return
-  }
-}
-
-/**
- * 주요 페이지들이 공유하는 상단 앱 헤더입니다.
- */
-export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopBarProps) {
+export function AppTopBar({ onOpenProfile, onAfterLogout }: AppTopBarProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { t } = useI18n()
+  const { isMobile, toggleSidebar } = useSidebar()
   const [isLogoutPending, setIsLogoutPending] = useState(false)
-  const meQuery = useMe(true)
-  const navigationItems = useMemo(
-    () => resolveVisibleAppNavigationItems(meQuery.data?.permissionCodes),
-    [meQuery.data?.permissionCodes],
-  )
-
-  const handleNavigateMenu = (route: string | null) => {
-    if (!route) {
-      return
-    }
-
-    const currentNavigationItem = navigationItems.find((item) => item.key === currentMenu)
-    if (currentNavigationItem?.route === route) {
-      return
-    }
-
-    navigate(route)
-  }
+  const navigationLocation = resolveAppNavigationLocation(location.pathname)
 
   const handleLogout = async () => {
     if (isLogoutPending) {
@@ -132,11 +51,9 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
     setIsLogoutPending(true)
 
     try {
-      await authApi.logout()
-    } catch (error) {
-      console.warn('[AppTopBar] logout request failed, continuing with local cleanup', error)
-    } finally {
+      // 서버 로그아웃과 페이지별 정리는 AppShellPage 가 합성해 넘긴다 — 실패해도 로컬 정리는 진행한다.
       await onAfterLogout?.()
+    } finally {
       queryClient.clear()
       // clear() 는 인메모리만 비운다 — localStorage 사본과 sessionStorage 는 별개로 지워야
       // 공유 PC 에서 다음 사용자가 이전 사용자의 업무 데이터를 복원해 보지 않는다(S09 E-1 / E-3).
@@ -148,43 +65,26 @@ export function AppTopBar({ currentMenu, onOpenProfile, onAfterLogout }: AppTopB
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 grid h-13.25 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 border-b border-border bg-card px-5">
-      <div className="flex items-center">
-        <img src={noriTcLogoUrl} alt="Nori-TC" className="h-10 w-auto" />
-      </div>
-
-      <div className="flex min-w-0 items-center justify-center overflow-hidden">
-        <nav className="flex min-w-0 items-center justify-center gap-6 whitespace-nowrap">
-          {navigationItems.map((menuItem) => {
-            const isCurrentMenu = menuItem.key === currentMenu
-
-            return (
-              <button
-                key={menuItem.key}
-                type="button"
-                onClick={() => handleNavigateMenu(menuItem.route)}
-                onMouseEnter={
-                  isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
-                }
-                onFocus={
-                  isCurrentMenu ? undefined : () => prefetchByMenuKey(queryClient, menuItem.key)
-                }
-                className={`group relative inline-flex h-9.5 items-center px-2 text-[15px] font-medium -tracking-tight transition-colors ${
-                  isCurrentMenu ? 'text-foreground' : 'text-muted-foreground hover:text-accent-foreground'
-                }`}
-              >
-                <span>{menuItem.label}</span>
-                <span
-                  className={`pointer-events-none absolute -bottom-px left-0 right-0 h-0.5 rounded-full transition-opacity ${
-                    isCurrentMenu
-                      ? 'bg-(--color-brand-accent) opacity-100'
-                      : 'bg-(--color-brand-accent) opacity-0 group-hover:opacity-35'
-                  }`}
-                />
-              </button>
-            )
-          })}
-        </nav>
+    <header className="z-20 flex h-13.25 shrink-0 items-center justify-between gap-6 border-b border-border bg-card px-5">
+      <div className="flex min-w-0 items-center gap-2">
+        {isMobile ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="size-9 shrink-0 rounded-md text-muted-foreground"
+            onClick={toggleSidebar}
+            aria-label={t('navigation.openMenu')}
+          >
+            <PanelLeft className="size-4.5" aria-hidden="true" />
+          </Button>
+        ) : null}
+        {navigationLocation ? (
+          <PageLocation
+            subtitle={t(navigationLocation.group.labelKey)}
+            name={t(navigationLocation.item.labelKey)}
+            className="min-w-0"
+          />
+        ) : null}
       </div>
 
       <div className="flex items-center justify-end gap-2">

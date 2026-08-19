@@ -13,7 +13,6 @@ interface EqpUiState {
   sidebarWidth: number
   expandedSidebarWidth: number
   isEditMode: boolean
-  isProfileModalOpen: boolean
   /** 상하 패널 분리 핸들의 상단 패널 높이 비율(%) */
   topPanelHeightPercent: number
   selectEqp: (eqpId: string) => void
@@ -28,7 +27,6 @@ interface EqpUiState {
   collapseSidebar: () => void
   toggleSidebar: () => void
   setEditMode: (enabled: boolean) => void
-  setProfileModalOpen: (open: boolean) => void
   /**
    * 상하 패널 높이 비율을 갱신합니다.
    * 직접 값 또는 이전 값을 받는 updater 함수 모두 허용합니다.
@@ -60,7 +58,6 @@ export const useEqpUiStore = create<EqpUiState>()(
       sidebarWidth: SIDEBAR_DEFAULT_WIDTH_PX,
       expandedSidebarWidth: SIDEBAR_DEFAULT_WIDTH_PX,
       isEditMode: false,
-      isProfileModalOpen: false,
       topPanelHeightPercent: EQP_PANEL_INITIAL_TOP_PERCENT,
       // 개별 설비 선택
       selectEqp: (eqpId) => set({ selection: { type: 'eqp', eqpId } }),
@@ -118,7 +115,6 @@ export const useEqpUiStore = create<EqpUiState>()(
               },
         ),
       setEditMode: (enabled) => set({ isEditMode: enabled }),
-      setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
       setTopPanelHeightPercent: (updater) =>
         set((state) => ({
           topPanelHeightPercent:

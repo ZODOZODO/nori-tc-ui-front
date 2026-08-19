@@ -18,7 +18,6 @@ interface ModelUiState {
   detailNodeByTab: Record<number, ModelDetailNode>
   isEditMode: boolean
   isCheckInModalOpen: boolean
-  isProfileModalOpen: boolean
   /** 상하 패널 분리 핸들의 상단 패널 높이 비율(%) */
   topPanelHeightPercent: number
   /**
@@ -45,7 +44,6 @@ interface ModelUiState {
   setDetailNodeForTab: (modelVersionKey: number, node: ModelDetailNode) => void
   setEditMode: (enabled: boolean) => void
   setCheckInModalOpen: (open: boolean) => void
-  setProfileModalOpen: (open: boolean) => void
   /**
    * 상하 패널 높이 비율을 갱신합니다.
    * 직접 값 또는 이전 값을 받는 updater 함수 모두 허용합니다.
@@ -104,7 +102,6 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
   detailNodeByTab: {},
   isEditMode: false,
   isCheckInModalOpen: false,
-  isProfileModalOpen: false,
   topPanelHeightPercent: MODEL_PANEL_INITIAL_TOP_PERCENT,
   selectedFlowId: null,
   draftFlow: null,
@@ -233,7 +230,6 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
     })),
   setEditMode: (enabled) => set({ isEditMode: enabled }),
   setCheckInModalOpen: (open) => set({ isCheckInModalOpen: open }),
-  setProfileModalOpen: (open) => set({ isProfileModalOpen: open }),
   setTopPanelHeightPercent: (updater) =>
     set((state) => ({
       topPanelHeightPercent:
@@ -324,7 +320,6 @@ export const useModelUiStore = create<ModelUiState>((set) => ({
       detailNodeByTab: {},
       isEditMode: false,
       isCheckInModalOpen: false,
-      isProfileModalOpen: false,
       topPanelHeightPercent: MODEL_PANEL_INITIAL_TOP_PERCENT,
       selectedFlowId: null,
       draftFlow: null,

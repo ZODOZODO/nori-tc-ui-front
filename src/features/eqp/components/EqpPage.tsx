@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,9 +12,8 @@ import {
   SELECT_EMPTY_VALUE,
 } from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
-import { AppPageShell } from '@/shared/components/AppPageShell'
+import { AppShellPage } from '@/shared/components/AppShellPage'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
-import { EQP_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
@@ -62,7 +61,6 @@ import {
 } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
 import { isActiveEquipment } from '../utils/eqp-runtime-state.util'
-import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -130,7 +128,6 @@ const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
 const EQP_ASYNC_POLL_INTERVAL_MS = 1000
 const EQP_ASYNC_MAX_ATTEMPTS = 60
 const PASSIVE_LIFECYCLE_UNSUPPORTED_KEY = 'eqp.lifecycle.passiveUnsupported'
-const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -317,7 +314,6 @@ export function EqpPage({ scope }: EqpPageProps) {
 
   const selection = useEqpUiStore((state) => state.selection)
   const isEditMode = useEqpUiStore((state) => state.isEditMode)
-  const isProfileModalOpen = useEqpUiStore((state) => state.isProfileModalOpen)
   const selectEqp = useEqpUiStore((state) => state.selectEqp)
   const selectGatewayAll = useEqpUiStore((state) => state.selectGatewayAll)
   const selectBusinessAll = useEqpUiStore((state) => state.selectBusinessAll)
@@ -325,7 +321,6 @@ export function EqpPage({ scope }: EqpPageProps) {
   const selectBusinessGroup = useEqpUiStore((state) => state.selectBusinessGroup)
   const clearSelection = useEqpUiStore((state) => state.clearSelection)
   const setEditMode = useEqpUiStore((state) => state.setEditMode)
-  const setProfileModalOpen = useEqpUiStore((state) => state.setProfileModalOpen)
   const topPanelHeightPercent = useEqpUiStore((state) => state.topPanelHeightPercent)
   const setTopPanelHeightPercent = useEqpUiStore((state) => state.setTopPanelHeightPercent)
 
@@ -1410,18 +1405,10 @@ export function EqpPage({ scope }: EqpPageProps) {
   const selectedBusinessGroupIndex = selection.type === 'business_group' ? selection.groupIndex : null
   const isGatewaySelected = selection.type === 'gateway_all'
 
-  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
-  if (!hasPermission(meQuery.data?.permissionCodes, EQP_READ_PERMISSION)) {
-    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
-  }
-
   return (
-    <AppPageShell
-      currentMenu="eqp"
-      onOpenProfile={() => setProfileModalOpen(true)}
+    <AppShellPage
       onAfterLogout={() => {
         clearDeployUiSessionState()
-        setProfileModalOpen(false)
         resetSelectionTransientStates()
         closeManagementDialog()
       }}
@@ -1794,7 +1781,6 @@ export function EqpPage({ scope }: EqpPageProps) {
         }}
       />
 
-      <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </AppPageShell>
+    </AppShellPage>
   )
 }

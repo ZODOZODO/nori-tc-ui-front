@@ -2,10 +2,9 @@ import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from '
 import { Beaker } from 'lucide-react'
 import { useI18n } from '@/i18n/i18n-context'
 import { Button } from '@/components/ui/button'
-import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
-import { AppPageShell } from '@/shared/components/AppPageShell'
+import { AppShellPage } from '@/shared/components/AppShellPage'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import {
   hasPermission,
@@ -71,7 +70,6 @@ type LiveMapViewMode = 'viewer' | 'builder' | 'scene3d'
  */
 export function LiveMapPage() {
   const { t } = useI18n()
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<LiveMapViewMode>('viewer')
   // 상세 패널 닫기(X) — resolver 가 selectedEqpId=null 일 때 ERROR 설비로 자동 폴백하므로,
@@ -218,7 +216,6 @@ export function LiveMapPage() {
 
   const handleAfterLogout = () => {
     clearDeployUiSessionState()
-    setIsProfileModalOpen(false)
     reset()
   }
 
@@ -227,11 +224,7 @@ export function LiveMapPage() {
   const isViewerMode = !isBuilderMode && !isScene3dMode
 
   return (
-    <AppPageShell
-      currentMenu="dash"
-      onOpenProfile={() => setIsProfileModalOpen(true)}
-      onAfterLogout={handleAfterLogout}
-    >
+    <AppShellPage onAfterLogout={handleAfterLogout}>
       {/* scrollbarGutter:stable — 뷰어/빌더 콘텐츠 높이 차이로 세로 스크롤바가 모드마다 생겼다 사라지며
           우측 정렬 KPI 그리드가 8px 씩 밀리는 것을 막는다(스크롤바 자리 상시 확보). */}
       <main
@@ -430,7 +423,6 @@ export function LiveMapPage() {
         </div>
       </main>
 
-      <UserProfileModal open={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
       {isDemoModalOpen && (
         <Suspense fallback={null}>
           <LiveMapDemoModal
@@ -440,6 +432,6 @@ export function LiveMapPage() {
           />
         </Suspense>
       )}
-    </AppPageShell>
+    </AppShellPage>
   )
 }

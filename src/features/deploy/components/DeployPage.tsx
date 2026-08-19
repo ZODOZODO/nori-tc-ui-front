@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { Navigate, useNavigate } from 'react-router'
-import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
-import { useMe } from '@/features/profile/hooks/useProfile'
-import { AppPageShell } from '@/shared/components/AppPageShell'
+import { useNavigate } from 'react-router'
+import { AppShellPage } from '@/shared/components/AppShellPage'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
-import { DEPLOY_READ_PERMISSION, hasPermission } from '@/shared/lib/permission'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { DeployHistoryPanel } from './DeployHistoryPanel'
 import { DeployMonitorPanel } from './DeployMonitorPanel'
 import { DeployRegisterPanel } from './DeployRegisterPanel'
 import { DeploySidebar } from './DeploySidebar'
-import { clearDeployUiSessionState, useDeployUiStore } from '../stores/deploy-ui.store'
+import { clearDeployUiSessionState } from '../stores/deploy-ui.store'
 import type { DeployMode } from '../types/deploy.types'
-
-const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
 interface DeployPageProps {
   /** 표시할 모드. 라우트가 정한다 — URL 이 단일 진실 원천이다. */
@@ -33,9 +28,6 @@ const renderPanel = (mode: DeployMode) => {
 
 export function DeployPage({ mode }: DeployPageProps) {
   const navigate = useNavigate()
-  const meQuery = useMe(true)
-  const isProfileModalOpen = useDeployUiStore((state) => state.isProfileModalOpen)
-  const setProfileModalOpen = useDeployUiStore((state) => state.setProfileModalOpen)
   const sidebarOpen = useSharedLayoutStore((state) => state.sidebarOpen)
   const sidebarWidth = useSharedLayoutStore((state) => state.sidebarWidth)
   const toggleSidebar = useSharedLayoutStore((state) => state.toggleSidebar)
@@ -59,20 +51,8 @@ export function DeployPage({ mode }: DeployPageProps) {
     }
   }, [])
 
-  // 메뉴 숨김만으로는 URL 직접 입력·딥링크를 막지 못한다 → 본문 진입도 게이팅한다(S09 E-2).
-  if (!hasPermission(meQuery.data?.permissionCodes, DEPLOY_READ_PERMISSION)) {
-    return <Navigate to={FORBIDDEN_FALLBACK_ROUTE} replace />
-  }
-
   return (
-    <AppPageShell
-      currentMenu="deploy"
-      onOpenProfile={() => setProfileModalOpen(true)}
-      onAfterLogout={() => {
-        clearDeployUiSessionState()
-        setProfileModalOpen(false)
-      }}
-    >
+    <AppShellPage onAfterLogout={clearDeployUiSessionState}>
       <main className="flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
         <DeploySidebar
           mode={mode}
@@ -87,8 +67,6 @@ export function DeployPage({ mode }: DeployPageProps) {
           <div className="flex min-h-full min-w-0 max-w-full flex-1 p-6">{activePanel}</div>
         </section>
       </main>
-
-      <UserProfileModal open={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} />
-    </AppPageShell>
+    </AppShellPage>
   )
 }
