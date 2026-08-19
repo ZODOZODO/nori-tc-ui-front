@@ -356,6 +356,7 @@
 | C12 | `2b0e544` | ui-front | 1개 — `features/deploy/components/DeployMonitorPanel.tsx` | **AC15** + AC1 AC2 AC3 | ✅ 완료 |
 | C13 | `5ec69b6` | ui-front | 8개 — `auth/LoginPage` · `eqp/EqpPage` · `eqp/EqpManageFormModal` · `deploy/DeployRegisterPanel` · `group/GroupAddMembersModal` · `group/GroupPermissionsModal` · `group/GroupUpsertModal` · `model/DcopItemPickerModal` (+ git 미추적 e2e 3파일 셀렉터) | AC4 AC5 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C14 | `5a9d497` | ui-front | 5개 — `model/modelDetailColumnDefs` · `model/ModelDetailPanel` · `model/ModelFlowSidebar` · `model/FlowFilterEditorModal` · `model/ActionDataIndexEditorModal` | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
+| C15 | `1ed1512` | ui-front | 1개 — `live-map/components/LiveMap3DScene.tsx` (+ git 미추적 e2e 8파일) | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 
 ---
 
@@ -380,6 +381,7 @@
 | C12 | 80 | 15 | 10 | (확인 흐름만 변경 — raw 요소 무관) |
 | C13 | **71** | **14** | **2** | Plan §5.C13 의 예정 수치(71 / 14 / 2)와 정확히 일치 |
 | C14 | **65** | **5** | 2 | Plan §5.C14 의 예정 수치(65 / 5 / 2)와 정확히 일치 |
+| C15 | **51** | **1** | 2 | Plan §5.C15 의 예정 수치(51 / 1 / 2)와 정확히 일치 |
 
 ---
 
@@ -925,6 +927,38 @@ baseline PASS(`model-check-in-diff-overflow`). **회귀 0**.
 Plan 이 C14 게이트로 지정한 6 spec 중 5개는 baseline 부터 전건 FAIL 이라 판정력이 없다.
 실질 판정은 `model-check-in-diff-overflow` 1건 + 빌드 / lint / grep 수치에 의존한다.
 
+### C15 — LiveMap3DScene 수렴 (`1ed1512`)
+
+**부분 판정(잔여 수치)**
+```
+button=51 select=1 checkbox=2
+```
+→ Plan §5.C15 의 예정치와 동일(button 14 / select 4 변환).
+
+빌드 / lint / 단위
+```
+✓ built in 16.78s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+# fail 0
+```
+
+회귀 e2e — Plan 지정 `live-map/live-map-3d-*.spec.ts` 15 spec / 17 테스트, `--workers=1`
+```
+[15/17] … live-map-3d-structure.spec.ts:91:1 › 빌트인 벽을 뷰어에 추가→저장 …
+[16/17] … live-map-3d-undo-counts.spec.ts:116:1 › "표시" 카운트는 현재 보고 있는 층만 센다 …
+[17/17] … live-map-3d-viewer.spec.ts:127:1 › 3D 모드가 layout 의 v2 객체를 <canvas> 로 렌더 …
+  17 passed (3.0m)
+```
+→ **17/17 PASS**. baseline FAIL 이던 `live-map-3d-eqp-cmp` 까지 통과했다. **회귀 0**.
+
+기본 병렬(4 worker)로 같은 15 spec 만 몰아 돌리면 WebGL 스펙 1~2개가 매번 다른 조합으로
+타임아웃한다(180s/90s 초과 — assertion 실패 아님). 15개 3D 스펙을 동시에 4개씩 돌리는 부하는
+baseline 전체 실행(70 spec 혼합 스케줄)에 없던 조건이라 판정은 `--workers=1` 결과로 한다.
+**AC16 최종 판정은 C18 의 전체 실행**(baseline 과 같은 스케줄)에서 다시 확인한다.
+
 ---
 
 ## 6. R8/R9 보류 사유
@@ -942,6 +976,12 @@ Plan 이 C14 게이트로 지정한 6 spec 중 5개는 baseline 부터 전건 FA
 | EQP 관리 폼 모달(SECS create) | [c9-before-eqp-form.png](assets/c9-before-eqp-form.png) | [c9-after-eqp-form.png](assets/c9-after-eqp-form.png) | **의도한 변경** — 컨트롤 높이 44→40px, 모서리 덜 둥글게, 글자 15px, 테두리/배경 톤 변화. 2열 필드 그리드 정렬·모달 폭·요소 잘림 **변화 없음** |
 | `/login` | — | — | **차이 0** — `LoginPage.tsx` 는 `Input` 프리미티브를 쓰지 않고 raw `<input>` 4곳(`:63,185,211,238`)을 직접 쓴다. 이 화면은 C9 의 영향 밖이다(캡처로 확인) |
 | 모델 변경사항 미리보기 모달 | — | — | **차이 0** — 화면 안에 Input/Select 가 없다(표·배지만). `model-check-in-diff-overflow` spec 캡처로 확인 |
+
+**C15 — LiveMap3DScene 프리미티브 수렴 전/후** (Plan §5.C15 가 요구한 3D 육안 확인)
+
+| 화면 | before | after | 판정 |
+|---|---|---|---|
+| 3D 편집모드(추가 패널 + 층 레일 + 선택 객체 패널) | [c15-before-3d-panels.png](assets/c15-before-3d-panels.png) | [c15-after-3d-panels.png](assets/c15-after-3d-panels.png) | **기하 변화 없음** — 상단 추가 패널 1줄 유지, 좌측 층 레일(2F/1F/All) 위치·크기 동일, 하단 선택 패널 1줄 유지. 차이는 native select 화살표 → chevron 아이콘과 트리거 폭 미세 변화뿐 |
 
 두 스크린샷을 직접 열어(Read) 비교했고, 잘림·겹침 같은 의도치 않은 깨짐은 없었다 → 그대로 커밋했다.
 `/login` 대신 **모델 상세 패널**을 찍으려 했으나 그 패널을 렌더하는 spec 4개(`model-flow`,
@@ -1224,3 +1264,35 @@ Plan 이 C14 게이트로 지정한 6 spec 중 5개는 baseline 부터 전건 FA
 - 이 커밋이 손댄 5파일 중 `FlowFilterEditorModal` / `ActionDataIndexEditorModal` /
   `ModelFlowSidebar` 는 **baseline PASS spec 이 하나도 없다**. C18 전체 실행에서도
   같은 상태이므로 이 3파일의 회귀는 e2e 로 증명되지 않는다(빌드·lint·수치 검산까지가 한계).
+
+### C15-결함-1 — 프리미티브 기본 크기가 떠 있는 3D 패널 기하를 깨뜨린다
+
+- `SelectTrigger` 는 `controlBaseClassName` 의 `w-full` + `h-10` 을 얹는다. 3D 편집 패널의 select 는
+  원래 `px-2 py-1 text-xs` 짜리 인라인 칩(약 24px)이라, 그대로 변환하면 **패널이 여러 줄로 불어나
+  좌측 층 버튼(`live-map-3d-floor-2`)을 덮어** 클릭이 가로막힌다(`undo-counts:138` 실패로 관측).
+- **트리거 4곳에 `h-auto w-auto` 를 덧붙여 종전 기하를 보존**했다(S-19). §3.6-B 는 "className 을 그대로
+  트리거로 옮긴다" 까지만 정하고, 프리미티브가 새로 얹는 폭/높이를 어떻게 할지는 정하지 않았다.
+
+### C15-결함-2 — Button 의 `transition-all` 이 명령형 transform 뱃지와 충돌한다
+
+- 설비 뱃지는 매 프레임 `style.transform` 으로 위치를 잡는다. `<Button>` 기본 클래스의
+  `transition-all` 이 걸리면 그 transform 이 **보간**돼 드래그 도중 위치가 뒤처지고,
+  좌표를 재는 드래그 e2e 가 비결정적으로 깨진다.
+- **`transition-none` + `h-auto`** 를 뱃지 className 에 넣어 종전 동작(즉시 이동, pill 높이)을 보존했다.
+  Plan §4.3 이 경고한 것은 `scale-*`/`translate-*` 유틸이었고 transition 은 다루지 않았다.
+
+### C15-결함-3 — Plan 이 센 selectOption 호출 수가 실제와 다르다
+
+- Plan §5.C15 는 "동반 e2e 수정 7파일 / 11 호출" 이라고 적었으나 실측은 **7파일 / 13 호출**이다
+  (§4.1 표 자체를 세면 13이 맞다 — 표는 정확하고 본문 요약만 틀렸다). 13건 전부 변환했다.
+- 추가로 Plan 이 목록화하지 않은 의존이 1곳 더 있었다:
+  `live-map-3d-eqp-meshpick.spec.ts:60` 의 `getByTestId('live-map-3d-eqp-select').inputValue()`.
+  radix 트리거는 `<button>` 이라 `inputValue()` 가 없어 `.catch(() => null)` 로 조용히 삼켜져
+  **헬퍼가 항상 false 를 반환**했다. 표시 라벨(eqpName) 비교로 바꿨다.
+
+### C15-결함-4 — 3D 스펙만 몰아 돌리면 병렬 타임아웃이 난다
+
+- 기본 4 worker 로 `live-map-3d-*` 15 spec 만 실행하면 매번 다른 1~2개가 타임아웃한다
+  (assertion 실패 아님). `--workers=1` 에서는 **17/17 PASS**.
+- baseline 은 70 spec 을 섞어 돌린 스케줄이라 3D 스펙이 4개씩 동시에 붙는 경우가 없었다.
+  이 커밋의 판정은 `--workers=1` 로 했고, **AC16 은 C18 전체 실행에서 baseline 과 같은 조건으로 재확인**한다.
