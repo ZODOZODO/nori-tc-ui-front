@@ -357,6 +357,7 @@
 | C13 | `5ec69b6` | ui-front | 8개 — `auth/LoginPage` · `eqp/EqpPage` · `eqp/EqpManageFormModal` · `deploy/DeployRegisterPanel` · `group/GroupAddMembersModal` · `group/GroupPermissionsModal` · `group/GroupUpsertModal` · `model/DcopItemPickerModal` (+ git 미추적 e2e 3파일 셀렉터) | AC4 AC5 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C14 | `5a9d497` | ui-front | 5개 — `model/modelDetailColumnDefs` · `model/ModelDetailPanel` · `model/ModelFlowSidebar` · `model/FlowFilterEditorModal` · `model/ActionDataIndexEditorModal` | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C15 | `1ed1512` | ui-front | 1개 — `live-map/components/LiveMap3DScene.tsx` (+ git 미추적 e2e 8파일) | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
+| C16 | `2c26123` | ui-front | 9개 — `live-map/components/` 의 `LiveMapDemoModal` · `LiveMapObjectEditor` · `LiveMapFlowArrowDialog` · `LiveMapPage` · `LiveMapCommLogPanel` · `LiveMapBoard` · `LiveMapFlowGroupDialog` · `LiveMapTooltipCard` · `LiveMapMachineNode` (+ 스크린샷 4장, + git 미추적 e2e 2파일) | **AC4 AC5 AC6** + AC1 AC2 AC3 | ✅ 완료 |
 
 ---
 
@@ -382,6 +383,7 @@
 | C13 | **71** | **14** | **2** | Plan §5.C13 의 예정 수치(71 / 14 / 2)와 정확히 일치 |
 | C14 | **65** | **5** | 2 | Plan §5.C14 의 예정 수치(65 / 5 / 2)와 정확히 일치 |
 | C15 | **51** | **1** | 2 | Plan §5.C15 의 예정 수치(51 / 1 / 2)와 정확히 일치 |
+| C16 | **18** | **0** | **0** | Plan §5.C16 의 예정 수치(18 / 0 / 0)와 정확히 일치. 잔여 18건은 허용 5파일(EqpSidebar 7 · ModelSidebar 5 · DeploySidebar 2 · DlqSidebar 2 · UserManagementSidebar 2) — **AC4 / AC5 / AC6 green** |
 
 ---
 
@@ -961,6 +963,60 @@ baseline 전체 실행(70 spec 혼합 스케줄)에 없던 조건이라 판정�
 
 ---
 
+### C16 — 잔여 live-map 수렴 (`2c26123`)
+
+**최종 판정 — AC4 / AC5 / AC6**
+```
+$ grep -rn "<select" src/features | wc -l          → 0        # AC4 green
+$ grep -rn 'type="checkbox"' src/features | wc -l  → 0        # AC5 green
+$ grep -rl "<button" src/features
+src/features/deploy/components/DeploySidebar.tsx
+src/features/dlq/components/DlqSidebar.tsx
+src/features/eqp/components/EqpSidebar.tsx
+src/features/model/components/ModelSidebar.tsx
+src/features/user-management/components/UserManagementSidebar.tsx
+button 합계 = 18                                              # AC6 green
+```
+→ Plan §5.C16 이 지정한 허용 5파일과 **정확히 일치**하고 합계도 18 로 SPEC 의 "80 → ≤18" 을 만족한다.
+
+빌드 / lint / 단위
+```
+✓ built in 19.68s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+# pass 211
+# fail 0
+```
+
+회귀 e2e ① — 비 3D live-map 8 spec + `modal/modal-visual-sweep-livemap.spec.ts`
+```
+[17/17] [chromium] › tests\e2e\modal\modal-visual-sweep-livemap.spec.ts:56:1 › LiveMapDemoModal — 와이드 3D 데모 모달 시각
+LIVEMAP_DEMO_DIALOG {"w":1280,"h":662,"vw":1280}
+
+  17 passed (55.9s)
+```
+→ **17/17 PASS**(baseline 전건 PASS 와 동일). 모달 폭 1280 = 뷰포트 폭 → 가로 오버플로우 없음.
+
+회귀 e2e ② — `live-map/live-map-3d-*.spec.ts` 15 spec / 17 테스트, `--workers=1`(C15 와 동일 조건)
+```
+[16/17] … live-map-3d-undo-counts.spec.ts:116:1 › "표시" 카운트는 현재 보고 있는 층만 센다 …
+[17/17] … live-map-3d-viewer.spec.ts:127:1 › 3D 모드가 layout 의 v2 객체를 <canvas> 로 렌더 …
+  17 passed (3.0m)
+```
+
+회귀 e2e ③ — `verify-ui/overlays-live-map.spec.ts`
+```
+  1 failed
+    [chromium] › tests\e2e\verify-ui\overlays-live-map.spec.ts:41:1 › LiveMapDemoModal(본체) — 열림 / 닫힘 / 오버플로우
+  3 did not run
+```
+→ 실패 사유가 `expect(page).toHaveURL(expected) failed`(`:232` 로그인 리다이렉트)로 **§2.3 baseline FAIL 과 동일**하고
+skip 3건도 baseline 과 같다. **회귀 0**.
+
+---
+
 ## 6. R8/R9 보류 사유
 
 (C17 에서 기록)
@@ -982,6 +1038,16 @@ baseline 전체 실행(70 spec 혼합 스케줄)에 없던 조건이라 판정�
 | 화면 | before | after | 판정 |
 |---|---|---|---|
 | 3D 편집모드(추가 패널 + 층 레일 + 선택 객체 패널) | [c15-before-3d-panels.png](assets/c15-before-3d-panels.png) | [c15-after-3d-panels.png](assets/c15-after-3d-panels.png) | **기하 변화 없음** — 상단 추가 패널 1줄 유지, 좌측 층 레일(2F/1F/All) 위치·크기 동일, 하단 선택 패널 1줄 유지. 차이는 native select 화살표 → chevron 아이콘과 트리거 폭 미세 변화뿐 |
+
+**C16 — 잔여 live-map 수렴 전/후** (33 버튼이 뷰어 전면에 걸려 육안 확인)
+
+| 화면 | before | after | 판정 |
+|---|---|---|---|
+| 뷰어 board(설비 노드 3 + 상세 패널 + 통신로그) | [c16-before-viewer.png](assets/c16-before-viewer.png) | [c16-after-viewer.png](assets/c16-after-viewer.png) | **동일** — 선택 노드의 주황 테두리/연한 배경, 긴 eqpId 줄바꿈, 포트 dot 2줄 배치 모두 보존. 통신로그 행 간격만 30→34px(size `sm` 의 `h-8`) |
+| 구조물 편집(빌더) | [c16-before-builder.png](assets/c16-before-builder.png) | [c16-after-builder.png](assets/c16-after-builder.png) | **동일** — 객체 목록 행 높이 49→48px, 폼 행·3D 미리보기 위치 변화 없음 |
+
+1차 캡처에서 **선택된 설비 노드가 hover 시 검게 뒤집히는 회귀**를 발견했다(아래 C16-결함-2).
+고친 뒤 다시 찍어 before 와 대조했고, 위 표가 그 최종본이다.
 
 두 스크린샷을 직접 열어(Read) 비교했고, 잘림·겹침 같은 의도치 않은 깨짐은 없었다 → 그대로 커밋했다.
 `/login` 대신 **모델 상세 패널**을 찍으려 했으나 그 패널을 렌더하는 spec 4개(`model-flow`,
@@ -1296,3 +1362,43 @@ baseline 전체 실행(70 spec 혼합 스케줄)에 없던 조건이라 판정�
   (assertion 실패 아님). `--workers=1` 에서는 **17/17 PASS**.
 - baseline 은 70 spec 을 섞어 돌린 스케줄이라 3D 스펙이 4개씩 동시에 붙는 경우가 없었다.
   이 커밋의 판정은 `--workers=1` 로 했고, **AC16 은 C18 전체 실행에서 baseline 과 같은 조건으로 재확인**한다.
+
+### C16-결함-1 — 규칙 A 의 variant 판정이 `hover:bg-*` 를 다루지 않는다
+
+- 규칙 A 는 "`bg-` 로 시작하는 배경 클래스 포함 → `default`" 만 정한다. 그런데 `hover:bg-muted` 처럼
+  hover 변형만 있는 className 이 흔하다. C15 에서 세운 해석(**`hover:bg-*` 는 배경으로 세지 않는다**,
+  **조건부 className 의 한쪽 분기에만 `bg-*` 가 있으면 `ghost`**)을 C16 에도 그대로 적용했다.
+- 그 결과: `hover:bg-*` 만 있는 아이콘/링크형 버튼 = `ghost`, `border` 만 있는 것 = `outline`,
+  양쪽 분기 모두 `bg-*` 를 가진 토글형 = `default`.
+
+### C16-결함-2 — `variant="default"` 의 `hover:bg-primary/90` 이 브랜드색 컨트롤을 뒤집는다
+
+- 규칙 A 대로 `default` 를 준 버튼 중 className 의 배경이 `bg-primary` 가 **아닌** 것들
+  (설비 노드 `bg-brand-primary/5`, 데모 테스트타입 버튼 `bg-brand-primary/10`·`bg-card`)은
+  twMerge 가 `bg-primary` 는 지우지만 **`hover:bg-primary/90` 은 지우지 않는다**(className 에 대응 hover 가 없어서).
+  이 테마의 `primary` 는 거의 검정이라 hover 시 주황 컨트롤이 검게 뒤집히고 `text-primary-foreground`(흰 글자)까지 남는다.
+  실제로 1차 캡처에서 선택된 설비 노드가 검은 막대로 찍혔다.
+- 보존적 선택(S-19): 각 분기의 **자기 배경을 hover 값으로 명시**(`hover:bg-brand-primary/5` 등)해
+  "hover 해도 색이 바뀌지 않던" 종전 동작을 되돌리고, 설비 노드에는 `text-foreground` 를 붙였다.
+  Plan 은 "className 을 통째로 넘기면 twMerge 가 알아서 이긴다"고만 적었고 이 부분 겹침은 다루지 않는다.
+
+### C16-결함-3 — 프리미티브 기본값이 여러 줄짜리 버튼의 기하를 깨뜨린다 (C15-결함-1 의 연장)
+
+- `size="sm"` 의 `h-8`, base 의 `items-center justify-center whitespace-nowrap`, `gap-1.5`,
+  `rounded-md` 가 **2줄 이상인 버튼**에 걸리면 내용이 잘리거나 중앙 정렬된다. 해당 4곳에만 최소 클래스를 넣었다:
+  - `LiveMapMachineNode`(상태+ID / 포트 dot 2줄) — `h-auto items-stretch justify-start whitespace-normal`
+  - `LiveMapObjectEditor` 의 객체/빌트인 목록 항목(이름+종류 2줄) — `h-auto justify-start gap-0 px-0`
+  - `LiveMapDemoModal` 의 run 그룹 헤더(배지 여러 개가 줄바꿈) — `h-auto justify-start whitespace-normal rounded-none`
+  - `LiveMapCommLogPanel` 의 로그 행 — 아래 테두리만 있던 행이라 `outline` 의 사방 border·모서리를
+    `border-x-0 border-t-0 rounded-none` 으로 되돌림
+- 1줄짜리 버튼의 높이가 `h-8` 로 통일되는 것(예: 통신로그 목록 행 간격 30→34px)은 **수렴의 의도된 결과**로 보고 그대로 뒀다.
+
+### C16-결함-4 — Plan 이 목록화한 e2e 의존 2곳 외에 1곳이 더 있다
+
+- Plan §5.C16 은 `live-map-scenario-upload:127,131` 만 적었으나 같은 파일 `:105` 의
+  `dialog.locator('select option', { hasText: … })` 도 native `<select>` 의존이다(옵션이 DOM 에 상시 존재한다는 가정).
+  radix 는 열렸을 때만, 그것도 **body 포털**로 렌더하므로 트리거를 연 뒤 `page.getByRole('option')` 으로 바꿨다.
+- `demo-matrix.harness.spec.ts` 의 `resolveOptionLabel` 도 `page.locator('select option')` 을 쓰고 있어
+  `page.getByRole('option')` 으로 바꿨다(트리거를 먼저 열도록 호출 순서도 조정).
+- 소스에 `data-testid` 를 새로 심지 않고 radix 트리거의 `role="combobox"` 로 잡았다 — 규칙 B 는 기존 testid 만 옮기라고 하고,
+  이 select 에는 원래 testid 가 없었다.
