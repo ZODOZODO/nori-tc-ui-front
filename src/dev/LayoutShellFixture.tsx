@@ -94,7 +94,6 @@ export function LayoutShellFixture() {
       <Scene label="4. single-card (PageLayoutShell variant=single-card)">
         <PageLayoutShell
           variant="single-card"
-          bread={{ name: '로그인' }}
           heading={{ name: '로그인', description: '계정 정보를 입력하세요.' }}
         >
           <div className="rounded-xl border border-border bg-card p-6 shadow-soft-md">
@@ -109,8 +108,7 @@ export function LayoutShellFixture() {
       <Scene label="5. multi-section (PageLayoutShell variant=multi-section)">
         <PageLayoutShell
           variant="multi-section"
-          bread={{ subtitle: '설비 관리', name: '설비 목록' }}
-          heading={{ icon: <Boxes />, name: '설비 목록' }}
+          heading={{ name: '설비 목록' }}
           actions={
             <PageActionBar>
               <Button size="sm">등록</Button>

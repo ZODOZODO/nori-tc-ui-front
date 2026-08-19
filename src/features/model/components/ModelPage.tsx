@@ -3,6 +3,7 @@ import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.st
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { AppShellPage } from '@/shared/components/AppShellPage'
+import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { useI18n } from '@/i18n/i18n-context'
@@ -1334,6 +1335,7 @@ export function ModelPage({ scope }: ModelPageProps) {
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <AppPageHeading className="px-3 pt-3 md:px-4 md:pt-4" />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* 모델을 고르기 전에는 현재 라우트 스코프의 모델 목록을 보여준다 — 스코프가 URL 로
                 항상 정해지므로 구 "선택 없음" 빈 화면 분기는 이 목록이 대신한다. */}

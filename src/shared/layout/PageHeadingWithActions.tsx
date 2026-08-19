@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { pageHeadingClassName } from './page-heading-styles'
 
 interface PageHeadingWithActionsProps {
   /** heading-icon 위치의 아이콘 (lucide 등). */
@@ -20,7 +21,7 @@ interface PageHeadingWithActionsProps {
  * nori-client `components/header_subtitle_btn.jsx` 의 heading + 우측 버튼 group 시각 패턴.
  *
  * heading-primary 좌측 + actions 우측 (`flex-space-between`) + hr. PageHeading 과 동일한
- * 2026 재해석 규칙 (D10). 제목/액션이 함께 필요한 페이지용 — PageActionBar 와 통합 가능.
+ * 2026 재해석 규칙 (D10) 및 동일한 높이 계약(`page-heading-styles.ts`).
  */
 export function PageHeadingWithActions({
   icon,
@@ -31,11 +32,15 @@ export function PageHeadingWithActions({
   className,
 }: PageHeadingWithActionsProps) {
   return (
-    <div className={cn('flex flex-col gap-1 border-b border-border pb-3', className)}>
+    <div className={cn(pageHeadingClassName, className)}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-2">
-          {icon ? <span className="text-brand-primary [&_svg]:size-5">{icon}</span> : null}
-          <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">
+        <div className="flex items-center gap-2.5">
+          {icon ? (
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-primary/10 text-brand-accent [&_svg]:size-4.5">
+              {icon}
+            </span>
+          ) : null}
+          <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
             {name}
           </h1>
           {typeof total === 'number' ? (

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { AppShellPage } from '@/shared/components/AppShellPage'
+import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import {
   hasPermission,
@@ -232,6 +233,7 @@ export function LiveMapPage() {
         style={{ scrollbarGutter: 'stable' }}
       >
         <div className="flex w-full flex-col gap-4 px-6 py-6">
+          <AppPageHeading />
           <LiveMapHeader summary={summary} />
           {liveMapQuery.isError ? (
             <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">

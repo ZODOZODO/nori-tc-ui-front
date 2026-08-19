@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { PageHeadingWithActions } from '@/shared/layout/PageHeadingWithActions'
+import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/i18n/i18n-context'
 import { useGroups } from '../hooks/useGroups'
 import { useGroupUiStore } from '../stores/group-ui.store'
@@ -59,16 +59,19 @@ export function GroupAdminPanel() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
-      <PageHeadingWithActions
-        name={t('group.title')}
-        description={t('group.description')}
-        total={groupListQuery.data?.count ?? 0}
-        actions={
+      {/* 제목(h1)은 라우트 헤딩(AppPageHeading)이 그린다 — 한 화면에 h1 을 두 번 두지 않는다.
+          이 줄은 설명 / 총건수 / 액션만 담당한다. */}
+      <div className="flex shrink-0 items-start justify-between gap-4">
+        <p className="text-sm leading-body text-muted-foreground">{t('group.description')}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="secondary" className="tabular-nums">
+            {(groupListQuery.data?.count ?? 0).toLocaleString()}
+          </Badge>
           <Button type="button" data-testid="group-create-button" onClick={() => openCreateModal()}>
             {t('group.create')}
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <GroupListTable />
 

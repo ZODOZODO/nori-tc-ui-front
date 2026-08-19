@@ -17,8 +17,8 @@
 | C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | `b7d6223` |
 | C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | `2000a6c` |
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | `2b08643` |
-| C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 완료 | (이 커밋) |
-| C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 대기 | — |
+| C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 완료 | `585da64` |
+| C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 완료 | (이 커밋) |
 | C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 대기 | — |
 
 ---
@@ -483,5 +483,60 @@ $ npm run test:unit
   나오지 않았다. 같은 `LNB_BUTTON_RESET` 을 쓰는 sub-link 가 정상임을 확인했고, leaf 를 실제로
   클릭하는 e2e(`selectable-table-gateway-group` / `plc-model-tree` / `model-flow`)가 C7 스윕에서
   판정한다
+
+---
+
+## C6 — `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)`
+
+### 변경 파일
+- 신설 `src/shared/layout/page-heading-styles.ts` — `min-h-21` 높이 계약(foundation R9 보류분)
+- 신설 `src/shared/layout/AppPageHeading.tsx` — 아이콘을 LNB 정의에서 자동 유도
+- 교체 `PageHeading.tsx` / `PageHeadingWithActions.tsx` — wm 판(아이콘 틀 박스 + 높이 계약)
+- 교체 `PageLayoutShell.tsx` — wm 판. `bread` prop 제거(breadcrumb 은 topbar 소관),
+  `heading.icon` 제거(자동 유도)
+- 6 라우트 페이지에 `AppPageHeading` 배선 (AC9)
+- `src/dev/LayoutShellFixture.tsx` — `bread` / `heading.icon` 소비 2곳 갱신
+- `UserAdminPanel.tsx` / `GroupAdminPanel.tsx` — D5 이중 타이틀 해소
+- `src/i18n/locales/{ko,en,vi}.json` — 고아가 된 `user.title` / `group.title` 제거 (1079 → 1077)
+
+### 자율 확정
+
+| # | 항목 | 결정 |
+|---|---|---|
+| I17 | `AppPageHeading` 의 `name` prop | **선택으로 완화**하고 생략 시 현재 경로의 LNB 항목 라벨을 쓴다. Plan D5 는 "name = `t(navigationLocation.item.labelKey)`" 를 요구하는데, 그대로 두면 6 페이지가 각자 `useLocation` + `resolveAppNavigationLocation` + `t()` 를 반복한다. 컴포넌트가 이미 같은 값을 아이콘 유도에 쓰고 있으므로 라벨도 거기서 뽑는다 — 아이콘과 같은 이유로 "페이지가 제목을 따로 소유하면 LNB 와 갈라진다". 제목을 못 정하는 경로(LNB 밖 + name 미지정)는 빈 `h1` 대신 `null` 을 반환 |
+| I4 확정 | (D5) 이중 타이틀 실측 | `/user/users` 의 `<h1>` 목록이 실제로 `["Users","User Management"]` 2건이었다(스크립트 단언으로 확인). **panel 쪽 h1 제거** — `PageHeadingWithActions` 를 설명 + 총건수 Badge + 액션 버튼 한 줄로 축소했다. 정보 손실 0(설명·건수·`user-create-button`/`group-create-button` testId 모두 보존), 수정 후 `<h1>` = `["Users"]` 1건 |
+| I18 | `user.title` / `group.title` i18n 키 | panel h1 제거로 소비처 0 → ko/en/vi 에서 제거(L7 규칙: 키 제거 전 `grep` 0건 확인). e2e 주석 3곳이 이 키를 *언급*하지만 참조가 아니라 설명문이고, 해당 스펙은 이미 locale 무관 testId 로 단언한다 |
+
+### AC9 판정
+
+```
+$ grep -rl "AppPageHeading\|PageLayoutShell" <6 라우트 페이지>   →  6
+$ grep -c "AppPageHeading" src/shared/layout/PageLayoutShell.tsx →  3
+```
+
+### 게이트
+
+```
+$ npm run build
+✓ built in 16.13s
+
+$ npm run lint
+> eslint .            (무출력 — 통과)
+
+$ npm run test:unit
+# tests 241
+# pass 241
+# fail 0
+```
+
+### 실화면 확인 + 남은 소견 (Validate 판단 요청)
+
+- `/user/users`: 아이콘 + `Users` h1 → 설명 + 건수 Badge + `Add user` → User List 카드.
+  중복 제목 해소 확인
+- `/dlq/gateway`: 페이지 h1 `Gateway DLQ` 아래 **패널 카드 헤더도 `Gateway DLQ`** 로 문구가 겹친다.
+  다만 이건 `PageHeading*` 소비가 아니라 카드 헤더(건수 Badge / 최종 갱신 시각 / 검색 / Refresh 를
+  같이 얹은 기능 블록)라 D5 의 축소 대상(F5 가 지목한 user/group 패널)에 들어가지 않고,
+  SPEC Out of Scope("DLQ 5모드 화면 각각의 기능 개선 — 내비 승격만, 콘텐츠 불변")에 걸린다.
+  **손대지 않고 남긴다** — 카드 헤더 문구 정리가 필요하면 별도 결정으로 진행할 사항
 
 (커밋 진행에 따라 계속 추가)

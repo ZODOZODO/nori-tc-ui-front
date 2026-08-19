@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
 import { AppShellPage } from '@/shared/components/AppShellPage'
+import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
@@ -1415,6 +1416,7 @@ export function EqpPage({ scope }: EqpPageProps) {
         />
 
         <section className="flex min-w-0 flex-1 flex-col">
+          <AppPageHeading className="px-3 pt-3 md:px-4 md:pt-4" />
           <div className="flex min-h-0 flex-1 flex-col">
             {/* 가운데 영역: selection 유형에 따라 콘텐츠 분기 */}
             {selection.type === 'none' ? (

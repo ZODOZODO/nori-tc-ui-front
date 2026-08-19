@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { AppShellPage } from '@/shared/components/AppShellPage'
+import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { DeployHistoryPanel } from './DeployHistoryPanel'
 import { DeployMonitorPanel } from './DeployMonitorPanel'
 import { DeployRegisterPanel } from './DeployRegisterPanel'
@@ -45,9 +46,12 @@ export function DeployPage({ mode }: DeployPageProps) {
 
   return (
     <AppShellPage onAfterLogout={clearDeployUiSessionState}>
-      <main className="flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="flex min-h-full min-w-0 max-w-full flex-1 p-6">{activePanel}</div>
-      </main>
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-5 lg:p-6">
+        <AppPageHeading />
+        <main className="flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="flex min-h-full min-w-0 max-w-full flex-1">{activePanel}</div>
+        </main>
+      </section>
     </AppShellPage>
   )
 }

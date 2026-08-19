@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { PageHeading } from './PageHeading'
-import { PageHeadingWithActions } from './PageHeadingWithActions'
-import { PageLocation } from './PageLocation'
+import { AppPageHeading } from './AppPageHeading'
 
 /**
  * 페이지 콘텐츠 영역의 레이아웃 변형.
@@ -31,11 +29,9 @@ const VARIANT_MAIN_CLASS: Record<PageLayoutVariant, string> = {
 }
 
 interface PageLayoutShellProps {
-  /** bread crumb (Home › subtitle › name). */
-  bread: { subtitle?: string; name: string }
-  /** 페이지 제목 영역. */
-  heading: { icon?: ReactNode; name: string; description?: string }
-  /** 제목 우측 액션 영역. 있으면 PageHeadingWithActions, 없으면 PageHeading. */
+  /** 페이지 제목 영역. 아이콘은 라우트에서 자동 유도된다({@link AppPageHeading}). */
+  heading: { name: string; description?: string }
+  /** 제목 우측 액션 영역. */
   actions?: ReactNode
   /** 콘텐츠 레이아웃 변형. */
   variant?: PageLayoutVariant
@@ -45,14 +41,14 @@ interface PageLayoutShellProps {
 }
 
 /**
- * nori-client 공통 layout 위젯 (Location + SubTitleHeader + TableActions) 의 시각 패턴을
- * 하나로 묶은 통합 wrapper (D14 틀=nori-client). 모든 페이지가 이 shell 위에 콘텐츠를 올린다.
+ * nori-client 공통 layout 위젯 (SubTitleHeader + TableActions) 의 시각 패턴을 하나로 묶은 통합
+ * wrapper (D14 틀=nori-client). 모든 페이지가 이 shell 위에 콘텐츠를 올린다.
  *
- * 계층: AppPageShell(topbar + wrapper) ⊃ PageLayoutShell(콘텐츠 영역 내부 shell). AppPageShell
- * 은 유지되며 본 컴포넌트는 그 자식 (SPEC R8 L270).
+ * 계층: AppPageShell(LNB + topbar + wrapper) ⊃ PageLayoutShell(콘텐츠 영역 내부 shell).
+ * breadcrumb 은 페이지가 아니라 상단 헤더(AppTopBar)가 라우트에서 유도해 그리므로 `bread` prop 은
+ * 두지 않는다 — 같은 정보를 두 곳에서 그리면 어긋난다.
  */
 export function PageLayoutShell({
-  bread,
   heading,
   actions,
   variant = 'multi-section',
@@ -60,16 +56,9 @@ export function PageLayoutShell({
   className,
 }: PageLayoutShellProps) {
   return (
-    <section className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-6', className)}>
-      <PageLocation subtitle={bread.subtitle} name={bread.name} />
-      {actions ? (
-        <PageHeadingWithActions {...heading} actions={actions} />
-      ) : (
-        <PageHeading {...heading} />
-      )}
-      <main className={cn('min-h-0 min-w-0 flex-1', VARIANT_MAIN_CLASS[variant])}>
-        {children}
-      </main>
+    <section className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-5 lg:p-6', className)}>
+      <AppPageHeading {...heading} actions={actions} />
+      <main className={cn('min-h-0 min-w-0 flex-1', VARIANT_MAIN_CLASS[variant])}>{children}</main>
     </section>
   )
 }
