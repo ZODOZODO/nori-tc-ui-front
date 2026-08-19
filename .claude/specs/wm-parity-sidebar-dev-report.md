@@ -14,8 +14,8 @@
 | C0 | (커밋 없음) AC11 baseline | 완료 | — |
 | C1 | `feat(ui): LNB 사이드바 프리미티브 이식 (R1)` | 완료 | `484a2c1` |
 | C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | `c5b8928` |
-| C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | (이 커밋) |
-| C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 대기 | — |
+| C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | `b7d6223` |
+| C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | (이 커밋) |
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 대기 | — |
 | C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 대기 | — |
 | C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 대기 | — |
@@ -223,5 +223,91 @@ rail 버튼 `onFocus` 는 그룹 항목 전체. 전환은 `startTransition(() =>
 
 AC12 선확인: `grep -c "prefetchQuery\|preloadRouteModule"` → `AppLnbSidebar.tsx:15` / `AppLnbFlyout.tsx:0`
 (합계 15건 ≥ 1건).
+
+---
+
+## C4a — `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)`
+
+구 topbar 와 구 도메인 사이드바를 **유지한 채** 라우팅만 전환했다(Plan L1 완화) — 사이드바 클릭이
+`navigate` 가 되어 화면 동작은 그대로다. 셸 교체는 C4b.
+
+### 변경 파일
+- `src/app/RequireAuth.tsx` — children → **Outlet layout route**
+- `src/app/Router.tsx` — 16 정적 라우트 + 리다이렉트 8종(구경로 6 + `/`·`*`),
+  `lazy()` 가 `route-modules` 의 loader 를 공유, 모듈 상단 `preloadRouteModule(location.pathname)`
+- `src/features/dlq/components/DlqPage.tsx` — `mode` prop 수신, 모드 전환 = `navigate('/dlq/'+mode)`
+- `src/features/user-management/components/UserManagementPage.tsx` — `mode` prop,
+  `MODE_SEGMENT` 표(`user→users` / `group→groups`)로 navigate
+- `src/features/deploy/components/DeployPage.tsx` — `mode` prop, navigate 전환
+- `src/features/deploy/stores/deploy-ui.store.ts` — `mode` / `setMode` / `activateMode` 제거,
+  내부 `set({mode})` 3곳 제거
+- `src/features/deploy/components/DeployRegisterPanel.tsx` — `moveToNextMode` 가 navigate,
+  `createServerDeployBridge({activateMode:false})` 인자 제거
+- `src/features/deploy/components/DeployMonitorPanel.tsx` — `setMode('deploy')` 2곳 → `navigate('/deploy/deploy')`
+- `src/features/eqp/components/EqpPage.tsx` — `EqpScope` 타입 + `scope` prop + URL→store 보정 effect,
+  Business/Gateway 전체선택 핸들러가 navigate
+- `src/features/model/components/ModelPage.tsx` — 로컬 `selectedInterfaceGroup` state 제거 →
+  `scope` prop, `handleSelectInterfaceGroup` 이 navigate
+- `src/features/auth/hooks/useLogin.ts` — `LOGIN_ENTRY_ROUTE` `/eqp/live-map` → `/live-map` (D9)
+- 삭제 `src/features/dlq/stores/dlq-ui.store.ts`, `src/features/user-management/stores/user-management-ui.store.ts`
+- `tests/unit/route-auth-guard.test.ts`, `tests/unit/logout-client-state-cleanup.test.ts` — 구조 변경 반영
+
+### 자율 확정 (Plan 밖 발견)
+
+| # | 항목 | 결정 |
+|---|---|---|
+| I6 | **단위 테스트 3건이 C4a 구조 변경으로 깨짐** (Plan §6.4 는 `i18n-vi-parity` 만 열거) | 삭제하지 않고 **의도 보존 + 단언 이관**. `route-auth-guard.test.ts` 의 "`<RequireAuth>` 6개" 카운트는 layout route 로는 성립하지 않으므로, **16 보호 라우트가 가드 블록 안쪽 오프셋에 있는지**를 직접 단언하는 더 강한 형태로 바꿨다(개수만 세면 가드 블록 *밖* 에 라우트를 새로 달아도 통과). `logout-client-state-cleanup.test.ts` 는 가드 매칭을 `<Route element={<RequireAuth />}>` 로 갱신. 구 경로 리다이렉트 6종이 가드 **밖** 인지도 함께 단언 |
+| I7 | EqpPage 보정 effect 의 무한 루프 위험 | selection 을 렌더 클로저가 아니라 `useEqpUiStore.getState()` 로 읽어 **scope 변경 시에만** 실행. selection 을 의존성에 넣으면 기존 "선택 정합성" effect(빈 그룹이면 `clearSelection`)와 서로를 되돌리는 루프가 된다 |
+| I8 | ModelPage 의 "선택 없음 빈 화면" 분기 | 스코프가 URL 로 항상 정해지므로 `selectedModelVersionKey === null` 이 곧 "스코프 목록 표시" 다. 구 `selectedInterfaceGroup !== null` 분기와 구 빈 화면 분기가 **같은 조건**이 되어 둘을 병존시킬 수 없으므로 스코프 목록 쪽으로 합쳤다(빈 화면 제거). dead path 보존 룰의 대상이 아니다 — 조건이 사라진 것이 아니라 하나로 합쳐졌다 |
+| I9 | `createLocalDeploy` 는 호출처 0건 (기존 dead code) | 언급만 하고 삭제하지 않는다. `mode` 필드가 사라져 `set({mode:'deploy'})` 한 줄만 제거했다(제거하지 않으면 컴파일 실패) |
+
+### Plan L2 재확인 — deploy store 밖 mode 소비 0건
+
+```
+$ grep -rn "state\.mode\|setMode" src/features/deploy
+(0건)
+```
+
+### 게이트
+
+```
+$ npx tsc -b
+(무출력 — 통과)
+
+$ npm run build
+✓ built in 16.62s
+
+$ npm run lint
+> eslint .            (무출력 — 통과)
+
+$ npm run test:unit
+# tests 240
+# pass 240
+# fail 0
+```
+
+### 수동 스모크 (Plan C4a 요구) — 라우팅 영향 spec 3개 실측
+
+```
+  3 failed
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2: /user 사이드바 Group 클릭 시 그룹 패널 활성화
+    [chromium] › tests\e2e\group-page.spec.ts:478:1 › Group-AC-8a: 권한 없는 사용자는 User 메뉴 미표시 (Group 사이드바 자체에 도달 불가)
+    [chromium] › tests\e2e\user-page.spec.ts:338:1 › topbar User 클릭 시 /user 로 라우팅
+  24 passed (58.7s)
+```
+
+- `/dlq` 딥링크 → `/dlq/dashboard` 리다이렉트 후 패널 렌더, 사이드바 클릭 모드 전환까지
+  `dlq-page.spec.ts` 7건 전부 통과 (C4a 스모크 목표 충족)
+- group-page 2건은 **baseline 에서도 실패**하던 사전 실패다(C0 표 참조)
+- `user-page.spec.ts:338` 은 baseline PASS 였고 이번에 깨졌다 — 원인은 Plan F9 가 예고한
+  URL 단언(`/\/user$/` → 실제 `/user/users`)이다. **C7(R12 §6.3)에서 갱신할 계획된 파급**이며
+  기능 회귀가 아니다. AC11 최종 판정은 C7 이후 전체 재실행으로 한다
+
+### e2e 파일의 git 추적 상태 (R12 범위에 영향)
+
+`.gitignore:20` 이 `/tests/e2e/` 를 제외한다 — **e2e 스펙은 git 추적 대상이 아니고 로컬 전용**이다
+(`git ls-files tests/` = 40건, 전부 `tests/unit` + 헬퍼 2). 따라서 C7 의 신설
+`tests/e2e/wm-parity-sidebar.spec.ts` 와 §6 갱신분은 커밋 diff 에 나타나지 않는다.
+AC4 / AC11 은 로컬 실행 결과 인용으로만 판정 가능하다(Validate 세션도 로컬 재실행 필요).
 
 (커밋 진행에 따라 계속 추가)

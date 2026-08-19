@@ -80,11 +80,12 @@ test('로그아웃이 persist 캐시와 deploy sessionStorage 를 함께 정리�
 
 test('보호 라우트가 인증 가드를 경유한다', () => {
   const router = readSource('src/app/Router.tsx')
-  assert.match(router, /<RequireAuth>/, 'E-3 회귀: 라우트 인증 가드가 없다')
+  // 가드는 layout route 형태다 — 보호 라우트 16 개를 각각 감싸면 누락이 조용히 생긴다.
+  assert.match(router, /<Route element=\{<RequireAuth \/>\}>/, 'E-3 회귀: 라우트 인증 가드가 없다')
 
   // /login 은 가드 밖이어야 한다 — 안에 넣으면 리다이렉트 루프가 된다.
   const loginRoute = /<Route path="\/login"[^\n]*\/>/.exec(router)
   assert.ok(loginRoute)
-  const guardStart = router.indexOf('<RequireAuth>')
+  const guardStart = router.indexOf('<Route element={<RequireAuth />}>')
   assert.ok(router.indexOf(loginRoute[0]) < guardStart, '/login 이 인증 가드 안에 있다')
 })

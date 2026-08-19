@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, Outlet } from 'react-router'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useI18n } from '@/i18n/i18n-context'
 
@@ -13,8 +12,11 @@ const LOGIN_ROUTE = '/login'
  * 여기서 `/auth/me` 결과로 먼저 판정해 미인증이면 본문을 렌더하지 않는다.
  *
  * 서버 데이터 경계는 백엔드가 지킨다(closed-by-default). 이 가드는 잔여 렌더를 막는 클라이언트 방어선이다.
+ *
+ * children 이 아니라 `<Outlet />` 을 반환하는 layout route 다 — 보호 라우트가 16 개로 늘면서
+ * 라우트마다 가드를 감싸면 누락이 조용히 생긴다. 한 번 감싸고 그 아래를 전부 상속시킨다.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth() {
   const { t } = useI18n()
   const meQuery = useMe(true)
 
@@ -30,5 +32,5 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     return <Navigate to={LOGIN_ROUTE} replace />
   }
 
-  return children
+  return <Outlet />
 }

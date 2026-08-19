@@ -51,22 +51,70 @@ test('보호 라우트 가드가 미인증에서 본문 대신 /login 리다이�
   // 판정 전에 본문을 렌더하면 같은 잔여 렌더가 생긴다 — pending 은 반드시 자체 화면이어야 한다.
   assert.match(source, /meQuery\.isPending/, 'pending 분기가 사라져 판정 전 본문이 렌더된다')
   assert.equal(
-    source.indexOf('meQuery.isPending') < source.indexOf('return children'),
+    source.indexOf('meQuery.isPending') < source.indexOf('return <Outlet />'),
     true,
-    'pending 판정이 children 반환보다 뒤에 있으면 판정 전 렌더가 일어난다',
+    'pending 판정이 Outlet 반환보다 뒤에 있으면 판정 전 렌더가 일어난다',
   )
 })
 
-test('로그인·픽스처를 뺀 모든 라우트가 RequireAuth 로 감싸져 있다', () => {
+/**
+ * 확정 메뉴 트리(wm-parity-sidebar SPEC)의 보호 라우트 전수.
+ *
+ * 라우트가 16 개로 늘면서 가드를 라우트마다 감싸는 방식(구 `<RequireAuth>` children)에서
+ * layout route(`<Route element={<RequireAuth />}>`) 로 바뀌었다. 개수만 세면 라우트를 가드 블록
+ * **밖에** 새로 달아도 통과하므로, 각 경로가 가드 블록 안쪽 범위에 있는지를 직접 단언한다.
+ */
+const PROTECTED_ROUTE_PATHS = [
+  '/live-map',
+  '/dlq/dashboard',
+  '/dlq/gateway',
+  '/dlq/business',
+  '/dlq/quarantine',
+  '/dlq/repair-task',
+  '/eqp/business',
+  '/eqp/gateway',
+  '/model/secs',
+  '/model/socket',
+  '/model/plc',
+  '/deploy/register',
+  '/deploy/deploy',
+  '/deploy/history',
+  '/user/users',
+  '/user/groups',
+]
+
+test('로그인·픽스처·리다이렉트를 뺀 모든 라우트가 RequireAuth layout route 안에 있다', () => {
   const router = readSource('src/app/Router.tsx')
 
-  const guarded = (router.match(/<RequireAuth>/g) ?? []).length
-  assert.equal(guarded, 6, `보호 라우트 수가 6 에서 ${guarded} 로 바뀌었다 — 라우트 추가 시 가드 누락 의심`)
+  const guardOpen = router.indexOf('<Route element={<RequireAuth />}>')
+  assert.notEqual(guardOpen, -1, '인증 layout route 가 사라졌다')
   assert.equal(
-    (router.match(/<\/RequireAuth>/g) ?? []).length,
-    guarded,
-    'RequireAuth 여닫는 태그 수가 다르다',
+    (router.match(/<RequireAuth \/>/g) ?? []).length,
+    1,
+    '인증 가드가 두 곳 이상에 배치됐다 — 가드 블록이 쪼개지면 누락을 눈으로 찾아야 한다',
   )
+
+  const guardClose = router.indexOf('</Route>', guardOpen)
+  assert.notEqual(guardClose, -1, '인증 layout route 가 닫히지 않았다')
+
+  for (const path of PROTECTED_ROUTE_PATHS) {
+    const declaration = `<Route path="${path}"`
+    const at = router.indexOf(declaration)
+    assert.notEqual(at, -1, `보호 라우트 ${path} 가 사라졌다`)
+    assert.equal(
+      at > guardOpen && at < guardClose,
+      true,
+      `보호 라우트 ${path} 가 인증 가드 블록 밖에 있다 — 미인증 진입이 열린다`,
+    )
+  }
+
+  // 구 경로 리다이렉트는 가드 밖이어야 한다 — 안에 두면 미인증 시 /login 대신 리다이렉트가 먼저 돈다.
+  for (const path of ['/dlq', '/eqp', '/model', '/deploy', '/user', '/eqp/live-map']) {
+    const at = router.indexOf(`<Route path="${path}" element={<Navigate`)
+    assert.notEqual(at, -1, `구 경로 리다이렉트 ${path} 가 사라졌다 — 북마크가 깨진다`)
+    assert.equal(at > guardClose, true, `구 경로 리다이렉트 ${path} 가 가드 블록 안에 있다`)
+  }
+
   // 미매치 경로가 열려 있으면 가드를 우회한다.
   assert.match(router, /<Route path="\*" element=\{<Navigate to="\/login" replace \/>\}/)
 })

@@ -11,7 +11,6 @@ import type {
   CreateLocalDeployInput,
   DeployEventType,
   DeployHistoryItem,
-  DeployMode,
   DeployMonitorFilters,
   DeployRegisterFilters,
   DeployRegisterTargetItem,
@@ -20,7 +19,6 @@ import type {
 } from '../types/deploy.types'
 
 interface DeployUiState {
-  mode: DeployMode
   selectedEqpIds: string[]
   selectedEqpTargetsById: Record<string, DeployRegisterTargetItem>
   selectedEqpParamVersions: Record<string, string>
@@ -41,7 +39,6 @@ interface DeployUiState {
   selectedModelVersionKey: number | null
   selectedBusinessJarRef: number | null
   isProfileModalOpen: boolean
-  setMode: (mode: DeployMode) => void
   submitRegisterSearch: (filters: DeployRegisterFilters) => void
   resetRegisterFilters: () => void
   setMonitorFilters: (historyOnly: boolean, filters: Partial<DeployMonitorFilters>) => void
@@ -70,7 +67,6 @@ interface DeployUiState {
     interfaceType?: DeployRegisterTargetItem['commInterface'] | null
     targetCount?: number
     eqpIds?: string[]
-    activateMode?: boolean
   }) => void
   markDeployStatus: (
     deployKey: number,
@@ -114,7 +110,6 @@ export const createDefaultMonitorFilters = (): DeployMonitorFilters => {
 
 const DEPLOY_UI_STORAGE_KEY = 'deploy-ui-state'
 const createInitialDeployUiDataState = () => ({
-  mode: 'register' as DeployMode,
   selectedEqpIds: [] as string[],
   selectedEqpTargetsById: {} as Record<string, DeployRegisterTargetItem>,
   selectedEqpParamVersions: {} as Record<string, string>,
@@ -294,7 +289,6 @@ export const useDeployUiStore = create<DeployUiState>()(
   persist(
     (set, get) => ({
       ...createInitialDeployUiDataState(),
-      setMode: (mode) => set({ mode }),
       submitRegisterSearch: (filters) =>
         set((state) => ({
           registerFilters: filters,
@@ -438,7 +432,6 @@ export const useDeployUiStore = create<DeployUiState>()(
         interfaceType,
         targetCount,
         eqpIds,
-        activateMode = true,
       }) => {
         const state = get()
         const resolvedEqpIds = eqpIds ?? state.selectedEqpIds
@@ -463,11 +456,6 @@ export const useDeployUiStore = create<DeployUiState>()(
         })
 
         set({
-          mode: activateMode
-            ? isTerminalDeployStatus(deployStatus)
-              ? 'history'
-              : 'deploy'
-            : state.mode,
           activeDeployKey: deployKey,
           deployListOffset: 0,
           historyListOffset: isTerminalDeployStatus(deployStatus) ? 0 : state.historyListOffset,
@@ -595,7 +583,6 @@ export const useDeployUiStore = create<DeployUiState>()(
         }
 
         set({
-          mode: 'deploy',
           activeDeployKey: deployKey,
           deployListOffset: 0,
           localHistory: [historyItem, ...state.localHistory],
@@ -655,7 +642,6 @@ export const useDeployUiStore = create<DeployUiState>()(
         }
 
         set({
-          mode: 'deploy',
           activeDeployKey: nextDeployKeyValue,
           deployListOffset: 0,
           localHistory: [nextHistoryItem, ...state.localHistory],

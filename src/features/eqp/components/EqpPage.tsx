@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -286,6 +286,14 @@ const computeEqpParamDiffRows = (
   })
 }
 
+/** 설비 페이지의 1단계 스코프 — 확정 메뉴 트리의 `/eqp/business` · `/eqp/gateway` 와 1:1. */
+export type EqpScope = 'business' | 'gateway'
+
+interface EqpPageProps {
+  /** 표시할 스코프. 라우트가 정한다. */
+  scope: EqpScope
+}
+
 /**
  * EQP Info 메인 페이지입니다.
  * DB 기반 Check Out / Save / Check In 흐름을 처리합니다.
@@ -298,9 +306,13 @@ const computeEqpParamDiffRows = (
  * - gateway_group: gateway_app 그룹 클릭 → 해당 그룹 설비 목록 테이블 표시
  * - business_group: business_app 그룹 클릭 → 해당 그룹 설비가 참조하는 모델 목록 테이블 표시
  * - eqp: 개별 설비 클릭 → 설비 정보 + ResizableDivider + 파라미터/Checkout 영역 표시
+ *
+ * 스코프(Business / Gateway)는 라우트가 정한다 — URL 이 단일 진실 원천이다. store 의 selection 은
+ * 스코프 안의 세부 선택(그룹 / 개별 설비)만 담고, 스코프와 어긋나면 진입 시 보정된다.
  */
-export function EqpPage() {
+export function EqpPage({ scope }: EqpPageProps) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const selection = useEqpUiStore((state) => state.selection)
@@ -647,6 +659,35 @@ export function EqpPage() {
   }, [])
 
   /**
+   * 라우트 스코프와 store 의 selection 을 맞춥니다(URL → store 단방향 보정).
+   *
+   * selection 은 sessionStorage 에 남으므로 `/eqp/business` 로 들어와도 이전 gateway 선택이
+   * 복원될 수 있다. 그러면 URL 은 business 인데 화면은 gateway 를 그린다 — URL 이 원천이므로
+   * 어긋난 쪽(store)을 그 스코프의 "전체" 선택으로 되돌린다.
+   *
+   * 역방향(store → URL)은 만들지 않는다. 스코프를 바꾸는 수단이 LNB navigate 뿐이라
+   * 역방향 동기화는 같은 상태를 두 곳에서 쓰게 만들 뿐이다.
+   *
+   * selection 을 렌더 클로저가 아니라 `getState()` 로 읽어 **스코프가 바뀔 때만** 돈다. selection
+   * 을 의존성에 넣으면, 아래 정합성 effect 가 빈 그룹을 감지해 선택을 풀 때마다 이 effect 가
+   * 다시 선택해 두 effect 가 서로를 되돌리는 무한 루프가 된다.
+   */
+  useEffect(() => {
+    const { type } = useEqpUiStore.getState().selection
+    const isBusinessSelection = type === 'business_all' || type === 'business_group'
+    const isGatewaySelection =
+      type === 'gateway_all' || type === 'gateway_group' || type === 'eqp'
+
+    if (scope === 'business' && !isBusinessSelection) {
+      selectBusinessAll()
+      return
+    }
+    if (scope === 'gateway' && !isGatewaySelection) {
+      selectGatewayAll()
+    }
+  }, [scope, selectBusinessAll, selectGatewayAll])
+
+  /**
    * sessionStorage에서 복원된 선택 상태가 현재 목록과 불일치하면 선택을 정리합니다.
    * 목록 조회 성공 이후에만 검증해 로딩 중 오탐으로 선택이 해제되는 문제를 방지합니다.
    */
@@ -822,8 +863,9 @@ export function EqpPage() {
   const handleSelectBusinessAll = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
-    selectBusinessAll()
-  }, [queryClient, selectBusinessAll])
+    // 스코프 전환은 URL 이 원천이다 — navigate 하면 위 보정 effect 가 selection 을 맞춘다.
+    navigate('/eqp/business')
+  }, [navigate, queryClient])
 
   /**
    * Gateway 전체 선택 처리.
@@ -832,8 +874,9 @@ export function EqpPage() {
   const handleSelectGatewayAll = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
-    selectGatewayAll()
-  }, [queryClient, selectGatewayAll])
+    // 스코프 전환은 URL 이 원천이다 — navigate 하면 위 보정 effect 가 selection 을 맞춘다.
+    navigate('/eqp/gateway')
+  }, [navigate, queryClient])
 
   const handleSaveCreateEqp = async (request: EqpCreateRequest) => {
     try {

@@ -34,8 +34,11 @@ export type LoginFormValues = z.infer<ReturnType<typeof buildLoginSchema>>
 
 /**
  * 로그인 성공 후 이동할 기본 진입 경로입니다 — live-map(설비 라이브맵)을 첫 화면으로 둡니다.
+ *
+ * 구 경로 `/eqp/live-map` 은 리다이렉트로 살아 있지만 여기서 쓰지 않는다 — 로그인마다 홉이
+ * 한 번 더 생기고, 최종 URL 을 단언하는 테스트가 중간 경로에 걸린다.
  */
-const LOGIN_ENTRY_ROUTE = '/eqp/live-map'
+const LOGIN_ENTRY_ROUTE = '/live-map'
 
 export function useLogin() {
   const navigate = useNavigate()

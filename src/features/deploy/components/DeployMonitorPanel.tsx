@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -249,8 +250,8 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const redeployLocalHistoryItem = useDeployUiStore((state) => state.redeployLocalHistoryItem)
   const deleteLocalDeploy = useDeployUiStore((state) => state.deleteLocalDeploy)
   const createServerDeployBridge = useDeployUiStore((state) => state.createServerDeployBridge)
-  const setMode = useDeployUiStore((state) => state.setMode)
 
+  const navigate = useNavigate()
   const meQuery = useMe(true)
   const monitorOptionsQuery = useDeployRegisterOptions()
   const userListQuery = useUsers(true)
@@ -730,7 +731,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       return
     }
 
-    setMode('deploy')
+    navigate('/deploy/deploy')
     setFeedbackMessage(t('deploy.monitor.redeployLocalSuccess', { key: nextDeployKey }))
     setFeedbackTone('success')
   }
@@ -758,7 +759,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         interfaceType: sourceHistoryItem?.interfaceType ?? null,
         targetCount: sourceHistoryItem?.targetSummary.total ?? 0,
       })
-      setMode('deploy')
+      navigate('/deploy/deploy')
       setFeedbackMessage(
         result.resultMessage?.message || t('deploy.monitor.redeployServerSuccess'),
       )

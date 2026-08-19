@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
 import { Loader2, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -81,6 +82,7 @@ type ScenarioRow = DeployRegisterScenarioPreviewResult['scenarios'][number]
 
 export function DeployRegisterPanel() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const registerFilters = useDeployUiStore((state) => state.registerFilters)
   const selectedEqpIds = useDeployUiStore((state) => state.selectedEqpIds)
@@ -105,7 +107,6 @@ export function DeployRegisterPanel() {
   const setSelectedModelVersionKey = useDeployUiStore((state) => state.setSelectedModelVersionKey)
   const setSelectedBusinessJarRef = useDeployUiStore((state) => state.setSelectedBusinessJarRef)
   const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
-  const setMode = useDeployUiStore((state) => state.setMode)
   const createServerDeployBridge = useDeployUiStore((state) => state.createServerDeployBridge)
   const clearRegisterState = useDeployUiStore((state) => state.clearRegisterState)
 
@@ -322,8 +323,9 @@ export function DeployRegisterPanel() {
     resetMonitorFilters(nextMode === 'history')
     resetMonitorListOffsets()
     setActiveDeployKey(deployKey)
-    setMode(nextMode)
     closeDeployDialog()
+    // 모드는 store 가 아니라 URL 이 원천이다 — navigate 해야 새로고침/뒤로가기가 맞는다.
+    navigate(`/deploy/${nextMode}`)
   }
 
   const loadCreatedDeploySnapshot = async (deployKey: number) => {
@@ -619,7 +621,6 @@ export function DeployRegisterPanel() {
         eventType: DEPLOY_EVENT_TYPE,
         targetCount: selectedEqpItems.length,
         eqpIds: selectedEqpItems.map((item) => item.eqpId),
-        activateMode: false,
       })
 
       if (resolvedSummary) {

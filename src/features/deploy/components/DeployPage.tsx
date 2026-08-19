@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { AppPageShell } from '@/shared/components/AppPageShell'
@@ -15,6 +15,11 @@ import type { DeployMode } from '../types/deploy.types'
 
 const FORBIDDEN_FALLBACK_ROUTE = '/login'
 
+interface DeployPageProps {
+  /** 표시할 모드. 라우트가 정한다 — URL 이 단일 진실 원천이다. */
+  mode: DeployMode
+}
+
 const renderPanel = (mode: DeployMode) => {
   switch (mode) {
     case 'register':
@@ -26,11 +31,10 @@ const renderPanel = (mode: DeployMode) => {
   }
 }
 
-export function DeployPage() {
+export function DeployPage({ mode }: DeployPageProps) {
+  const navigate = useNavigate()
   const meQuery = useMe(true)
-  const mode = useDeployUiStore((state) => state.mode)
   const isProfileModalOpen = useDeployUiStore((state) => state.isProfileModalOpen)
-  const setMode = useDeployUiStore((state) => state.setMode)
   const setProfileModalOpen = useDeployUiStore((state) => state.setProfileModalOpen)
   const sidebarOpen = useSharedLayoutStore((state) => state.sidebarOpen)
   const sidebarWidth = useSharedLayoutStore((state) => state.sidebarWidth)
@@ -72,7 +76,7 @@ export function DeployPage() {
       <main className="flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
         <DeploySidebar
           mode={mode}
-          onChangeMode={setMode}
+          onChangeMode={(nextMode) => navigate(`/deploy/${nextMode}`)}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           onToggleSidebar={toggleSidebar}

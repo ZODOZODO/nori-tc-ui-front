@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { UserProfileModal } from '@/features/profile/components/UserProfileModal'
 import { useMe } from '@/features/profile/hooks/useProfile'
@@ -148,11 +148,20 @@ const collectCascadeDeletedVersionKeys = (
     .filter((item) => item.modelName === rootModelName || item.parentModel === rootModelName)
     .map((item) => item.modelVersionKey)
 
+interface ModelPageProps {
+  /** 표시할 인터페이스 스코프. 라우트가 정한다 — URL 이 단일 진실 원천이다. */
+  scope: ProtocolType
+}
+
 /**
  * Model Info 메인 페이지입니다.
+ *
+ * 인터페이스 스코프(SECS / Socket / PLC)는 라우트가 정한다. 모델 탭을 열면 그 탭이 화면을
+ * 차지하고, 스코프 목록으로 돌아가는 수단은 LNB navigate 다.
  */
-export function ModelPage() {
+export function ModelPage({ scope }: ModelPageProps) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const selectedModelVersionKey = useModelUiStore((state) => state.selectedModelVersionKey)
   const openedTabs = useModelUiStore((state) => state.openedTabs)
   const activeTab = useModelUiStore((state) => state.activeTab)
@@ -245,7 +254,6 @@ export function ModelPage() {
   })
   const [deleteDialogErrorMessage, setDeleteDialogErrorMessage] = useState<string | null>(null)
   const [explicitCheckoutModelVersionKey, setExplicitCheckoutModelVersionKey] = useState<number | null>(null)
-  const [selectedInterfaceGroup, setSelectedInterfaceGroup] = useState<ProtocolType | null>(null)
 
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
@@ -287,14 +295,14 @@ export function ModelPage() {
   }, [modelItems, selectedModel])
 
   const interfaceGroupRows = useMemo(() => {
-    if (!selectedInterfaceGroup) {
+    if (!scope) {
       return []
     }
 
     const latestRepresentativeByName = new Map<string, ModelInfo>()
 
     sortByUpdatedAtDesc(
-      modelItems.filter((item) => item.commInterface.toUpperCase() === selectedInterfaceGroup.toUpperCase()),
+      modelItems.filter((item) => item.commInterface.toUpperCase() === scope.toUpperCase()),
     ).forEach((item) => {
       if (!latestRepresentativeByName.has(item.modelName)) {
         latestRepresentativeByName.set(item.modelName, item)
@@ -302,7 +310,7 @@ export function ModelPage() {
     })
 
     return sortByUpdatedAtDesc([...latestRepresentativeByName.values()])
-  }, [modelItems, selectedInterfaceGroup])
+  }, [modelItems, scope])
 
   const branchCreateSourceVersions = useMemo(() => {
     if (!branchCreateTargetModel) {
@@ -723,7 +731,6 @@ export function ModelPage() {
    * Sidebar에서 모델명 선택 시 Model 정보 테이블 화면으로 전환합니다.
    */
   const handleSelectModel = (model: ModelInfo) => {
-    setSelectedInterfaceGroup(null)
     if (openedTabs.length === 0) {
       setActiveTab(null)
     }
@@ -741,7 +748,6 @@ export function ModelPage() {
    * 기억하도록 하는 격리 보장 (store 의 `detailNodeByTab` 의도와 정합).
    */
   const handleOpenModelDetail = (model: ModelInfo) => {
-    setSelectedInterfaceGroup(null)
     const alreadyOpened = openedTabs.some(
       (tab) => tab.modelVersionKey === model.modelVersionKey,
     )
@@ -758,22 +764,22 @@ export function ModelPage() {
   }
 
   const handleSelectTab = (modelVersionKey: number) => {
-    setSelectedInterfaceGroup(null)
     setActiveTab(modelVersionKey)
     setSelectedModelVersionKey(modelVersionKey)
     setCheckInErrorMessage(null)
   }
 
+  /** 인터페이스 스코프 전환 — URL 이 원천이므로 navigate 하고, 열려 있던 모델 선택은 정리한다. */
   const handleSelectInterfaceGroup = useCallback(
     (interfaceType: ProtocolType) => {
-      setSelectedInterfaceGroup(interfaceType)
       setSelectedModelVersionKey(null)
       setActiveTab(null)
       setEditMode(false)
       setCheckInModalOpen(false)
       setCheckInErrorMessage(null)
+      navigate(`/model/${interfaceType.toLowerCase()}`)
     },
-    [setActiveTab, setCheckInModalOpen, setEditMode, setSelectedModelVersionKey],
+    [navigate, setActiveTab, setCheckInModalOpen, setEditMode, setSelectedModelVersionKey],
   )
 
   const handleCloseTab = (modelVersionKey: number) => {
@@ -1315,7 +1321,7 @@ export function ModelPage() {
         <ModelSidebar
           modelItems={modelItems}
           selectedModelVersionKey={selectedModelVersionKey}
-          selectedInterfaceGroup={selectedInterfaceGroup}
+          selectedInterfaceGroup={scope}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           isLoading={modelListQuery.isLoading}
@@ -1341,7 +1347,9 @@ export function ModelPage() {
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {selectedInterfaceGroup !== null ? (
+            {/* 모델을 고르기 전에는 현재 라우트 스코프의 모델 목록을 보여준다 — 스코프가 URL 로
+                항상 정해지므로 구 "선택 없음" 빈 화면 분기는 이 목록이 대신한다. */}
+            {selectedModelVersionKey === null ? (
               <section className="flex flex-1 flex-col p-3 md:p-4">
                 <ModelInfoTable
                   models={interfaceGroupRows}
@@ -1357,8 +1365,6 @@ export function ModelPage() {
                   onOpenDetail={handleOpenModelDetail}
                 />
               </section>
-            ) : selectedModelVersionKey === null ? (
-              <div className="flex flex-1" />
             ) : !isVersionFrame ? (
               <section className="flex flex-1 flex-col p-3 md:p-4">
                 <ModelInfoTable
