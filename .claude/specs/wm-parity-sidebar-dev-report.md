@@ -12,8 +12,8 @@
 | # | 커밋 | 상태 | SHA |
 |---|---|---|---|
 | C0 | (커밋 없음) AC11 baseline | 완료 | — |
-| C1 | `feat(ui): LNB 사이드바 프리미티브 이식 (R1)` | 완료 | (이 커밋) |
-| C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 대기 | — |
+| C1 | `feat(ui): LNB 사이드바 프리미티브 이식 (R1)` | 완료 | `484a2c1` |
+| C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | (이 커밋) |
 | C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 대기 | — |
 | C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 대기 | — |
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 대기 | — |
@@ -135,6 +135,45 @@ tc `index.css` 에 이미 있어 CSS 추가는 `.hover-scroll` 뿐이다(F7 확�
 > nori-tc-ui@0.0.0 lint
 > eslint .
 LINT_EXIT=0
+```
+
+---
+
+## C2 — `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)`
+
+### 변경 파일
+- 수정 `src/shared/lib/app-navigation.ts` — 확정 표 그대로 6 그룹 / 16 항목 트리 +
+  `resolveVisibleAppNavigationGroups` / `isAppNavigationRouteActive` / `resolveAppNavigationLocation` 추가.
+  구 `APP_TOP_NAVIGATION_ITEMS` / `resolveVisibleAppNavigationItems` 는 **의도적으로 잔존**
+  (AppTopBar 가 아직 소비 — C4b 에서 제거). Plan C2 명시
+- 신설 `src/shared/lib/app-navigation-icons.ts` — `Record<ItemKey|GroupKey, LucideIcon>` 2 종
+- 수정 `src/i18n/locales/{ko,en,vi}.json` — 각 30 키 추가(`navigation.*` 27 + `accessDenied.*` 3),
+  3 언어 모두 1096 키로 parity 유지. 기존 키 재포맷 0 (`git diff --numstat` = 31 삽입 / 1 삭제 ×3)
+- 신설 `tests/unit/app-navigation-visibility.test.ts` — AC3 권한 필터 게이트 8 테스트
+
+### 결정
+- 권한 바인딩은 **값 문자열** 기준. Live-Map 은 `DASH_READ_PERMISSION`(값 `'LIVE_MAP_READ'`,
+  `permission.ts:5`) — 테스트가 `groupKeys(['DASH_READ']) === []` 로 상수명 오바인딩을 음성 단언한다
+- TC 고유명(Live-Map / SECS / Socket / PLC / Business / Gateway / Repair Task / Gateway DLQ /
+  Business DLQ / Model)은 ko/en/vi 전 언어 영어 — `i18n-vi-parity.test.ts` AC3 Tier A 토큰 규칙과 정합
+- 그룹 en/vi 신규 번역: 처리실패=`Processing Failures`/`Lỗi xử lý`, 적용=`Deployment`/`Triển khai`,
+  모니터링=`Monitoring`/`Giám sát`, 설비=`Equipment`/`Thiết bị`, 시스템=`System`/`Hệ thống`.
+  모델 그룹은 `Model` 이 Tier A 토큰이라 en/vi 모두 `Model` 유지
+- 고아 키 정리(`dlq.sidebar.*` 등)와 `i18n-vi-parity` 키 치환은 Plan D11/F2 대로 **C5** 에서 수행
+  (해당 사이드바가 아직 살아 있어 지금 지우면 런타임에서 키가 깨진다)
+
+### 게이트 (build + lint + test:unit)
+
+```
+✓ built in 15.64s
+=== LINT ===
+> nori-tc-ui@0.0.0 lint
+> eslint .
+=== UNIT ===
+1..240
+# tests 240
+# pass 240
+# fail 0
 ```
 
 (커밋 진행에 따라 계속 추가)
