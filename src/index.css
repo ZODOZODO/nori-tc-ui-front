@@ -245,6 +245,17 @@
   }
 }
 
+/* 평소에는 스크롤바를 숨기고 포인터가 그 요소 위에 있을 때만 노출한다 (전역 LNB `SidebarContent`).
+   기존 `.thin-scroll` 과 달리 클래스를 붙인 컨테이너에만 걸린다 — `.overflow-*` 유틸 전역에 거는
+   방식은 이 레포의 스크롤 컨테이너 전부의 시각을 바꾸므로 채택하지 않는다. */
+.hover-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.hover-scroll:hover {
+  scrollbar-color: var(--border) transparent;
+}
+
 /* 얇은 모던 스크롤바 — 기본 두꺼운 스크롤바 대체. 토큰 색 반응. */
 .thin-scroll {
   scrollbar-width: thin;
