@@ -185,7 +185,8 @@ TC 고유명(Live-Map/SECS/Socket/PLC/Business/Gateway/Repair Task)은 전 언�
 ## SDD 진행 상태
 
 - [x] **Specify** — 이 SPEC.md 작성 완료 (산출물: `.claude/specs/wm-parity-sidebar.md`)
-- [ ] **Plan** — 별 세션에서 Plan Mode 로 구현 계획 수립 (산출물: `.claude/specs/wm-parity-sidebar-plan.md`)
+- [x] **Plan** — 별 세션에서 구현 계획 수립 완료 (산출물: `.claude/specs/wm-parity-sidebar-plan.md`,
+      2026-08-19 — wm 원본 16파일 전건 Read 대조 + tc 실측, 커밋 슬라이스 C0~C7 / 결정 D1~D14)
 - [ ] **Implement** — 별 세션에서 Acceptance Criteria 만족하는 구현 (산출물: `.claude/specs/wm-parity-sidebar-dev-report.md`)
 - [ ] **Validate** — 별 세션에서 SPEC + Plan + Dev report 셋 다 입력으로 검증, 위 체크박스 업데이트
 
