@@ -78,8 +78,10 @@ export function LiveMapFlowGroupDialog({
               {t('livemap.flow.groupColor')}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setColor(null)}
                 aria-pressed={color === null}
                 className={`flex h-7 items-center rounded-pill border px-2.5 text-[11px] font-bold transition-colors ${
@@ -89,11 +91,13 @@ export function LiveMapFlowGroupDialog({
                 }`}
               >
                 {t('livemap.flow.colorNone')}
-              </button>
+              </Button>
               {GROUP_COLOR_PRESETS.map((preset) => (
-                <button
+                <Button
                   key={preset}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setColor(preset)}
                   aria-label={preset}
                   aria-pressed={color === preset}

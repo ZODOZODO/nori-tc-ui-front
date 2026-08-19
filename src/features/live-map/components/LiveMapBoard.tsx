@@ -770,24 +770,28 @@ export function LiveMapBoard({
                               className="flex items-center gap-1"
                               onPointerDown={(event) => event.stopPropagation()}
                             >
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setEditingGroup(group)}
                                 aria-label={t('livemap.flow.editGroup')}
                                 data-testid={`live-map-flow-group-edit-${group.id}`}
                                 className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                               >
                                 <Pencil className="size-3" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setDeletingGroup(group)}
                                 aria-label={t('livemap.flow.deleteGroup')}
                                 data-testid={`live-map-flow-group-delete-${group.id}`}
                                 className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
                               >
                                 <Trash2 className="size-3" />
-                              </button>
+                              </Button>
                             </span>
                           ) : null}
                           <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">

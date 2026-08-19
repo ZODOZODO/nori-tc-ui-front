@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Box, Cylinder, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import type { ShapeJson, LiveMapObjectKind } from '../lib/live-map-layout.model'
 import type { LiveMapObjectResponse } from '../api/layout.api'
@@ -182,14 +183,16 @@ export function LiveMapObjectEditor() {
       <div data-testid="object-editor-list" className="flex w-56 min-h-0 shrink-0 flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t('livemap.builder.objects')}</span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             data-testid="object-editor-new"
             className="rounded-md border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
             onClick={resetDraft}
           >
             + {t('livemap.builder.new')}
-          </button>
+          </Button>
         </div>
         <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-auto">
           {builtinStructures.map((builtin) => (
@@ -197,16 +200,18 @@ export function LiveMapObjectEditor() {
               key={builtin.objectKey}
               className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border px-2 py-1.5"
             >
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 data-testid={`object-builtin-item-${builtin.slug}`}
-                className="flex min-w-0 flex-1 flex-col items-start text-left"
+                className="flex h-auto min-w-0 flex-1 flex-col items-start justify-start gap-0 px-0 text-left"
                 title={t('livemap.builder.builtinHint')}
                 onClick={() => loadBuiltin(builtin)}
               >
                 <span className="w-full truncate text-xs font-semibold text-foreground">{builtin.objectName}</span>
                 <span className="text-[10px] text-muted-foreground">{t('livemap.builder.builtinBadge')}</span>
-              </button>
+              </Button>
             </div>
           ))}
           {objects.length === 0 ? (
@@ -219,24 +224,28 @@ export function LiveMapObjectEditor() {
                   editingKey === object.objectKey ? 'border-primary bg-brand-primary/5' : 'border-border'
                 }`}
               >
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   data-testid={`object-list-item-${object.objectKey}`}
-                  className="flex min-w-0 flex-1 flex-col items-start text-left"
+                  className="flex h-auto min-w-0 flex-1 flex-col items-start justify-start gap-0 px-0 text-left"
                   onClick={() => loadObject(object)}
                 >
                   <span className="w-full truncate text-xs font-semibold text-foreground">{object.objectName}</span>
                   <span className="text-[10px] text-muted-foreground">{object.objectKind}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   data-testid={`object-list-delete-${object.objectKey}`}
                   className="text-danger"
                   aria-label={t('livemap.builder.deleteObject', { name: object.objectName })}
                   onClick={() => deleteObject.mutate(object.objectKey)}
                 >
                   <Trash2 className="size-3.5" />
-                </button>
+                </Button>
               </div>
             ))
           )}
@@ -265,21 +274,23 @@ export function LiveMapObjectEditor() {
             </span>
           </div>
           <div className="flex items-center gap-1 rounded-md border border-border p-0.5" role="group" aria-label={t('livemap.builder.addShape')}>
-            <button type="button" data-testid="object-editor-add-box" title={t('livemap.builder.addBox')} aria-label={t('livemap.builder.addBox')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
+            <Button type="button" variant="ghost" size="sm" data-testid="object-editor-add-box" title={t('livemap.builder.addBox')} aria-label={t('livemap.builder.addBox')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('box')}>
               <Box className="size-4" />
-            </button>
-            <button type="button" data-testid="object-editor-add-cylinder" title={t('livemap.builder.addCylinder')} aria-label={t('livemap.builder.addCylinder')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
+            </Button>
+            <Button type="button" variant="ghost" size="sm" data-testid="object-editor-add-cylinder" title={t('livemap.builder.addCylinder')} aria-label={t('livemap.builder.addCylinder')} className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => addPrim('cylinder')}>
               <Cylinder className="size-4" />
-            </button>
+            </Button>
           </div>
-          <button
+          <Button
             type="button"
+            variant="default"
+            size="sm"
             data-testid="object-editor-save"
             className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
             onClick={handleSave}
           >
             {editingKey != null ? t('livemap.builder.update') : t('livemap.builder.save')}
-          </button>
+          </Button>
           <span className="text-xs text-muted-foreground">
             {t('livemap.builder.shapesLabel')} <span data-testid="object-editor-prim-count">{prims.length}</span>
           </span>
@@ -307,9 +318,9 @@ export function LiveMapObjectEditor() {
                     className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent p-0"
                   />
                 </label>
-                <button type="button" className="ml-auto text-danger" aria-label={t('livemap.builder.removeShape')} onClick={() => removePrim(prim.id)}>
+                <Button type="button" variant="ghost" size="sm" className="ml-auto text-danger" aria-label={t('livemap.builder.removeShape')} onClick={() => removePrim(prim.id)}>
                   <Trash2 className="size-4" />
-                </button>
+                </Button>
               </div>
             ))
           )}

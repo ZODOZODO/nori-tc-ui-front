@@ -258,8 +258,10 @@ export function LiveMapPage() {
             </Button>
             {canViewLayout ? (
               <div className="inline-flex rounded-pill border border-border bg-card p-1 shadow-soft-sm">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   data-testid="live-map-mode-viewer"
                   aria-pressed={isViewerMode}
                   onClick={() => setViewMode('viewer')}
@@ -270,9 +272,11 @@ export function LiveMapPage() {
                   }`}
                 >
                   {t('livemap.mode.viewer')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   data-testid="live-map-mode-3d"
                   aria-pressed={isScene3dMode}
                   onClick={() => setViewMode('scene3d')}
@@ -283,11 +287,13 @@ export function LiveMapPage() {
                   }`}
                 >
                   3D
-                </button>
+                </Button>
                 {/* 구조물 편집(builder)은 WRITE 권한자 전용 — READ 만 있는 사용자는 3D 읽기만 가능. */}
                 {canEdit ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     data-testid="live-map-mode-builder"
                     aria-pressed={isBuilderMode}
                     onClick={() => setViewMode('builder')}
@@ -298,7 +304,7 @@ export function LiveMapPage() {
                     }`}
                   >
                     {t('livemap.mode.builder')}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : null}

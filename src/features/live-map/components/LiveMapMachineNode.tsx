@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import {
   LIVE_MAP_PORT_STATUS_CLASS,
@@ -30,17 +31,19 @@ export function LiveMapMachineNode({
   const variant = LIVE_MAP_STATUS_CLASS[status]
 
   return (
-    <button
+    <Button
       type="button"
+      variant="default"
+      size="sm"
       onClick={() => onSelect(eqpId)}
       data-testid={`live-map-node-${eqpId}`}
       aria-label={`${eqpId} ${t('livemap.node.selectSuffix')}`}
       aria-pressed={selected}
       disabled={dimmed}
       title={eqpId}
-      className={`flex w-full min-w-0 flex-col gap-1 rounded-[7px] border px-2 py-1.5 text-left transition-colors ${
+      className={`flex h-auto w-full min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-[7px] border px-2 py-1.5 text-left text-foreground transition-colors ${
         selected
-          ? 'border-brand-primary bg-brand-primary/5 ring-1 ring-brand-primary/30'
+          ? 'border-brand-primary bg-brand-primary/5 ring-1 ring-brand-primary/30 hover:bg-brand-primary/5'
           : 'border-border bg-card hover:bg-muted/60'
       } ${dimmed ? 'opacity-30' : ''}`}
     >
@@ -64,6 +67,6 @@ export function LiveMapMachineNode({
           ))}
         </span>
       ) : null}
-    </button>
+    </Button>
   )
 }

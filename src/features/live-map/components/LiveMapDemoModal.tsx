@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRight, Beaker, ChevronRight, CircleStop, Cpu, Play, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SELECT_EMPTY_VALUE,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -80,23 +89,12 @@ interface TriStateCheckboxProps {
 }
 
 function TriStateCheckbox({ state, ariaLabel, onChange }: TriStateCheckboxProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.indeterminate = state === 'indeterminate'
-    }
-  }, [state])
-
   return (
-    <input
-      ref={inputRef}
-      type="checkbox"
-      checked={state === 'checked'}
-      onChange={onChange}
+    <Checkbox
+      checked={state === 'indeterminate' ? 'indeterminate' : state === 'checked'}
+      onCheckedChange={() => onChange()}
       onClick={(event) => event.stopPropagation()}
       aria-label={ariaLabel}
-      className="size-4 shrink-0 cursor-pointer rounded border-input accent-brand-primary"
     />
   )
 }
@@ -467,12 +465,10 @@ export function LiveMapDemoModal({
                     : nodeStyle
                 }`}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isChecked}
-                  onChange={() => node.eqpId && handleToggleEquipment(node.eqpId)}
+                  onCheckedChange={() => node.eqpId && handleToggleEquipment(node.eqpId)}
                   aria-label={`${node.label} ${t('livemap.node.selectSuffix')}`}
-                  className="size-4 shrink-0 cursor-pointer rounded border-input accent-brand-primary"
                 />
                 <Cpu className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="flex-1 truncate text-sm font-medium">{node.label}</span>
@@ -495,8 +491,10 @@ export function LiveMapDemoModal({
         <div key={node.id} className="space-y-2">
           <div className="flex items-center gap-2" style={{ marginLeft: `${depth * 16}px` }}>
             {hasChildren ? (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => handleToggleExpanded(node.id)}
                 disabled={isSearchActive}
                 className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
@@ -509,7 +507,7 @@ export function LiveMapDemoModal({
                 <ChevronRight
                   className={`size-4 transition-transform ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
                 />
-              </button>
+              </Button>
             ) : (
               <span className="size-5 shrink-0" aria-hidden="true" />
             )}
@@ -700,14 +698,16 @@ export function LiveMapDemoModal({
                   width: '4.375rem',
                   render: (targetEquipment) => (
                     <div className="flex justify-center">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleRemoveTargetEquipment(targetEquipment.eqpId)}
                         className="inline-flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-danger hover:bg-danger/10 hover:text-danger"
                         aria-label={`${targetEquipment.eqpId} ${t('livemap.demo.colDelete')}`}
                       >
                         <Trash2 className="size-4" />
-                      </button>
+                      </Button>
                     </div>
                   ),
                 }}
@@ -734,18 +734,20 @@ export function LiveMapDemoModal({
                   <div className="flex items-center gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       {DEMO_TEST_TYPES.map((testType) => (
-                        <button
+                        <Button
                           key={testType}
                           type="button"
+                          variant="default"
+                          size="sm"
                           onClick={() => setSelectedTestType(testType)}
                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                             selectedTestType === testType
-                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                              : 'border-border bg-card text-muted-foreground hover:border-brand-primary/40'
+                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/10'
+                              : 'border-border bg-card text-muted-foreground hover:border-brand-primary/40 hover:bg-card'
                           }`}
                         >
                           {t(TEST_TYPE_I18N_KEY[testType])}
-                        </button>
+                        </Button>
                       ))}
                     </div>
 
@@ -766,27 +768,33 @@ export function LiveMapDemoModal({
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <select
-                      value={effectiveSelectedScenarioId}
-                      onChange={(event) => setSelectedScenarioId(event.target.value)}
-                      className="h-10 min-w-65 rounded-[14px] border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-brand-primary"
+                    <Select
+                      value={effectiveSelectedScenarioId === '' ? SELECT_EMPTY_VALUE : effectiveSelectedScenarioId}
+                      onValueChange={(next) => setSelectedScenarioId(next === SELECT_EMPTY_VALUE ? '' : next)}
                       disabled={isScenarioLoading || scenarioOptions.length === 0}
                     >
-                      {scenarioOptions.length === 0 ? (
-                        <option value="">{t('livemap.demo.scenarioEmpty')}</option>
-                      ) : null}
-                      {scenarioOptions.map((scenarioOption) => (
-                        <option
-                          key={`${scenarioOption.scenarioId}:${scenarioOption.version}`}
-                          value={scenarioOption.scenarioId}
-                        >
-                          {scenarioOption.name} (v{scenarioOption.version})
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="h-10 w-auto min-w-65 rounded-[14px] border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-brand-primary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scenarioOptions.length === 0 ? (
+                          <SelectItem value={SELECT_EMPTY_VALUE}>{t('livemap.demo.scenarioEmpty')}</SelectItem>
+                        ) : null}
+                        {scenarioOptions.map((scenarioOption) => (
+                          <SelectItem
+                            key={`${scenarioOption.scenarioId}:${scenarioOption.version}`}
+                            value={scenarioOption.scenarioId}
+                          >
+                            {scenarioOption.name} (v{scenarioOption.version})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                    <button
+                    <Button
                       type="button"
+                      variant="default"
+                      size="sm"
                       onClick={() => {
                         // 새로고침 시작 시 이전 메시지를 정리하고, 완료 시 실패 메시지를 반영한다.
                         setStartMessage(null)
@@ -798,7 +806,7 @@ export function LiveMapDemoModal({
                       title={t('livemap.demo.refreshTitle')}
                     >
                       <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
+                    </Button>
 
                     {/* 시나리오 업로드(R-8) — hidden file input 을 업로드 버튼이 트리거. 권한 무관(업로드는 기존 WRITE). */}
                     <input
@@ -813,8 +821,10 @@ export function LiveMapDemoModal({
                         event.target.value = ''
                       }}
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="default"
+                      size="sm"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isScenarioMutating}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-card text-muted-foreground transition hover:border-brand-primary/40 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
@@ -823,12 +833,14 @@ export function LiveMapDemoModal({
                       data-testid="scenario-upload-button"
                     >
                       <Upload className="size-4" />
-                    </button>
+                    </Button>
 
                     {/* 시나리오 삭제(R-8) — 삭제 권한 미보유 시 비표시, 시드 시나리오는 비활성(SEED_PROTECTED). */}
                     {canDeleteScenario ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="default"
+                        size="sm"
                         onClick={() => {
                           void handleDeleteSelectedScenario()
                         }}
@@ -843,7 +855,7 @@ export function LiveMapDemoModal({
                         data-testid="scenario-delete-button"
                       >
                         <Trash2 className="size-4" />
-                      </button>
+                      </Button>
                     ) : null}
 
                     <Button
@@ -892,11 +904,13 @@ export function LiveMapDemoModal({
                       <div
                         className={`flex items-center ${isRunExpanded ? 'border-b border-border' : ''}`}
                       >
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleToggleRunGroup(group.runId)}
                         aria-expanded={isRunExpanded}
-                        className="flex flex-1 flex-wrap items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/40"
+                        className="flex h-auto flex-1 flex-wrap items-center justify-start gap-2 whitespace-normal rounded-none px-4 py-3 text-left transition hover:bg-muted/40"
                       >
                         <ChevronRight
                           className={`size-4 shrink-0 text-muted-foreground transition-transform ${
@@ -913,9 +927,11 @@ export function LiveMapDemoModal({
                         <Badge variant="outline">
                           {group.completedCount}/{group.totalCount}
                         </Badge>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           void handleStopRun(group.runId)
                         }}
@@ -925,7 +941,7 @@ export function LiveMapDemoModal({
                       >
                         <CircleStop className="size-4" />
                         {t('livemap.demo.stopRunAllLabel')}
-                      </button>
+                      </Button>
                       </div>
                       {isRunExpanded ? (
                       <SelectableTable<SimulatorRunTarget>
@@ -937,8 +953,10 @@ export function LiveMapDemoModal({
                           width: '4.375rem',
                           render: (target) => (
                             <div className="flex justify-center">
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   void handleStopTarget(group.runId, target.eqpId)
                                 }}
@@ -951,7 +969,7 @@ export function LiveMapDemoModal({
                                 aria-label={`${target.eqpId} ${t('livemap.demo.colEnd')}`}
                               >
                                 <CircleStop className="size-5" />
-                              </button>
+                              </Button>
                             </div>
                           ),
                         }}

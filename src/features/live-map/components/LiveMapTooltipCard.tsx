@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
 import {
   LIVE_MAP_PORT_STATUS_CLASS,
@@ -49,14 +50,16 @@ export function LiveMapTooltipCard({ equipment, onClose }: LiveMapTooltipCardPro
         <span className="text-[11px] font-bold tracking-[0.08em] text-muted-foreground">
           {t('livemap.detail.selectedLabel')}
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={onClose}
           aria-label={t('livemap.detail.close')}
           className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <X className="size-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="mt-1 flex items-center justify-between gap-3">

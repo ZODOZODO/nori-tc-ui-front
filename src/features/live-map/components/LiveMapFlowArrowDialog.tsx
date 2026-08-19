@@ -130,8 +130,10 @@ export function LiveMapFlowArrowDialog({
               {t('livemap.flow.arrowColor')}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setColor(null)}
                 aria-pressed={color === null}
                 className={`flex h-7 items-center rounded-pill border px-2.5 text-[11px] font-bold transition-colors ${
@@ -141,11 +143,13 @@ export function LiveMapFlowArrowDialog({
                 }`}
               >
                 {t('livemap.flow.colorNone')}
-              </button>
+              </Button>
               {ARROW_COLOR_PRESETS.map((preset) => (
-                <button
+                <Button
                   key={preset}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setColor(preset)}
                   aria-label={preset}
                   aria-pressed={color === preset}
@@ -164,9 +168,11 @@ export function LiveMapFlowArrowDialog({
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {ARROW_WIDTH_PRESETS.map((preset) => (
-                <button
+                <Button
                   key={preset}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setStrokeWidth(preset)}
                   aria-pressed={strokeWidth === preset}
                   data-testid={`live-map-flow-arrow-width-${preset}`}
@@ -180,7 +186,7 @@ export function LiveMapFlowArrowDialog({
                     className="w-7 rounded-full bg-foreground"
                     style={{ height: preset }}
                   />
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -191,9 +197,11 @@ export function LiveMapFlowArrowDialog({
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {ARROW_DASH_OPTIONS.map((option) => (
-                <button
+                <Button
                   key={option.value}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setDash(option.value)}
                   aria-pressed={dash === option.value}
                   data-testid={`live-map-flow-arrow-dash-${option.value}`}
@@ -204,7 +212,7 @@ export function LiveMapFlowArrowDialog({
                   }`}
                 >
                   {t(option.labelKey)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

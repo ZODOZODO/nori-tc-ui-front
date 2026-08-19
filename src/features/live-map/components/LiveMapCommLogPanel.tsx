@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -58,10 +59,12 @@ function ClickableLogRow({
 }) {
   const isRecv = entry.direction === 'RECV'
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => onSelect(entry)}
-      className="flex w-full cursor-pointer gap-3 border-b border-border px-4 py-2 text-left text-[12px] transition hover:bg-muted focus:bg-muted focus:outline-none"
+      className="flex w-full cursor-pointer justify-start gap-3 rounded-none border-x-0 border-t-0 border-b border-border px-4 py-2 text-left text-[12px] transition hover:bg-muted focus:bg-muted focus:outline-none"
     >
       <span className="w-24 shrink-0 font-mono text-muted-foreground">
         {formatTime(entry.timestampMs)}
@@ -77,7 +80,7 @@ function ClickableLogRow({
         {entry.messageName ?? '-'}
       </span>
       <span className="min-w-0 flex-1 truncate text-muted-foreground">{entry.payload ?? ''}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -229,13 +232,15 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
             <span className="text-[9px] text-muted-foreground">{t('livemap.commlog.syncing')}</span>
           )}
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => setIsListOpen(true)}
           className="text-[10px] font-semibold text-brand-primary transition-colors hover:text-brand-primary/80"
         >
           {t('livemap.commlog.more')}
-        </button>
+        </Button>
       </div>
 
       <div
@@ -252,10 +257,12 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
               const isRecv = entry.direction === 'RECV'
               return (
                 <li key={`${entry.timestampMs}-${idx}`}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setSelectedEntry(entry)}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted focus:bg-muted focus:outline-none"
+                    className="flex w-full items-center justify-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted focus:bg-muted focus:outline-none"
                   >
                     <span className={`size-1.5 shrink-0 rounded-full ${directionDotClass(isRecv)}`} />
                     <span className="w-10 shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -264,7 +271,7 @@ export function LiveMapCommLogPanel({ eqpId }: LiveMapCommLogPanelProps) {
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
                       {entry.messageName ?? entry.payload ?? '-'}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               )
             })}
