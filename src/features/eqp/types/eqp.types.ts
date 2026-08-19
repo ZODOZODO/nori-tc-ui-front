@@ -1,6 +1,5 @@
-import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
+import type { ApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
-import i18n from '@/i18n'
 
 export type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
@@ -434,52 +433,6 @@ export interface EqpParamRow {
   paramName: string
   paramValue: string
   description: string
-}
-
-/**
- * 실패 응답 payload 최소 타입입니다.
- */
-export type EqpFailResponse = ApiResponse<null> & {
-  success: false
-  data: null
-  errorCode: string
-  errorMsg: string
-}
-
-/**
- * EQP API 계층 공통 기본 오류 메시지입니다.
- * 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
- */
-export const defaultEqpErrorMessage = (): string => i18n.t('error.eqp.default')
-
-/**
- * 알 수 없는 실패 payload를 EqpFailResponse 형태로 정규화합니다.
- */
-export const createEqpFailResponse = (
-  payload: unknown,
-  fallbackMessage = defaultEqpErrorMessage(),
-): EqpFailResponse => {
-  if (isApiResponse(payload) && payload.success === false) {
-    return {
-      success: false,
-      data: null,
-      errorCode:
-        typeof payload.errorCode === 'string' && payload.errorCode.length > 0
-          ? payload.errorCode
-          : 'UNKNOWN_ERROR',
-      errorMsg:
-        typeof payload.errorMsg === 'string' && payload.errorMsg.length > 0
-          ? payload.errorMsg
-          : fallbackMessage,
-    }
-  }
-
-  return {
-    success: false,
-    data: null,
-    errorCode: 'UNKNOWN_ERROR',
-    errorMsg: fallbackMessage,
-  }
 }
 
 // =========================================================================

@@ -4,14 +4,12 @@ import { apiClient } from '@/shared/lib/api-client'
 import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import {
   defaultAuthErrorMessage,
-  createLoginFailResponse,
   isLoginSuccessResponse,
-  type LoginFailResponse,
   type LoginRequest,
   type LoginResponse,
   type LoginSuccessResponse,
 } from '../types/auth.types'
-import { ApiError } from '@/shared/lib/api-error'
+import { ApiError, createFailResponse, type ApiFailResponse } from '@/shared/lib/api-error'
 
 // 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
 const defaultLogoutErrorMessage = () => i18n.t('error.auth.logout')
@@ -26,7 +24,7 @@ type CsrfRequestPurpose = 'login' | 'logout'
 /**
  * 403 Forbidden 응답을 요청 문맥별 사용자 안내 메시지로 변환합니다.
  */
-const buildForbiddenAuthResponse = (context: AuthErrorContext): LoginFailResponse => {
+const buildForbiddenAuthResponse = (context: AuthErrorContext): ApiFailResponse => {
   switch (context) {
     case 'login-csrf':
       return {
@@ -69,12 +67,12 @@ const createContextualAuthFailResponse = (
   status: number | undefined,
   fallbackMessage: string,
   context: AuthErrorContext
-): LoginFailResponse => {
+): ApiFailResponse => {
   if (status === 403) {
     return buildForbiddenAuthResponse(context)
   }
 
-  return createLoginFailResponse(payload, fallbackMessage)
+  return createFailResponse(payload, fallbackMessage)
 }
 
 /**

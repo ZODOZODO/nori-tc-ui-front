@@ -1,10 +1,9 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { ApiError, assertSuccessResponse, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
   type ApiResponse,
-  createModelFailResponse,
   type ModelBranchCreateRequest,
   type ModelDeleteBatchResult,
   type ModelDeleteBatchResponse,
@@ -74,7 +73,7 @@ const normalizeModelListPayload = (
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createModelFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -131,7 +130,7 @@ const normalizeModelNodeDetailPayload = (
 ): ModelNodeDetailData => {
   if (!isRecord(payload)) {
     throw new ApiError(
-      createModelFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -181,7 +180,7 @@ export const modelApi = {
         withCredentials: true,
       })
 
-      const successPayload = resolveSuccessPayload<unknown>(
+      const successPayload = resolveSuccessPayload(
         response.data,
         response.status,
         modelListFallbackMessage(),

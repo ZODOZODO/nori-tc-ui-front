@@ -1,9 +1,8 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { ApiError, assertSuccessResponse, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
-  createEqpFailResponse,
   type AsyncAcceptResponse,
   type AsyncResultData,
   type AsyncResultResponse,
@@ -83,7 +82,7 @@ const normalizeEqpListPayload = (
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createEqpFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -122,7 +121,7 @@ export const eqpApi = {
         withCredentials: true,
       })
 
-      const successPayload = resolveSuccessPayload<unknown>(
+      const successPayload = resolveSuccessPayload(
         response.data,
         response.status,
         eqpListFallbackMessage(),
@@ -147,7 +146,7 @@ export const eqpApi = {
         },
       )
 
-      const payload = resolveSuccessPayload<unknown>(
+      const payload = resolveSuccessPayload(
         response.data,
         response.status,
         i18n.t('error.eqp.shardLeases'),
@@ -155,7 +154,7 @@ export const eqpApi = {
 
       if (!Array.isArray(payload)) {
         throw new ApiError(
-          createEqpFailResponse(
+          createFailResponse(
             {
               success: false,
               data: null,
@@ -448,11 +447,7 @@ export const eqpApi = {
         ),
       )
 
-      resolveSuccessPayload<null>(
-        response.data,
-        response.status,
-        i18n.t('error.eqp.undoCheckout'),
-      )
+      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.undoCheckout'))
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.undoCheckout'))
     }
@@ -570,12 +565,12 @@ export const eqpApi = {
 
       if (!payload.traceId) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
             errorMsg: i18n.t('error.eqp.startNoTraceId'),
-          }),
+          }, i18n.t('error.eqp.startNoTraceId')),
           response.status,
         )
       }
@@ -609,12 +604,12 @@ export const eqpApi = {
 
       if (!payload.traceId) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
             errorMsg: i18n.t('error.eqp.endNoTraceId'),
-          }),
+          }, i18n.t('error.eqp.endNoTraceId')),
           response.status,
         )
       }
@@ -651,12 +646,12 @@ export const eqpApi = {
 
       if (!payload.traceId) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
             errorMsg: i18n.t('error.eqp.endNoTraceId'),
-          }),
+          }, i18n.t('error.eqp.endNoTraceId')),
           response.status,
         )
       }
@@ -695,12 +690,12 @@ export const eqpApi = {
 
       if (!payload.traceId) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
             errorMsg: i18n.t('error.eqp.pollingGroupNoTraceId'),
-          }),
+          }, i18n.t('error.eqp.pollingGroupNoTraceId')),
           response.status,
         )
       }
@@ -738,12 +733,12 @@ export const eqpApi = {
 
       if (!payload.traceId) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'INVALID_RESPONSE',
             errorMsg: i18n.t('error.eqp.pollingGroupNoTraceId'),
-          }),
+          }, i18n.t('error.eqp.pollingGroupNoTraceId')),
           response.status,
         )
       }
@@ -767,12 +762,12 @@ export const eqpApi = {
 
       if (response.status === 404) {
         throw new ApiError(
-          createEqpFailResponse({
+          createFailResponse({
             success: false,
             data: null,
             errorCode: 'NOT_FOUND',
             errorMsg: i18n.t('error.eqp.asyncNotFound'),
-          }),
+          }, i18n.t('error.eqp.asyncNotFound')),
           404,
         )
       }

@@ -1,7 +1,6 @@
 import i18n from '@/i18n'
-import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { ApiError, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import type {
   DeployCreateRequest,
@@ -38,13 +37,6 @@ const fallbackRedeployError = () => i18n.t('error.deploy.redeploy')
 const fallbackDeleteError = () => i18n.t('error.deploy.delete')
 const fallbackScenarioError = () => i18n.t('error.deploy.scenarios')
 const fallbackScenarioPreviewError = () => i18n.t('error.deploy.scenarioPreview')
-
-type DeployFailResponse = ApiResponse<null> & {
-  success: false
-  data: null
-  errorCode: string
-  errorMsg: string
-}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -105,33 +97,6 @@ const isDeployExecutionPolicy = (
   DEPLOY_EXECUTION_POLICY_VALUES.includes(
     value as (typeof DEPLOY_EXECUTION_POLICY_VALUES)[number],
   )
-
-const createDeployFailResponse = (
-  payload: unknown,
-  fallbackMessage = fallbackRegisterTargetsError(),
-): DeployFailResponse => {
-  if (isApiResponse(payload) && payload.success === false) {
-    return {
-      success: false,
-      data: null,
-      errorCode:
-        typeof payload.errorCode === 'string' && payload.errorCode.length > 0
-          ? payload.errorCode
-          : 'UNKNOWN_ERROR',
-      errorMsg:
-        typeof payload.errorMsg === 'string' && payload.errorMsg.length > 0
-          ? payload.errorMsg
-          : fallbackMessage,
-    }
-  }
-
-  return {
-    success: false,
-    data: null,
-    errorCode: 'UNKNOWN_ERROR',
-    errorMsg: fallbackMessage,
-  }
-}
 
 const isDeployRegisterTargetItem = (value: unknown): value is DeployRegisterTargetItem =>
   isRecord(value) &&
@@ -309,7 +274,7 @@ const normalizeRegisterTargetPage = (
   requestedLimit: number,
 ): DeployRegisterTargetPage => {
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
-    throw new ApiError(createDeployFailResponse(payload))
+    throw new ApiError(createFailResponse(payload, fallbackRegisterTargetsError()))
   }
 
   const items = payload.items
@@ -334,7 +299,7 @@ const normalizeDeployHistoryPage = (
 ): DeployHistoryPage => {
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createDeployFailResponse(payload, fallbackHistoryError()),
+      createFailResponse(payload, fallbackHistoryError()),
     )
   }
 
@@ -359,7 +324,7 @@ const normalizeDeployTargetPage = (
   requestedSize: number,
 ): DeployTargetPage => {
   if (!isRecord(payload) || !Array.isArray(payload.targets)) {
-    throw new ApiError(createDeployFailResponse(payload, fallbackTargetsError()))
+    throw new ApiError(createFailResponse(payload, fallbackTargetsError()))
   }
 
   return {
@@ -382,7 +347,7 @@ const normalizeDeployActionResult = (
   fallbackMessage = fallbackCancelError(),
 ): DeployActionResult => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number') {
-    throw new ApiError(createDeployFailResponse(payload, fallbackMessage))
+    throw new ApiError(createFailResponse(payload, fallbackMessage))
   }
 
   return {
@@ -407,7 +372,7 @@ const normalizeDeployActionResult = (
 
 const normalizeDeploySummary = (payload: unknown): DeploySummary => {
   if (!isRecord(payload) || typeof payload.deployKey !== 'number' || typeof payload.deployName !== 'string') {
-    throw new ApiError(createDeployFailResponse(payload, fallbackSummaryError()))
+    throw new ApiError(createFailResponse(payload, fallbackSummaryError()))
   }
 
   return {
@@ -496,7 +461,7 @@ const normalizeDeploySummary = (payload: unknown): DeploySummary => {
 
 const normalizeDeployScenarioCatalog = (payload: unknown): DeployScenarioCatalogResponse => {
   if (!isRecord(payload) || !Array.isArray(payload.scenarios) || typeof payload.scenarioCount !== 'number') {
-    throw new ApiError(createDeployFailResponse(payload, fallbackScenarioError()))
+    throw new ApiError(createFailResponse(payload, fallbackScenarioError()))
   }
 
   const scenarios = payload.scenarios.filter(isDeployScenarioSummary)
@@ -523,7 +488,7 @@ const normalizeDeployRegisterScenarioPreview = (
     !Array.isArray(payload.scenarios)
   ) {
     throw new ApiError(
-      createDeployFailResponse(payload, fallbackScenarioPreviewError()),
+      createFailResponse(payload, fallbackScenarioPreviewError()),
     )
   }
 
@@ -562,7 +527,7 @@ export const deployApi = {
       })
 
       return normalizeRegisterTargetPage(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackRegisterTargetsError(),
@@ -610,7 +575,7 @@ export const deployApi = {
       )
 
       return normalizeDeployActionResult(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackStartError(),
@@ -635,7 +600,7 @@ export const deployApi = {
       )
 
       return normalizeDeployActionResult(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackHoldError(),
@@ -660,7 +625,7 @@ export const deployApi = {
       )
 
       return normalizeDeployActionResult(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackCancelError(),
@@ -707,7 +672,7 @@ export const deployApi = {
       )
 
       return normalizeDeployActionResult(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackDeleteError(),
@@ -727,7 +692,7 @@ export const deployApi = {
       })
 
       return normalizeDeployScenarioCatalog(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackScenarioError(),
@@ -753,7 +718,7 @@ export const deployApi = {
       )
 
       return normalizeDeployRegisterScenarioPreview(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackScenarioPreviewError(),
@@ -785,7 +750,7 @@ export const deployApi = {
       })
 
       return normalizeDeployHistoryPage(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackHistoryError(),
@@ -805,7 +770,7 @@ export const deployApi = {
       })
 
       return normalizeDeploySummary(
-        resolveSuccessPayload<unknown>(response.data, response.status, fallbackSummaryError()),
+        resolveSuccessPayload(response.data, response.status, fallbackSummaryError()),
       )
     } catch (error) {
       throw normalizeApiError(error, fallbackSummaryError())
@@ -831,7 +796,7 @@ export const deployApi = {
       })
 
       return normalizeDeployTargetPage(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           fallbackTargetsError(),

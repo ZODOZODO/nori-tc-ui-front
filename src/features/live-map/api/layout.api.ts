@@ -1,6 +1,6 @@
 import type { ApiResponse } from '@/shared/types/api.types'
 import { apiClient } from '@/shared/lib/api-client'
-import { normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import type {
   CanvasJson,
@@ -121,10 +121,14 @@ export const layoutApi = {
   deleteObject: async (objectKey: number): Promise<void> => {
     try {
       const csrfToken = await issueCsrfToken()
-      await apiClient.delete<ApiResponse<null>>(`/live-map/layout/objects/${objectKey}`, {
-        withCredentials: true,
-        headers: { [CSRF_HEADER_NAME]: csrfToken },
-      })
+      const response = await apiClient.delete<ApiResponse<null>>(
+        `/live-map/layout/objects/${objectKey}`,
+        {
+          withCredentials: true,
+          headers: { [CSRF_HEADER_NAME]: csrfToken },
+        },
+      )
+      assertSuccessResponse(response.data, response.status, failMessage)
     } catch (error) {
       throw normalizeApiError(error, failMessage)
     }

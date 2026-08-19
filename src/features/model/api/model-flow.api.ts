@@ -1,9 +1,8 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
-  createModelFailResponse,
   type ApiResponse,
   type ModelFlow,
   type ModelFlowCreateRequest,
@@ -14,7 +13,6 @@ import {
   type ModelFlowListResponse,
   type ModelFlowUpdateRequest,
 } from '../types/model.types'
-import { isApiResponse } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const flowListFallbackMessage = (): string => i18n.t('error.model.flowList')
@@ -142,12 +140,7 @@ export const modelFlowApi = {
         ),
       )
 
-      if (!isApiResponse(response.data) || response.data.success !== true) {
-        throw new ApiError(
-          createModelFailResponse(response.data, flowDeleteFallbackMessage()),
-          response.status,
-        )
-      }
+      assertSuccessResponse(response.data, response.status, flowDeleteFallbackMessage())
     } catch (error) {
       throw normalizeApiError(error, flowDeleteFallbackMessage())
     }

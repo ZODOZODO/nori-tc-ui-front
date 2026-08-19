@@ -17,7 +17,7 @@ interface UpdateFlowVariables {
  * - create: 신규 Flow 생성 후 목록 캐시 무효화
  * - update: 4 섹션 갱신 후 목록 + 해당 flowDetail 캐시 무효화
  *
- * 400 / 404 / 409 에러는 ModelApiError 형태로 그대로 호출자에 전파하여
+ * 400 / 404 / 409 에러는 ApiError 형태로 그대로 호출자에 전파하여
  * 화면에서 inline 메시지로 표시할 수 있도록 합니다.
  */
 export function useModelFlowMutations(modelVersionKey: number | null) {

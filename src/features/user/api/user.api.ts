@@ -1,9 +1,8 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { ApiError, assertSuccessResponse, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
-  createUserFailResponse,
   type UserCreateRequest,
   type UserCreateResponse,
   type UserDeleteResponse,
@@ -64,7 +63,7 @@ const normalizeUserPagePayload = (
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createUserFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -116,7 +115,7 @@ export const userApi = {
       })
 
       return normalizeUserPagePayload(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           userListFallbackMessage(),

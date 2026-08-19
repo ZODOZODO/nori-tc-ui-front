@@ -1,4 +1,5 @@
 import i18n from '@/i18n'
+import { type ApiFailResponse } from '@/shared/lib/api-error'
 import { isApiResponse, isRecord, type ApiResponse } from '@/shared/types/api.types'
 
 /**
@@ -30,19 +31,9 @@ export type LoginSuccessResponse = ApiResponse<LoginSuccessData> & {
 }
 
 /**
- * 로그인 실패 응답 타입입니다.
- */
-export type LoginFailResponse = ApiResponse<null> & {
-  success: false
-  data: null
-  errorCode: string
-  errorMsg: string
-}
-
-/**
  * 로그인 API 응답 유니온 타입입니다.
  */
-export type LoginResponse = LoginSuccessResponse | LoginFailResponse
+export type LoginResponse = LoginSuccessResponse | ApiFailResponse
 
 /**
  * 서버에서 예측하지 못한 응답이 오거나 네트워크 오류가 발생했을 때
@@ -70,54 +61,5 @@ export const isLoginSuccessResponse = (value: unknown): value is LoginSuccessRes
     value.errorCode === null &&
     value.errorMsg === null
   )
-}
-
-/**
- * 로그인 실패 응답인지 확인합니다.
- */
-export const isLoginFailResponse = (value: unknown): value is LoginFailResponse => {
-  if (!isApiResponse(value) || value.success !== false) {
-    return false
-  }
-
-  return (
-    value.data === null && typeof value.errorCode === 'string' && typeof value.errorMsg === 'string'
-  )
-}
-
-/**
- * 어떤 입력이 와도 로그인 실패 응답 형태로 정규화합니다.
- * - 백엔드 실패 payload를 우선 사용
- * - 형식이 맞지 않으면 기본 코드/메시지로 보정
- */
-export const createLoginFailResponse = (
-  payload: unknown,
-  fallbackMessage = defaultAuthErrorMessage()
-): LoginFailResponse => {
-  if (isLoginFailResponse(payload)) {
-    return payload
-  }
-
-  if (isApiResponse(payload) && payload.success === false) {
-    return {
-      success: false,
-      data: null,
-      errorCode:
-        typeof payload.errorCode === 'string' && payload.errorCode.length > 0
-          ? payload.errorCode
-          : 'UNKNOWN_ERROR',
-      errorMsg:
-        typeof payload.errorMsg === 'string' && payload.errorMsg.length > 0
-          ? payload.errorMsg
-          : fallbackMessage,
-    }
-  }
-
-  return {
-    success: false,
-    data: null,
-    errorCode: 'UNKNOWN_ERROR',
-    errorMsg: fallbackMessage,
-  }
 }
 

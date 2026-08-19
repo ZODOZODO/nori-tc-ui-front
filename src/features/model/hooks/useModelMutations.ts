@@ -8,12 +8,11 @@ import {
   removeModelVersionQueries,
 } from '../lib/model-query-keys'
 import {
-  createModelFailResponse,
   type ModelInfo,
   type ModelPageResponse,
   type ModelUpsertRequest,
 } from '../types/model.types'
-import { ApiError } from '@/shared/lib/api-error'
+import { ApiError, createFailResponse } from '@/shared/lib/api-error'
 
 const EDIT_MODEL_VERSION = 'EDIT'
 
@@ -63,18 +62,24 @@ const resolveLockOwner = (model: ModelInfo): string | null => {
 /**
  * 다른 사용자가 EDIT 잠금을 점유한 경우를 표현하는 전용 에러를 생성합니다.
  */
-const createCheckoutConflictError = (owner: string | null): ApiError =>
-  new ApiError(
-    createModelFailResponse({
-      success: false,
-      data: null,
-      errorCode: 'CHECKOUT_CONFLICT',
-      errorMsg: owner
-        ? i18n.t('error.model.checkoutConflictBy', { owner })
-        : i18n.t('error.model.checkoutConflict'),
-    }),
+const createCheckoutConflictError = (owner: string | null): ApiError => {
+  const conflictMessage = owner
+    ? i18n.t('error.model.checkoutConflictBy', { owner })
+    : i18n.t('error.model.checkoutConflict')
+
+  return new ApiError(
+    createFailResponse(
+      {
+        success: false,
+        data: null,
+        errorCode: 'CHECKOUT_CONFLICT',
+        errorMsg: conflictMessage,
+      },
+      conflictMessage,
+    ),
     409,
   )
+}
 
 /**
  * Model 관련 mutation 훅 모음입니다.

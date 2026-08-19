@@ -1,5 +1,4 @@
-import i18n from '@/i18n'
-import { isApiResponse, type ApiResponse } from '@/shared/types/api.types'
+import type { ApiResponse } from '@/shared/types/api.types'
 
 /**
  * UserController GET /api/user/{userPk} 응답 payload 타입입니다.
@@ -112,51 +111,5 @@ export interface UserUpdateRequest {
 export interface UserPasswordResetRequest {
   newPassword: string
   updatedBy?: string | null
-}
-
-/**
- * User API 계층 공통 실패 응답 타입입니다.
- */
-export type UserFailResponse = ApiResponse<null> & {
-  success: false
-  data: null
-  errorCode: string
-  errorMsg: string
-}
-
-/**
- * User API 기본 오류 메시지입니다.
- * 모듈 로드 시점이 아닌 호출 시점에 평가해 현재 UI 언어를 따르도록 getter 로 둔다.
- */
-export const defaultUserErrorMessage = () => i18n.t('error.user.default')
-
-/**
- * 실패 payload 를 UserFailResponse 형태로 정규화합니다.
- */
-export const createUserFailResponse = (
-  payload: unknown,
-  fallbackMessage = defaultUserErrorMessage(),
-): UserFailResponse => {
-  if (isApiResponse(payload) && payload.success === false) {
-    return {
-      success: false,
-      data: null,
-      errorCode:
-        typeof payload.errorCode === 'string' && payload.errorCode.length > 0
-          ? payload.errorCode
-          : 'UNKNOWN_ERROR',
-      errorMsg:
-        typeof payload.errorMsg === 'string' && payload.errorMsg.length > 0
-          ? payload.errorMsg
-          : fallbackMessage,
-    }
-  }
-
-  return {
-    success: false,
-    data: null,
-    errorCode: 'UNKNOWN_ERROR',
-    errorMsg: fallbackMessage,
-  }
 }
 

@@ -1,5 +1,4 @@
-import i18n from '@/i18n'
-import { isApiResponse, type ApiResponse as BaseApiResponse } from '@/shared/types/api.types'
+import type { ApiResponse as BaseApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
 export type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
@@ -318,52 +317,6 @@ export const MODEL_DETAIL_NODE_LABELS: Record<ModelDetailNode, string> = {
   workflow: 'Flow',
   mdf: 'MDF',
   'dcop-itemes': 'Dcop Itemes',
-}
-
-/**
- * 실패 응답 payload 최소 타입입니다.
- */
-export type ModelFailResponse = ApiResponse<null> & {
-  success: false
-  data: null
-  errorCode: string
-  errorMsg: string
-}
-
-/**
- * Model API 계층 기본 오류 메시지입니다.
- * 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
- */
-export const defaultModelErrorMessage = (): string => i18n.t('error.model.default')
-
-/**
- * 알 수 없는 실패 payload를 ModelFailResponse 형태로 정규화합니다.
- */
-export const createModelFailResponse = (
-  payload: unknown,
-  fallbackMessage = defaultModelErrorMessage(),
-): ModelFailResponse => {
-  if (isApiResponse(payload) && payload.success === false) {
-    return {
-      success: false,
-      data: null,
-      errorCode:
-        typeof payload.errorCode === 'string' && payload.errorCode.length > 0
-          ? payload.errorCode
-          : 'UNKNOWN_ERROR',
-      errorMsg:
-        typeof payload.errorMsg === 'string' && payload.errorMsg.length > 0
-          ? payload.errorMsg
-          : fallbackMessage,
-    }
-  }
-
-  return {
-    success: false,
-    data: null,
-    errorCode: 'UNKNOWN_ERROR',
-    errorMsg: fallbackMessage,
-  }
 }
 
 /**

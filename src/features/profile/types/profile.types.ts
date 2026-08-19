@@ -1,8 +1,5 @@
 import type { ApiResponse } from '@/shared/types/api.types'
 import {
-  createUserFailResponse,
-  defaultUserErrorMessage,
-  type UserFailResponse,
   type UserInfo,
   type UserInfoResponse,
   type UserPage,
@@ -23,18 +20,6 @@ export interface MeInfo {
 }
 
 export type MeResponse = ApiResponse<MeInfo>
-
-/**
- * Profile API 기본 오류 메시지입니다. user 모듈의 메시지 getter 를 그대로 재사용합니다.
- */
-export const defaultProfileErrorMessage = defaultUserErrorMessage
-
-export type ProfileFailResponse = UserFailResponse
-
-export const createProfileFailResponse = (
-  payload: unknown,
-  fallbackMessage: string = defaultProfileErrorMessage(),
-): ProfileFailResponse => createUserFailResponse(payload, fallbackMessage)
 
 export type {
   UserInfo,

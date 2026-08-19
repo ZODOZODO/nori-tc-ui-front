@@ -1,9 +1,8 @@
 import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
-import { ApiError, assertSuccessResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
+import { ApiError, assertSuccessResponse, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
 import {
-  createGroupFailResponse,
   type GroupCreateResponse,
   type GroupDeleteResponse,
   type GroupInfo,
@@ -64,7 +63,7 @@ const normalizeGroupMemberPagePayload = (
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createGroupFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -102,7 +101,7 @@ const normalizeGroupPagePayload = (
 
   if (!isRecord(payload) || !Array.isArray(payload.items)) {
     throw new ApiError(
-      createGroupFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -157,7 +156,7 @@ const normalizePagedPayload = <TItem>(
 
   if (itemsSource === null) {
     throw new ApiError(
-      createGroupFailResponse(
+      createFailResponse(
         {
           success: false,
           data: null,
@@ -188,7 +187,7 @@ export const groupApi = {
       })
 
       return normalizeGroupPagePayload(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           groupListFallbackMessage(),
@@ -285,7 +284,7 @@ export const groupApi = {
       })
 
       return normalizeGroupMemberPagePayload(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           groupMemberListFallbackMessage(),
@@ -353,7 +352,7 @@ export const groupApi = {
       })
 
       return normalizePagedPayload<PermissionInfo>(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           permissionCatalogFallbackMessage(),
@@ -383,7 +382,7 @@ export const groupApi = {
       )
 
       return normalizePagedPayload<GroupPermissionMapping>(
-        resolveSuccessPayload<unknown>(
+        resolveSuccessPayload(
           response.data,
           response.status,
           groupPermissionListFallbackMessage(),
@@ -412,11 +411,7 @@ export const groupApi = {
         ),
       )
 
-      resolveSuccessPayload<GroupPermissionMapping>(
-        response.data,
-        response.status,
-        i18n.t('error.group.addPermission'),
-      )
+      assertSuccessResponse(response.data, response.status, i18n.t('error.group.addPermission'))
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.group.addPermission'))
     }

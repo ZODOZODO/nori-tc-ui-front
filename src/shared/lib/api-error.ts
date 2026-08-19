@@ -93,9 +93,14 @@ export const assertSuccessResponse = (
 }
 
 /**
- * 성공 응답의 data 를 꺼냅니다. 성공 형태가 아니면 ApiError 로 던집니다.
+ * 성공 응답의 data 를 꺼냅니다. 성공 형태가 아니거나 data 가 null 이면 ApiError 로 던집니다.
+ *
+ * `TData` 는 **nullable 일 수 없다**. `data: null` 이 정상인 응답(= `Promise<void>` 를 반환하는 API)에
+ * 이 함수를 쓰면 성공 응답마다 던지기 때문이다 — 그 경우는 {@link assertSuccessResponse} 를 쓴다.
+ * 제약을 걸어 두지 않았을 때 실제로 `resolveSuccessPayload<null>` 호출이 컴파일을 통과해
+ * `undoEqpCheckout` 이 성공을 실패로 보고하는 회귀가 있었다.
  */
-export const resolveSuccessPayload = <TData>(
+export const resolveSuccessPayload = <TData extends NonNullable<unknown>>(
   payload: unknown,
   status: number,
   fallbackMessage: string,
