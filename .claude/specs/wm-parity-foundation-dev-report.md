@@ -358,6 +358,8 @@
 | C14 | `5a9d497` | ui-front | 5개 — `model/modelDetailColumnDefs` · `model/ModelDetailPanel` · `model/ModelFlowSidebar` · `model/FlowFilterEditorModal` · `model/ActionDataIndexEditorModal` | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C15 | `1ed1512` | ui-front | 1개 — `live-map/components/LiveMap3DScene.tsx` (+ git 미추적 e2e 8파일) | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C16 | `2c26123` | ui-front | 9개 — `live-map/components/` 의 `LiveMapDemoModal` · `LiveMapObjectEditor` · `LiveMapFlowArrowDialog` · `LiveMapPage` · `LiveMapCommLogPanel` · `LiveMapBoard` · `LiveMapFlowGroupDialog` · `LiveMapTooltipCard` · `LiveMapMachineNode` (+ 스크린샷 4장, + git 미추적 e2e 2파일) | **AC4 AC5 AC6** + AC1 AC2 AC3 | ✅ 완료 |
+| C17 | (커밋 없음 — 게이트) `1859d83` 은 dev-report 갱신 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | (AC 없음 — R8/R9 판정) | ✅ 완료 |
+| C18 | (커밋 없음 — 게이트) 아래 dev-report 갱신 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | **AC16** + AC1 AC2 AC3 최종 | ✅ 완료 (AC16 은 `[~]` 부분) |
 
 ---
 
@@ -1034,6 +1036,101 @@ $ grep -n "deltaY" nori-tc-ui-front/src/components/ui/resizable-divider.tsx
 
 ---
 
+### C18 — 최종 게이트 (커밋 없는 게이트 · 코드 변경 0)
+
+측정 조건은 §1 과 동일하게 유지했다 — 백엔드 미기동(`netstat` 로 8080/3000 점유 0건 확인), 워커 4,
+`npx playwright test --reporter=list,json`. HEAD `1859d83`, 작업 트리 clean.
+
+**AC1 — `npm run build`**
+```
+dist/assets/react-vendor-VH1en6bk.js               228.56 kB │ gzip:  73.23 kB
+dist/assets/konva-vendor-Dp7wt_BH.js               312.33 kB │ gzip:  95.73 kB
+dist/assets/three-vendor-D0YZ_Sa2.js               906.27 kB │ gzip: 244.45 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+✓ built in 32.48s
+```
+
+**AC2 — `npm run lint`**
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+(에러/경고 0줄)
+
+**AC3 — `npm run test:unit`**
+```
+1..211
+# tests 211
+# suites 0
+# pass 211
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4868.8888
+```
+
+**AC16 — 전체 e2e 2회 실행 (동일 조건)**
+
+| 구분 | baseline (C0) | run1 | run2 |
+|---|---|---|---|
+| passed | 90 | **88** | **88** |
+| failed | 78 | 80 | 80 |
+| skipped | 14 | 14 (집합 동일) | 14 (집합 동일) |
+| 소요 | 16.1m | 18.2m | 16.8m |
+
+```
+  14 did not run
+  88 passed (18.2m)          ← run1
+
+  14 did not run
+  88 passed (16.8m)          ← run2
+```
+
+baseline PASS 90건 중 미통과 목록(§AC16 판정절차 1):
+
+| 실행 | 미통과 | 실패 형태 |
+|---|---|---|
+| run1 | `live-map-3d-eqp-autoplace :: gateway_app 자동 배치` · `live-map-3d-eqp-drag :: 뱃지로 끌면 설비가 이동한다` | 둘 다 **타임아웃**(120s/90s 한도인데 실측 4.0m/3.0m 소요). `GPU stall due to ReadPixels` · `ContextResult::kTransientFailure: Failed to send GpuControl.CreateCommandBuffer` |
+| run2 | `live-map-3d-eqp-drag :: …` · `live-map-3d-eqp-redrag :: 두 번 연속 끌면 두 번 다 이동한다` | 동일 타임아웃 형태(2.7m/3.0m) |
+
+- **미통과 집합이 실행마다 바뀐다** — autoplace 는 run1 만, redrag 는 run2 만 실패했다. 회귀라면 두 실행에서
+  같은 테스트가 실패해야 한다.
+- 새로 PASS 로 전환된 테스트 **0건**, baseline FAIL 이 아닌 신규 FAIL 은 위 3건이 전부, skipped 집합 동일.
+  즉 3D WebGL 스펙 외 영역의 변동은 **0**이다.
+- **격리 재실행 — `live-map-3d-*` 13 파일 전건 `--workers=1`**
+```
+  ok 15 live-map-3d-undo-counts.spec.ts:64:1 › 구조물 추가 → … Ctrl+Z 단계 복원 (5.7s)
+  ok 16 live-map-3d-undo-counts.spec.ts:116:1 › "표시" 카운트는 현재 보고 있는 층만 센다 (5.7s)
+  ok 17 live-map-3d-viewer.spec.ts:127:1 › 3D 모드가 layout 의 v2 객체를 … 렌더한다 (3.1s)
+
+  17 passed (2.9m)
+```
+  baseline PASS 에 속한 3D 테스트 16건이 전건 PASS 한다(문제의 3건 포함, 각 12~16s). 4 worker 에서 3~4분
+  걸리던 테스트가 격리 시 12초에 끝난다 = **GPU 경합에 의한 타임아웃**이지 동작 회귀가 아니다.
+
+**AC16 판정: `[~] 부분` — 동일 조건 단일 실행에서 88/90.** 규칙 1(baseline PASS 전건 통과)을 글자 그대로는
+충족하지 못한다. 미통과 2건은 매 실행 다른 3D WebGL 스펙이고 전부 GPU 경합 타임아웃이며 격리 실행에서
+전건 PASS 하지만, 글로벌 룰 14(부분 충족은 `[x]` 금지)에 따라 `[x]` 로 올리지 않는다.
+**나머지 88건 + baseline FAIL 78건 + skipped 14건은 baseline 과 완전히 동일하다.**
+
+**AC16 판정절차 3 — console/pageerror 단언이 없는 spec** (baseline PASS 44 파일 중 3 파일 / 18 테스트):
+
+| spec | baseline PASS 테스트 수 | 비고 |
+|---|---|---|
+| `dlq-page.spec.ts` | 7 | `page.on('console')` · `page.on('pageerror')` 리스너 없음 |
+| `user-page.spec.ts` | 10 | 동 |
+| `login-page.smoke.spec.ts` | 1 | 동 |
+
+나머지 41 파일은 직접 리스너를 달고 `expect` 로 단언하거나 `verify-ui/_shared` 의
+`attachObservers` + `expectClean` 을 쓴다 → 그 파일들은 spec PASS 가 곧 console/pageerror 0건이다.
+
+원본 산출물: `…/scratchpad/e2e-final{,2}.txt` · `e2e-final{,2}.json` · `e2e-final-3d-all-w1.txt`
+
+---
+
 ## 6. R8/R9 보류 사유
 
 **판정: 5건 전부 보류. 코드 변경 0.** SPEC R8/R9 가 "소비처가 이번 SPEC 범위에 없으면 이식 보류 +
@@ -1448,3 +1545,29 @@ SPEC Constraints 와 글로벌 룰 11(premature abstraction 금지)이 금지하
 - 다만 그 모달은 Parent Model / Source Description 읽기 전용 블록을 함께 렌더하므로 wm 의
   "이름 하나만 받는 창" 계약으로 대체할 수 없다. 결론(보류)은 같지만 §6 에는 이 사실을 적어 뒀다 —
   향후 별도 SPEC 이 이 모달을 다룰 때 후보로 다시 검토되도록.
+
+### C18-결함-1 — S-06 의 봉인 조건(워커 4)이 AC16 을 결정적으로 만들지 못한다
+
+- Plan 은 재현성을 위해 baseline 과 C18 을 **같은 조건(백엔드 미기동 · 워커 4)** 으로 못박고(S-06 / W8),
+  AC16 을 "baseline PASS 전건 통과" 로 정의했다. 그런데 `live-map-3d-*` 스펙은 그 조건에서 **비결정적**이다 —
+  swiftshader 소프트웨어 WebGL 4개가 동시에 붙으면 GPU 컨텍스트 생성/ReadPixels 가 막혀 90~120s 한도를 넘긴다.
+- 실측: run1 은 autoplace + drag, run2 는 drag + redrag 가 실패했다. **미통과 집합이 실행마다 바뀐다.**
+  격리(`--workers=1`)하면 3D 17건 전건 PASS(각 3~16s).
+- 이 위험은 C15-결함-4 에서 이미 관측됐고 "C18 에서 baseline 과 같은 조건으로 재확인" 으로 넘겼는데,
+  **재확인해도 같은 비결정성이 그대로 나온다**. 조건을 바꾸지 말라는 봉인 때문에 AC16 은 이 머신에서
+  단일 실행으로는 green 이 될 수 없다.
+- 취한 조치(S-19 — 보수적 선택): AC16 을 `[x]` 로 올리지 않고 `[~] 부분(88/90)` 으로 두고, 근거 3종
+  (2회 실행의 서로 다른 미통과 집합 / 타임아웃 형태 / 격리 전건 PASS)을 §5 에 남겼다. 판정은 Validate 에 넘긴다.
+- 후속 제안(범위 밖): `playwright.config.ts` 에서 `live-map-3d-*` 를 워커 1 프로젝트로 분리하거나
+  `fullyParallel` 을 그 디렉터리만 끄면 조건을 바꾸지 않고도 결정적으로 만들 수 있다.
+
+### C18-결함-2 — baseline PASS 집합에 vacuous PASS 가 1건 섞여 있다
+
+- Plan §S-06 은 백엔드 미기동이면 `demo-matrix.harness.spec.ts` 가 **baseline FAIL** 로 잡힌다고 적었는데,
+  실측 baseline 에서 이 spec 은 **PASS** 다(§2.2 에 포함).
+- 원인: 하니스가 본문 전체를 `try/catch` 로 감싸고(`demo-matrix.harness.spec.ts:63,196-198`) 예외를
+  `result.harnessError` 로만 흡수한 뒤, 마지막 단언이 `expect(result.startError).toBeNull()`
+  (`:202`) 이다. `startError` 는 초기값이 `null`(`:53`) 이라 **로그인 단계에서 이미 죽어도 단언이 통과**한다.
+- 영향: AC16 판정 대상에 아무것도 검증하지 않는 테스트가 1건 포함된다. 다만 이 spec 은 baseline 과 C18
+  양쪽에서 똑같이 PASS 하므로 목록 대조 결과 자체는 왜곡하지 않는다.
+- 조치 없음(git 미추적 로컬 하니스이고 SPEC 범위 밖). 글로벌 룰 11 의 "무력한 mock" 사례로 기록만 한다.
