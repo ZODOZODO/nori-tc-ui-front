@@ -1017,9 +1017,40 @@ skip 3건도 baseline 과 같다. **회귀 0**.
 
 ---
 
+### C17 — R8/R9 판정 (커밋 없는 게이트 · 코드 변경 0)
+
+판정 근거 재실측 — 보류 5건의 "tc 소비처 없음" 을 워크스페이스 grep 으로 확인했다.
+```
+$ grep -rl "StatusLabel\|NameInputDialog\|PageMetricGrid\|list-panel-layout\|page-heading-styles" \
+    nori-tc-ui-front/src nori-tc-ui-backend
+(출력 없음 — tc 전 레포에 동명 컴포넌트/상수 0건)
+
+$ grep -n "deltaY" nori-tc-ui-front/src/components/ui/resizable-divider.tsx
+10:  onDrag: (deltaY: number) => void
+30:      const deltaY = event.clientY - dragStartYRef.current
+32:      onDrag(deltaY)
+```
+→ 5건 전부 **보류 유지**. 상세 근거는 §6. 소스 변경이 없어 build/lint/test:unit 결과는 C16 과 동일하다.
+
+---
+
 ## 6. R8/R9 보류 사유
 
-(C17 에서 기록)
+**판정: 5건 전부 보류. 코드 변경 0.** SPEC R8/R9 가 "소비처가 이번 SPEC 범위에 없으면 이식 보류 +
+dev-report 에 사유 기록(미사용 코드 금지 룰 우선)" 을 명시했고, Plan §5.C17 이 실측으로 5건 전부 보류로
+봉인(S-15)했다. C17 에서 그 근거를 다시 실측해 확인했다 — 5건 모두 보류 판정이 유지된다.
+
+| # | wm 원본 (`nori-wm-ui-front`) | wm 소비처 | tc 소비처 실측 | 판정 |
+|---|---|---|---|---|
+| R8-1 | `src/shared/components/StatusLabel.tsx` (42줄) | `DcspecPage:143` · `EqpDetailModal:51,97,134,142` 등 | tc 에 동명 컴포넌트 **0**. 상태 색 토큰(`--success/--warning/--danger/--info`)은 `index.css:67-74,133-138` 에 존재하나, **R1~R7·R10·R11 어느 요구사항도 상태 표시를 건드리지 않는다**. 도입하려면 eqp/live-map 의 상태 배지 11파일을 전면 교체해야 한다 | **보류** |
+| R8-2 | `src/shared/components/NameInputDialog.tsx` (85줄) | `ReferenceRuleFlowWorkspace:398` (복사 흐름) | tc 에 동명 컴포넌트 **0**. 가장 가까운 후보인 `BranchModelCreateModal` 은 `<Input>` 이 1개(suffix)뿐이지만 Parent Model·Source Description 읽기 전용 블록을 함께 렌더한다 → wm 의 "이름 하나만 받는 창" 계약과 맞지 않는다 | **보류** |
+| R9-1 | `src/shared/layout/PageMetricGrid.tsx` (117줄) | wm 10개 페이지(`ApprovalsPage` · `AuditPage` · `DcspecPage` · `DlqPage` · `GroupAdminPanel` · `MasterCrudPage` · `ProductManagementPage` · `RecipePage` · `UserAdminPanel` · `WorkPage`) | tc 에 동명 컴포넌트 **0**. 도입 = live-map/deploy 대시보드에 KPI 카드 그리드라는 **신규 UI 를 만드는 일**이라 Foundation 범위 밖 | **보류** |
+| R9-2 | `src/shared/layout/list-panel-layout.ts` (15줄) | `DcspecPage:53` · `RecipePage:53` · `LiveMapPage:70` — 전부 `deltaX` 기반 | tc 의 분할 패널(`EqpPage:1482`, `ModelPage:1388`)은 `ResizableDivider`(`components/ui/resizable-divider.tsx:10,30-32`)가 **`deltaY`** 를 넘기는 **세로 분할**이고 크기 단위도 **percent**(`topPanelHeightPercent`, `PANEL_MIN/MAX_PERCENT = 15/85`)다. wm 은 **가로 분할 + px**(`384/280/720`) → 계약 자체가 다르다 | **보류** |
+| R9-3 | `src/shared/layout/page-heading-styles.ts` (8줄) | wm 제목 영역 공통 상수 | tc `PageHeading.tsx` / `PageHeadingWithActions.tsx` 는 `flex flex-col gap-1 border-b border-border pb-3`(min-h 없음). wm 값은 `flex min-h-21 shrink-0 flex-col gap-1.5 border-b border-border pb-4` → **적용하면 제목 높이·여백이 바뀐다**(시각 변경). 상수를 소비할 컴포넌트는 2개지만 실사용 페이지는 `GroupAdminPanel:62` · `UserAdminPanel:45` 뿐이고(`PageHeading` 은 `src/dev/LayoutShellFixture.tsx` 전용) 그 2개 화면이 그대로 밀린다 | **보류** |
+
+**공통 사유** — 5건 모두 "프리미티브만 옮기면 끝" 이 아니라 **시각/기능 확장**을 동반한다. 소비처 없는 이식은
+SPEC Constraints 와 글로벌 룰 11(premature abstraction 금지)이 금지하고, SPEC R8/R9 자신이 보류를 허용한다.
+향후 필요해지면 각각 별도 SPEC 으로 다룬다.
 
 ---
 
@@ -1402,3 +1433,18 @@ skip 3건도 baseline 과 같다. **회귀 0**.
   `page.getByRole('option')` 으로 바꿨다(트리거를 먼저 열도록 호출 순서도 조정).
 - 소스에 `data-testid` 를 새로 심지 않고 radix 트리거의 `role="combobox"` 로 잡았다 — 규칙 B 는 기존 testid 만 옮기라고 하고,
   이 select 에는 원래 testid 가 없었다.
+
+### C17-결함-1 — Plan §5.C17 이 인용한 좌표·줄 수가 드리프트다
+
+- 분할 패널 좌표: Plan 은 `EqpPage:1040` · `ModelPage:551` 이라고 적었으나 실제 `<ResizableDivider>` 사용부는
+  **`EqpPage.tsx:1482` · `ModelPage.tsx:1388`** 이다(판정 내용 자체는 그대로 — 세로/percent 분할이 맞다).
+- wm 원본 줄 수: Plan 은 41 / 82 / 116 줄로 적었으나 `wc -l` 실측은 **42 / 85 / 117** 이다(±1~3).
+- §6 표에는 실측값을 적었다. C6-결함-1 과 같은 종류의 인용 드리프트라 판정에는 영향이 없다.
+
+### C17-결함-2 — "tc 에 이름만 받는 흐름 없음" 은 정확히는 "계약이 다른 흐름이 1개 있음" 이다
+
+- Plan 은 R8-2(NameInputDialog)의 tc 소비처를 "없음" 으로 적었으나, `BranchModelCreateModal` 은
+  `<Input>` 이 **1개(suffix)** 뿐이라 형태상 가장 가까운 후보다.
+- 다만 그 모달은 Parent Model / Source Description 읽기 전용 블록을 함께 렌더하므로 wm 의
+  "이름 하나만 받는 창" 계약으로 대체할 수 없다. 결론(보류)은 같지만 §6 에는 이 사실을 적어 뒀다 —
+  향후 별도 SPEC 이 이 모달을 다룰 때 후보로 다시 검토되도록.
