@@ -13,8 +13,8 @@
 |---|---|---|---|
 | C0 | (커밋 없음) AC11 baseline | 완료 | — |
 | C1 | `feat(ui): LNB 사이드바 프리미티브 이식 (R1)` | 완료 | `484a2c1` |
-| C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | (이 커밋) |
-| C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 대기 | — |
+| C2 | `feat(navigation): 2단 내비 정의·아이콘·i18n (R2/R3)` | 완료 | `c5b8928` |
+| C3 | `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)` | 완료 | (이 커밋) |
 | C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 대기 | — |
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 대기 | — |
 | C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 대기 | — |
@@ -175,5 +175,53 @@ LINT_EXIT=0
 # pass 240
 # fail 0
 ```
+
+---
+
+## C3 — `feat(navigation): AppLnbSidebar/Flyout + route-modules (R4/R8)`
+
+### 변경 파일
+- 신설 `src/app/route-modules.ts` — 6 lazy 페이지 loader + 24 경로 매핑
+  (16 확정 라우트 + `/` + `/login` + 구경로 6종)
+- 신설 `src/shared/components/AppLnbFlyout.tsx` — body portal 플라이아웃, caret 2겹,
+  투명 브릿지(`pl-3`), Esc 닫기, autoFocus. `react-router-dom` → `react-router` 조정
+- 신설 `src/shared/components/AppLnbSidebar.tsx` — 그룹 아코디언(닫은 그룹만 기억) /
+  rail hover·클릭 플라이아웃(닫힘 지연 180ms) / 모바일 내비 시 off-canvas 닫기 /
+  D6 prefetch 2계열
+
+### D6 prefetch 배선 (실측 근거)
+
+| 항목 | prefetch |
+|---|---|
+| liveMap | `['live-map']` getLiveMap, 5_000 |
+| dlqDashboard | **gateway/business/quarantine/repair-task 4종** — `DashboardPanel.tsx:168-171` 이 자체 query 없이 그 4 훅을 mount 해 집계 (I1) |
+| dlqGateway / dlqBusiness / dlqQuarantine / dlqRepairTask | 각 `['dlq', <mode>]`, 30_000 |
+| eqpBusiness / eqpGateway | `eqpQueryKeys.list()` getEqpList(0,500), 60_000 |
+| modelSecs / modelSocket / modelPlc | `modelQueryKeys.list()` getModelList(0,500), 60_000 |
+| userUsers | `userQueryKeys.list(0, USER_PAGE_SIZE)`, 30_000 |
+| userGroups | **배선함** `groupQueryKeys.list(0, GROUP_PAGE_SIZE)` getGroupList, 30_000 (I2) |
+| deployRegister / deployDeploy / deployHistory | 제외 — 구 topbar 사유 주석 승계 |
+
+라우트 청크 preload 는 `preloadRouteModule` 로 항목 `onPointerEnter`/`onFocus`/`onTouchStart`,
+rail 버튼 `onFocus` 는 그룹 항목 전체. 전환은 `startTransition(() => navigate(route))`.
+
+### 배선 지점 결정
+- prefetch switch 는 별도 파일로 빼지 않고 `AppLnbSidebar.tsx` 안에 둔다 — 구
+  `AppTopBar.tsx:43-98` 의 `prefetchByMenuKey` 와 같은 자리·같은 형태다(기존 컨벤션 답습).
+  덤으로 AC12 의 두 토큰이 모두 이 파일에 실재하게 된다
+- 펼침 항목 링크에 `data-testid="lnb-item-<itemKey>"` 부여 — 신설 e2e(C7)가 locale 과 무관하게
+  16 항목을 집을 수 있게 한다(기존 사이드바 testId 컨벤션 답습)
+
+### 게이트 (build + lint — 셸 배선은 C4b)
+
+```
+✓ built in 15.79s
+=== LINT ===
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+
+AC12 선확인: `grep -c "prefetchQuery\|preloadRouteModule"` → `AppLnbSidebar.tsx:15` / `AppLnbFlyout.tsx:0`
+(합계 15건 ≥ 1건).
 
 (커밋 진행에 따라 계속 추가)
