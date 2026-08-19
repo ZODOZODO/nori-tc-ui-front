@@ -359,7 +359,7 @@
 | C15 | `1ed1512` | ui-front | 1개 — `live-map/components/LiveMap3DScene.tsx` (+ git 미추적 e2e 8파일) | AC4 AC6 **부분** + AC1 AC2 AC3 | ✅ 완료 (최종 판정은 C16) |
 | C16 | `2c26123` | ui-front | 9개 — `live-map/components/` 의 `LiveMapDemoModal` · `LiveMapObjectEditor` · `LiveMapFlowArrowDialog` · `LiveMapPage` · `LiveMapCommLogPanel` · `LiveMapBoard` · `LiveMapFlowGroupDialog` · `LiveMapTooltipCard` · `LiveMapMachineNode` (+ 스크린샷 4장, + git 미추적 e2e 2파일) | **AC4 AC5 AC6** + AC1 AC2 AC3 | ✅ 완료 |
 | C17 | (커밋 없음 — 게이트) `1859d83` 은 dev-report 갱신 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | (AC 없음 — R8/R9 판정) | ✅ 완료 |
-| C18 | (커밋 없음 — 게이트) 아래 dev-report 갱신 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | **AC16** + AC1 AC2 AC3 최종 | ✅ 완료 (AC16 은 `[~]` 부분) |
+| C18 | (커밋 없음 — 게이트) `0d76f39` 는 dev-report 갱신 커밋 | ui-front | `.claude/specs/wm-parity-foundation-dev-report.md` | **AC16** + AC1 AC2 AC3 최종 | ✅ 완료 (AC16 은 `[~]` 부분) |
 
 ---
 
