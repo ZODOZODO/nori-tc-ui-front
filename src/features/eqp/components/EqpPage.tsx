@@ -665,8 +665,19 @@ export function EqpPage({ scope }: EqpPageProps) {
    * selection 을 렌더 클로저가 아니라 `getState()` 로 읽어 **스코프가 바뀔 때만** 돈다. selection
    * 을 의존성에 넣으면, 아래 정합성 effect 가 빈 그룹을 감지해 선택을 풀 때마다 이 effect 가
    * 다시 선택해 두 effect 가 서로를 되돌리는 무한 루프가 된다.
+   *
+   * 스코프 진입 시 그 스코프가 그리는 목록 캐시를 무효화한다 — 이 무효화는 원래 사이드바의
+   * Business/Gateway 헤더 클릭 핸들러가 하던 일이고, 헤더가 전역 LNB 로 승격되며 트리거가
+   * 라우팅으로 옮겨왔으므로 책임도 여기로 따라온다. 무효화 범위는 같은 목록을 그리는 형제
+   * 핸들러(`handleSelectGatewayGroup` / `handleSelectBusinessGroup`)와 동일하게 맞춘다 —
+   * 갈라지면 "그룹을 고르면 최신인데 스코프로 들어오면 옛 데이터" 가 된다.
    */
   useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({
+      queryKey: scope === 'business' ? modelQueryKeys.list() : eqpQueryKeys.gatewayShardLeases(),
+    })
+
     const { type } = useEqpUiStore.getState().selection
     const isBusinessSelection = type === 'business_all' || type === 'business_group'
     const isGatewaySelection =
@@ -679,7 +690,7 @@ export function EqpPage({ scope }: EqpPageProps) {
     if (scope === 'gateway' && !isGatewaySelection) {
       selectGatewayAll()
     }
-  }, [scope, selectBusinessAll, selectGatewayAll])
+  }, [scope, queryClient, selectBusinessAll, selectGatewayAll])
 
   /**
    * sessionStorage에서 복원된 선택 상태가 현재 목록과 불일치하면 선택을 정리합니다.
