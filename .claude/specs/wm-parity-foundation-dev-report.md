@@ -1571,3 +1571,218 @@ SPEC Constraints 와 글로벌 룰 11(premature abstraction 금지)이 금지하
 - 영향: AC16 판정 대상에 아무것도 검증하지 않는 테스트가 1건 포함된다. 다만 이 spec 은 baseline 과 C18
   양쪽에서 똑같이 PASS 하므로 목록 대조 결과 자체는 왜곡하지 않는다.
 - 조치 없음(git 미추적 로컬 하니스이고 SPEC 범위 밖). 글로벌 룰 11 의 "무력한 mock" 사례로 기록만 한다.
+
+---
+
+## 9. Validate 정정 (2026-08-19)
+
+> Validate 세션이 실측으로 확인한 **위 본문의 사실 오류**를 정정한다. 원문은 Implement 시점의 실행
+> 기록이라 고치지 않고(D-5 — 과거 기록 조작 금지) 여기에 정정만 누적한다.
+
+### 정정-1. `C1-b-결함-1` 의 "7곳 전건 전환" 은 사실이 아니다 — 1곳이 누락됐고 런타임 회귀였다
+
+- 본문은 `allowNullData=true` 호출이 **7곳**이며 `undoCheckout` 포함 전건을 `assertSuccessResponse` 로
+  바꿨다고 적었다. 실측은 다르다.
+- baseline `3704176` 에서 4번째 인자 `true` 를 넘기던 호출은 **14곳**이다
+  (eqp 6 / group 4 / model 2 / user 2 — 각 파일 블록 스캔으로 전수 확인).
+- C1-b(`1b429c4`) 후 `assertSuccessResponse` 호출은 **13곳**. 누락된 1곳이
+  `eqp.api.ts` 의 `undoEqpCheckout` 이다. diff 상 4번째 인자 `true` 만 지워지고 함수명이
+  `resolveSuccessPayload<null>` 로 남았다(한 줄짜리 형제 5곳은 정상 전환).
+- 결과: 공용 `resolveSuccessPayload` 가 `data === null` 에 던지고
+  (`shared/lib/api-error.ts`), 이 엔드포인트는 `EqpDualCommandResponse = ApiResponse<null>` +
+  백엔드 `ResponseEntity.ok(ApiResponse.success(null))`(`EqpParamController.java:216`) 라
+  **성공할 때마다 100% 실패로 보고**했다. 엣지 케이스가 아니다.
+- 사용자 영향: EqpPage 의 체크아웃 되돌리기가 서버 성공에도 실패 메시지를 띄우고,
+  mutation `onSuccess` 의 캐시 무효화가 돌지 않아 화면이 stale 로 남았다.
+
+### 정정-2. `C1-b` 커밋 행(§3)의 세부 카운트가 틀렸다
+
+총계 31개는 맞으나 내역이 어긋난다 — types 는 5가 아니라 **6**(`profile.types.ts` 누락),
+api 는 "7" 이라 적고 8개를 나열했으며(실제 8), 소비처는 13이 아니라 **14**다. (6+8+14+shared 2+단위 1 = 31)
+
+### 정정-3. `C15` 커밋 행(§3)의 변경 파일 수가 틀렸다
+
+`1ed1512` 는 "1개" 가 아니라 **3개**다 — `LiveMap3DScene.tsx` + `.claude/specs/assets/c15-{before,after}-3d-panels.png`.
+C16 행은 "+스크린샷 4장" 을 명기했는데 C15 행만 빠졌다.
+
+### 정정-4. AC16 의 `88/90` 은 재현되지 않는 수치다
+
+Validate 세션이 **동일 봉인 조건**(백엔드 미기동 · 워커 4 · `npx playwright test`)에서 2회 재실행한 결과
+양쪽 다 **87/90** 이었고, 미통과 집합은 실행마다 달랐다.
+
+| 실행 | 미통과 |
+|---|---|
+| dev-report run1 | autoplace · drag |
+| dev-report run2 | drag · redrag |
+| Validate run1 | drag · meshpick · redrag |
+| Validate run2 | autoplace · drag · meshpick |
+
+미통과는 전건 `live-map-3d-eqp-*` 이고 실패 형태는 타임아웃 + `ContextResult::kTransientFailure`
+(GPU 컨텍스트 생성 실패)로 assertion 실패가 아니다. 4건 전부 `--workers=1` 격리에서 통과한다
+(`3 passed (1.0m)` / `3 passed (50.3s)`). → **통과 수를 고정 수치로 적으면 안 된다.** AC16 의 올바른 기술은
+"미통과가 3D 경합 타임아웃에 한정되고 그 외 영역은 baseline 과 동일" 이다.
+
+---
+
+## 10. Validate 후속 수정 (2026-08-19) — V-1 근본 원인 해소
+
+정정-1 의 회귀를 고치고, **같은 실수가 다시 컴파일을 통과하지 못하도록** 타입 제약을 걸었다.
+
+| # | 파일 | 변경 | 근거 |
+|---|---|---|---|
+| 1 | `src/shared/lib/api-error.ts` | `resolveSuccessPayload` 의 타입 파라미터를 `<TData extends NonNullable<unknown>>` 으로 제약 | **근본 원인.** 제약이 없어 `resolveSuccessPayload<null>` 이 컴파일을 통과했다. 제약 후에는 `error TS2344: Type 'null' does not satisfy the constraint '{}'` 로 **빌드가 깨진다**(버그 형태를 일부러 되돌려 실증) |
+| 2 | `src/features/eqp/api/eqp.api.ts` | `undoEqpCheckout` 을 `assertSuccessResponse` 로 교체 | 회귀 자체 수정. 형제 5곳과 동일 형태가 된다 |
+| 3 | api 5파일 (deploy/eqp/group/model/user) | `resolveSuccessPayload<unknown>(` 12곳 → 명시 타입인자 제거 | 1번 제약과 정합. `unknown` 은 `{}` 를 만족하지 않는다. 인자를 빼면 제약값 `{}` 로 추론되고, 소비처인 `normalize*(payload: unknown)` 이 그대로 받는다 |
+| 4 | `src/features/group/api/group.api.ts` | `addGroupPermission` 을 `assertSuccessResponse` 로 교체 | `Promise<void>` 인데 데이터 추출 헬퍼를 쓰고 결과를 버리던 **마지막 남은 동일 안티패턴**. 백엔드가 data 를 채우므로(`GroupController.java:224`) 현 동작은 동일하고, 형제 `removeGroupPermission` 과 형태가 맞는다 |
+| 5 | `src/features/model/hooks/useModelFlowMutations.ts` | JSDoc 의 `ModelApiError` → `ApiError` | C1-b 가 클래스를 없애며 남긴 죽은 참조 |
+| 6 | `tests/unit/api-void-endpoint-contract.test.ts` (신설) | `Promise<void>` API **전 17건** + 헬퍼 계약 4건 = 21 테스트 | 이 계약을 아무도 검증하지 않은 것이 회귀가 새어 나간 2차 원인. 수정 전 실행 시 `undoEqpCheckout` 1건만 정확히 RED |
+
+**RED 실증** (수정 전):
+```
+not ok 2 - eqpApi.undoEqpCheckout 은 success=true·data=null 응답을 성공으로 처리한다
+  error: '체크아웃 되돌리기에 실패했습니다.'
+  name: 'ApiError'
+  stack: |-
+    resolveSuccessPayload (src/shared/lib/api-error.ts:104:11)
+    Object.undoEqpCheckout (src/features/eqp/api/eqp.api.ts:451:7)
+```
+
+**타입 가드 실증** (버그 형태를 일부러 되돌린 뒤 `npx tsc -b --force`):
+```
+src/features/eqp/api/eqp.api.ts(451,29): error TS2344: Type 'null' does not satisfy the constraint '{}'.
+```
+
+**게이트** — build / lint / test:unit / 회귀 e2e 전부 PASS
+```
+✓ built in 17.50s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+1..232
+# tests 232
+# pass 232
+# fail 0
+
+  3 failed   ← eqp-line-select 1 + group-page 2 (전부 §2.3 baseline FAIL 과 동일)
+  41 passed (1.5m)   ← 이 파일군의 baseline PASS 합계와 정확히 일치 = 회귀 0
+```
+
+### 손대지 않은 인접 사항 (사용자 결정 대기)
+
+수정하지 않고 기록만 남긴다 — 전부 **이번 회귀와 무관한 사전 부채**이고, 고치면 SPEC/Plan 범위 밖의
+동작 변경이 된다(글로벌 룰 3·4).
+
+| 항목 | 사실 | 손대지 않은 이유 |
+|---|---|---|
+| `layout.api.ts` `deleteObject` | `Promise<void>` 인데 성공 봉투 검증이 **없다**. `validateStatus` 를 넘기지 않아 4xx/5xx 는 axios 가 던지지만, `200 + success:false` 는 성공으로 통과한다 | baseline 부터 동일(회귀 아님). 검증을 새로 넣는 것은 **새 실패 경로 추가** = 동작 변경 |
+| `model-flow.api.ts` `remove` | 봉투 검증을 `assertSuccessResponse` 대신 **인라인 복제**로 갖고 있다 | 동작은 동일. Plan §5.C1 의 제거 대상 표에 없던 항목이라 R1 범위 밖 |
+| `create*FailResponse` 5종 (eqp/group/model/user/deploy) | shared `createFailResponse` 와 **로직이 동일한 복제본**이다(`eqp.types.ts:458-475` 대조) | R1 취지에는 맞으나 Plan §5.C1 제거 표가 열거하지 않았다. 5파일 규모라 Plan 범위 결정 사항 |
+
+---
+
+## 11. Validate 후속 수정 2차 (2026-08-19) — 잔여 사전 부채 3건 전부 해소
+
+§10 말미에 "사용자 결정 대기" 로 남겼던 3건을 **전부 수정**했다. 아울러 그 과정에서 R1
+("`ApiResponse`/`isApiResponse`/… feature 로컬 사본 전부 제거")이 실제로는 미완이었음이 드러났다 —
+Plan §5.C1 의 제거 대상 표가 `create*FailResponse` / `*FailResponse` 를 열거하지 않아
+**8개 도메인 복제본이 그대로 남아 있었다.**
+
+### 11.1 `layout.api.deleteObject` — 성공 봉투 검증 부재
+
+- `Promise<void>` 인데 응답 봉투를 전혀 보지 않았다. `validateStatus` 를 넘기지 않아 4xx/5xx 는
+  axios 가 던지지만 **`200 + success:false` 는 성공으로 통과**했다.
+- `assertSuccessResponse(response.data, response.status, failMessage)` 를 추가해 형제
+  (`getLayout`/`putLayout`/`createObject`/`updateObject`)와 검증 수준을 맞췄다.
+
+### 11.2 `model-flow.api.remove` — 봉투 검증 인라인 복제
+
+- `if (!isApiResponse(response.data) || response.data.success !== true) throw new ApiError(...)` 8줄이
+  `assertSuccessResponse` 와 동일 로직이었다. 헬퍼 호출 1줄로 교체(동작 동일).
+- 이로써 `ApiError` · `createModelFailResponse` · `isApiResponse` import 3개가 이 파일에서 사라졌다.
+
+### 11.3 `create*FailResponse` / `*FailResponse` 8종 → shared 단일 정의
+
+**제거한 중복 (정의 8 · 타입 7)**
+
+| 도메인 | 제거한 빌더 | 제거한 타입 | shared 와의 차이 |
+|---|---|---|---|
+| eqp | `createEqpFailResponse` | `EqpFailResponse` | **없음**(기본 인자만) |
+| group | `createGroupFailResponse` | `GroupFailResponse` | **없음** |
+| model | `createModelFailResponse` | `ModelFailResponse` | **없음** |
+| user | `createUserFailResponse` | `UserFailResponse` | **없음** |
+| deploy | `createDeployFailResponse` | `DeployFailResponse` | **없음** |
+| profile | `createProfileFailResponse` | `ProfileFailResponse` | user 로 위임만 — **호출처 0(죽은 코드)** |
+| auth | `createLoginFailResponse` | `LoginFailResponse` | 아래 참조 |
+
+- 호출부 24곳을 전부 `createFailResponse(payload, <명시 fallback>)` 으로 전환했다.
+  도메인 빌더는 `fallbackMessage` 에 **기본 인자**를 갖고 있었으나 공용 정의는 필수 인자다 →
+  기본값에 의존하던 8곳에 문구를 명시했다(글로벌 룰 6 "기본 파라미터 값 사용 금지" 에도 부합).
+- `LoginFailResponse` 는 `LoginResponse` 유니온이 참조하므로 타입만 `ApiFailResponse` 로 치환했다.
+- **함께 소멸한 것**: `defaultEqpErrorMessage` / `defaultGroupErrorMessage` / `defaultModelErrorMessage` /
+  `defaultUserErrorMessage` / `defaultProfileErrorMessage` (전부 삭제된 빌더의 기본 인자 전용),
+  `isLoginFailResponse`(유일 소비처가 `createLoginFailResponse` 였다).
+  내 변경이 만든 미사용이라 함께 제거했다(글로벌 룰 4).
+- **함께 고아가 된 i18n 키 3개**: `error.eqp.default` / `error.model.default` / `error.user.default` 를
+  ko·en·vi 3파일에서 제거했다(각 1066키로 parity 유지). 동적 키 조합이 없음을 grep 으로 확인했다.
+  `error.group.default` 는 `GroupPermissionsModal` 이 계속 쓰므로 **유지**한다.
+
+**의도한 동작 변화 1건 (auth)** — `createLoginFailResponse` 에는 공용 정의에 없는 선행 분기가 있었다.
+```
+if (isLoginFailResponse(payload)) { return payload }   // 삭제됨
+```
+`isLoginFailResponse` 는 `errorCode`/`errorMsg` 가 **빈 문자열이어도 통과**시키므로, 서버가 빈 문구를
+주면 화면에 빈 에러가 떴다. 공용 `createFailResponse` 는 빈 값을 `UNKNOWN_ERROR` / fallback 문구로
+정규화한다 → **빈 에러 메시지가 사라지는 개선**이다. 그 외 경로는 로직이 동일하다.
+
+### 11.4 게이트
+
+```
+✓ built in 15.75s
+
+> nori-tc-ui@0.0.0 lint
+> eslint .
+
+1..232
+# tests 232
+# pass 232
+# fail 0
+```
+
+`npx tsc -b --force` 는 0 에러다. 순수 감소분이 크다 — **431줄 삭제 / 301줄 추가**.
+
+### 11.5 남은 것 없음
+
+§10 말미의 "사용자 결정 대기" 3건은 전부 해소됐다. `Promise<void>` API 는 이제 예외 없이
+`assertSuccessResponse` 로 성공을 단언하고(계약 테스트가 전건 고정), 실패 응답 정규화는
+`shared/lib/api-error.ts` 의 `createFailResponse` **단 하나**다.
+
+### 11.6 전체 e2e 재측정 (동일 봉인 조건)
+
+```
+  14 did not run
+  86 passed (17.2m)
+```
+
+baseline PASS 90 대비 미통과 4건. **전부 회귀 아님**을 개별 확인했다.
+
+| 미통과 | 판정 | 근거 |
+|---|---|---|
+| `live-map-3d-eqp-drag` · `-meshpick` · `-redrag` | 3D GPU 경합 타임아웃 | §9 정정-4 와 동일 현상. 이 3건은 **수정 전 Validate run1 에서도 동일하게 미통과**했다(수정 전후 PASS 집합 diff 결과 3D 는 차이 0) |
+| `group-page :: Group-AC-9` | **spec 경합, 인과 없음** | ① 실패 지점 `group-page.spec.ts:618` 은 **API 호출 이전 스테이징 단계**이고 바로 다음 줄이 `expect(grantCalls).toEqual([])` 다 — 이번에 바꾼 `addGroupPermission` 은 `:622` 저장 시점에야 호출되므로 도달조차 하지 않는다. ② 실패 형태가 "navigated to /user … element(s) not found" 로 모달이 리셋된 것이지 데이터 단언 실패가 아니다. ③ `--workers=1` 격리 재실행에서 **8 passed** 이고 실패 2건은 baseline FAIL 쌍(`Group-AC-1/2`, `Group-AC-8a`)뿐이다 |
+
+수정 전(Validate run1) 대비 PASS 집합 diff 는 `group-page` 1건 차이가 전부다.
+```
+$ diff <(수정 전 PASS 파일별 집계) <(수정 후 PASS 파일별 집계)
+7c7
+<       8 group-page.spec.ts
+---
+>       7 group-page.spec.ts
+```
+격리 재실행 출력:
+```
+  2 failed
+    [chromium] › tests\e2e\group-page.spec.ts:357:1 › Group-AC-1 / Group-AC-2 …
+    [chromium] › tests\e2e\group-page.spec.ts:478:1 › Group-AC-8a …
+  8 passed (1.1m)
+```

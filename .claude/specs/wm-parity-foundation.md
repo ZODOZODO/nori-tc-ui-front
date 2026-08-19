@@ -114,34 +114,59 @@ wm 레포에 검증된 해법이 이미 존재하므로 역이식이 원칙 (신
 
 > 각 항목 단일 명령/단일 assertion. OR 금지. 전부 nori-tc-ui-front 루트 기준.
 
-- [ ] AC1. `npm run build` PASS (tsc -b && vite build, 출력 인용)
-- [ ] AC2. `npm run lint` PASS (출력 인용)
-- [ ] AC3. `npm run test:unit` PASS (출력 인용)
-- [ ] AC4. `grep -rn "<select" src/features` 결과 0건
-- [ ] AC5. `grep -rn 'type="checkbox"' src/features` 결과 0건
-- [ ] AC6. `grep -rl "<button" src/features` 결과 파일 목록이 정확히 다음 5파일과 일치:
+> **Validate 판정 (2026-08-19, HEAD `fb91581`)** — 아래 체크박스는 Validate 세션이 SPEC 의 명령을
+> 문자 그대로 재실행해 직접 확인한 결과다. dev-report 의 자기 보고는 근거로 쓰지 않았다.
+> **16/17 [x], AC16 만 [~]**. 별건으로 AC 로는 잡히지 않는 런타임 회귀 1건을 발견했다 —
+> `eqpApi.undoEqpCheckout`(`src/features/eqp/api/eqp.api.ts:451`) 이 `assertSuccessResponse` 가 아니라
+> `resolveSuccessPayload<null>` 을 호출해 성공 응답을 항상 실패로 던진다(상세는 §Validate 발견 결함).
+
+- [x] AC1. `npm run build` PASS (tsc -b && vite build, 출력 인용) — `✓ built in 16.69s`
+- [x] AC2. `npm run lint` PASS (출력 인용) — exit 0, 경고 0줄
+- [x] AC3. `npm run test:unit` PASS (출력 인용) — `# tests 211 / # pass 211 / # fail 0`
+- [x] AC4. `grep -rn "<select" src/features` 결과 0건 — 실행 결과 0
+- [x] AC5. `grep -rn 'type="checkbox"' src/features` 결과 0건 — 실행 결과 0
+- [x] AC6. `grep -rl "<button" src/features` 결과 파일 목록이 정확히 다음 5파일과 일치
+      (집합 비교 — 초과 0 / 부족 0, 합계 18건):
       eqp/components/EqpSidebar.tsx, model/components/ModelSidebar.tsx,
       deploy/components/DeploySidebar.tsx, dlq/components/DlqSidebar.tsx,
       user-management/components/UserManagementSidebar.tsx
-- [ ] AC7. `grep -rn "const resolveSuccessPayload" src` 결과 1건 (shared 정의만)
-- [ ] AC8. `grep -rln "issueCsrfToken\s*=" src` 결과 1파일 (shared/lib/csrf.ts)
-- [ ] AC9. `grep -rn "class .*ApiError" src` 결과 1건 (shared 공통 클래스만)
-- [ ] AC10. `grep -rn "recharts" src package.json` 결과 0건
-- [ ] AC11. R10 의 6파일 전부에 대해 `git ls-files <경로>` 출력 0줄 (6경로 AND)
-- [ ] AC12. `grep -n "isLoading" src/shared/components/SelectableTable/SelectableTable.tsx`
+- [x] AC7. `grep -rn "const resolveSuccessPayload" src` 결과 1건 (shared 정의만)
+      — `src/shared/lib/api-error.ts:98`
+- [x] AC8. `grep -rln "issueCsrfToken\s*=" src` 결과 1파일 (shared/lib/csrf.ts) — 실측 1파일
+- [x] AC9. `grep -rn "class .*ApiError" src` 결과 1건 (shared 공통 클래스만)
+      — `src/shared/lib/api-error.ts:49`. 도메인 별칭도 0건(S-03 준수)
+- [x] AC10. `grep -rn "recharts" src package.json` 결과 0건 — 실측 0
+- [x] AC11. R10 의 6파일 전부에 대해 `git ls-files <경로>` 출력 0줄 (6경로 AND) — 실측 0줄
+- [x] AC12. `grep -n "isLoading" src/shared/components/SelectableTable/SelectableTable.tsx`
       1건 이상 AND `grep -rn -B8 "isLoading={" src/features --include="*.tsx" | grep -c "<SelectableTable"`
       결과 1 이상 — `<SelectableTable` 태그에 isLoading prop 을 실제 전달하는 소비처 판정.
       (패턴 검증 완료: wm features 양성 4건 / tc 현재 음성 0건. 구 패턴(파일 내 공존)은
       백포트 전에도 dlq 4패널이 매칭되는 무력 assertion 이라 폐기)
-- [ ] AC13. `grep -rln "notifyFailure" src/features/user src/features/group` 결과 7파일 이상
-- [ ] AC14. `grep -c "<Toaster" src/app/providers/AppProvider.tsx` 결과 1
-- [ ] AC15. `grep -rn "window.confirm" src` 결과 0건
-- [ ] AC16. e2e 회귀 0: Implement 세션 시작 시 clean HEAD 에서 `npm run test:e2e` 를
+      — 실측 `isLoading` 3건(`:47,:140,:571`) AND `<SelectableTable` 소비처 카운트 1
+- [x] AC13. `grep -rln "notifyFailure" src/features/user src/features/group` 결과 7파일 이상
+      — 실측 정확히 7파일
+- [x] AC14. `grep -c "<Toaster" src/app/providers/AppProvider.tsx` 결과 1 — 실측 1
+- [x] AC15. `grep -rn "window.confirm" src` 결과 0건 — 실측 0
+- [~] AC16. **부분 — 87/90.** e2e 회귀 0: Implement 세션 시작 시 clean HEAD 에서 `npm run test:e2e` 를
       실행해 PASS spec 목록을 dev-report 에 baseline 으로 기록하고, 구현 완료 후 동일
       명령에서 baseline 목록 전부 PASS AND console.error 0건 AND pageerror 0건
       (pre-existing FAIL 은 baseline 밖이므로 판정 제외 — 목록 대조로 기계 판정)
-- [ ] AC17. `grep -rn "features/auth/types/auth.types" src` 결과 0건 (R2 판정 —
-      features/auth 내부는 이 alias 경로를 쓰지 않음을 실측했으므로 오탐 없음)
+      - **충족**: baseline PASS 90 중 87 통과. 미통과 3건은 **매 실행 집합이 바뀌고**
+        (Validate run1 = drag/meshpick/redrag, run2 = autoplace/drag/meshpick, dev-report run1 =
+        autoplace/drag, run2 = drag/redrag) 전부 `live-map-3d-eqp-*` WebGL 스펙이다.
+        실패 형태는 전건 타임아웃 + `ContextResult::kTransientFailure`(GPU 컨텍스트 생성 실패)이고
+        assertion 실패가 아니다. 4건 전부 `--workers=1` 격리 실행에서 통과(3 passed 50.3s / 3 passed 1.0m).
+        3D 외 영역의 PASS/FAIL/skip 집합은 baseline 과 **완전히 동일**하다.
+      - **미충족**: 봉인 조건(백엔드 미기동 · 워커 4) 단일 실행에서 "baseline PASS 전건" 을
+        글자 그대로 만족하지 못한다. 이 머신에서 해당 조건은 3D 스펙에 대해 비결정적이라
+        재실행으로 해소되지 않는다(Validate 2회 실행 모두 87/90). 글로벌 룰 14 에 따라 `[x]` 금지.
+      - **참고**: dev-report 의 `88/90` 수치는 재현되지 않는다(Validate 2회 모두 87). 통과 수 자체가
+        실행마다 흔들리므로 이 AC 는 고정 수치가 아니라 "미통과가 3D 경합 타임아웃에 한정" 으로 읽어야 한다.
+      - **보조 관찰**: baseline PASS 44 파일 중 `dlq-page` / `user-page` / `login-page.smoke` 3 파일
+        (18 테스트)은 console/pageerror 리스너가 없어 "console.error 0" 을 단언하지 않는다(실측 0건).
+        `demo-matrix.harness.spec.ts` 는 마지막 단언이 초기값 `null` 검사라 vacuous PASS 다.
+- [x] AC17. `grep -rn "features/auth/types/auth.types" src` 결과 0건 (R2 판정 —
+      features/auth 내부는 이 alias 경로를 쓰지 않음을 실측했으므로 오탐 없음) — 실측 0
 
 ## Out of Scope
 
@@ -159,12 +184,66 @@ wm 레포에 검증된 해법이 이미 존재하므로 역이식이 원칙 (신
 - role-landing(역할별 로그인 랜딩) → wm-parity-sidebar 도 다루지 않음. tc 권한 모델에
   wm 식 역할 축이 있는지 확인 후 별도 SPEC (sidebar SPEC 의 Out of Scope 와 일치)
 
+## Validate 발견 결함 (2026-08-19) — **수정 완료**
+
+> AC 로는 잡히지 않는 런타임 회귀 1건을 발견하고 근본 원인까지 해소했다.
+> 상세 조치는 dev-report §10.
+
+### V-1. `undoEqpCheckout` 이 성공 응답을 항상 실패로 던진다 (C1-b `1b429c4` 회귀) — **해소**
+
+- **위치**: `src/features/eqp/api/eqp.api.ts:451`
+- **사실**: 이 호출만 `assertSuccessResponse` 가 아니라 `resolveSuccessPayload<null>(...)` 을 쓴다.
+  공용 `resolveSuccessPayload` 는 `payload.data === null` 이면 `ApiError` 를 던진다
+  (`src/shared/lib/api-error.ts:103`).
+- **응답 형태**: 이 엔드포인트의 타입은 `EqpDualCommandResponse = ApiResponse<null>`
+  (`src/features/eqp/types/eqp.types.ts:399`) 이고, 백엔드도 `ResponseEntity.ok(ApiResponse.success(null))`
+  를 반환한다(`nori-tc-ui-backend` `EqpParamController.java:216`). 즉 **data 는 성공 시에도 항상 null** 이라
+  이 경로는 예외 상황이 아니라 **성공할 때마다 100% 던진다**.
+- **원인**: `1b429c4` diff 에서 한 줄짜리 형제 5곳(`saveEditParams`/`checkin`/`create`/`update`/`delete`)은
+  `assertSuccessResponse` 로 바뀌었으나, 여러 줄로 쓰인 이 호출은 4번째 인자 `true`(allowNullData)만
+  삭제되고 함수명이 그대로 남았다. baseline `3704176` 에서 `allowNullData=true` 였던 14곳 중 13곳만
+  전환됐다(eqp 6 중 5).
+- **사용자 영향**: EqpPage 의 "체크아웃 되돌리기" 가 서버 성공에도
+  `error.eqp.undoCheckout`("체크아웃 되돌리기에 실패했습니다.")를 표시하고
+  (`EqpPage.tsx:1252,1257`), mutation 의 `onSuccess` 캐시 무효화가 돌지 않아 화면이 stale 로 남는다.
+- **탐지 실패 이유**: 이 경로를 덮는 e2e / 단위 테스트가 0건이라 AC1~AC3·AC16 이 전부 green 이다.
+- **dev-report 와의 불일치**: dev-report `C1-b-결함-1` 은 `undoCheckout` 을 포함해 전건
+  `assertSuccessResponse` 로 전환했다고 적었으나 코드는 그렇지 않았다(dev-report §9 정정-1 로 정정).
+
+**조치 (2026-08-19)** — 증상 1줄만 고치지 않고 재발 경로를 막았다.
+
+1. **근본 원인 차단**: `resolveSuccessPayload` 의 타입 파라미터를
+   `<TData extends NonNullable<unknown>>` 으로 제약했다. 이제 `resolveSuccessPayload<null>` 은
+   **빌드가 깨진다** — 버그 형태를 일부러 되돌려 실증했다:
+   `src/features/eqp/api/eqp.api.ts(451,29): error TS2344: Type 'null' does not satisfy the constraint '{}'.`
+2. **회귀 수정**: `undoEqpCheckout` → `assertSuccessResponse`.
+3. **제약 정합**: `resolveSuccessPayload<unknown>(` 12곳의 명시 타입인자 제거(api 5파일).
+4. **동일 안티패턴 제거**: `groupApi.addGroupPermission` 도 `assertSuccessResponse` 로
+   (`Promise<void>` 인데 데이터 추출 헬퍼를 쓰던 마지막 1곳).
+5. **죽은 참조 정정**: `useModelFlowMutations.ts` JSDoc 의 `ModelApiError` → `ApiError`.
+6. **계약 테스트 신설**: `tests/unit/api-void-endpoint-contract.test.ts` — `Promise<void>` API
+   **전 17건** + 헬퍼 계약 4건 = 21 테스트. 수정 전 실행 시 `undoEqpCheckout` 1건만 정확히 RED.
+
+게이트: build PASS / lint PASS / `test:unit` **232 pass 0 fail**(211 → 232) /
+회귀 e2e `41 passed` + `3 failed`(전부 baseline FAIL 과 동일) = **회귀 0**.
+
+**인접 부채 3건도 함께 해소**(dev-report §11):
+`layout.api.deleteObject` 에 봉투 검증 추가 / `model-flow.api.remove` 의 인라인 복제를 헬퍼 호출로 /
+`create*FailResponse`·`*FailResponse` **8종을 shared 단일 정의로 통합**(호출부 24곳 전환,
+고아가 된 `default*ErrorMessage` 5개·`isLoginFailResponse`·i18n 키 3개 동반 제거).
+이 통합으로 **R1 의 "feature 로컬 사본 전부 제거" 가 비로소 실제로 완료**됐다 — Plan §5.C1 의
+제거 대상 표가 `create*FailResponse` 계열을 열거하지 않아 8개 복제본이 남아 있었다.
+
 ## SDD 진행 상태
 
 - [x] **Specify** — 이 SPEC.md 작성 완료 (산출물: `.claude/specs/wm-parity-foundation.md`)
-- [ ] **Plan** — 별 세션에서 Plan Mode 로 구현 계획 수립 (산출물: `.claude/specs/wm-parity-foundation-plan.md`)
-- [ ] **Implement** — 별 세션에서 Acceptance Criteria 만족하는 구현 (산출물: `.claude/specs/wm-parity-foundation-dev-report.md`)
-- [ ] **Validate** — 별 세션에서 SPEC + Plan + Dev report 셋 다 입력으로 검증, 위 체크박스 업데이트
+- [x] **Plan** — 별 세션에서 Plan Mode 로 구현 계획 수립 (산출물: `.claude/specs/wm-parity-foundation-plan.md`)
+- [x] **Implement** — 별 세션에서 Acceptance Criteria 만족하는 구현 (산출물: `.claude/specs/wm-parity-foundation-dev-report.md`)
+- [x] **Validate** — SPEC + Plan + Dev report 셋 다 입력으로 검증 완료, 위 체크박스 갱신
+      (AC 16/17 [x] · AC16 [~] — 3D WebGL 경합 타임아웃 한정). 검증 중 발견한 런타임 회귀 V-1 은
+      근본 원인(타입 제약 부재) + 2차 원인(void API 계약 무검증)까지 해소하고 계약 테스트 21건을
+      추가했다. dev-report 의 사실 오류 4건은 §9 로 정정했다.
+      후속 `wm-parity-sidebar` 착수 가능.
 
 ## 다음 단계 진입 프롬프트
 
