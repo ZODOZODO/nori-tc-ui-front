@@ -1137,8 +1137,11 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
         })}
       </div>
 
-      {/* 상단 우측 — 편집 토글 + 저장 */}
-      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+      {/* 상단 우측 — 편집 토글 + 저장.
+          좌측 편집 패널과 같은 `top-4` 줄에 있고 그쪽은 `flex-wrap` 으로 폭에 따라 늘어난다.
+          전역 LNB 가 본문 폭을 256px 가져가면서 좌측 패널이 이 클러스터 아래까지 뻗어
+          Undo/Save 클릭을 가로챘다 — 이쪽을 위 레이어로 올려 히트 테스트를 이긴다. */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         {/* 현재 층(전체/1/2층) 기준 — 표시 합계 + 구조물 종류별 + 설비 대수. 편집 가능자에겐 미저장 변경 수도. */}
         <span
           data-testid="live-map-3d-count-chip"
@@ -1257,7 +1260,10 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
 
       {/* 편집 — 추가 패널: 구조물(라이브러리 + 기본 구조) | 미배치 설비 */}
       {editing ? (
-        <div className="absolute left-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-[14px] border border-border bg-card/90 px-3 py-2 shadow-soft-md backdrop-blur">
+        /* `top-4` 가 아니라 `top-16` — 우측 컨트롤 클러스터와 같은 줄에 두면 이 패널이
+           `flex-wrap` 으로 늘어나며 그 아래로 파고들어 Undo/Save 를 덮는다(전역 LNB 가 본문 폭을
+           256px 가져간 뒤 실제로 덮혔다). 우측 상세 패널(`right-4 top-16`)과 같은 줄로 내린다. */
+        <div className="absolute left-4 top-16 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-[14px] border border-border bg-card/90 px-3 py-2 shadow-soft-md backdrop-blur">
           <Select
             value={addObjectKey === '' ? SELECT_EMPTY_VALUE : addObjectKey}
             onValueChange={(next) => setAddObjectKey(next === SELECT_EMPTY_VALUE ? '' : next)}

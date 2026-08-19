@@ -233,7 +233,9 @@ export function LiveMapPage() {
         style={{ scrollbarGutter: 'stable' }}
       >
         <div className="flex w-full flex-col gap-4 px-6 py-6">
-          <AppPageHeading />
+          {/* 캔버스 높이가 보드 fit 스케일을 정하는 화면이라 제목 블록의 세로 공간을 최소로
+              둔다(구분선·최소 높이 없이 제목 한 줄) — 구 LiveMapHeader 제목 줄을 이것이 대체한다. */}
+          <AppPageHeading className="min-h-0 gap-0 border-b-0 pb-0" />
           <LiveMapHeader summary={summary} />
           {liveMapQuery.isError ? (
             <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">

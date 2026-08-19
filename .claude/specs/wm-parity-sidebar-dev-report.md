@@ -18,8 +18,8 @@
 | C4a | `feat(routing): 16 라우트 + 리다이렉트 + URL 단일 진실 원천 (R5)` | 완료 | `2000a6c` |
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | `2b08643` |
 | C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 완료 | `585da64` |
-| C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 완료 | (이 커밋) |
-| C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 대기 | — |
+| C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 완료 | `c1a73c9` |
+| C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 완료 | (이 커밋) |
 
 ---
 
@@ -539,4 +539,129 @@ $ npm run test:unit
   SPEC Out of Scope("DLQ 5모드 화면 각각의 기능 개선 — 내비 승격만, 콘텐츠 불변")에 걸린다.
   **손대지 않고 남긴다** — 카드 헤더 문구 정리가 필요하면 별도 결정으로 진행할 사항
 
-(커밋 진행에 따라 계속 추가)
+---
+
+## C7 — `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)`
+
+> **git 추적 밖**: `.gitignore:20` 이 `/tests/e2e/` 를 제외한다. 아래 e2e 변경은 로컬 파일에만
+> 존재하고 이 커밋의 diff 에는 나타나지 않는다(커밋에 담기는 것은 이 dev-report 와 C7 에서
+> 발견해 고친 **src 수정 3건**뿐이다). Validate 세션은 로컬에서 재실행해 확인해야 한다.
+
+### 신설 — `tests/e2e/wm-parity-sidebar.spec.ts` (25 테스트)
+- 16 라우트: 최종 URL + `<h1>` 렌더 + 해당 LNB 항목의 `aria-current="page"` (라벨 텍스트가 아니라
+  속성으로 봐서 locale 무관)
+- 리다이렉트 8종: `/dlq` `/deploy` `/user` `/eqp` `/model` `/eqp/live-map` + `/` `*`
+- 권한 미보유(EQP_READ 만): `/dlq/dashboard` 에서 `access-denied-notice` 렌더 + URL 유지 +
+  권한 없는 LNB 항목 부재 + 있는 항목 존재
+- 전 테스트 `console.error` 0 AND `pageerror` 0
+
+**mock 은 `url.pathname.startsWith('/api/')` 술어로 건다** — `'**/api/**'` glob 은 Vite dev 의
+모듈 요청(`/src/features/dlq/api/dlq.api.ts`)까지 삼켜 화면이 백지가 된다(C4b 진단에서 실증).
+
+### 갱신 — 기존 스펙 (Plan §6 + 실행에서 추가 발견)
+
+| 분류 | 대상 | 처리 |
+|---|---|---|
+| §6.1 제거 testId 7파일 18건 | `dlq-sidebar-*` / `user-management-sidebar-*` / `deploy-sidebar-*` | 가시성 단언은 `lnb-item-*` 로, 모드 전환 클릭은 신 라우트 `goto` 로 (15건) |
+| §6.2 헤더 role-button 16파일 | `getByRole('button', {name:'Gateway'\|'Business'\|'SECS'\|'Socket'\|'PLC', exact:true})` | 클릭 22건 → 스코프 라우트 `goto`, 로케이터 참조 4건 → `lnb-item-*` |
+| §6.3 URL 단언 4곳 | `group-page:366` / `user-page:347` / `verify-ui/routes.spec` 라우트 표 / `verify-ui/_shared:232` | 신 최종 URL 로 갱신. `routes.spec` 의 `AUTHENTICATED_ROUTES` 는 6 → **16 라우트로 확장** |
+| **Plan 밖 추가 발견 (실행에서 드러남)** | `locator('aside button', {hasText:'Gateway'})` 4파일 (`eqp-line-select` / `modal-visual-sweep-eqp` / `plc-eqp-form` / `plc-eqp-polling-group`) | §6.2 가 잡은 `getByRole` 형태와 문법이 달라 목록에 없었다. Gateway 스코프 진입은 `goto('/eqp/gateway')`, Eqp Create 우클릭은 `eqp-sidebar-gateway-tree` 컨테이너로 |
+| **Plan 밖 추가 발견** | `getByRole('complementary').getByRole('button', {name:'배포'\|'Deploy'})` 2파일 (`deploy-monitor-view-modal` / `selectable-table-deploy-monitor`) | 삭제된 DeploySidebar(`<aside>`) 클릭 → `goto('/deploy/deploy')` |
+| **Plan 밖 추가 발견** | 권한 미보유 차단 단언 2건 (`group-page` Group-AC-8b / `user-page` `/user 직접 접근 차단`) | `toHaveURL(/(login\|forbidden\|eqp)/)` → `access-denied-notice` 렌더 (R11 의 **의도된 동작 변경**: /login 튕김 폐기) |
+
+### C7 에서 발견해 고친 **src** 회귀 3건 (실측 → 수정 → 재검증)
+
+전체 스윕 1차에서 baseline PASS 11건이 떨어졌다. `--workers=2` → `--workers=1` 로 좁혀
+**4건이 직렬에서도 재현**됨을 확인하고(= 플레이크 아님) 원인을 실측했다.
+
+| # | 증상 | 실측 원인 | 수정 |
+|---|---|---|---|
+| I19 | `live-map-flow-groups` "그룹 추가" 가 `expect(336).toBeGreaterThan(336)` 로 실패 (리사이즈 드래그가 0px) + "드래그&드롭" 이 노드 미발견 | `<AppPageHeading />`(min-h-21 + border-b + gap-4)를 `LiveMapHeader` 위에 **쌓아** 캔버스 세로 공간을 ~84px 빼앗았다. 이 화면은 보드 높이가 fit 스케일을 정하고, 리사이즈 핸들이 뷰포트 밖으로 밀려 합성 드래그가 핸들에 닿지 않았다 | 헤딩을 `className="min-h-0 gap-0 border-b-0 pb-0"` 로 컴팩트화하고 `LiveMapHeader` 의 중복 제목 줄을 제거해 **순 증가 0**으로 맞췄다(Plan D5 의 "3D 풀블리드 훼손 없게 컴팩트 배치" 이행) |
+| I20 | `live-map-3d-undo-counts` 가 90s 타임아웃 — `live-map-3d-undo` 클릭이 `absolute left-4 top-4 … flex-wrap` 패널에 **intercepted** | 전역 LNB 가 본문 폭을 256px 가져가면서 좌측 편집 패널이 더 넓게 wrap 해 같은 `top-4` 줄의 우측 컨트롤 클러스터(Undo/Save) 아래로 파고들었다 | 우측 클러스터를 `z-20` 으로 올려 히트 테스트를 이기게 하고, 좌측 편집 패널을 `top-4` → `top-16` 으로 내려 **시각 겹침까지** 해소(기존 `right-4 top-16` 상세 패널과 같은 줄). 스크린샷으로 두 툴바가 겹치지 않고 모든 컨트롤이 보이는 것을 확인 |
+| I21 | (스펙 측) `live-map` 에 `<h1>` 2개 | `LiveMapHeader` 가 `livemap.title` 을 `<h1>` 로 그리고 있었다 — 내가 추가한 페이지 헤딩과 충돌 | I19 수정으로 그 제목 줄 자체를 제거해 해소(h1 1개) |
+
+### AC4 판정 — PASS
+
+```
+$ npx playwright test tests/e2e/wm-parity-sidebar.spec.ts
+  25 passed (43.1s)
+```
+최종 전체 스윕에서도 `wm-parity-sidebar.spec.ts` = `{"expected":25,"unexpected":0,"skipped":0}`.
+각 테스트가 `console.error` / `pageerror` 배열을 `[]` 로 단언하므로 오류 0 게이트가 함께 걸려 있다.
+
+### AC11 판정 — PASS (회귀 0)
+
+최종 전체 스윕(`npx playwright test`, 로컬 워커 4):
+
+```
+  90 failed
+  14 did not run
+  113 passed (18.8m)
+```
+
+baseline 대조 (JSON 리포터 파싱):
+
+```
+baseline PASS: 87 | after total: 217
+
+### baseline PASS 중 after 미통과 (회귀 후보): 0
+
+### baseline PASS 중 after 에 이름이 없는 항목 (스펙 갱신으로 제목 변경/삭제): 0
+
+### after 전체 집계: {"expected":113,"unexpected":90,"skipped":14}
+```
+
+- **baseline PASS 87건 전부 통과** → 회귀 0. D12 의 `--workers=1` 예외 조항을 쓸 필요가 없었다
+  (3D 스펙 포함 전건이 워커 4 병렬에서 그대로 통과)
+- 새로 통과 26건 = 신설 spec 25 + `group-page` Group-AC-1/AC-2(baseline FAIL 이었는데 로케이터
+  갱신으로 살아남)
+- 남은 90 실패는 baseline 81 + `verify-ui/routes.spec` 라우트 표 확장분(6→16 라우트라 실백엔드
+  없이 실패하는 항목이 +10). 즉 **성격이 바뀐 실패는 없다**
+
+### AC1 / AC2 / AC3 최종 재실행
+
+```
+$ npm run build
+✓ built in 16.96s
+
+$ npm run lint
+> eslint .            (무출력 — 통과)
+
+$ npm run test:unit
+# tests 241
+# pass 241
+# fail 0
+```
+
+---
+
+## AC 최종 자기 판정 (Validate 세션이 재검증할 대상)
+
+| AC | 판정 | 근거 |
+|---|---|---|
+| AC1 `npm run build` | PASS | `✓ built in 16.96s` |
+| AC2 `npm run lint` | PASS | eslint 무출력 (경고 0 · 오류 0) |
+| AC3 `npm run test:unit` | PASS | 241/241. `resolveVisibleAppNavigationGroups` 권한 필터(항목 숨김 + 빈 그룹 숨김) 8 테스트 포함 |
+| AC4 신설 e2e | PASS | 25/25 + console.error/pageerror 0 |
+| AC5 `navigationItems.map` 0건 | PASS | grep 0 |
+| AC6 `APP_TOP_BAR_OFFSET_CLASS` 0건 | PASS | grep 0 (주석 언급까지 제거) |
+| AC7 `<button` in `src/features` 0건 | PASS | grep 0 |
+| AC8 3 사이드바 파일 제거 | PASS | `git ls-files` 0줄 |
+| AC9 6 페이지 헤딩 + PageLayoutShell 경유 | PASS | grep 6줄 / `AppPageHeading` 3건 |
+| AC10 셸 배선 | PASS | `AppPageShell.tsx` 내 `AppLnbSidebar` 2건 |
+| AC11 e2e 회귀 0 | PASS | baseline PASS 87 전건 통과 (부분 판정 불필요) |
+| AC12 LNB prefetch 배선 | PASS | `AppLnbSidebar.tsx` 15건 |
+
+SPEC 의 AC 체크박스 마킹은 **Validate 세션 소관**이라 이 세션에서 건드리지 않았다.
+
+## 남은 소견 (Validate / 사용자 판단 요청)
+
+1. **DLQ·Deploy 패널 카드 헤더 문구가 페이지 헤딩과 겹친다** — 예: `/dlq/gateway` 에서 페이지
+   `h1 = Gateway DLQ` 아래 패널 카드 헤더도 `Gateway DLQ`. `PageHeading*` 소비가 아니라 건수·최종
+   갱신 시각·검색·Refresh 를 얹은 기능 블록이고 SPEC Out of Scope("콘텐츠 불변")라 손대지 않았다.
+2. **모델 스코프 목록으로 되돌아가는 수단** — 모델을 고르면 중앙이 그 모델의 버전 목록으로 바뀌고,
+   같은 스코프 LNB 항목을 다시 눌러도 이미 활성이라 navigate 가 일어나지 않는다(wm 이식 동작).
+   다른 스코프로 갔다 오면 초기화된다. Plan D2 가 `handleSelectInterfaceGroup` 제거를 명시해
+   그대로 따랐고, 필요하면 별도 결정 사항이다.
+3. **e2e 는 git 추적 밖**이라 AC4/AC11 은 커밋 diff 로 검증할 수 없다 — Validate 는 로컬 재실행 필요.
+

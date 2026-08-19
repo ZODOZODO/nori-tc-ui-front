@@ -25,10 +25,10 @@ export function LiveMapHeader({ summary }: LiveMapHeaderProps) {
 
   return (
     <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* 제목 줄은 라우트 헤딩(AppPageHeading)이 그린다 — 여기에 또 두면 h1 이 둘이 되고,
+          캔버스가 그만큼 낮아진다. 이 화면은 보드 높이가 fit 스케일을 정하므로 세로 공간을
+          한 줄도 더 쓰지 않는다. */}
       <div className="space-y-1.5">
-        <h1 className="text-[20px] font-extrabold tracking-tight text-foreground">
-          {t('livemap.title')}
-        </h1>
         <p className="text-sm text-muted-foreground">{t('livemap.subtitle')}</p>
       </div>
 
