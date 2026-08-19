@@ -19,7 +19,7 @@
 | C4b | `feat(shell): LNB 셸 전환 — topbar 개편 + RequirePermission (R6/R7/R11)` | 완료 | `2b08643` |
 | C5 | `refactor(sidebar): 도메인 사이드바 재편 (R9)` | 완료 | `585da64` |
 | C6 | `feat(layout): AppPageHeading + PageLayoutShell wm 판 (R10)` | 완료 | `c1a73c9` |
-| C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 완료 | (이 커밋) |
+| C7 | `test(e2e): wm-parity-sidebar 스펙 신설 + 기존 갱신 (R12)` | 완료 | `537bd6c` |
 
 ---
 
