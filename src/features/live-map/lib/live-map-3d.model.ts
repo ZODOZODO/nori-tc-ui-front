@@ -3,6 +3,12 @@
  *
  * <p>객체(shape_json v2)는 기본 도형(box/cylinder/plane) 조합으로 정의된다. 빌더(객체 라이브러리)가
  * 이 스펙을 만들고, 뷰어 3D 씬이 three 메시로 렌더한다(SPEC: live-map-3d). React/three 비의존 — 순수 TS.</p>
+ *
+ * <p>캔버스 색이 CSS 토큰이 아니라 hex 인 이유 — three 의 {@code Color.setStyle} 은 hex / rgb() / hsl() /
+ * 색이름만 파싱한다(three 0.184.0 {@code Color.js:286}). ui-front 테마 토큰(src/index.css)은 전부
+ * {@code oklch(...)} 이고 {@code var(--x)} 도 WebGL 에 전달할 수 없다 → 3D 캔버스 색은 이 모듈이 단일
+ * 출처로 hex 를 들고 있고, DOM 오버레이(뱃지 / 칩)는 {@code live-map-status-theme.ts} 의 Tailwind
+ * semantic 토큰을 쓴다.</p>
  */
 
 export type LiveMap3DPrimType = 'box' | 'cylinder' | 'plane'
@@ -42,6 +48,25 @@ export const LIVE_MAP_PORT_COLOR: Record<'RUN' | 'IDLE' | 'DOWN', string> = {
   RUN: LIVE_MAP_STATUS_COLOR.RUN,
   IDLE: LIVE_MAP_STATUS_COLOR.IDLE,
   DOWN: LIVE_MAP_STATUS_COLOR.DOWN,
+}
+
+/** 3D 씬 배경/바닥/그리드/조명 — 테마별 1세트. */
+export interface LiveMapScenePalette {
+  background: string
+  ground: string
+  gridCell: string
+  gridSection: string
+  hemiSky: string
+  hemiGround: string
+  ambient: number
+  hemi: number
+  badgeBg: string
+}
+
+/** 3D 뷰어 씬 색의 단일 출처. 빌더(객체 편집) 미리보기도 dark 세트의 배경을 그대로 쓴다. */
+export const LIVE_MAP_SCENE_PALETTE: Record<'light' | 'dark', LiveMapScenePalette> = {
+  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, badgeBg: 'rgba(11,16,32,0.92)' },
+  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, badgeBg: 'rgba(255,255,255,0.95)' },
 }
 
 /** shape_json 이 v2(3D) 스펙인지 — v1(Konva Group)과 구분한다. */

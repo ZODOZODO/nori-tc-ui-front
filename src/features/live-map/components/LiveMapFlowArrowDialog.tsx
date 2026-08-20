@@ -17,22 +17,11 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import {
   LIVE_MAP_FLOW_ARROW_DEFAULT_STYLE,
+  LIVE_MAP_FLOW_COLOR_PRESETS,
   type LiveMapFlowArrow,
   type LiveMapFlowArrowDash,
   type LiveMapFlowArrowPatch,
 } from '../lib/live-map-flow.model'
-
-/** 화살표 색 프리셋 — 그룹 색 프리셋과 동일 팔레트(시각 일관성). */
-const ARROW_COLOR_PRESETS = [
-  '#ef4444',
-  '#f59e0b',
-  '#22c55e',
-  '#0ea5e9',
-  '#6366f1',
-  '#ec4899',
-  '#14b8a6',
-  '#64748b',
-] as const
 
 const ARROW_WIDTH_PRESETS = [2, 3, 4, 6] as const
 
@@ -144,7 +133,7 @@ export function LiveMapFlowArrowDialog({
               >
                 {t('livemap.flow.colorNone')}
               </Button>
-              {ARROW_COLOR_PRESETS.map((preset) => (
+              {LIVE_MAP_FLOW_COLOR_PRESETS.map((preset) => (
                 <Button
                   key={preset}
                   type="button"

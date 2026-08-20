@@ -9,25 +9,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
-import type { LiveMapFlowGroup } from '../lib/live-map-flow.model'
+import { LIVE_MAP_FLOW_COLOR_PRESETS, type LiveMapFlowGroup } from '../lib/live-map-flow.model'
 
 export interface LiveMapFlowGroupPatch {
   title: string
   subtitle: string
   color: string | null
 }
-
-/** 그룹 색 프리셋 — 라이트/다크 양 테마에서 가독되는 채도 높은 hex. */
-const GROUP_COLOR_PRESETS = [
-  '#ef4444',
-  '#f59e0b',
-  '#22c55e',
-  '#0ea5e9',
-  '#6366f1',
-  '#ec4899',
-  '#14b8a6',
-  '#64748b',
-] as const
 
 /**
  * 공정 흐름 그룹 표시 속성(이름/부제/색) 편집 다이얼로그입니다.
@@ -92,7 +80,7 @@ export function LiveMapFlowGroupDialog({
               >
                 {t('livemap.flow.colorNone')}
               </Button>
-              {GROUP_COLOR_PRESETS.map((preset) => (
+              {LIVE_MAP_FLOW_COLOR_PRESETS.map((preset) => (
                 <Button
                   key={preset}
                   type="button"

@@ -62,6 +62,23 @@ export interface LiveMapFlowArrow {
   dash: LiveMapFlowArrowDash
 }
 
+/**
+ * 그룹 / 화살표 색 프리셋 — 라이트·다크 양 테마에서 가독되는 채도 높은 hex.
+ *
+ * <p>그룹과 화살표가 같은 팔레트를 써야 시각이 일관되므로 두 다이얼로그가 이 목록 하나만 참조한다.
+ * 사용자가 고른 값이 그대로 canvas_json.flow 에 영속되므로 CSS 토큰(var/oklch)으로 대체할 수 없다.</p>
+ */
+export const LIVE_MAP_FLOW_COLOR_PRESETS = [
+  '#ef4444',
+  '#f59e0b',
+  '#22c55e',
+  '#0ea5e9',
+  '#6366f1',
+  '#ec4899',
+  '#14b8a6',
+  '#64748b',
+] as const
+
 /** 화살표 스타일 기본값 — 신규 생성 다이얼로그 초기값. */
 export const LIVE_MAP_FLOW_ARROW_DEFAULT_STYLE = {
   color: null,

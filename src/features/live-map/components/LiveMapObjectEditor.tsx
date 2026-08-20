@@ -10,6 +10,7 @@ import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } f
 import {
   isLiveMap3DShape,
   LIVE_MAP_BUILTIN_STRUCTURES,
+  LIVE_MAP_SCENE_PALETTE,
   LIVE_MAP_STRUCTURE_COLOR_BY_NAME,
   type LiveMap3DPrim,
   type LiveMap3DPrimType,
@@ -17,6 +18,9 @@ import {
   type LiveMapBuiltinStructure,
 } from '../lib/live-map-3d.model'
 import { LiveMap3DObject } from './LiveMap3DObject'
+
+/** 미리보기 배경 — 뷰어 다크 씬과 같은 배경이라야 여기서 만든 색이 뷰어에서 보일 색과 일치한다. */
+const PREVIEW_BACKGROUND = LIVE_MAP_SCENE_PALETTE.dark.background
 
 const PRIM_DEFAULT: Record<LiveMap3DPrimType, Omit<LiveMap3DPrim, 'id'>> = {
   box: { type: 'box', size: { x: 2, y: 2, z: 2 }, position: { x: 0, y: 1, z: 0 }, rotationY: 0, color: '#9aa7b8' },
@@ -333,13 +337,14 @@ export function LiveMapObjectEditor() {
         ) : null}
       </div>
 
-      {/* 3D 미리보기 */}
+      {/* 3D 미리보기 — 캔버스가 그려지기 전 여백까지 같은 배경으로 덮으려 래퍼 배경도 같은 값을 쓴다. */}
       <div
         data-testid="object-editor-preview"
-        className="h-full w-80 shrink-0 overflow-hidden rounded-[18px] border border-border bg-[#0e1422]"
+        className="h-full w-80 shrink-0 overflow-hidden rounded-[18px] border border-border"
+        style={{ backgroundColor: PREVIEW_BACKGROUND }}
       >
         <Canvas frameloop="demand" shadows orthographic camera={{ position: [7, 7, 7], zoom: 42, near: -100, far: 100 }}>
-          <color attach="background" args={['#0e1422']} />
+          <color attach="background" args={[PREVIEW_BACKGROUND]} />
           <ambientLight intensity={0.7} />
           <directionalLight position={[6, 10, 4]} intensity={1.1} castShadow />
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>

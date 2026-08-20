@@ -31,6 +31,7 @@ import {
   LIVE_MAP_BOARD_PX_WIDTH,
   LIVE_MAP_BUILTIN_STRUCTURES,
   LIVE_MAP_FAB_LINE_LAYOUT,
+  LIVE_MAP_SCENE_PALETTE,
   LIVE_MAP_STATUS_COLOR,
   LIVE_MAP_STRUCTURE_COLOR_BY_NAME,
   placementToWorld,
@@ -40,6 +41,7 @@ import {
   worldToPlacement,
   type LiveMap3DShape,
   type LiveMapBuiltinStructure,
+  type LiveMapScenePalette,
 } from '../lib/live-map-3d.model'
 import { useEqpList } from '@/features/eqp/hooks/useEqpList'
 import { useGatewayShardLeases } from '@/features/eqp/hooks/useGatewayShardLeases'
@@ -98,22 +100,8 @@ const STACK_CENTER_Y = (FLOOR_HEIGHT * (FLOOR_LEVELS.length - 1)) / 2
 /** 층 뷰 — 특정 층만 보기 or 전체 적층. */
 type FloorView = number | 'all'
 
-/** 3D 캔버스(WebGL)는 CSS 토큰을 못 쓰므로 테마별 색을 직접 분기한다. 오버레이/상세는 CSS 토큰으로 자동 대응. */
-interface ScenePalette {
-  background: string
-  ground: string
-  gridCell: string
-  gridSection: string
-  hemiSky: string
-  hemiGround: string
-  ambient: number
-  hemi: number
-  badgeBg: string
-}
-const SCENE_PALETTE: Record<'light' | 'dark', ScenePalette> = {
-  dark: { background: '#0e1422', ground: '#0b1020', gridCell: '#1e2638', gridSection: '#3a4a63', hemiSky: '#cbd5e1', hemiGround: '#0b0f1a', ambient: 0.45, hemi: 0.45, badgeBg: 'rgba(11,16,32,0.92)' },
-  light: { background: '#eef2f7', ground: '#dce3ed', gridCell: '#cdd6e2', gridSection: '#9aabbf', hemiSky: '#ffffff', hemiGround: '#c2ccd8', ambient: 0.72, hemi: 0.6, badgeBg: 'rgba(255,255,255,0.95)' },
-}
+/** 선택된 뱃지 — 상태색 배경 위 전경색. 상태색이 채도 높은 hex 라 테마 무관 순백이 대비 짝이다. */
+const SELECTED_BADGE_FG = '#ffffff'
 
 /** objectKey 0 = 라이브러리 객체 없이 자동 표시되는 빌트인 설비. 저장 시 백킹 EQUIPMENT 객체 키로 치환. */
 const AUTO_OBJECT_KEY = 0
@@ -255,7 +243,7 @@ function SceneContent({
   placements: ResolvedPlacement[]
   selectedIdSet: ReadonlySet<string>
   editing: boolean
-  palette: ScenePalette
+  palette: LiveMapScenePalette
   floorView: FloorView
   badgeRefs: RefObject<Map<string, HTMLButtonElement | null>>
   onSelect: (localId: string, additive: boolean) => void
@@ -447,7 +435,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
   const gatewayShardLeasesQuery = useGatewayShardLeases()
   const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
   const theme = useThemeStore((state) => state.theme)
-  const palette = SCENE_PALETTE[theme]
+  const palette = LIVE_MAP_SCENE_PALETTE[theme]
 
   const idRef = useRef(0)
   const nextLocalId = () => {
@@ -1126,11 +1114,11 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
               style={{
                 transform: 'translate(-9999px, -9999px)',
                 borderColor: color,
-                color: isSelected ? '#ffffff' : color,
+                color: isSelected ? SELECTED_BADGE_FG : color,
                 background: isSelected ? color : palette.badgeBg,
               }}
             >
-              <span className="size-1.5 rounded-full" style={{ background: isSelected ? '#ffffff' : color }} />
+              <span className="size-1.5 rounded-full" style={{ background: isSelected ? SELECTED_BADGE_FG : color }} />
               {badge.eqpId} · {badge.statusLabel}
             </Button>
           )
