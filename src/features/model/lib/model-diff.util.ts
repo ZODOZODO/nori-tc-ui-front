@@ -3,6 +3,7 @@ import type {
   ModelDetailRow,
   ModelDiffItem,
   ModelDiffSection,
+  ModelNodeDetailData,
 } from '../types/model.types'
 
 /**
@@ -66,3 +67,33 @@ export const computeNodeDiff = (
 
   return { added, changed, deleted }
 }
+
+/**
+ * check-in diff 모달에 그릴 노드별 섹션을 조립합니다.
+ *
+ * 컬럼은 현재 버전 것을 쓰되 비어 있으면 이전 버전 것으로 대체한다 — EDIT 버전에서 모든 row 를
+ * 지우면 서버가 컬럼을 빈 배열로 주고, 그대로 넘기면 삭제분만 있는 섹션의 표 머리가 사라진다.
+ * 변경이 하나도 없는 노드는 모달 노이즈라 걸러낸다.
+ */
+export const buildCheckInDiffSections = (
+  nodeResults: {
+    node: ModelDetailNode
+    currentData: ModelNodeDetailData
+    previousData: ModelNodeDetailData
+  }[],
+): ModelDiffSection[] =>
+  nodeResults
+    .map(({ node, currentData, previousData }) => {
+      const { added, changed, deleted } = computeNodeDiff(node, currentData.rows, previousData.rows)
+      return {
+        detailNode: node,
+        columns: currentData.columns.length > 0 ? currentData.columns : previousData.columns,
+        added,
+        changed,
+        deleted,
+      }
+    })
+    .filter(
+      (section) =>
+        section.added.length > 0 || section.changed.length > 0 || section.deleted.length > 0,
+    )

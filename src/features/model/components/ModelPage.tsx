@@ -14,7 +14,7 @@ import { useModelManagementMutations } from '../hooks/useModelManagementMutation
 import { useModelNodeDetail } from '../hooks/useModelNodeDetail'
 import { useModelMutations } from '../hooks/useModelMutations'
 import { useModelUiStore } from '../stores/model-ui.store'
-import { computeNodeDiff } from '../lib/model-diff.util'
+import { buildCheckInDiffSections } from '../lib/model-diff.util'
 import {
   type ModelDetailRow,
   type ModelDiffSection,
@@ -1085,23 +1085,7 @@ export function ModelPage({ scope }: ModelPageProps) {
 
       const results = await Promise.all(nodeFetchPairs)
 
-      const sections: ModelDiffSection[] = results
-        .map(({ node, currentData, previousData }) => {
-          const { added, changed, deleted } = computeNodeDiff(node, currentData.rows, previousData.rows)
-          return {
-            detailNode: node,
-            columns: currentData.columns.length > 0 ? currentData.columns : previousData.columns,
-            added,
-            changed,
-            deleted,
-          }
-        })
-        .filter(
-          (section) =>
-            section.added.length > 0 || section.changed.length > 0 || section.deleted.length > 0,
-        )
-
-      setCheckInDiffSections(sections)
+      setCheckInDiffSections(buildCheckInDiffSections(results))
     } catch {
       // diff 조회 실패 시 diff 없이 바로 check in 모달로 이동합니다.
       setIsCheckInDiffModalOpen(false)

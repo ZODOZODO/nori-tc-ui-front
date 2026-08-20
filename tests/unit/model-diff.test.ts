@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { computeNodeDiff } from '@/features/model/lib/model-diff.util.ts'
+import {
+  buildCheckInDiffSections,
+  computeNodeDiff,
+} from '@/features/model/lib/model-diff.util.ts'
 import type { ModelDetailRow } from '@/features/model/types/model.types.ts'
 
 /**
@@ -60,4 +63,52 @@ test('computeNodeDiff(model-parameter): col0 고유 노드는 values[0] 식별�
   assert.equal(diff.changed[0].identity, 'SITE')
   assert.equal(diff.added.length, 1)
   assert.equal(diff.added[0].identity, 'ADDED')
+})
+
+const nodeDetail = (columns: string[], rows: ModelDetailRow[]) => ({
+  columns,
+  rows,
+  mdfContents: [],
+})
+
+test('buildCheckInDiffSections: 변경이 없는 노드는 섹션에서 제외한다', () => {
+  const unchanged = [row('param:1', ['SITE', 'SAME', ''])]
+
+  const sections = buildCheckInDiffSections([
+    {
+      node: 'model-parameter',
+      currentData: nodeDetail(['Name', 'Value', 'Desc'], unchanged),
+      previousData: nodeDetail(['Name', 'Value', 'Desc'], unchanged),
+    },
+    {
+      node: 'mes-message',
+      currentData: nodeDetail(['Name'], [row('mes:1', ['NEW_MSG'])]),
+      previousData: nodeDetail(['Name'], []),
+    },
+  ])
+
+  // 변경 없는 노드까지 남기면 모달이 빈 섹션으로 도배된다.
+  assert.equal(sections.length, 1)
+  assert.equal(sections[0].detailNode, 'mes-message')
+  assert.equal(sections[0].added.length, 1)
+})
+
+test('buildCheckInDiffSections: 현재 버전 컬럼이 비면 이전 버전 컬럼으로 대체한다', () => {
+  // EDIT 에서 row 를 전부 지우면 서버가 columns 를 빈 배열로 준다 — 그대로 쓰면 삭제분만
+  // 있는 섹션의 표 머리가 사라진다.
+  const sections = buildCheckInDiffSections([
+    {
+      node: 'model-parameter',
+      currentData: nodeDetail([], []),
+      previousData: nodeDetail(['Name', 'Value', 'Desc'], [row('param:1', ['SITE', 'OLD', ''])]),
+    },
+  ])
+
+  assert.equal(sections.length, 1)
+  assert.deepEqual(sections[0].columns, ['Name', 'Value', 'Desc'])
+  assert.equal(sections[0].deleted.length, 1)
+})
+
+test('buildCheckInDiffSections: 노드가 하나도 없으면 빈 배열이다', () => {
+  assert.deepEqual(buildCheckInDiffSections([]), [])
 })
