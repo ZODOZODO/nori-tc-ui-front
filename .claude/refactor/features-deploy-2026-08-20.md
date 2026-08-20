@@ -291,13 +291,99 @@ e2e:
 
 **판정: 정적 개선(-12.8%) + 런타임 regression 없음 → commit**
 
-## 5. 회차 종료 시점 잔존 현황 (features/deploy)
+### 4-3. deploy-ui.store.ts 순수함수 분리 (→ lib/deploy-ui-state.ts)
+
+방향은 wm-parity-foundation-plan.md:1153 에서 확정된 사항이라 분할 패턴 선택 없이 적용.
+
+**변경 파일**
+- `src/features/deploy/stores/deploy-ui.store.ts` (수정)
+- `src/features/deploy/lib/deploy-ui-state.ts` (신규)
+- `src/features/deploy/components/DeployMonitorPanel.tsx` (import 경로만 변경)
+
+**이동 대상** — set/get 클로저를 쓰지 않는 순수 함수·상수 8 개:
+`toDateInputValue`(모듈 내부, 미export) / `EMPTY_REGISTER_FILTERS` /
+`createDefaultMonitorFilters` / `createInitialDeployUiDataState` / `nextDeployKey` /
+`createBridgeTargets` / `createPlaceholderTargetSummary` / `createServerBridgeHistoryItem` /
+`mergeHistoryItem`.
+
+`DEPLOY_UI_STORAGE_KEY` 는 persist 설정과 `clearDeployUiSessionState` 가 쓰므로 store 에 잔류.
+`createDefaultMonitorFilters` 는 외부 import 처가 DeployMonitorPanel 1 곳뿐이라(워크스페이스
+Grep 확인) store 재export 없이 import 경로를 lib 로 바꿨다.
+
+**정적 효과**
+
+| 항목 | before | after | 변화 |
+|---|---|---|---|
+| deploy-ui.store.ts LOC | 796 | 607 | **-189 (-23.7%)** |
+| deploy-ui-state.ts LOC | — | 212 | 신규 (전부 순수 함수 → 단위테스트 부착 가능) |
+
+store 는 임계(400) 를 여전히 초과(607). create() 본문의 액션 구현이 남은 덩어리다.
+
+**게이트 — 전부 PASS**
+
+lint:
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+unit:
+```
+1..241
+# tests 241
+# pass 241
+# fail 0
+# duration_ms 3416.9677
+```
+build:
+```
+dist/assets/DeployPage-Ci5FzAvI.js                  70.77 kB │ gzip:  16.40 kB
+✓ built in 22.17s
+```
+청크 불변(70.77 kB) — 같은 청크 안의 모듈 이동이라 예상대로.
+
+e2e:
+```
+  ok 3 [chromium] › deploy-register-bulk-guard.spec.ts:72:1 › 100+ 설비 전체선택 → 추가 시 가상화 + 개수 가드로 서버 400 을 사전 차단한다 (9.4s)
+  ok 1 [chromium] › deploy-monitor-view-modal.spec.ts:96:1 › Deploy View 모달 — 대상별 진행 현황 테이블이 모달 폭 안에 들어온다 (가로 overflow 없음) (10.0s)
+  ok 2 [chromium] › deploy-register-scenario-modal.spec.ts:125:1 › 시나리오 선택 모달 — 테이블이 모달 폭 안에 줄바꿈되어 들어온다 (가로 overflow 없음) (12.3s)
+
+  3 passed (15.9s)
+```
+
+**런타임 regression** — 2 회 샘플 (`-store.json` / `-store-2.json`)
+
+| 지표 | baseline | after #1 | after #2 | 판정 |
+|---|---|---|---|---|
+| DeployPage cold slowest | 29ms | 37ms | 32ms | PASS (아래 주석) |
+| DeployPage warm slowest | 42ms | 20ms | 51ms | PASS |
+| DeployPage api 수 / rows | 3 / 3, 1 | 3 / 3, 1 | 3 / 3, 1 | 동일 |
+
+## 5. 측정 방법론 한계 (정직하게 기록)
+
+- **±5% 게이트는 이 지표 크기에서 판정 불가**다. DeployPage 응답은 20~51ms 대이고
+  ±5% = ±1.5ms 로 측정 노이즈(회차 간 스프레드 ~30ms)보다 훨씬 작다. 그래서 본 회차의
+  런타임 판정은 **api 호출 수 / rows 수 불변 + 3 회 변경 전후 스프레드가 baseline 범위와
+  겹침** 을 근거로 했다. "±5% 이내라서 PASS" 라고는 주장하지 않는다.
+- dev 서버 재시작 직후 첫 run 에 **한 라우트가 4.6s 급 spike** 를 보인다 (1 회차 LiveMap
+  4611ms, 2 회차 EqpPage 4656ms, 3 회차 EqpPage 4167/4591ms 그리고 재샘플의 LiveMap
+  4597ms). 매번 다른 라우트에서 발생하므로 vite on-demand transform 아티팩트이고
+  deploy 변경과 무관하다. 이 때문에 회차마다 2 회 샘플을 떴다.
+- e2e 는 매 회차 직전 dev 서버를 재시작하고 실행했다 (Windows stale HMR 서빙으로 옛 코드가
+  PASS 하는 위양성 차단).
+
+## 6. 회차 종료 시점 잔존 현황 (features/deploy)
 
 | 파일 | LOC | 임계 | 상태 |
 |---|---|---|---|
 | DeployRegisterPanel.tsx | 1357 | 500 | P1 잔존 — 다음 후보: 파생 상태 useMemo 20 건 → 커스텀 훅, 결과 알림 모달, 3 개 PageCard |
 | DeployMonitorPanel.tsx | 1055 | 500 | P1 잔존 — 다음 후보: 조회 필터 카드, 이력 목록 카드 |
-| deploy.api.ts | 811 | 400 | P2 — 이번 회차 확정 3 대상 밖 |
-| deploy-ui.store.ts | 796 | 400 | **P1 미착수** — 확정 대상이었으나 이번 세션 미적용 |
+| deploy.api.ts | 811 | 400 | P2 — 이번 회차 확정 3 대상 밖 (스코프 확장은 사용자 결정) |
+| deploy-ui.store.ts | 607 | 400 | P1 잔존 — create() 액션 본문이 남은 덩어리 |
 | DeployMonitorViewModal.tsx | 463 | 500 | PASS |
 | DeployRegisterScenarioModal.tsx | 249 | 500 | PASS |
+| deploy-ui-state.ts | 212 | — | PASS |
+| deploy-monitor-format.ts | 31 | — | PASS |
+
+deploy 합계 5750 → 5854 LOC (+104, 경계/props/import 비용 — `find src/features/deploy
+-name "*.ts*" -exec wc -l {} +` 실측). **거대 파일 3 개는
+1556/1519/796 → 1357/1055/607 로 전부 축소**했으나 셋 다 임계는 여전히 초과한다.
