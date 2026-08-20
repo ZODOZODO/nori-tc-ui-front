@@ -211,10 +211,7 @@ export function useEqpLifecycleCommands({
           message: null,
         })
       } catch (error) {
-        const resolvedMessage =
-          error instanceof Error && error.message
-            ? error.message
-            : resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
+        const resolvedMessage = resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
 
         closeLifecycleDialog()
         setLifecycleResultDialog({

@@ -28,6 +28,7 @@ import {
 import type { EqpJarOption, EqpManageDetail, EqpManageOptions, EqpUpdateRequest } from '../types/eqp.types'
 import { useI18n } from '@/i18n/i18n-context'
 import i18n from '@/i18n'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 interface EqpModelBindingModalProps {
   open: boolean
@@ -221,7 +222,7 @@ export function EqpModelBindingModal({
 
       await onSubmit(request)
     } catch (error) {
-      setLocalErrorMessage(error instanceof Error ? error.message : t('eqp.form.invalidInput'))
+      setLocalErrorMessage(resolveErrorMessage(error, t('eqp.form.invalidInput')))
     }
   }
 

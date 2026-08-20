@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 interface EqpPollingGroupControlProps {
   eqpId: string
@@ -66,7 +67,7 @@ export function EqpPollingGroupControl({
     } catch (error) {
       setResult({
         kind: 'failure',
-        message: error instanceof Error && error.message ? error.message : t('eqp.pollingGroup.failed'),
+        message: resolveErrorMessage(error, t('eqp.pollingGroup.failed')),
       })
     }
   }

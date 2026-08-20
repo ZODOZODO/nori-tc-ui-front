@@ -46,6 +46,7 @@ import type {
 import { useI18n } from '@/i18n/i18n-context'
 import i18n from '@/i18n'
 import { useLineList } from '@/shared/hooks/useLineList'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 type EqpManageFormMode = 'create' | 'update'
 
@@ -804,7 +805,7 @@ export function EqpManageFormModal({
 
       await onSubmit(request)
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : t('eqp.form.invalidInput'))
+      setFormErrorMessage(resolveErrorMessage(error, t('eqp.form.invalidInput')))
     }
   }
 
