@@ -47,7 +47,7 @@ import { useEqpLifecycleCommands } from '../hooks/useEqpLifecycleCommands'
 import { useEqpMutations } from '../hooks/useEqpMutations'
 import { useEqpParams } from '../hooks/useEqpParams'
 import { useEqpParamMutations } from '../hooks/useEqpParamMutations'
-import { resolveErrorMessage } from '../lib/eqp-error-message'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { resolveEqpItems } from '../lib/eqp-list-payload'
 import {
   computeEqpParamDiffRows,

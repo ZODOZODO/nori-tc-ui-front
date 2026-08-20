@@ -46,7 +46,7 @@ import {
 import { ModelInfoTable } from './ModelInfoTable'
 import { ModelSidebar } from './ModelSidebar'
 import { ParentModelCommitModal } from './ParentModelCommitModal'
-import { ApiError } from '@/shared/lib/api-error'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 // 사용자가 모델 버전 frame 진입 시에만 mount. 2007 LOC 패널이라 페이지 초기 청크에서 제외.
 const ModelDetailPanel = lazy(() =>
@@ -56,17 +56,6 @@ const ModelDetailPanel = lazy(() =>
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
 const PANEL_MAX_PERCENT = 85
-
-/**
- * 알 수 없는 오류를 화면 메시지로 변환합니다.
- */
-const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
-  if (error instanceof ApiError) {
-    return error.payload.errorMsg
-  }
-
-  return fallbackMessage
-}
 
 interface ModelPageProps {
   /** 표시할 인터페이스 스코프. 라우트가 정한다 — URL 이 단일 진실 원천이다. */

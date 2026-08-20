@@ -1,10 +1,10 @@
-import { ApiError } from '@/shared/lib/api-error'
+import { ApiError } from './api-error'
 
 /**
  * 알 수 없는 오류를 화면 메시지로 변환합니다.
  *
- * EqpPage 와 {@link useEqpLifecycleCommands} 가 함께 쓴다 — 훅이 페이지를 import 하면
- * 순환 참조가 되므로 공유 지점을 lib 에 둔다.
+ * {@link ApiError} 를 푸는 일이라 자리가 shared 다 — feature 별 사본을 두면 model 이
+ * features/eqp/lib 을 import 하는 경계 위반이나 사본 증식으로 이어진다.
  */
 export const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
   if (error instanceof ApiError) {
