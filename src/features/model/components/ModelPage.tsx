@@ -16,10 +16,6 @@ import { useModelMutations } from '../hooks/useModelMutations'
 import { useModelUiStore } from '../stores/model-ui.store'
 import { computeNodeDiff } from '../lib/model-diff.util'
 import {
-  PLC_DETAIL_NODES,
-  SECS_DETAIL_NODES,
-  SOCKET_DETAIL_NODES,
-  type ModelDetailNode,
   type ModelDetailRow,
   type ModelDiffSection,
   type ModelMdfContent,
@@ -27,6 +23,17 @@ import {
   type ModelParentCommitResult,
   type ProtocolType,
 } from '../types/model.types'
+import {
+  collectCascadeDeletedVersionKeys,
+  collectModelVersionKeysByModelKeys,
+  createEditableDetailRowId,
+  DIFF_EXCLUDED_NODES,
+  isDeprecatedStatus,
+  resolveDetailNodesByInterface,
+  resolveLatestModelByName,
+  sortByUpdatedAtDesc,
+  sortDetailRowsByFirstColumn,
+} from '../lib/model-page-helpers'
 import { modelApi } from '../api/model.api'
 import { BranchModelCreateModal } from './BranchModelCreateModal'
 import { ModelCheckInDiffModal } from './ModelCheckInDiffModal'
@@ -60,90 +67,6 @@ const resolveErrorMessage = (error: unknown, fallbackMessage: string): string =>
 
   return fallbackMessage
 }
-
-/**
- * 상세 데이터 rows를 첫 번째 컬럼 값 기준으로 오름차순 정렬합니다.
- * Model Param, Flow, Dcop Items 등 모든 detail 테이블에 공통 적용됩니다.
- */
-const sortDetailRowsByFirstColumn = (rows: ModelDetailRow[]): ModelDetailRow[] =>
-  [...rows].sort((a, b) => (a.values[0] ?? '').localeCompare(b.values[0] ?? ''))
-
-/**
- * updatedAt 기준 최신순으로 모델 목록을 정렬합니다.
- */
-const sortByUpdatedAtDesc = (models: ModelInfo[]): ModelInfo[] =>
-  [...models].sort((firstItem, secondItem) => {
-    const secondTime = Date.parse(secondItem.updatedAt)
-    const firstTime = Date.parse(firstItem.updatedAt)
-    return secondTime - firstTime
-  })
-
-/**
- * MDF 노드는 XML 비교가 의미 없으므로 diff 대상에서 제외합니다.
- */
-const DIFF_EXCLUDED_NODES: ReadonlySet<ModelDetailNode> = new Set(['mdf'])
-
-/**
- * 인터페이스 타입별 상세 노드 기본 집합을 반환합니다.
- */
-const resolveDetailNodesByInterface = (commInterface: ProtocolType): ModelDetailNode[] => {
-  const normalizedInterface = commInterface.toUpperCase()
-  if (normalizedInterface === 'SOCKET') {
-    return SOCKET_DETAIL_NODES
-  }
-  if (normalizedInterface === 'PLC') {
-    return PLC_DETAIL_NODES
-  }
-  return SECS_DETAIL_NODES
-}
-
-/**
- * 신규 상세 row에 사용할 임시 식별자입니다.
- */
-const createEditableDetailRowId = (): string =>
-  `detail-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-
-/**
- * 상태 문자열이 DEPRECATED인지 확인합니다.
- */
-const isDeprecatedStatus = (status: string): boolean =>
-  status.trim().toUpperCase() === 'DEPRECATED'
-
-/**
- * 특정 model_name의 최신 대표 항목을 찾습니다.
- */
-const resolveLatestModelByName = (modelItems: ModelInfo[], modelName: string | null): ModelInfo | null => {
-  if (!modelName) {
-    return null
-  }
-
-  return sortByUpdatedAtDesc(modelItems.filter((item) => item.modelName === modelName))[0] ?? null
-}
-
-/**
- * 삭제 대상 modelKey 집합에 포함된 모든 version key를 수집합니다.
- */
-const collectModelVersionKeysByModelKeys = (
-  modelItems: ModelInfo[],
-  modelKeys: number[],
-): number[] => {
-  const targetModelKeySet = new Set(modelKeys)
-
-  return modelItems
-    .filter((item) => targetModelKeySet.has(item.modelKey))
-    .map((item) => item.modelVersionKey)
-}
-
-/**
- * root model 삭제 시 함께 사라지는 branch version key까지 모두 수집합니다.
- */
-const collectCascadeDeletedVersionKeys = (
-  modelItems: ModelInfo[],
-  rootModelName: string,
-): number[] =>
-  modelItems
-    .filter((item) => item.modelName === rootModelName || item.parentModel === rootModelName)
-    .map((item) => item.modelVersionKey)
 
 interface ModelPageProps {
   /** 표시할 인터페이스 스코프. 라우트가 정한다 — URL 이 단일 진실 원천이다. */
