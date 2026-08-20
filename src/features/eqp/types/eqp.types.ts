@@ -435,6 +435,21 @@ export interface EqpParamRow {
   description: string
 }
 
+export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
+
+/**
+ * Check In 직전에 보여줄 파라미터 변경점 한 줄입니다.
+ * CheckInModal 이 렌더하고 {@link ../lib/eqp-param-rows} 가 계산한다.
+ */
+export interface EqpParamDiffRow {
+  status: EqpParamDiffStatus
+  paramName: string
+  parentValue: string
+  branchValue: string
+  parentDescription: string
+  branchDescription: string
+}
+
 // =========================================================================
 // Check Out / Check In 관련 타입
 // =========================================================================

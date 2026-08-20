@@ -16,7 +16,6 @@ import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
-import type { EqpParamDiffRow } from './CheckInModal'
 import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
 import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
@@ -49,12 +48,17 @@ import { useEqpMutations } from '../hooks/useEqpMutations'
 import { useEqpParams } from '../hooks/useEqpParams'
 import { useEqpParamMutations } from '../hooks/useEqpParamMutations'
 import { resolveErrorMessage } from '../lib/eqp-error-message'
+import { resolveEqpItems } from '../lib/eqp-list-payload'
+import {
+  computeEqpParamDiffRows,
+  createEditableParamRowId,
+  toEditableParamRow,
+  type EditableEqpParamRow,
+} from '../lib/eqp-param-rows'
 import { eqpQueryKeys, invalidateEqpSelectionQueries } from '../lib/eqp-query-keys'
 import { useEqpUiStore } from '../stores/eqp-ui.store'
 import {
   type EqpCreateRequest,
-  type EqpInfo,
-  type EqpParamRow,
   type EqpUpdateRequest,
   type ProtocolType,
 } from '../types/eqp.types'
@@ -71,8 +75,6 @@ const EMPTY_VERSION_VALUE = ''
 // ResizableDivider 크기 제한 (%)
 const PANEL_MIN_PERCENT = 15
 const PANEL_MAX_PERCENT = 85
-
-type EditableEqpParamRow = EqpParamRow & { rowId: string }
 
 type EqpManagementDialogState =
   | { type: 'none' }
@@ -94,149 +96,6 @@ const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
   status: 'success',
   eqpId: null,
   message: null,
-}
-
-/**
- * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
- * paramName은 사용자가 수정할 수 있으므로 React key와 수정 대상 식별자로 사용할 수 없습니다.
- */
-const createEditableParamRowId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-
-  return `eqp-param-row-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
-}
-
-/**
- * API 파라미터 행을 편집 가능한 로컬 행 모델로 변환합니다.
- */
-const toEditableParamRow = (row: EqpParamRow): EditableEqpParamRow => ({
-  rowId: createEditableParamRowId(),
-  ...row,
-})
-
-/**
- * EQP 목록 항목의 최소 유효성(eqpId 문자열)을 확인합니다.
- */
-const isEqpInfoItem = (value: unknown): value is EqpInfo =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as { eqpId?: unknown }).eqpId === 'string' &&
-  (value as { eqpId: string }).eqpId.length > 0
-
-/**
- * 목록 payload를 화면에서 안전하게 사용할 수 있는 EQP 배열로 정규화합니다.
- */
-const resolveEqpItems = (payload: unknown): EqpInfo[] => {
-  if (!payload) {
-    return []
-  }
-
-  if (Array.isArray(payload)) {
-    return payload.filter(isEqpInfoItem)
-  }
-
-  if (typeof payload === 'object' && payload !== null) {
-    const items = (payload as { items?: unknown }).items
-    if (Array.isArray(items)) {
-      return items.filter(isEqpInfoItem)
-    }
-  }
-
-  return []
-}
-
-const normalizeParamText = (value: string | null | undefined): string => value ?? ''
-
-const computeEqpParamDiffRows = (
-  branchRows: readonly EqpParamRow[],
-  parentRows: readonly EqpParamRow[],
-): EqpParamDiffRow[] => {
-  const parentByName = new Map<string, EqpParamRow>()
-  const branchByName = new Map<string, EqpParamRow>()
-
-  parentRows.forEach((row) => {
-    const paramName = row.paramName.trim()
-    if (paramName) {
-      parentByName.set(paramName, {
-        ...row,
-        paramName,
-        paramValue: normalizeParamText(row.paramValue),
-        description: normalizeParamText(row.description),
-      })
-    }
-  })
-
-  branchRows.forEach((row) => {
-    const paramName = row.paramName.trim()
-    if (paramName) {
-      branchByName.set(paramName, {
-        ...row,
-        paramName,
-        paramValue: normalizeParamText(row.paramValue),
-        description: normalizeParamText(row.description),
-      })
-    }
-  })
-
-  const diffRows: EqpParamDiffRow[] = []
-
-  branchByName.forEach((branchRow, paramName) => {
-    const parentRow = parentByName.get(paramName)
-
-    if (!parentRow) {
-      diffRows.push({
-        status: 'added',
-        paramName,
-        parentValue: '',
-        branchValue: branchRow.paramValue,
-        parentDescription: '',
-        branchDescription: branchRow.description,
-      })
-      return
-    }
-
-    if (
-      parentRow.paramValue !== branchRow.paramValue ||
-      parentRow.description !== branchRow.description
-    ) {
-      diffRows.push({
-        status: 'changed',
-        paramName,
-        parentValue: parentRow.paramValue,
-        branchValue: branchRow.paramValue,
-        parentDescription: parentRow.description,
-        branchDescription: branchRow.description,
-      })
-    }
-  })
-
-  parentByName.forEach((parentRow, paramName) => {
-    if (branchByName.has(paramName)) {
-      return
-    }
-
-    diffRows.push({
-      status: 'deleted',
-      paramName,
-      parentValue: parentRow.paramValue,
-      branchValue: '',
-      parentDescription: parentRow.description,
-      branchDescription: '',
-    })
-  })
-
-  const statusOrder: Record<EqpParamDiffRow['status'], number> = {
-    added: 0,
-    changed: 1,
-    deleted: 2,
-  }
-
-  return diffRows.sort((left, right) => {
-    const statusCompare = statusOrder[left.status] - statusOrder[right.status]
-    return statusCompare === 0 ? left.paramName.localeCompare(right.paramName) : statusCompare
-  })
 }
 
 /** 설비 페이지의 1단계 스코프 — 확정 메뉴 트리의 `/eqp/business` · `/eqp/gateway` 와 1:1. */

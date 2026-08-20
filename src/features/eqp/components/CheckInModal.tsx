@@ -13,17 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SelectableTable, type ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
-
-export type EqpParamDiffStatus = 'added' | 'changed' | 'deleted'
-
-export interface EqpParamDiffRow {
-  status: EqpParamDiffStatus
-  paramName: string
-  parentValue: string
-  branchValue: string
-  parentDescription: string
-  branchDescription: string
-}
+import type { EqpParamDiffRow, EqpParamDiffStatus } from '../types/eqp.types'
 
 interface CheckInModalProps {
   open: boolean
