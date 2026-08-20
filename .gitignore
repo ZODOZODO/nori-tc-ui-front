@@ -17,7 +17,11 @@ blob-report/
 
 # E2E(Playwright)는 브라우저가 필요해 self-hosted CI 러너에서 미실행 → 추적 제외(로컬 검증 전용).
 # 단위 테스트(tests/unit)는 CI(test:unit)에서 실행하므로 추적한다.
-/tests/e2e/
+# 단 perf/refactor SKILL 의 측정 스크립트 2개는 추적 — 2026-08 로컬 전용이던 원본이 유실돼
+# 재작성한 이력이 있다. 디렉터리 ignore(`/tests/e2e/`)는 내부 negation 을 무시하므로 `*` 패턴 사용.
+/tests/e2e/*
+!/tests/e2e/_perf_measure.mjs
+!/tests/e2e/_load_trace.mjs
 
 # Editor directories and files
 .vscode/*
