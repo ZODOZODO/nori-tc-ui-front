@@ -219,4 +219,85 @@ e2e 직전 vite dev 서버 재시작(포트 3000 taskkill 후 bat 재기동) —
 - after #1 의 `LiveMapPage cold 4611ms` 는 dev 서버 재시작 직후 vite 최초 transform
   아티팩트다 — after #2 에서 167ms 로 복귀. deploy 변경과 무관.
 
-**판정: 정적 개선(-30.5%) + 런타임 regression 없음 → commit**
+**판정: 정적 개선(-30.5%) + 런타임 regression 없음 → commit** (521f706)
+
+### 4-2. 시나리오 선택 모달 추출 (DeployRegisterPanel → DeployRegisterScenarioModal)
+
+**변경 파일**
+- `src/features/deploy/components/DeployRegisterPanel.tsx` (수정)
+- `src/features/deploy/components/DeployRegisterScenarioModal.tsx` (신규)
+
+**경계 결정 — controlled component** (후보 제시 때의 "selectedScenarioCode 자식 소유"에서 변경).
+자식이 소유하려면 `preview.recommendedScenarioCode ?? preview.scenarios[0]?.code ?? ''`
+초기화를 자식에서 다시 해야 하고(현재는 부모 handleDeploy 가 preview 수신 시점에 계산),
+그 순간 초기화 타이밍이 바뀌어 동작 변경 위험이 생긴다. 그래서 부모가 `scenarioDialogState`
+를 그대로 소유하고 자식은 `open` / `preview` / `selectedScenarioCode` / `isDeploying` +
+`onSelectScenarioCode` / `onDeploy` / `onClose` 만 받는 controlled 로 두었다 — **동작 변경 0**.
+
+`formatChangeKinds` / `Loader2` / `ScenarioRow` 는 이동 블록 전용이라 부모 import 에서 제거.
+`Dialog*` / `TableRow` / `SelectableTable` 은 부모의 결과 알림 모달·검색 테이블이 계속 쓰므로 잔류.
+
+**정적 효과**
+
+| 항목 | before | after | 변화 |
+|---|---|---|---|
+| DeployRegisterPanel.tsx LOC | 1556 | 1357 | **-199 (-12.8%)** |
+| DeployRegisterScenarioModal.tsx LOC | — | 249 | 신규 |
+| 패널 useState | 8 | 8 | 불변 (모달 useState 0 — 완전 controlled) |
+| 패널 useMemo | 20 | 20 | 불변 (파생 상태는 이번 분할 대상 아님) |
+
+**게이트 — 전부 PASS**
+
+lint:
+```
+> nori-tc-ui@0.0.0 lint
+> eslint .
+```
+unit:
+```
+1..241
+# tests 241
+# pass 241
+# fail 0
+# duration_ms 3463.9908
+```
+build:
+```
+dist/assets/DeployPage-CjSiD32-.js                  70.77 kB │ gzip:  16.40 kB
+✓ built in 20.36s
+```
+DeployPage 70.64 → 70.77 kB (+0.18%, baseline 70.46 대비 누적 +0.44%) — ±10% 내 PASS.
+
+e2e:
+```
+  ok 1 [chromium] › deploy-register-bulk-guard.spec.ts:72:1 › 100+ 설비 전체선택 → 추가 시 가상화 + 개수 가드로 서버 400 을 사전 차단한다 (9.2s)
+  ok 3 [chromium] › deploy-monitor-view-modal.spec.ts:96:1 › Deploy View 모달 — 대상별 진행 현황 테이블이 모달 폭 안에 들어온다 (가로 overflow 없음) (9.4s)
+  ok 2 [chromium] › deploy-register-scenario-modal.spec.ts:125:1 › 시나리오 선택 모달 — 테이블이 모달 폭 안에 줄바꿈되어 들어온다 (가로 overflow 없음) (10.2s)
+
+  3 passed (12.2s)
+```
+(e2e 직전 dev 서버 재시작)
+
+**런타임 regression** — `refactor-after-2026-08-20T0137-scenario.json`
+
+| 지표 | baseline | after | 판정 |
+|---|---|---|---|
+| DeployPage cold slowest | 29ms | 26ms | PASS |
+| DeployPage warm slowest | 42ms | 37ms | PASS |
+| DeployPage api 수 / rows | 3 / 3, 1 | 3 / 3, 1 | 동일 |
+
+같은 run 의 `EqpPage warm 4656ms` 는 dev 서버 재시작 직후 vite 최초 transform 아티팩트
+(1 회차의 LiveMap 4611ms 와 동일 현상). deploy 변경과 무관.
+
+**판정: 정적 개선(-12.8%) + 런타임 regression 없음 → commit**
+
+## 5. 회차 종료 시점 잔존 현황 (features/deploy)
+
+| 파일 | LOC | 임계 | 상태 |
+|---|---|---|---|
+| DeployRegisterPanel.tsx | 1357 | 500 | P1 잔존 — 다음 후보: 파생 상태 useMemo 20 건 → 커스텀 훅, 결과 알림 모달, 3 개 PageCard |
+| DeployMonitorPanel.tsx | 1055 | 500 | P1 잔존 — 다음 후보: 조회 필터 카드, 이력 목록 카드 |
+| deploy.api.ts | 811 | 400 | P2 — 이번 회차 확정 3 대상 밖 |
+| deploy-ui.store.ts | 796 | 400 | **P1 미착수** — 확정 대상이었으나 이번 세션 미적용 |
+| DeployMonitorViewModal.tsx | 463 | 500 | PASS |
+| DeployRegisterScenarioModal.tsx | 249 | 500 | PASS |
