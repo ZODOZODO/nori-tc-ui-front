@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useDeployScenarios } from '../hooks/useDeployScenarios'
@@ -92,18 +93,12 @@ export function DeployMonitorViewModal({
     deployKey !== null && historyItem !== null,
   )
 
-  const summaryErrorMessage =
-    summaryQuery.isError && summaryQuery.error instanceof Error
-      ? summaryQuery.error.message
-      : summaryQuery.isError
-        ? t('deploy.monitor.commentSummaryError')
-        : null
-  const targetsErrorMessage =
-    targetsQuery.isError && targetsQuery.error instanceof Error
-      ? targetsQuery.error.message
-      : targetsQuery.isError
-        ? t('deploy.monitor.commentTargetsError')
-        : null
+  const summaryErrorMessage = summaryQuery.isError
+    ? resolveErrorMessage(summaryQuery.error, t('deploy.monitor.commentSummaryError'))
+    : null
+  const targetsErrorMessage = targetsQuery.isError
+    ? resolveErrorMessage(targetsQuery.error, t('deploy.monitor.commentTargetsError'))
+    : null
 
   const targets = useMemo(() => {
     if (deployKey === null) {

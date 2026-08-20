@@ -248,12 +248,9 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     MONITOR_PAGE_SIZE,
   )
 
-  const historyErrorMessage =
-    deployHistoryQuery.isError
-      ? deployHistoryQuery.error instanceof Error
-        ? deployHistoryQuery.error.message
-        : t('deploy.monitor.historyLoadError')
-      : null
+  const historyErrorMessage = deployHistoryQuery.isError
+    ? resolveErrorMessage(deployHistoryQuery.error, t('deploy.monitor.historyLoadError'))
+    : null
 
   const serverHistoryItems = useMemo(
     () => deployHistoryQuery.data?.items ?? [],
@@ -443,16 +440,12 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
 
   const summaryErrorMessage =
     deploySummaryQuery.isError && !historyOnly
-      ? deploySummaryQuery.error instanceof Error
-        ? deploySummaryQuery.error.message
-        : t('deploy.monitor.summaryLoadError')
+      ? resolveErrorMessage(deploySummaryQuery.error, t('deploy.monitor.summaryLoadError'))
       : null
 
   const targetsErrorMessage =
     deployTargetsQuery.isError && !historyOnly
-      ? deployTargetsQuery.error instanceof Error
-        ? deployTargetsQuery.error.message
-        : t('deploy.monitor.targetsLoadError')
+      ? resolveErrorMessage(deployTargetsQuery.error, t('deploy.monitor.targetsLoadError'))
       : null
   const monitorOptionsErrorMessage =
     monitorOptionsQuery.isError && monitorOptionsQuery.error instanceof Error
