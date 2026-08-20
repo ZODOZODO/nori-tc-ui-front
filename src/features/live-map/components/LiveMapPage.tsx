@@ -12,6 +12,7 @@ import {
   LIVE_MAP_LAYOUT_READ_PERMISSION,
   LIVE_MAP_LAYOUT_WRITE_PERMISSION,
 } from '@/shared/lib/permission'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { LiveMapBoard } from './LiveMapBoard'
@@ -239,7 +240,7 @@ export function LiveMapPage() {
           <LiveMapHeader summary={summary} />
           {liveMapQuery.isError ? (
             <div className="rounded-[18px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
-              {liveMapQuery.error instanceof Error ? liveMapQuery.error.message : t('livemap.error')}
+              {resolveErrorMessage(liveMapQuery.error, t('livemap.error'))}
             </div>
           ) : null}
 

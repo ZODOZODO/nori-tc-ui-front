@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import { Box, Cylinder, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import type { LiveMapObjectKind } from '../lib/live-map-layout.model'
 import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
@@ -163,7 +164,7 @@ export function LiveMapObjectEditor() {
       resetDraft()
     }
     const onFail = (error: unknown) =>
-      setStatus(error instanceof Error ? error.message : t('livemap.builder.saveFailed'))
+      setStatus(resolveErrorMessage(error, t('livemap.builder.saveFailed')))
 
     if (editingKey != null) {
       updateObject.mutate({ objectKey: editingKey, body }, { onSuccess: onDone('livemap.builder.objectUpdated'), onError: onFail })

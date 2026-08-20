@@ -14,6 +14,7 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { hasPermission, LIVE_MAP_LAYOUT_WRITE_PERMISSION } from '@/shared/lib/permission'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
 import { useThemeStore } from '@/shared/stores/theme.store'
 import type { LiveMapObjectResponse, LiveMapPlacementResponse } from '../api/layout.api'
@@ -1038,7 +1039,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       })
       setStatus(t('livemap.viewer3d.statusSaved'))
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : t('livemap.viewer3d.statusSaveFailed'))
+      setStatus(resolveErrorMessage(error, t('livemap.viewer3d.statusSaveFailed')))
     }
   }
 

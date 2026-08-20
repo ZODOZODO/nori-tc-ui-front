@@ -44,6 +44,7 @@ import { resolveRunStateChipClass } from '../lib/live-map-status-theme'
 import { liveMapDemoRunApi } from '../api/live-map-demo-run.api'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { hasPermission, LIVE_MAP_DEMO_RUN_SCENARIO_DELETE_PERMISSION } from '@/shared/lib/permission'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import type {
   LiveMapDemoTargetEquipment,
   LiveMapDemoTestType,
@@ -204,11 +205,7 @@ export function LiveMapDemoModal({
       (scenarioResult.status === 'rejected' && scenarioResult.reason) ||
       (runResult.status === 'rejected' && runResult.reason)
 
-    if (failure instanceof Error) {
-      return failure.message
-    }
-
-    return failure ? t('livemap.demo.refreshFailed') : null
+    return failure ? resolveErrorMessage(failure, t('livemap.demo.refreshFailed')) : null
   }, [refetchRunList, refetchScenarios, t])
 
   useEffect(() => {
@@ -340,7 +337,7 @@ export function LiveMapDemoModal({
       )
     } catch (error) {
       // 시작 실패는 배지가 아니라 팝업으로 강조(409=이미 점유 등 사용자가 놓치면 안 되는 메시지).
-      setStartError(error instanceof Error ? error.message : t('error.livemap.demoStart'))
+      setStartError(resolveErrorMessage(error, t('error.livemap.demoStart')))
     }
   }
 
@@ -352,7 +349,7 @@ export function LiveMapDemoModal({
       // M8: 어느 설비를 종료했는지 메시지에 eqpId 포함(다중 설비 run 식별).
       setStartMessage(`${eqpId} — ${t('livemap.demo.stopRequested')}`)
     } catch (error) {
-      setStartMessage(error instanceof Error ? error.message : `${eqpId} — ${t('livemap.demo.stopFailed')}`)
+      setStartMessage(resolveErrorMessage(error, `${eqpId} — ${t('livemap.demo.stopFailed')}`))
     } finally {
       setStoppingEqpIds((prev) => {
         const next = new Set(prev)
@@ -370,7 +367,7 @@ export function LiveMapDemoModal({
       await stopRunMutation.mutateAsync(runId)
       setStartMessage(t('livemap.demo.stopRunAllRequested', { runId }))
     } catch (error) {
-      setStartMessage(error instanceof Error ? error.message : t('livemap.demo.stopFailed'))
+      setStartMessage(resolveErrorMessage(error, t('livemap.demo.stopFailed')))
     } finally {
       setStoppingRunIds((prev) => {
         const next = new Set(prev)
@@ -393,7 +390,7 @@ export function LiveMapDemoModal({
       setSelectedScenarioId(created.scenarioId)
       setStartMessage(t('livemap.demo.scenarioUploaded', { name: created.name }))
     } catch (error) {
-      setStartError(error instanceof Error ? error.message : t('error.livemap.scenarioUpload'))
+      setStartError(resolveErrorMessage(error, t('error.livemap.scenarioUpload')))
     } finally {
       setIsScenarioMutating(false)
     }
@@ -413,7 +410,7 @@ export function LiveMapDemoModal({
       setSelectedScenarioId('')
       setStartMessage(t('livemap.demo.scenarioDeleted', { scenarioId: selectedScenario.scenarioId }))
     } catch (error) {
-      setStartError(error instanceof Error ? error.message : t('error.livemap.scenarioDelete'))
+      setStartError(resolveErrorMessage(error, t('error.livemap.scenarioDelete')))
     } finally {
       setIsScenarioMutating(false)
     }
