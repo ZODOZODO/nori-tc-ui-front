@@ -1076,10 +1076,12 @@ export function ModelPage({ scope }: ModelPageProps) {
       const results = await Promise.all(nodeFetchPairs)
 
       setCheckInDiffSections(buildCheckInDiffSections(results))
-    } catch {
-      // diff 조회 실패 시 diff 없이 바로 check in 모달로 이동합니다.
+    } catch (error) {
+      // diff 조회 실패 시 diff 없이 바로 check in 모달로 이동합니다. 실패를 삼키면 비교가 비어 있는
+      // 것을 사용자가 "변경 없음" 으로 읽으므로, 이동한 모달의 인라인 슬롯에 사유를 남깁니다.
       setIsCheckInDiffModalOpen(false)
       setCheckInModalOpen(true)
+      setCheckInErrorMessage(resolveErrorMessage(error, t('model.page.checkinDiffError')))
     } finally {
       setIsCheckInDiffLoading(false)
     }

@@ -686,6 +686,7 @@
   "model.page.rootManageError": "root model 관리 요청을 처리하지 못했습니다.",
   "model.page.branchCreateError": "branch model 생성에 실패했습니다.",
   "model.page.parentDiffError": "parent commit diff를 불러오지 못했습니다.",
+  "model.page.checkinDiffError": "변경사항 미리보기를 불러오지 못했습니다. 비교 없이 저장 단계로 진행합니다.",
   "model.page.rootReadOnly": "root model은 checkout 없이 읽기 전용으로만 조회할 수 있습니다.",
   "model.page.deprecatedNoEdit": "DEPRECATED branch model은 편집할 수 없습니다.",
   "model.page.checkoutError": "체크아웃에 실패했습니다.",

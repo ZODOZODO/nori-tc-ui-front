@@ -686,6 +686,7 @@
   "model.page.rootManageError": "Không thể xử lý yêu cầu quản lý root Model.",
   "model.page.branchCreateError": "Không thể tạo branch Model.",
   "model.page.parentDiffError": "Không thể tải parent commit diff.",
+  "model.page.checkinDiffError": "Không thể tải bản xem trước thay đổi. Tiếp tục sang bước lưu mà không so sánh.",
   "model.page.rootReadOnly": "Một root Model chỉ có thể xem ở chế độ chỉ đọc khi chưa Check Out.",
   "model.page.deprecatedNoEdit": "Một branch Model DEPRECATED không thể chỉnh sửa.",
   "model.page.checkoutError": "Không thể Check Out.",

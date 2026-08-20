@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe, useResetPassword, useUpdateUser, useUserDetail } from '../hooks/useProfile'
 import { ApiError } from '@/shared/lib/api-error'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 interface UserProfileModalProps {
   open: boolean
@@ -141,12 +142,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
       })
       closeModal()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setFeedbackMessage(error.payload.errorMsg)
-        return
-      }
-
-      setFeedbackMessage(t('profile.feedback.saveError'))
+      setFeedbackMessage(resolveErrorMessage(error, t('profile.feedback.saveError')))
     }
   }
 
@@ -175,12 +171,7 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
       setShowPasswordEditor(false)
       setFeedbackMessage(t('profile.feedback.pwChanged'))
     } catch (error) {
-      if (error instanceof ApiError) {
-        setFeedbackMessage(error.payload.errorMsg)
-        return
-      }
-
-      setFeedbackMessage(t('profile.feedback.pwError'))
+      setFeedbackMessage(resolveErrorMessage(error, t('profile.feedback.pwError')))
     }
   }
 

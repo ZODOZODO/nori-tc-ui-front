@@ -686,6 +686,7 @@
   "model.page.rootManageError": "Failed to process the root model management request.",
   "model.page.branchCreateError": "Failed to create the branch model.",
   "model.page.parentDiffError": "Failed to load the parent commit diff.",
+  "model.page.checkinDiffError": "Failed to load the change preview. Continuing to the save step without a comparison.",
   "model.page.rootReadOnly": "A root model can only be viewed in read-only mode without a checkout.",
   "model.page.deprecatedNoEdit": "A DEPRECATED branch model cannot be edited.",
   "model.page.checkoutError": "Failed to check out.",
