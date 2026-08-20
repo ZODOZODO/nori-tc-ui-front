@@ -29,6 +29,7 @@ import {
   createEditableDetailRowId,
   DIFF_EXCLUDED_NODES,
   isDeprecatedStatus,
+  mergeSelectedModelIntoList,
   resolveDetailNodesByInterface,
   resolveLatestModelByName,
   sortByUpdatedAtDesc,
@@ -167,25 +168,14 @@ export function ModelPage({ scope }: ModelPageProps) {
 
   const currentUserId = meQuery.data?.userId ?? null
 
-  const modelItems = useMemo(() => {
-    const baseItems = modelListQuery.data?.items ?? []
-    const selectedDetail = selectedModelDetailQuery.data
-
-    if (!selectedDetail) {
-      return baseItems
-    }
-
-    const hasSelectedInList = baseItems.some(
-      (item) => item.modelVersionKey === selectedDetail.modelVersionKey,
-    )
-    if (!hasSelectedInList) {
-      return [selectedDetail, ...baseItems]
-    }
-
-    return baseItems.map((item) =>
-      item.modelVersionKey === selectedDetail.modelVersionKey ? selectedDetail : item,
-    )
-  }, [modelListQuery.data, selectedModelDetailQuery.data])
+  const modelItems = useMemo(
+    () =>
+      mergeSelectedModelIntoList(
+        modelListQuery.data?.items ?? [],
+        selectedModelDetailQuery.data,
+      ),
+    [modelListQuery.data, selectedModelDetailQuery.data],
+  )
 
   const selectedModel = useMemo(
     () => modelItems.find((item) => item.modelVersionKey === selectedModelVersionKey) ?? null,

@@ -101,3 +101,30 @@ export const collectCascadeDeletedVersionKeys = (
   modelItems
     .filter((item) => item.modelName === rootModelName || item.parentModel === rootModelName)
     .map((item) => item.modelVersionKey)
+
+/**
+ * 목록 응답에 선택된 모델의 단건 상세를 겹쳐 최신 상태의 목록을 만듭니다.
+ *
+ * 단건 상세가 목록보다 새로우므로(체크아웃 / 체크인 직후) 같은 version key 가 있으면 교체한다.
+ * 목록에 아예 없으면 앞에 끼운다 — 다른 스코프에서 고른 선택이 남아 있을 때 그 모델의 버전
+ * 화면이 빈 목록으로 뜨는 것을 막는다.
+ */
+export const mergeSelectedModelIntoList = (
+  baseItems: ModelInfo[],
+  selectedDetail: ModelInfo | undefined,
+): ModelInfo[] => {
+  if (!selectedDetail) {
+    return baseItems
+  }
+
+  const hasSelectedInList = baseItems.some(
+    (item) => item.modelVersionKey === selectedDetail.modelVersionKey,
+  )
+  if (!hasSelectedInList) {
+    return [selectedDetail, ...baseItems]
+  }
+
+  return baseItems.map((item) =>
+    item.modelVersionKey === selectedDetail.modelVersionKey ? selectedDetail : item,
+  )
+}

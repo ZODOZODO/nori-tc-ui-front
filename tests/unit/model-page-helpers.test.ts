@@ -4,6 +4,7 @@ import {
   collectCascadeDeletedVersionKeys,
   collectModelVersionKeysByModelKeys,
   isDeprecatedStatus,
+  mergeSelectedModelIntoList,
   resolveDetailNodesByInterface,
   resolveLatestModelByName,
   sortByUpdatedAtDesc,
@@ -14,7 +15,7 @@ import type { ModelDetailRow, ModelInfo, ProtocolType } from '@/features/model/t
 /**
  * ModelPage 헬퍼의 행동 고정.
  *
- * 이 9 개 헬퍼는 ModelPage.tsx 안에 있어 단위 검증이 불가했고, 사이드바 트리 조작을 거치는
+ * 이 헬퍼들은 ModelPage.tsx 안에 있어 단위 검증이 불가했고, 사이드바 트리 조작을 거치는
  * model e2e 는 wm-parity 개편으로 진입 경로가 stale 해 로컬에서 사전 실패한다(44 중 37).
  * 즉 삭제 파급 수집 / 3 모드 노드 분기에 실행 가능한 게이트가 없었다 — lib 로 분리한 뒤
  * 그 구멍을 여기서 막는다.
@@ -133,4 +134,35 @@ test('isDeprecatedStatus: 공백과 대소문자를 흡수한다', () => {
   assert.equal(isDeprecatedStatus('  deprecated '), true)
   assert.equal(isDeprecatedStatus('ACTIVE'), false)
   assert.equal(isDeprecatedStatus(''), false)
+})
+
+test('mergeSelectedModelIntoList: 목록에 있는 선택은 단건 상세로 교체한다', () => {
+  const baseItems = [
+    model({ modelVersionKey: 10, status: 'ACTIVE' }),
+    model({ modelVersionKey: 11, status: 'ACTIVE' }),
+  ]
+  const selectedDetail = model({ modelVersionKey: 11, status: 'DEPRECATED' })
+
+  const merged = mergeSelectedModelIntoList(baseItems, selectedDetail)
+
+  // 교체가 빠지면 체크인 직후 상세에서 바뀐 값이 목록 표에 반영되지 않는다.
+  assert.equal(merged.length, 2)
+  assert.equal(merged[1].status, 'DEPRECATED')
+  assert.equal(merged[0].status, 'ACTIVE')
+})
+
+test('mergeSelectedModelIntoList: 목록에 없는 선택은 맨 앞에 끼운다', () => {
+  const baseItems = [model({ modelVersionKey: 10 })]
+  const selectedDetail = model({ modelVersionKey: 99, modelName: 'OTHER_SCOPE' })
+
+  const merged = mergeSelectedModelIntoList(baseItems, selectedDetail)
+
+  // prepend 가 빠지면 다른 스코프에서 고른 선택의 버전 화면이 빈 목록으로 뜬다.
+  assert.deepEqual(merged.map((item) => item.modelVersionKey), [99, 10])
+})
+
+test('mergeSelectedModelIntoList: 선택이 없으면 목록을 그대로 반환한다', () => {
+  const baseItems = [model({ modelVersionKey: 10 })]
+
+  assert.equal(mergeSelectedModelIntoList(baseItems, undefined), baseItems)
 })
