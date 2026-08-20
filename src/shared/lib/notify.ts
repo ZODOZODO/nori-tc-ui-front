@@ -1,4 +1,5 @@
 import { toast } from '@/shared/stores/toast.store'
+import { resolveErrorMessage } from './resolve-error-message'
 
 /**
  * 변경 요청 실패를 토스트로 알리고 띄운 문구를 반환합니다.
@@ -11,8 +12,7 @@ import { toast } from '@/shared/stores/toast.store'
  * 위한 것이다 — `setFormError(notifyFailure(error, t('...')))` 로 한 줄에 둘 다 처리한다.</p>
  */
 export function notifyFailure(error: unknown, fallbackMessage: string): string {
-  const message =
-    error instanceof Error && error.message.trim().length > 0 ? error.message : fallbackMessage
+  const message = resolveErrorMessage(error, fallbackMessage)
   toast.error(message)
   return message
 }

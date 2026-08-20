@@ -28,13 +28,13 @@ import {
   formatActiveDeployHint,
   formatDeployDetail,
   getDeployErrorDetail,
-  getErrorMessage,
   isFailedDeployOutcome,
   mergeModelOptions,
   resolveFailureDetail,
   toUniqueModelOptions,
 } from '../lib/deploy-register-utils'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { PageCard } from '@/shared/layout/PageCard'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -521,7 +521,7 @@ export function DeployRegisterPanel() {
           : null,
       )
     } catch (error) {
-      const errorMessage = getErrorMessage(error, t('deploy.register.previewFailed'))
+      const errorMessage = resolveErrorMessage(error, t('deploy.register.previewFailed'))
       setFeedbackMessage(errorMessage)
       openDeployDialog({
         isSuccess: false,
@@ -691,7 +691,7 @@ export function DeployRegisterPanel() {
         nextDeployKey: result.deployKey,
       })
     } catch (error) {
-      const errorMessage = getErrorMessage(error, t('error.deploy.create'))
+      const errorMessage = resolveErrorMessage(error, t('error.deploy.create'))
       setFeedbackMessage(errorMessage)
       openDeployDialog({
         isSuccess: false,
@@ -1127,7 +1127,7 @@ export function DeployRegisterPanel() {
             </p>
           ) : registerTargetsQuery.isError ? (
             <p className="py-8 text-center text-sm text-danger">
-              {getErrorMessage(registerTargetsQuery.error, t('deploy.register.targetsLoadError'))}
+              {resolveErrorMessage(registerTargetsQuery.error, t('deploy.register.targetsLoadError'))}
             </p>
           ) : registerTargetsQuery.isLoading ? (
             <div className="space-y-2 rounded-[14px] border border-border p-3">
@@ -1332,11 +1332,11 @@ export function DeployRegisterPanel() {
         {registerOptionsQuery.isError || meQuery.isError ? (
           <div className="px-6 pb-3 text-sm text-danger">
             {registerOptionsQuery.isError
-              ? getErrorMessage(registerOptionsQuery.error, t('deploy.register.optionsLoadError'))
+              ? resolveErrorMessage(registerOptionsQuery.error, t('deploy.register.optionsLoadError'))
               : null}
             {registerOptionsQuery.isError && meQuery.isError ? ' ' : null}
             {meQuery.isError
-              ? getErrorMessage(meQuery.error, t('deploy.register.userLoadError'))
+              ? resolveErrorMessage(meQuery.error, t('deploy.register.userLoadError'))
               : null}
           </div>
         ) : null}

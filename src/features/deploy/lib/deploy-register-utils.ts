@@ -10,9 +10,6 @@ import { ApiError } from '@/shared/lib/api-error'
 
 export const EMPTY_SELECT_VALUE = '__empty__'
 
-export const getErrorMessage = (error: unknown, fallbackMessage: string): string =>
-  error instanceof Error && error.message ? error.message : fallbackMessage
-
 export const getDeployErrorDetail = (error: unknown): string | null => {
   if (!(error instanceof ApiError)) {
     return null

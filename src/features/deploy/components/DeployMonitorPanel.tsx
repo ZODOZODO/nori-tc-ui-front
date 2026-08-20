@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { PageCard } from '@/shared/layout/PageCard'
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
@@ -546,9 +547,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       )
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(
-        error instanceof Error ? error.message : t('error.deploy.redeploy'),
-      )
+      setFeedbackMessage(resolveErrorMessage(error, t('error.deploy.redeploy')))
       setFeedbackTone('error')
     }
   }
@@ -606,7 +605,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         setFeedbackTone('success')
         setDeleteDialogState(null)
       } catch (error) {
-        setFeedbackMessage(error instanceof Error ? error.message : t('deploy.monitor.deleteError'))
+        setFeedbackMessage(resolveErrorMessage(error, t('deploy.monitor.deleteError')))
         setFeedbackTone('error')
       }
       return
@@ -631,7 +630,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       setFeedbackMessage(result.resultMessage?.message || t('deploy.monitor.startSuccess'))
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : t('error.deploy.start'))
+      setFeedbackMessage(resolveErrorMessage(error, t('error.deploy.start')))
       setFeedbackTone('error')
     }
   }
@@ -649,7 +648,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       setFeedbackMessage(result.resultMessage?.message || t('deploy.monitor.holdSuccess'))
       setFeedbackTone('success')
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : t('error.deploy.hold'))
+      setFeedbackMessage(resolveErrorMessage(error, t('error.deploy.hold')))
       setFeedbackTone('error')
     }
   }

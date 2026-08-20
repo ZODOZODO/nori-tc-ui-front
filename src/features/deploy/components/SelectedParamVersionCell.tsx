@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n/i18n-context'
 import { useDeployEqpParamVersions } from '../hooks/useDeployEqpParamVersions'
-import { EMPTY_SELECT_VALUE, getErrorMessage } from '../lib/deploy-register-utils'
+import { EMPTY_SELECT_VALUE } from '../lib/deploy-register-utils'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import type { DeployRegisterTargetItem } from '../types/deploy.types'
 
 interface SelectedParamVersionCellProps {
@@ -81,7 +82,7 @@ export function SelectedParamVersionCell({
 
       {paramVersionsQuery.isError ? (
         <p className="mt-1 text-xs text-danger">
-          {getErrorMessage(paramVersionsQuery.error, t('error.deploy.eqpParamVersions'))}
+          {resolveErrorMessage(paramVersionsQuery.error, t('error.deploy.eqpParamVersions'))}
         </p>
       ) : null}
     </div>
