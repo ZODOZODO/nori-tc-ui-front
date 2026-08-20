@@ -93,14 +93,17 @@ test('발행된 명령의 반환값이 그대로 전달된다', async () => {
 })
 
 /**
- * 배선 회귀망 — guard 는 EqpPage 의 두 pending flag 에 실제로 합성돼야 의미가 있다.
- * EqpPage 는 1712 LOC 컴포넌트이고 이 인프라에 jsdom/RTL 이 없어 mount 검증이 불가하므로,
- * D-1/D-2 가 지목한 두 파생식이 guard 를 포함하는지 소스 수준으로 고정한다.
+ * 배선 회귀망 — guard 는 useEqpLifecycleCommands 의 두 pending flag 에 실제로 합성돼야 의미가 있다.
+ * 이 인프라에 jsdom/RTL 이 없어 hook mount 검증이 불가하므로, D-1/D-2 가 지목한 두 파생식이
+ * guard 를 포함하는지 소스 수준으로 고정한다.
  * (버튼 disabled·스피너의 실제 렌더는 Playwright e2e 담당.)
  */
-test('EqpPage 의 lifecycle·pollingGroup pending flag 가 guard 를 포함한다', () => {
+test('useEqpLifecycleCommands 의 lifecycle·pollingGroup pending flag 가 guard 를 포함한다', () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-  const source = readFileSync(join(root, 'src/features/eqp/components/EqpPage.tsx'), 'utf8')
+  const source = readFileSync(
+    join(root, 'src/features/eqp/hooks/useEqpLifecycleCommands.ts'),
+    'utf8',
+  )
 
   const lifecycle = /const isLifecyclePending\s*=\s*([^\n]*(?:\n[^\n]*){0,4}?)\n\n/.exec(source)
   const pollingGroup = /const isPollingGroupPending\s*=\s*([^\n]*(?:\n[^\n]*){0,4}?)\n\n/.exec(source)

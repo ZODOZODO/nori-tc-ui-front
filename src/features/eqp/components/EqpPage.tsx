@@ -13,7 +13,6 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import { AppShellPage } from '@/shared/components/AppShellPage'
 import { AppPageHeading } from '@/shared/layout/AppPageHeading'
-import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
 import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
 import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
@@ -26,7 +25,6 @@ import { EqpPollingGroupControl } from './EqpPollingGroupControl'
 import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
 import { EqpLifecycleResultDialog } from './EqpLifecycleResultDialog'
 import { EqpModelBindingModal } from './EqpModelBindingModal'
-import { ApiError } from '@/shared/lib/api-error'
 
 // 사용자가 "등록 / 정보" 누른 시점에만 mount. 1275 LOC 모달이라 페이지 초기 청크에서 제외.
 const EqpManageFormModal = lazy(() =>
@@ -37,7 +35,6 @@ import { EqpSidebar } from './EqpSidebar'
 import { GatewayGroupTable } from './GatewayGroupTable'
 import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
-import { eqpApi } from '../api/eqp.api'
 import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
 import { useGatewayShardLeases } from '../hooks/useGatewayShardLeases'
@@ -47,9 +44,11 @@ import { useEqpRuntimeState } from '../hooks/useEqpRuntimeState'
 import { useEqpCheckoutStatus } from '../hooks/useEqpCheckoutStatus'
 import { useEqpManageDetail } from '../hooks/useEqpManageDetail'
 import { useEqpManageOptions } from '../hooks/useEqpManageOptions'
+import { useEqpLifecycleCommands } from '../hooks/useEqpLifecycleCommands'
 import { useEqpMutations } from '../hooks/useEqpMutations'
 import { useEqpParams } from '../hooks/useEqpParams'
 import { useEqpParamMutations } from '../hooks/useEqpParamMutations'
+import { resolveErrorMessage } from '../lib/eqp-error-message'
 import { eqpQueryKeys, invalidateEqpSelectionQueries } from '../lib/eqp-query-keys'
 import { useEqpUiStore } from '../stores/eqp-ui.store'
 import {
@@ -60,7 +59,6 @@ import {
   type ProtocolType,
 } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
-import { isActiveEquipment } from '../utils/eqp-runtime-state.util'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -90,22 +88,6 @@ interface EqpDeleteResultDialogState {
   message: string | null
 }
 
-type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
-
-interface EqpLifecycleDialogState {
-  open: boolean
-  action: EqpLifecycleAction
-  eqp: EqpInfo | null
-}
-
-interface EqpLifecycleResultDialogState {
-  open: boolean
-  status: 'success' | 'failure'
-  action: EqpLifecycleAction
-  eqpId: string | null
-  message: string | null
-}
-
 const EMPTY_MANAGEMENT_DIALOG_STATE: EqpManagementDialogState = { type: 'none' }
 const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
   open: false,
@@ -113,21 +95,6 @@ const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
   eqpId: null,
   message: null,
 }
-const EMPTY_EQP_LIFECYCLE_DIALOG_STATE: EqpLifecycleDialogState = {
-  open: false,
-  action: 'start',
-  eqp: null,
-}
-const EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE: EqpLifecycleResultDialogState = {
-  open: false,
-  status: 'success',
-  action: 'start',
-  eqpId: null,
-  message: null,
-}
-const EQP_ASYNC_POLL_INTERVAL_MS = 1000
-const EQP_ASYNC_MAX_ATTEMPTS = 60
-const PASSIVE_LIFECYCLE_UNSUPPORTED_KEY = 'eqp.lifecycle.passiveUnsupported'
 
 /**
  * 편집 중인 파라미터 행을 안정적으로 식별하기 위한 임시 키를 생성합니다.
@@ -148,17 +115,6 @@ const toEditableParamRow = (row: EqpParamRow): EditableEqpParamRow => ({
   rowId: createEditableParamRowId(),
   ...row,
 })
-
-/**
- * 알 수 없는 오류를 화면 메시지로 변환합니다.
- */
-const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
-  if (error instanceof ApiError) {
-    return error.payload.errorMsg
-  }
-
-  return fallbackMessage
-}
 
 /**
  * EQP 목록 항목의 최소 유효성(eqpId 문자열)을 확인합니다.
@@ -385,22 +341,11 @@ export function EqpPage({ scope }: EqpPageProps) {
   const [deleteResultDialog, setDeleteResultDialog] = useState<EqpDeleteResultDialogState>(
     EMPTY_EQP_DELETE_RESULT_DIALOG_STATE,
   )
-  const [lifecycleDialog, setLifecycleDialog] = useState<EqpLifecycleDialogState>(
-    EMPTY_EQP_LIFECYCLE_DIALOG_STATE,
-  )
-  const [lifecycleResultDialog, setLifecycleResultDialog] = useState<EqpLifecycleResultDialogState>(
-    EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE,
-  )
-  const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null)
-
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
   // 체크아웃 중복 요청(더블 클릭) 방지용 로컬 가드
   const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false)
   const isCheckoutSubmittingRef = useRef(false)
-  // 202 + 폴링으로 완결되는 명령의 in-flight 가드 — 폴링 구간까지 재진입을 막는다.
-  const lifecycleGuard = useAsyncCommandGuard()
-  const pollingGroupGuard = useAsyncCommandGuard()
 
   const {
     createEqpMutation,
@@ -412,6 +357,25 @@ export function EqpPage({ scope }: EqpPageProps) {
     startPollingGroupMutation,
     endPollingGroupMutation,
   } = useEqpMutations()
+  const {
+    lifecycleDialog,
+    lifecycleResultDialog,
+    lifecycleErrorMessage,
+    isLifecyclePending,
+    isPollingGroupPending,
+    openLifecycleDialog,
+    closeLifecycleDialog,
+    closeLifecycleResultDialog,
+    handleConfirmLifecycleAction,
+    handleStartPollingGroup,
+    handleEndPollingGroup,
+  } = useEqpLifecycleCommands({
+    startEqpMutation,
+    endEqpMutation,
+    reconnectEqpMutation,
+    startPollingGroupMutation,
+    endPollingGroupMutation,
+  })
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
   const allEqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data as unknown), [eqpListQuery.data])
@@ -625,31 +589,6 @@ export function EqpPage({ scope }: EqpPageProps) {
     setManagementErrorMessage(null)
     setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
     setManagementDialog({ type: 'delete', eqpId })
-  }, [])
-
-  const openLifecycleDialog = useCallback((eqp: EqpInfo, action: EqpLifecycleAction) => {
-    setLifecycleErrorMessage(null)
-    setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
-    if (!isActiveEquipment(eqp)) {
-      setLifecycleResultDialog({
-        open: true,
-        status: 'failure',
-        action,
-        eqpId: eqp.eqpId,
-        message: t(PASSIVE_LIFECYCLE_UNSUPPORTED_KEY),
-      })
-      return
-    }
-    setLifecycleDialog({
-      open: true,
-      action,
-      eqp,
-    })
-  }, [t])
-
-  const closeLifecycleDialog = useCallback(() => {
-    setLifecycleDialog(EMPTY_EQP_LIFECYCLE_DIALOG_STATE)
-    setLifecycleErrorMessage(null)
   }, [])
 
   /**
@@ -922,142 +861,6 @@ export function EqpPage({ scope }: EqpPageProps) {
       })
     }
   }
-
-  const waitForEqpAsyncCompletion = useCallback(
-    async (traceId: string, fallbackMessage: string) => {
-      for (let attempt = 0; attempt < EQP_ASYNC_MAX_ATTEMPTS; attempt += 1) {
-        const result = await eqpApi.getAsyncResult(traceId)
-
-        if (result.status === 'PASS') {
-          return
-        }
-
-        if (result.status === 'FAIL' || result.status === 'TIMEOUT') {
-          throw new Error(result.errorMsg ?? fallbackMessage)
-        }
-
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, EQP_ASYNC_POLL_INTERVAL_MS)
-        })
-      }
-
-      throw new Error(fallbackMessage)
-    },
-    [],
-  )
-
-  const executeLifecycleAction = useCallback(
-    async (eqp: EqpInfo, action: EqpLifecycleAction) => {
-      if (!isActiveEquipment(eqp)) {
-        throw new Error(t(PASSIVE_LIFECYCLE_UNSUPPORTED_KEY))
-      }
-
-      const request = {
-        interfaceType: eqp.commInterface,
-        uiMessage: null,
-      } as const
-
-      if (action === 'start') {
-        const traceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-        await waitForEqpAsyncCompletion(traceId, t('eqp.page.startTimeout'))
-        return
-      }
-
-      if (action === 'end') {
-        const traceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-        await waitForEqpAsyncCompletion(traceId, t('eqp.page.endTimeout'))
-        return
-      }
-
-      if (action === 'reconnect') {
-        // stuck(desired=STARTED + control=OFFLINE) 복구 — END+START 가 아니라 EQP_RECONNECT 단일 명령.
-        const traceId = await reconnectEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-        await waitForEqpAsyncCompletion(traceId, t('eqp.page.startTimeout'))
-        return
-      }
-
-      const endTraceId = await endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-      await waitForEqpAsyncCompletion(endTraceId, t('eqp.page.endTimeout'))
-
-      const startTraceId = await startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request })
-      await waitForEqpAsyncCompletion(startTraceId, t('eqp.page.startTimeout'))
-    },
-    [endEqpMutation, startEqpMutation, reconnectEqpMutation, waitForEqpAsyncCompletion, t],
-  )
-
-  const handleConfirmLifecycleAction = useCallback(async () => {
-    const targetEqp = lifecycleDialog.eqp
-    const action = lifecycleDialog.action
-
-    if (!targetEqp) {
-      setLifecycleErrorMessage(t('eqp.page.noSelectedForAction'))
-      return
-    }
-
-    await lifecycleGuard.run(async () => {
-      try {
-        setLifecycleErrorMessage(null)
-        await executeLifecycleAction(targetEqp, action)
-        closeLifecycleDialog()
-        setLifecycleResultDialog({
-          open: true,
-          status: 'success',
-          action,
-          eqpId: targetEqp.eqpId,
-          message: null,
-        })
-      } catch (error) {
-        const resolvedMessage =
-          error instanceof Error && error.message
-            ? error.message
-            : resolveErrorMessage(error, t('eqp.page.lifecycleFailed'))
-
-        closeLifecycleDialog()
-        setLifecycleResultDialog({
-          open: true,
-          status: 'failure',
-          action,
-          eqpId: targetEqp.eqpId,
-          message: resolvedMessage,
-        })
-      }
-    })
-  }, [closeLifecycleDialog, executeLifecycleAction, lifecycleDialog, lifecycleGuard, t])
-
-  // 두 flag 는 mutateAsync(202) settle 뒤 최장 60초 폴링 구간까지 덮어야 한다 — guard 없이
-  // mutation.isPending 만 보면 그 구간에 버튼이 되살아나 명령이 중복 발행된다(S09 D-1 / D-2).
-  const isLifecyclePending =
-    lifecycleGuard.isRunning ||
-    startEqpMutation.isPending ||
-    endEqpMutation.isPending ||
-    reconnectEqpMutation.isPending
-
-  const isPollingGroupPending =
-    pollingGroupGuard.isRunning ||
-    startPollingGroupMutation.isPending ||
-    endPollingGroupMutation.isPending
-
-  const handleStartPollingGroup = useCallback(
-    async (eqpId: string, groupMessageName: string): Promise<boolean> => {
-      const result = await pollingGroupGuard.run(async () => {
-        const traceId = await startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
-        await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupStartTimeout'))
-      })
-      return result.dispatched
-    },
-    [pollingGroupGuard, startPollingGroupMutation, waitForEqpAsyncCompletion, t],
-  )
-
-  const handleEndPollingGroup = useCallback(
-    async (eqpId: string, groupMessageName: string): Promise<boolean> => {
-      const result = await pollingGroupGuard.run(async () => {
-        const traceId = await endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName })
-        await waitForEqpAsyncCompletion(traceId, t('eqp.page.pollingGroupEndTimeout'))
-      })
-      return result.dispatched
-    },
-    [pollingGroupGuard, endPollingGroupMutation, waitForEqpAsyncCompletion, t],
-  )
 
   /**
    * ResizableDivider 드래그 처리.
@@ -1761,7 +1564,7 @@ export function EqpPage({ scope }: EqpPageProps) {
         message={lifecycleResultDialog.message}
         onOpenChange={(open) => {
           if (!open) {
-            setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
+            closeLifecycleResultDialog()
           }
         }}
       />
