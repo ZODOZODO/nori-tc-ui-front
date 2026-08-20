@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import { Box, Cylinder, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n-context'
-import type { ShapeJson, LiveMapObjectKind } from '../lib/live-map-layout.model'
+import type { LiveMapObjectKind } from '../lib/live-map-layout.model'
 import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useCreateObject, useDeleteObject, useLayoutObjects, useUpdateObject } from '../hooks/useLayout'
 import {
@@ -156,8 +156,8 @@ export function LiveMapObjectEditor() {
       setStatus(t('livemap.builder.errNoShape'))
       return
     }
-    // shape_json 컬럼은 opaque JSONB — v2 스펙을 ShapeJson 자리에 저장(백엔드 무변경).
-    const body = { objectName: trimmedName, objectKind: kind, shapeJson: shape as unknown as ShapeJson }
+    // shape_json 컬럼은 opaque JSONB — v1(Konva) 자리에 v2 스펙을 저장한다(백엔드 무변경).
+    const body = { objectName: trimmedName, objectKind: kind, shapeJson: shape }
     const onDone = (doneKey: string) => () => {
       setStatus(t(doneKey))
       resetDraft()

@@ -22,7 +22,7 @@ import { useCreateObject, useLayout, useLayoutObjects, useSaveLayout } from '../
 import { useLiveMap } from '../hooks/useLiveMap'
 import { buildLiveMapEquipmentNodes } from '../lib/live-map-data'
 import { createSelectionEdgesGeometry, SELECTION_BOX_INFLATE } from '../lib/selection-box-geometry'
-import { buildTransformJson, DEFAULT_CANVAS_JSON, type ShapeJson } from '../lib/live-map-layout.model'
+import { buildTransformJson, DEFAULT_CANVAS_JSON } from '../lib/live-map-layout.model'
 import {
   buildDefaultStructureLayout,
   isBuiltinStructureKey,
@@ -119,7 +119,7 @@ const builtinAsObject = (builtin: LiveMapBuiltinStructure): LiveMapObjectRespons
   objectKey: builtin.objectKey,
   objectName: builtin.objectName,
   objectKind: 'STRUCTURE',
-  shapeJson: builtin.shapeJson as unknown as ShapeJson,
+  shapeJson: builtin.shapeJson,
   isActive: true,
 })
 
@@ -985,7 +985,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const created = await createObject.mutateAsync({
       objectName: BUILTIN_EQUIPMENT_NAME,
       objectKind: 'EQUIPMENT',
-      shapeJson: BUILTIN_EQUIPMENT_SHAPE as unknown as ShapeJson,
+      shapeJson: BUILTIN_EQUIPMENT_SHAPE,
     })
     return created.objectKey
   }
@@ -1005,7 +1005,7 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
     const created = await createObject.mutateAsync({
       objectName: builtin.objectName,
       objectKind: 'STRUCTURE',
-      shapeJson: builtin.shapeJson as unknown as ShapeJson,
+      shapeJson: builtin.shapeJson,
     })
     return created.objectKey
   }

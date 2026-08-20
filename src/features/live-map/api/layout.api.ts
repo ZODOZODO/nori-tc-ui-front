@@ -5,7 +5,7 @@ import { CSRF_HEADER_NAME, issueCsrfToken } from '@/shared/lib/csrf'
 import type {
   CanvasJson,
   LiveMapObjectKind,
-  ShapeJson,
+  LiveMapShapeJson,
   TransformJson,
 } from '../lib/live-map-layout.model'
 
@@ -13,7 +13,7 @@ export interface LiveMapObjectResponse {
   objectKey: number
   objectName: string
   objectKind: LiveMapObjectKind
-  shapeJson: ShapeJson
+  shapeJson: LiveMapShapeJson
   isActive: boolean
 }
 
@@ -46,7 +46,7 @@ export interface LiveMapLayoutPutBody {
 export interface LiveMapObjectSaveBody {
   objectName: string
   objectKind: LiveMapObjectKind
-  shapeJson: ShapeJson
+  shapeJson: LiveMapShapeJson
 }
 
 const failMessage = 'live-map layout request failed'

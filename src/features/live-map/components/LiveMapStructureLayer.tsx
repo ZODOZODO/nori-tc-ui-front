@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Group, Layer, Stage } from 'react-konva'
 import type { LiveMapObjectResponse } from '../api/layout.api'
 import { useLayout } from '../hooks/useLayout'
-import { sortByDepth } from '../lib/live-map-layout.model'
+import { isKonvaShapeJson, sortByDepth } from '../lib/live-map-layout.model'
 import { LIVE_MAP_BOARD_HEIGHT, LIVE_MAP_BOARD_WIDTH } from '../mocks/live-map.mock'
 import { KonvaPrimitive } from './LiveMapKonvaPrimitive'
 
@@ -37,15 +37,19 @@ export function LiveMapStructureLayer({ lineKey }: LiveMapStructureLayerProps) {
     const resolved = placements
       .map((placement) => {
         const object = objectsByKey.get(placement.objectKey)
+        if (!object || object.objectKind !== 'STRUCTURE') {
+          return null
+        }
         // 이 2D 레이어는 v1(Konva, shapeJson.root) STRUCTURE 만 렌더한다. v2(3D, {v:2,prims}) 객체는
         // root 가 없어 건너뛴다(3D 씬이 담당) — 없으면 root.children 접근에서 크래시.
-        const hasKonvaRoot = (object?.shapeJson as { root?: unknown } | undefined)?.root != null
-        if (!object || object.objectKind !== 'STRUCTURE' || !hasKonvaRoot) {
+        const shape = object.shapeJson
+        if (!isKonvaShapeJson(shape)) {
           return null
         }
         return {
           placementKey: placement.placementKey,
           object,
+          shape,
           transform: placement.transformJson,
           depth: placement.transformJson.depth,
           zIndex: placement.transformJson.zIndex,
@@ -74,7 +78,7 @@ export function LiveMapStructureLayer({ lineKey }: LiveMapStructureLayerProps) {
               skewX={structure.transform.skewX}
               skewY={structure.transform.skewY}
             >
-              {(structure.object.shapeJson.root.children ?? []).map((child, index) => (
+              {(structure.shape.root.children ?? []).map((child, index) => (
                 <KonvaPrimitive key={`${structure.placementKey}-${index}`} node={child} />
               ))}
             </Group>

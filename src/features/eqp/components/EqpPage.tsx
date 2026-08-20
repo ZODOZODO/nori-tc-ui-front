@@ -237,7 +237,7 @@ export function EqpPage({ scope }: EqpPageProps) {
   })
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
-  const allEqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data as unknown), [eqpListQuery.data])
+  const allEqpItems = useMemo(() => resolveEqpItems(eqpListQuery.data), [eqpListQuery.data])
   // 선택 라인 소속 설비만 노출한다 — lineKey 미해석(라인 목록 로딩/선택 시드 전)이면 빈 목록.
   const eqpItems = useMemo(
     () => (selectedLineKey === null ? [] : allEqpItems.filter((item) => item.lineKey === selectedLineKey)),

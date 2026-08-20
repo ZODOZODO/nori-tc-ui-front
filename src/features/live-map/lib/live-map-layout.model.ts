@@ -8,6 +8,8 @@
  * shape_json = {v, root:<Konva Group toObject()>}, transform_json = skew 기반 의사 2.5D.</p>
  */
 
+import type { LiveMap3DShape } from './live-map-3d.model'
+
 export const LIVE_MAP_SCHEMA_VERSION = 1
 
 export type LiveMapObjectKind = 'STRUCTURE' | 'EQUIPMENT'
@@ -19,11 +21,19 @@ export interface KonvaNode {
   children?: KonvaNode[]
 }
 
-/** tc_live_map_object.shape_json — 합성 객체 원형(Konva Group 직렬화 + v 래퍼). */
+/** tc_live_map_object.shape_json v1 — 합성 객체 원형(Konva Group 직렬화 + v 래퍼). */
 export interface ShapeJson {
   v: number
   root: KonvaNode
 }
+
+/**
+ * tc_live_map_object.shape_json 의 실제 타입 — v1(Konva Group) 또는 v2(3D prims).
+ *
+ * <p>두 스펙이 같은 JSONB 컬럼을 공유하므로(스키마 무변경 확장) API 경계는 둘 중 하나만 단정할 수 없다.
+ * v1 은 {@link isKonvaShapeJson}, v2 는 {@code isLiveMap3DShape} 로 좁힌 뒤 쓴다.</p>
+ */
+export type LiveMapShapeJson = ShapeJson | LiveMap3DShape
 
 /** tc_live_map_placement.transform_json — skew 기반 의사 2.5D 배치 변환. */
 export interface TransformJson {
@@ -74,6 +84,10 @@ export const isPrimitiveClassName = (name: string): name is PrimitiveClassName =
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/** shape_json 이 v1(Konva Group) 스펙인지 — v2(3D prims)에는 root 가 없다({@code isLiveMap3DShape} 와 짝). */
+export const isKonvaShapeJson = (json: unknown): json is ShapeJson =>
+  isPlainObject(json) && isPlainObject(json.root)
+
 /** 최상위 v(정수)가 존재하는지 확인(서버 PUT 검증과 동일 규칙의 프론트 사전검증). */
 export const hasSchemaVersion = (json: unknown): boolean =>
   isPlainObject(json) && Number.isInteger((json as Record<string, unknown>).v)
@@ -91,22 +105,37 @@ export const buildShapeJson = (
   },
 })
 
+/** 최상위 v 가 정수인지 — 통과 시 그 필드만 좁힌다. */
+const hasIntegerVersion = (
+  json: Record<string, unknown>,
+): json is Record<string, unknown> & Pick<ShapeJson, 'v'> => Number.isInteger(json.v)
+
+/**
+ * root 가 Konva Group 노드인지 — 통과 시 그 필드만 좁힌다.
+ *
+ * <p>검사 범위는 root 가 객체이고 className 이 'Group' 인지까지다. attrs / children 하위 구조는
+ * 서버가 보존하는 Konva 직렬화 결과를 신뢰하고 검사하지 않는다(렌더 시 KonvaPrimitive 가 노드별로 걸러낸다).</p>
+ */
+const hasGroupRoot = (
+  json: Record<string, unknown>,
+): json is Record<string, unknown> & Pick<ShapeJson, 'root'> =>
+  isPlainObject(json.root) && json.root.className === 'Group'
+
 /** shape_json 의 v(정수) + root Group 구조를 검증한다. 위반 시 Error. */
 export const validateShapeJson = (json: unknown): ShapeJson => {
   if (!isPlainObject(json)) {
     throw new Error('shapeJson must be an object')
   }
-  if (!Number.isInteger(json.v)) {
+  if (!hasIntegerVersion(json)) {
     throw new Error('shapeJson.v must be an integer')
   }
-  const root = json.root
-  if (!isPlainObject(root)) {
+  if (!isPlainObject(json.root)) {
     throw new Error('shapeJson.root must be an object')
   }
-  if (root.className !== 'Group') {
+  if (!hasGroupRoot(json)) {
     throw new Error('shapeJson.root.className must be "Group"')
   }
-  return json as unknown as ShapeJson
+  return json
 }
 
 /** 배치 변환 기본값 + 부분 override. */
