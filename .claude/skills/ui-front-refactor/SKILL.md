@@ -80,6 +80,9 @@ OUTPUT_PATH=".claude/perf/measurements/refactor-baseline-${TS}.json" \
   node tests/e2e/_perf_measure.mjs 2>&1 | tail -10
 ```
 
+로그인 자격은 `tests/e2e/perf-login.local.json`(git 미추적) — 없으면 스크립트가 생성 안내와 함께
+명확히 실패한다. 평문 비밀번호는 문서/git 에 기록 금지.
+
 분할 후 **regression 검증** 용도. 분할 자체로 응답 시간 / 청크 분포가 의도치 않게 바뀌면 안 됨.
 
 > **NOTE — baseline 파일명 prefix 컨벤션** (refactor / perf 트랙 분리):

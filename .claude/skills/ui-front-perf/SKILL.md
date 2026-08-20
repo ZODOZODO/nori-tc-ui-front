@@ -65,7 +65,9 @@ OUTPUT_PATH=".claude/perf/measurements/baseline-${TS}.json" \
 ```
 
 이 스크립트는:
-- 로그인 (admin / ChangeMe123!)
+- 로그인 — 자격은 `tests/e2e/perf-login.local.json`(git 미추적, `{"userId":"...","password":"..."}`,
+  tc-db.local.properties 와 같은 로컬 시크릿 관례) 에서 읽고, `TEST_USER`/`TEST_PASS` env 로
+  오버라이드 가능. 계정은 tc_user_info 의 ACTIVE 계정이어야 한다. 평문 비밀번호는 문서/git 기록 금지.
 - 5 페이지 cold + warm 측정
 - EqpPage / ModelPage 사이드바 첫 클릭 후 추가 측정
 - 각 페이지 `/api/*` 응답 시간 + DOM `tbody tr` 카운트
@@ -240,7 +242,7 @@ baseline.json vs after.json 비교:
 - 라우트 lazy 분할: 이미 적용 ([src/app/Router.tsx:4-37](src/app/Router.tsx#L4-L37))
 - 전역 Query 정책: [src/app/providers/AppProvider.tsx](src/app/providers/AppProvider.tsx)
 - 측정 스크립트: [tests/e2e/_perf_measure.mjs](tests/e2e/_perf_measure.mjs) (5페이지 런타임/API/row), [tests/e2e/_load_trace.mjs](tests/e2e/_load_trace.mjs) (첫 로딩 분해 — 모듈 워터폴/백엔드, dev↔prod)
-- 측정 환경변수: `BASE_URL` / `TEST_USER` / `TEST_PASS` / `OUTPUT_PATH` / `PAGES` / `HEADLESS` (_load_trace 는 `ROUTE_KEY` 추가)
+- 측정 환경변수: `BASE_URL` / `TEST_USER` / `TEST_PASS` / `OUTPUT_PATH` / `PAGES` / `HEADLESS` (_load_trace 는 `ROUTE_KEY` 추가). 로그인 자격 기본 출처는 `tests/e2e/perf-login.local.json` (git 미추적)
 - prod-preview: `npm run preview` → :4173, `/api` → 백엔드(`preview.proxy`)
 
 ## 측정 가능 / 불가 매트릭스

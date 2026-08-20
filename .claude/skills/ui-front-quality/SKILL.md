@@ -1,6 +1,6 @@
 ---
 name: ui-front-quality
-description: nori-tc-ui-front (React 19 + Vite 7 + TS 5.9 strict) 코드 품질 measurement-first 워크플로우. 4 축 — 타입 안전성(tsc + any/unknown/as) / lint(eslint, biome) / 테스트(unit + e2e 회귀 + 커버 범위) / a11y — baseline 측정 → 우선순위 → 변경마다 사용자 승인 → 재측정 + 테스트 회귀 차단 → 효과 없으면 롤백. 툴 없는 축(커버리지/a11y)은 발명 금지, 사용자 결정 게이트. "측정 안 한 추정 개선" 금지.
+description: nori-tc-ui-front (React 19 + Vite 7 + TS 5.9 strict) 코드 품질 measurement-first 워크플로우. 4 축 — 타입 안전성(tsc + any/unknown/as) / lint(eslint) / 테스트(unit + e2e 회귀 + 커버 범위) / a11y — baseline 측정 → 우선순위 → 변경마다 사용자 승인 → 재측정 + 테스트 회귀 차단 → 효과 없으면 롤백. 툴 없는 축(커버리지/a11y)은 발명 금지, 사용자 결정 게이트. "측정 안 한 추정 개선" 금지.
 allowed-tools: [AskUserQuestion, Read, Glob, Grep, Bash, Write, Edit]
 ---
 
@@ -22,21 +22,21 @@ refactor 와의 경계: god component 분할 = refactor. `any` 제거 / 테스�
 - `$1` = 축 (선택). 기본 `all`. 옵션:
   - `all` — 4 축 baseline 모두
   - `type` — 타입 안전성만 (tsc + any/unknown/as/@ts-ignore)
-  - `lint` — eslint + biome 상태만
+  - `lint` — eslint 상태만
   - `test` — unit + e2e 회귀 + 커버 범위만
   - `a11y` — 접근성만 (툴 presence 우선)
   - `verify` — 직전 변경의 재측정 + 테스트 회귀만
 
 `$1` 비어있으면 AskUserQuestion 으로 축 선택받음.
 
-> **패키지 매니저 NOTE**: 레포는 pnpm (pnpm-lock.yaml). 단 CI([.gitlab-ci.yml:43-44](.gitlab-ci.yml#L43-L44)) 와 sibling skill (ui-front-perf / ui-front-refactor) 은 `npm run` 사용. 본 skill 도 일관성 위해 `npm run` 사용. node_modules 미설치 시 `pnpm install` 안내.
+> **패키지 매니저 NOTE**: 레포는 npm (package-lock.json — 2026-07-06 커밋 8d273a1 에서 biome 제거·npm 전환). CI 와 sibling skill (ui-front-perf / ui-front-refactor) 도 `npm run` 사용. node_modules 미설치 시 `npm install` 안내.
 
 ## Step 0 — 사전 점검
 
 ### 0-1. node_modules + 툴 presence
 ```bash
 cd c:/workspace_nori/nori-tc-ui-front
-test -d node_modules && echo "node_modules OK" || echo "node_modules MISSING → pnpm install"
+test -d node_modules && echo "node_modules OK" || echo "node_modules MISSING → npm install"
 echo "--- 4 축 툴 presence ---"
 grep -E '"(lint|test:unit|test:e2e)"' package.json
 grep -iE "axe|jsx-a11y|@axe-core|vitest|c8|istanbul|@vitest/coverage" package.json || echo "→ 커버리지 / a11y 전용 툴 미설치 (Step 1-3 / 1-4 결정 게이트)"
@@ -73,15 +73,12 @@ echo "@ts-ignore/@ts-expect-error/eslint-disable:" && grep -rEn "@ts-ignore|@ts-
 echo "as 캐스트(대략):" && grep -rEn " as [A-Z]" src --include="*.ts" --include="*.tsx" | wc -l
 ```
 
-### 1-2. Lint (eslint + biome 상태)
+### 1-2. Lint (eslint)
 ```bash
 npx eslint . 2>&1 | tail -20; echo "eslint exit: ${PIPESTATUS[0]}"
 ```
 **마지막 `✖ N problems (E errors, W warnings)` 줄 + exit code 인용 필수.**
-
-biome 상태 확인 (configured-but-unscripted):
-- [biome.json](biome.json) 존재 + `@biomejs/biome` devDep 설치됨. 단 **package.json scripts 에 biome 없음** — 설정만 있고 미연결.
-- biome 의 lint/format 을 실제 게이트로 쓸지는 **Step 2 결정 항목**. 자동 실행 금지 (eslint 와 규칙 중복 / 충돌 가능). 현재는 `eslint .` 가 유일한 연결된 lint.
+`eslint .` 가 유일한 lint 게이트다 (biome 는 2026-07-06 커밋 8d273a1 에서 제거됨 — biome.json / devDep 없음).
 
 ### 1-3. 테스트 (unit + e2e 회귀 + 커버 범위)
 ```bash
@@ -137,13 +134,12 @@ npm run build 2>&1 | tail -15; echo "build exit: ${PIPESTATUS[0]}"
 
 - **P1 (즉시 — build/test breaking)**:
   - `tsc -b` 에러 (현재 1건: tanstack 버전 중복)
-  - `eslint .` errors (현재 2건)
+  - `eslint .` errors
   - 실패하는 unit / e2e 테스트
 - **P2 (다음 — 측정 가능 품질)**:
   - hot path 의 `any`/`unknown` 제거 (queryFn 반환 / API 응답 타입)
   - 미커버 critical feature 디렉터리 테스트 추가 (model / eqp / deploy 등 핵심)
   - 커버리지 툴 도입 결정 (vitest coverage / c8)
-  - biome 연결 결정 (eslint 와 역할 분리 / 통합)
 - **P3 (기록만 — false positive / 측정 어려움)**:
   - `as X` 캐스트 (정당한 케이스 다수)
   - a11y 수동 grep (툴 없이는 게이트 불가)
@@ -153,7 +149,6 @@ npm run build 2>&1 | tail -15; echo "build exit: ${PIPESTATUS[0]}"
 다음은 **새 devDependency 추가**라 자동 진행 금지. AskUserQuestion 으로 결정:
 - 커버리지 측정: `@vitest/coverage-v8` 또는 `c8` 도입?
 - a11y 게이트: `@axe-core/playwright` 도입?
-- lint 일원화: biome 를 script 에 연결 vs eslint-only 유지?
 
 ### 보고서 작성
 `.claude/quality/<YYYY-MM-DD>-<axis>-quality.md`:
@@ -227,7 +222,7 @@ npm run test:unit 2>&1 | tail -10; echo "unit exit: ${PIPESTATUS[0]}"
 - 다음 후보 있음 → Step 3 으로
 - 없음 → 종료 보고:
   - 적용한 품질 개선 목록 (commit hash + 축별 before/after 카운트)
-  - 결정 게이트 결과 (커버리지/a11y/biome 툴 도입 여부)
+  - 결정 게이트 결과 (커버리지/a11y 툴 도입 여부)
   - 미적용 후보 (P3 기록만 / 사용자 거절)
   - 다음 측정 시점 권장
 
@@ -242,7 +237,7 @@ npm run test:unit 2>&1 | tail -10; echo "unit exit: ${PIPESTATUS[0]}"
 - **compound 변경 금지** — any 113 건을 한 커밋에 손대지 않는다. 한 번에 한 논리 단위.
 - **exit code 오인용 금지** — `| tail` 뒤 `$?` 는 tail 것. 반드시 `${PIPESTATUS[0]}` 인용 (2026-05-27 실측: tsc 에러여도 tail 뒤 `$?`=0)
 - **측정 도구 없는 축에서 % 주장 금지** — 커버리지 툴 미설치 → "커버리지 N%" 금지. a11y 툴 미설치 → "a11y 통과" 금지. 측정 가능한 것(파일 수 / 에러 수)만 주장.
-- **의존성 자동 추가 금지** — vitest-coverage / axe-core / biome 연결은 사용자 결정 게이트
+- **의존성 자동 추가 금지** — vitest-coverage / axe-core 도입은 사용자 결정 게이트
 - **무력한 mock 테스트 추가 금지** — 항상 통과하는 mock 은 production 깨져도 PASS. 진짜 실패 시나리오 1개 이상 (글로벌 #11)
 - **타입 좁히기로 호출처 깨고 방치 금지** — `any` 제거 시 영향 호출처 빌드 통과 확인
 
@@ -256,8 +251,8 @@ npm run test:unit 2>&1 | tail -10; echo "unit exit: ${PIPESTATUS[0]}"
 ## 컨벤션 참조
 
 - 타입: `tsc -b` strict ([tsconfig.app.json:23-28](tsconfig.app.json#L23-L28) — strict / noUnusedLocals / noUnusedParameters / noFallthroughCasesInSwitch / noUncheckedSideEffectImports). skipLibCheck:true.
-- lint: `eslint .` ([eslint.config.js](eslint.config.js) — js.recommended + tseslint.recommended + reactHooks + reactRefresh). biome.json 은 미연결.
-- unit test: `node --test --experimental-strip-types tests/*.test.ts` ([package.json:9](package.json#L9))
+- lint: `eslint .` ([eslint.config.js](eslint.config.js) — js.recommended + tseslint.recommended + reactHooks + reactRefresh)
+- unit test: `node --import ./tests/alias-hooks.mjs --test --experimental-strip-types tests/unit/*.test.ts` ([package.json](package.json) scripts.test:unit — `@/` 별칭은 alias-hooks 가 해석)
 - e2e: `playwright test` ([playwright.config.ts](playwright.config.ts))
 - 빌드: `tsc -b && vite build` ([package.json:8](package.json#L8))
 - feature-sliced 구조 (`src/features/<domain>/{api,components,hooks,lib,stores,types}`)
@@ -270,7 +265,6 @@ npm run test:unit 2>&1 | tail -10; echo "unit exit: ${PIPESTATUS[0]}"
 | 타입 | tsc 에러 수 | ✅ | `npx tsc -b` + `${PIPESTATUS[0]}` |
 | 타입 | any/unknown/as 카운트 | ✅ | Grep + wc |
 | lint | eslint error/warning 수 | ✅ | `npx eslint .` 마지막 줄 |
-| lint | biome 위반 수 | ⚠️ | 미연결 — 도입 결정 후 `npx biome lint` |
 | 테스트 | unit/e2e pass/fail | ✅ | `npm run test:unit` / `test:e2e` exit code |
 | 테스트 | 테스트 파일 수 / 미커버 dir | ✅ | find + grep |
 | 테스트 | 커버리지 % | ❌ | 툴 미설치 — vitest-coverage/c8 도입 선결 |
