@@ -214,6 +214,24 @@ export const resolveVisibleAppNavigationGroups = (
     items: group.items.filter((item) => hasPermission(permissionCodes, item.requiredPermission)),
   })).filter((group) => group.items.length > 0)
 
+/**
+ * 로그인 직후 진입 경로를 보유 권한으로 결정합니다.
+ *
+ * <p>확정 트리 순서(그룹 → 항목)에서 처음으로 접근 가능한 항목의 라우트다. 별도 우선순위 표를
+ * 두지 않는다 — {@link resolveVisibleAppNavigationGroups} 가 이미 트리 순서를 유지한 채 권한
+ * 필터와 빈 그룹 제거를 하므로, 트리가 단일 원천으로 남는다.</p>
+ *
+ * <p>접근 가능 항목이 하나도 없으면 트리의 첫 라우트를 돌려준다. 그 화면의 권한 가드가 그
+ * 자리에서 안내를 렌더하므로(`RequirePermission`) 조용한 `/login` 튕김이 되지 않고, 전용 안내
+ * 라우트를 새로 만들 필요도 없다. fallback 을 별도 상수로 두지 않는 이유는 트리 순서가 바뀔 때
+ * 상수만 남아 drift 하는 것을 막기 위해서다.</p>
+ */
+export const resolveLoginLandingRoute = (
+  permissionCodes: readonly string[] | null | undefined,
+): string =>
+  resolveVisibleAppNavigationGroups(permissionCodes)[0]?.items[0]?.route ??
+  APP_NAVIGATION_GROUPS[0].items[0].route
+
 /** 현재 경로가 그 LNB 항목의 화면인지 — 항목 route 자신과 그 하위 경로만 해당한다. */
 export const isAppNavigationRouteActive = (pathname: string, route: string): boolean =>
   pathname === route || pathname.startsWith(`${route}/`)

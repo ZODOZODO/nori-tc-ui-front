@@ -1,13 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router'
 import { z } from 'zod'
+import { profileApi } from '@/features/profile/api/profile.api'
 import { useI18n } from '@/i18n/i18n-context'
 import { authApi } from '../api/auth.api'
 import { type LoginRequest, type LoginSuccessResponse } from '../types/auth.types'
 import { ApiError } from '@/shared/lib/api-error'
+import { resolveLoginLandingRoute } from '@/shared/lib/app-navigation'
 
 /**
  * 로그인 폼 유효성 스키마를 만든다.
@@ -32,16 +34,9 @@ const buildLoginSchema = (t: (key: string) => string) =>
 
 export type LoginFormValues = z.infer<ReturnType<typeof buildLoginSchema>>
 
-/**
- * 로그인 성공 후 이동할 기본 진입 경로입니다 — live-map(설비 라이브맵)을 첫 화면으로 둡니다.
- *
- * 구 경로 `/eqp/live-map` 은 리다이렉트로 살아 있지만 여기서 쓰지 않는다 — 로그인마다 홉이
- * 한 번 더 생기고, 최종 URL 을 단언하는 테스트가 중간 경로에 걸린다.
- */
-const LOGIN_ENTRY_ROUTE = '/live-map'
-
 export function useLogin() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { t } = useI18n()
 
   const loginSchema = useMemo(() => buildLoginSchema(t), [t])
@@ -56,11 +51,31 @@ export function useLogin() {
 
   const loginMutation = useMutation<LoginSuccessResponse, ApiError, LoginRequest>({
     mutationFn: (credentials) => authApi.login(credentials),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       console.info('[useLogin] login flow completed', {
         userPk: result.data.userPk,
       })
-      navigate(LOGIN_ENTRY_ROUTE, { replace: true })
+
+      // 진입 경로는 보유 권한이 정한다 — 고정 경로(`/live-map`)는 그 권한이 없는 사용자를
+      // 로그인 직후 권한없음 화면에 떨어뜨렸다.
+      //
+      // 키를 `useMe`(useProfile.ts)와 맞춰 결과를 캐시에 심으므로, 직후 라우트 가드가 같은
+      // 요청을 다시 보내지 않는다. `staleTime: 0` 은 방어가 아니라 신선도 요구다 — 기본값이
+      // 5분(AppProvider)이라 명시하지 않으면 메모리에 남은 이전 사용자의 me 를 네트워크 없이
+      // 돌려받아 그 사람 권한으로 랜딩할 수 있다.
+      let permissionCodes: readonly string[] | null = null
+      try {
+        const me = await queryClient.fetchQuery({
+          queryKey: ['auth', 'me'],
+          queryFn: () => profileApi.getMe(),
+          staleTime: 0,
+        })
+        permissionCodes = me.permissionCodes
+      } catch (error) {
+        console.error('[useLogin] failed to resolve landing route from /auth/me', error)
+      }
+
+      navigate(resolveLoginLandingRoute(permissionCodes), { replace: true })
     },
     onError: (error) => {
       console.error('[useLogin] login flow failed', {
