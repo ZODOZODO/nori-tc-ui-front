@@ -36,8 +36,10 @@ const ALL_PERMISSIONS = [
 /**
  * 트리의 첫 라우트입니다 — 접근 가능 항목이 0 일 때의 목적지이기도 하다.
  *
- * 리터럴로 박지 않고 트리에서 읽는다. 별도 상수를 두면 트리 순서가 바뀔 때 테스트와 구현이
- * 각자 drift 해, 정작 틀린 쪽을 못 가리킨다.
+ * 이 값으로 **fallback 목적지를 단언하지 않는다.** 구현이 같은 식을 쓰므로 양변이 함께 움직여
+ * 어떤 fallback 이든 통과한다(고정 반환 구현에서도 통과하는 것을 실측했다). 아래 두 test 는
+ * 목적지를 리터럴로 못 박고, 이 상수는 "그 리터럴이 곧 트리 첫 항목" 이라는 **별개 성질**을
+ * 확인하는 데만 쓴다.
  */
 const TREE_FIRST_ROUTE = APP_NAVIGATION_GROUPS[0].items[0].route
 
@@ -56,14 +58,25 @@ test('단일 권한 보유자는 그 그룹의 첫 항목으로 진입한다', (
   assert.equal(resolveLoginLandingRoute(['USER_READ']), '/user/users')
 })
 
-test('접근 가능 항목이 0 이면 트리 첫 라우트로 보내 그 자리에서 안내가 렌더된다', () => {
+test('접근 가능 항목이 0 이면 /live-map 으로 보내 그 자리에서 안내가 렌더된다', () => {
   // 조용한 /login 튕김을 하지 않는다는 뜻이다 — 목적지의 RequirePermission 이
   // AccessDeniedNotice 를 렌더한다(RequirePermission.tsx:68-74). 전용 라우트를 새로 만들지 않는다.
-  assert.equal(resolveLoginLandingRoute([]), TREE_FIRST_ROUTE)
-  assert.equal(resolveLoginLandingRoute(null), TREE_FIRST_ROUTE)
-  assert.equal(resolveLoginLandingRoute(undefined), TREE_FIRST_ROUTE)
+  //
+  // 목적지를 리터럴로 못 박는다. 트리에서 읽은 값과 비교하면 구현이 같은 식을 쓰는 탓에
+  // 양변이 함께 움직여 어떤 fallback 이든 통과한다 — 판별력이 0 이 된다.
+  assert.equal(resolveLoginLandingRoute([]), '/live-map')
+  assert.equal(resolveLoginLandingRoute(null), '/live-map')
+  assert.equal(resolveLoginLandingRoute(undefined), '/live-map')
   // 트리 권한이 하나도 아닌 코드만 가진 경우도 같다.
-  assert.equal(resolveLoginLandingRoute(['AUTH_ME_PERM']), TREE_FIRST_ROUTE)
+  assert.equal(resolveLoginLandingRoute(['AUTH_ME_PERM']), '/live-map')
+})
+
+test('fallback 목적지는 트리 첫 항목과 같다 — 그래서 현행 사용자 랜딩이 바뀌지 않는다', () => {
+  // 위 test 가 못 박은 리터럴이 왜 '/live-map' 인지의 근거다. 트리 첫 항목이 다른 것으로
+  // 바뀌면 이 test 가 먼저 깨져 "위 리터럴도 같이 고쳐야 한다" 를 알려준다 — 리터럴만 두면
+  // 트리 변경 시 무엇이 틀렸는지 알 수 없다.
+  assert.equal(TREE_FIRST_ROUTE, '/live-map')
+  assert.equal(resolveLoginLandingRoute([]), TREE_FIRST_ROUTE)
 })
 
 test('결정은 확정 트리 순서를 따른다 — 6 그룹 전건', () => {
