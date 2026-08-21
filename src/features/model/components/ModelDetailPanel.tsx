@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
+import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   summarizeActionDataIndexValue,
@@ -595,10 +596,16 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
     : activeFlowMutation.isError
       ? 'error'
       : 'idle'
-  const flowSaveErrorMessage =
-    activeFlowMutation.isError && activeFlowMutation.error instanceof Error
-      ? activeFlowMutation.error.message
-      : null
+  // 이전 구현의 `error instanceof Error ? ... : null` 은 도달 불가한 방어였다 — mutationFn 이
+  // 부르는 api 레이어가 언제나 ApiError 를 던진다. FlowCard 는 errorMessage 가 null 이면 아무것도
+  // 렌더하지 않고(FlowCard.tsx:254) saveStatus='error' 는 버튼 상태만 바꾸므로, 그 죽은 분기는
+  // "저장 실패인데 사유가 없는" 상태를 허용하는 모양으로 남아 있었다. fallback 은 모드별로 준다.
+  const flowSaveErrorMessage = activeFlowMutation.isError
+    ? resolveErrorMessage(
+        activeFlowMutation.error,
+        isDraftMode ? t('error.model.flowCreate') : t('error.model.flowUpdate'),
+      )
+    : null
 
   const handleSaveFlow = (payload: ModelFlowUpdateRequest) => {
     if (isDraftMode) {

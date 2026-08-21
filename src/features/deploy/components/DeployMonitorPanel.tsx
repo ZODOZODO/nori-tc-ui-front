@@ -447,14 +447,16 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
     deployTargetsQuery.isError && !historyOnly
       ? resolveErrorMessage(deployTargetsQuery.error, t('deploy.monitor.targetsLoadError'))
       : null
-  const monitorOptionsErrorMessage =
-    monitorOptionsQuery.isError && monitorOptionsQuery.error instanceof Error
-      ? monitorOptionsQuery.error.message
-      : null
-  const userListErrorMessage =
-    userListQuery.isError && userListQuery.error instanceof Error
-      ? userListQuery.error.message
-      : null
+  // 이전 구현의 `error instanceof Error ? ... : null` 은 도달 불가한 방어였다 — api 레이어가
+  // 언제나 normalizeApiError 로 ApiError 를 던지므로(user.api.ts:127, eqp.api.ts) error 는 항상
+  // Error 다. 소비처(:798, :802)는 null 이면 아무것도 렌더하지 않으니, 그 죽은 분기를 남겨두면
+  // "isError 인데 화면은 조용한" 상태를 코드가 허용하는 것처럼 읽힌다.
+  const monitorOptionsErrorMessage = monitorOptionsQuery.isError
+    ? resolveErrorMessage(monitorOptionsQuery.error, t('deploy.register.optionsLoadError'))
+    : null
+  const userListErrorMessage = userListQuery.isError
+    ? resolveErrorMessage(userListQuery.error, t('error.user.list'))
+    : null
   const serverTotalCount = deployHistoryQuery.data?.count ?? 0
   const displayTotalCount = serverTotalCount + bridgeHistoryItems.length
   const currentPage = Math.floor(currentOffset / MONITOR_PAGE_SIZE) + 1

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
 import { useMe, useResetPassword, useUpdateUser, useUserDetail } from '../hooks/useProfile'
-import { ApiError } from '@/shared/lib/api-error'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
 interface UserProfileModalProps {
@@ -84,17 +83,25 @@ export function UserProfileModal({ open, onClose }: UserProfileModalProps) {
     [draftFormState, userDetailQuery.data],
   )
 
+  /**
+   * 조회 실패 사유입니다.
+   *
+   * 이전 구현은 `instanceof ApiError` 로 좁혀 검사했다. api 레이어가 언제나 ApiError 를 던지므로
+   * 실패 경로 자체는 덮였지만, 그 밖의 실패가 오면 null 이 되어 로딩이 끝난 뒤 빈 폼만 남는다
+   * (:303 은 문구가 null 이면 아무것도 렌더하지 않는다). 공용 함수는 `Error` 전체를 받아
+   * 그 구멍을 닫는다 — 좁은 검사를 유지할 이유가 없다.
+   */
   const modalErrorMessage = useMemo(() => {
-    if (meQuery.error instanceof ApiError) {
-      return meQuery.error.payload.errorMsg
+    if (meQuery.error) {
+      return resolveErrorMessage(meQuery.error, t('error.user.detail'))
     }
 
-    if (userDetailQuery.error instanceof ApiError) {
-      return userDetailQuery.error.payload.errorMsg
+    if (userDetailQuery.error) {
+      return resolveErrorMessage(userDetailQuery.error, t('error.user.detail'))
     }
 
     return null
-  }, [meQuery.error, userDetailQuery.error])
+  }, [meQuery.error, userDetailQuery.error, t])
 
   const resetTransientState = () => {
     setDraftFormState({})
