@@ -261,9 +261,18 @@ Validate 세션은 이 두 한계를 그대로 인정하고 추가 AC 를 발명
 - [x] **Specify** — 이 SPEC.md 작성 완료 (산출물: `.claude/specs/role-landing.md`, 2026-08-21).
       선행 조사(라이브 DB 읽기 전용 조회 + wm/tc/ui-backend 3 레포 대조)로 대안 A/B 비교 후
       사용자 결정 = A(권한 기반 랜딩).
-- [ ] **Plan** — 별 세션에서 구현 계획 수립 (산출물: `.claude/specs/role-landing-plan.md`)
-- [ ] **Implement** — 별 세션에서 Acceptance Criteria 만족하는 구현 (산출물: `.claude/specs/role-landing-dev-report.md`)
-- [ ] **Validate** — 별 세션에서 SPEC + Plan + Dev report 셋 다 입력으로 검증, 위 체크박스 업데이트
+- [x] **Plan** — 구현 계획 수립 완료 (산출물: `.claude/specs/role-landing-plan.md`, 2026-08-21).
+      Plan 단계 조사에서 `staleTime` 기본 5 분 문제(→ R4-a)와 e2e mock 으로 랜딩 검증이 가능하다는
+      사실(→ AC14)을 발견해 SPEC 을 개정했다(`fd5f4fb`).
+- [x] **Implement** — Acceptance Criteria 만족 구현 완료 (산출물: `.claude/specs/role-landing-dev-report.md`,
+      커밋 `e816b0a`(실패 테스트 선행) → `0a630df`(구현) → `df357a6`(e2e)).
+      AC1~AC14 전건 PASS, 되돌리기로 unit 4 fail / e2e 1 failed 재현 확인(vacuous-pass 아님).
+- [ ] **Validate** — 별 세션에서 SPEC + Plan + Dev report 셋 다 입력으로 검증, 위 AC 체크박스 업데이트
+
+> **절차 이탈 기록**: 표준은 4 단계를 별 세션으로 두지만, 사용자 지시로 Specify → Plan →
+> Implement 를 **한 세션에서 연속 수행**했다. 세 산출물 파일은 표준 경로에 모두 존재한다.
+> Validate 는 별 세션으로 두는 것이 이 이탈을 보정하는 지점이다 — 같은 세션의 자기 평가를
+> 독립 컨텍스트로 다시 판정해야 AC 마킹이 신뢰 가능하다.
 
 ## 다음 단계 진입 프롬프트
 
