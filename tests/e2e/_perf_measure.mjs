@@ -145,7 +145,11 @@ const main = async () => {
   const page = await context.newPage()
 
   // UI 폼 로그인 — 셀렉터는 LoginPage.tsx 실측(#userId :193 / #password :219, submit :279).
-  // 성공 시 useLogin.ts:41 의 LOGIN_ENTRY_ROUTE('/live-map') 로 이동한다.
+  //
+  // 진입 경로는 고정 상수가 아니라 보유 권한이 정한다(`resolveLoginLandingRoute`,
+  // app-navigation.ts). 아래 `/live-map` 대기는 **TEST_USER 가 LIVE_MAP_READ 를 보유한다는
+  // 전제**에 의존한다 — 그 권한이 회수되면 랜딩은 접근 가능한 다음 화면으로 가고, 여기서는
+  // 측정 실패가 아니라 타임아웃으로 보인다. 아래 catch 문구가 그 진단을 안내한다.
   await page.goto(`${BASE_URL}/login`, { waitUntil: 'load' })
   await page.fill('#userId', TEST_USER)
   await page.fill('#password', TEST_PASS)
@@ -154,7 +158,7 @@ const main = async () => {
     await page.waitForURL('**/live-map', { timeout: 30_000 })
   } catch {
     console.error(
-      `[error] 로그인 후 /live-map 미도달 — 계정(${TEST_USER}) 또는 backend(:8080) 상태를 확인하세요.`,
+      `[error] 로그인 후 /live-map 미도달 — 계정(${TEST_USER}) 의 LIVE_MAP_READ 권한 또는 backend(:8080) 상태를 확인하세요.`,
     )
     await browser.close()
     process.exit(1)
