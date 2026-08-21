@@ -183,6 +183,8 @@ wm 레포에 검증된 해법이 이미 존재하므로 역이식이 원칙 (신
 - RequirePermission 이식 → wm-parity-sidebar R11 에서 다룸
 - role-landing(역할별 로그인 랜딩) → wm-parity-sidebar 도 다루지 않음. tc 권한 모델에
   wm 식 역할 축이 있는지 확인 후 별도 SPEC (sidebar SPEC 의 Out of Scope 와 일치)
+  → **확인 완료 (2026-08-21). 역할 축 없음 → 권한 기반 랜딩으로 대체.**
+  후속 SPEC: `.claude/specs/role-landing.md`
 
 ## Validate 발견 결함 (2026-08-19) — **수정 완료**
 

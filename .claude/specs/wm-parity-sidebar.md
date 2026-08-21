@@ -176,6 +176,10 @@ TC 고유명(Live-Map/SECS/Socket/PLC/Business/Gateway/Repair Task)은 전 언�
 
 - role-landing(역할별 로그인 랜딩) — wm 은 ADMIN/OPERATOR 등 역할 상수 기반인데
   tc 권한 모델에 동일 역할 축이 있는지 미확인. 확인 후 별도 SPEC
+  → **확인 완료 (2026-08-21). tc 에 역할 축은 없다** (`MeInfo` / `MeResponse` /
+  `UserPrincipal` 모두 `permissionCodes` 뿐, tc 측 `roleCode` grep 0 건). wm 식 역할 축
+  이식은 기각하고 **권한 기반 랜딩**으로 같은 문제를 해결한다 →
+  후속 SPEC: `.claude/specs/role-landing.md`
 - DLQ 5모드 화면 각각의 기능 개선 (내비 승격만, 콘텐츠 불변)
 - 도메인 in-page 트리(설비 목록/모델 트리)의 기능 변경 — 스코프 필터링 외 불변
 - combobox / searchable-select / switch / tooltip 이식 (foundation 과 동일 사유)
