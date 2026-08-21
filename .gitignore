@@ -22,9 +22,12 @@ blob-report/
 # 에러 문구 표면화 스펙도 추적 — 실패가 화면에 뜨는지 단언하는 스펙이 레포에 0 건이었고,
 # 이 레포엔 jsdom/RTL 이 없어(`*.test.tsx` 0 개) 같은 계약을 tests/unit 으로 옮길 수 없다.
 # 로컬 전용으로 두면 유실되는 순간 그 계약을 아무도 검증하지 않는 상태로 되돌아간다.
+# 로그인 랜딩 스펙도 같은 사유로 추적 — 진입 경로가 권한으로 갈리는지는 순수 함수 단위
+# 테스트가 못 본다(반환값만 보고 그 값이 navigate 를 타는지는 안 본다).
 /tests/e2e/*
 !/tests/e2e/_perf_measure.mjs
 !/tests/e2e/_load_trace.mjs
+!/tests/e2e/login-landing.spec.ts
 !/tests/e2e/deploy/
 /tests/e2e/deploy/*
 !/tests/e2e/deploy/deploy-error-surface.spec.ts
