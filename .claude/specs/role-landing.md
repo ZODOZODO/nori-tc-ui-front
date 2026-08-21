@@ -124,8 +124,15 @@ tc 에는 그 축이 없다. 실측:
       하지 않고, `/access-denied` 같은 신규 라우트도 만들지 않는다.
 - [ ] R4. 랜딩 결정에 필요한 `me` 는 `queryClient.fetchQuery({ queryKey: ['auth','me'] })` 로
       읽는다 — `RequireAuth`/`RequirePermission` 이 쓰는 `useMe` 와 같은 키
-      (`src/features/profile/hooks/useProfile.ts:9`)라 캐시가 공유되고 `staleTime` 5분이므로
-      직후 가드가 같은 요청을 다시 보내지 않는다.
+      (`src/features/profile/hooks/useProfile.ts:9`)라 결과가 캐시에 심기고 직후 가드가
+      같은 엔트리를 재사용한다(네트워크 요청 총 1 회).
+- [ ] R4-a. 그 `fetchQuery` 는 **`staleTime: 0` 을 명시**한다. `src/app/providers/AppProvider.tsx:12`
+      의 `defaultOptions.queries.staleTime` 이 **5 분**이라, 명시하지 않으면 메모리에 남은
+      `['auth','me']` 엔트리가 5 분 이내일 때 `fetchQuery` 가 네트워크를 타지 않고 그 값을
+      돌려준다. 랜딩은 **방금 로그인한 계정**의 권한을 반영해야 하므로 이건 방어 분기가 아니라
+      읽기 신선도 요구의 명시다. 없으면 정확성이 다른 3 파일의 불변식
+      (`AppTopBar.tsx:57` `queryClient.clear()` / `api-client.ts:23-25` 의 하드 이동 /
+      `RequireAuth` 의 error 상태)에 암묵적으로 의존한다.
 - [ ] R5. `me` 조회 실패는 `console.error` 로 표면화한 뒤 트리 첫 라우트로 이동한다.
       조용히 삼키지 않는다(글로벌 룰 7).
 - [ ] R6. 결정 로직은 **순수 함수**로 두어 `tests/unit` 게이트에 넣는다. 훅 안에 인라인하지 않는다.
@@ -148,6 +155,10 @@ tc 에는 그 축이 없다. 실측:
 - **렌더 테스트 인프라가 없다.** `.tsx` 를 import 하는 단위 테스트가 불가하고 jsdom/RTL 도
   없다(`tests/unit/route-auth-guard.test.ts:15-18` 에 기술된 기존 제약). 훅 배선은
   같은 파일이 쓰는 **소스 스캔 단언** 방식으로만 검증한다.
+- **`.gitignore` 추적 예외 1 건을 추가한다.** 랜딩 동작 e2e(AC14)는 `/tests/e2e/*` 무시 규칙의
+  negation 으로 추적한다. 선례이자 동일 사유는 `.gitignore:8-16` 의
+  `deploy-error-surface.spec.ts` — jsdom/RTL 이 없어 이 계약을 `tests/unit` 으로 옮길 수 없고,
+  로컬 전용으로 두면 유실 시 아무도 검증하지 않는 상태로 되돌아간다. 그 외 e2e 는 정책대로 미추적.
 
 ## 동작 명세 — 기존 사용자에게 변화가 없다
 
@@ -189,8 +200,9 @@ tc 에는 그 축이 없다. 실측:
 - [ ] AC6. `grep -c "LOGIN_ENTRY_ROUTE" src/features/auth/hooks/useLogin.ts` 결과가 **0** 이다.
       (상수 고정 랜딩이 남아 있지 않음)
 - [ ] AC7. `tests/unit/login-landing.test.ts` 가 `useLogin.ts` 소스를 읽어
-      `queryKey: ['auth', 'me']` 패턴과 `console.error` 존재를 단언하고 pass 한다
-      (`route-auth-guard.test.ts` 와 같은 소스 스캔 방식 — R4/R5 의 회귀 게이트).
+      `queryKey: ['auth', 'me']` 패턴 AND `staleTime` AND `console.error` 존재를 **모두**
+      단언하고 pass 한다 (`route-auth-guard.test.ts` 와 같은 소스 스캔 방식 —
+      R4 / R4-a / R5 의 회귀 게이트).
 - [ ] AC8. `npm run build` 가 exit 0 으로 끝난다(`tsc -b && vite build`).
 - [ ] AC9. `npm run lint` 이 exit 0 이고 출력에 문제 목록이 없다(착수 전 실측: 출력 없음).
 - [ ] AC10. `grep -c '<Route path=' src/app/Router.tsx` 결과가 착수 전과 동일한 **27** 이다.
@@ -199,17 +211,33 @@ tc 에는 그 축이 없다. 실측:
       `cd ../nori-tc-exec && git status --porcelain -- docs/db_table` 출력이 0 줄이다(R7).
 - [ ] AC13. e2e 회귀 0 — `npx playwright test tests/e2e/login-page.smoke.spec.ts` 가 PASS 하고
       `page.on('console')` / `page.on('pageerror')` 의 error level 0 건이다.
+- [ ] AC14. 랜딩 분기가 **실제 브라우저에서** 갈리는 것을 신규 `tests/e2e/login-landing.spec.ts`
+      2 케이스로 단언하고 `npx playwright test tests/e2e/login-landing.spec.ts` 가 2 passed 로
+      끝난다 AND `page.on('console')` error level 0 건 AND `page.on('pageerror')` 0 건이다.
+      - a) `me.permissionCodes = ['DLQ_READ']` (LIVE_MAP_READ 미보유) → 로그인 폼 제출 후
+        `expect(page).toHaveURL(/\/dlq\/dashboard$/)`
+      - b) `me.permissionCodes = ['LIVE_MAP_READ','DLQ_READ']` → `expect(page).toHaveURL(/\/live-map$/)`
+        (현행 랜딩 무회귀 양성 대조)
 
 ### AC 의 알려진 한계 (Plan/Implement 가 확장 발명하지 말 것)
 
-랜딩 경로가 **실제 브라우저에서** 권한별로 갈리는지는 위 AC 로 덮이지 않는다. 그러려면
-`LIVE_MAP_READ` 미보유 계정으로 실제 백엔드에 로그인해야 하고, 라이브/로컬 DB 3 그룹 모두
-그 권한을 갖고 있어 그 계정이 존재하지 않는다(위 실측). 시드/DB 를 바꿔 계정을 만드는 것은
-이 SPEC 의 Out of Scope 다(R7).
+> **정정 (Plan 단계, 2026-08-21)**: 이 절의 초판은 "브라우저 검증에는 `LIVE_MAP_READ` 미보유
+> **실계정**이 필요하고 그 계정이 없어 덮을 수 없다" 고 썼다. **그 근거는 사실이 아니었다.**
+> e2e 스위트는 `page.route('**/api/auth/me')` 로 `permissionCodes` 를 임의 주입하는 관례를
+> 이미 갖고 있다(`group-page.spec.ts:154-160` / `dlq-page.spec.ts:187-193`, 미보유 사용자
+> 상수 `UNPERMISSIONED_ME` 까지 `group-page.spec.ts:38-42` 에 있다). 로그인 폼 제출 선례도
+> 있다(`verify-ui/_shared.ts:228-230`). 즉 계정도 DB 변경도 없이 덮인다 → **AC14 로 덮는다.**
 
-그래서 이 SPEC 은 **순수 함수 단위 게이트(AC2/AC3/AC4) + 훅 배선 소스 게이트(AC5/AC6/AC7)**
-로 판정한다. 이 한계는 결함이 아니라 명시된 선택이며, Validate 세션은 여기에 추가 AC 를
-발명하지 말고 이 한계를 그대로 인정한다.
+실제로 남는 한계는 두 가지다.
+
+1. **AC14 는 CI 게이트가 아니다.** `tests/e2e` 는 브라우저가 필요해 self-hosted 러너에서
+   실행되지 않는다(`.gitignore:4-5`). 추적 예외로 유실은 막지만, 회귀 감지는 로컬 실행에
+   의존한다. CI 에서 도는 것은 `tests/unit`(AC1~AC3, AC7)뿐이다.
+2. **실제 백엔드·실계정 대조는 하지 않는다.** AC14 는 `me` 응답을 mock 한다. 라이브 3 그룹이
+   모두 `LIVE_MAP_READ` 를 갖고 있어(위 실측) 미보유 실계정이 존재하지 않고, 시드/DB 를 바꿔
+   계정을 만드는 것은 Out of Scope 다(R7).
+
+Validate 세션은 이 두 한계를 그대로 인정하고 추가 AC 를 발명하지 않는다.
 
 ## Out of Scope
 
