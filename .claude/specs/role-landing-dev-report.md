@@ -92,8 +92,8 @@ export const resolveLoginLandingRoute = (
 
 | AC | 판정 | 근거 |
 |---|---|---|
-| AC1 | PASS | `# tests 274 / # pass 274 / # fail 0` (착수 전 265 → +9) |
-| AC2 | PASS | 6 케이스 전건 — 전권한/`/live-map`, `['DLQ_READ','EQP_READ']`/`/dlq/dashboard`, `['EQP_READ']`/`/eqp/business`, `['DEPLOY_READ']`/`/deploy/register`, `['USER_READ']`/`/user/users`, `[]`·`null`·`undefined`/`/live-map` |
+| AC1 | PASS | `# tests 275 / # pass 275 / # fail 0` (착수 전 265 → +10, F1 수정으로 274 → 275) |
+| AC2 | PASS | 6 케이스 전건 — 전권한/`/live-map`, `['DLQ_READ','EQP_READ']`/`/dlq/dashboard`, `['EQP_READ']`/`/eqp/business`, `['DEPLOY_READ']`/`/deploy/register`, `['USER_READ']`/`/user/users`, `[]`·`null`·`undefined`/`'/live-map'` **리터럴**(F1 수정 후) |
 | AC3 | PASS | `APP_NAVIGATION_GROUPS` 순회 6 그룹 전건 단언 통과 |
 | AC4 | PASS | 고정 반환으로 되돌려 `# fail 4` 재현 후 복원 (출력 아래 인용) |
 | AC5 | PASS | `grep -c` = **2** (≥1) |
@@ -111,15 +111,17 @@ export const resolveLoginLandingRoute = (
 
 ### AC1 — 최종 단위 테스트
 
+F1~F3 수정 후 최종:
+
 ```
-# tests 274
+# tests 275
 # suites 0
-# pass 274
+# pass 275
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4059.6361
+# duration_ms 7386.4222
 ```
 
 ### AC4 — vacuous-pass 차단 (`resolveLoginLandingRoute` 본문을 `return '/live-map'` 로 되돌림)
@@ -184,6 +186,70 @@ Running 3 tests using 1 worker
 
 미보유 케이스만 깨지고 보유 케이스는 통과한다 — 정확히 의도한 판별력이다(고정 반환이 곧
 `/live-map` 이므로 양성 대조는 살아 있어야 한다).
+
+## 자기 검토에서 발견한 결함과 조치 (2026-08-21, 최초 "완료" 보고 이후)
+
+최초 보고는 "결함 없이 구현 완료" 였다. 사용자 질책으로 재검증하니 **내 변경이 만든 결함 2 건**과
+**내 오진 1 건**이 있었다. 판정 이력을 그대로 남긴다.
+
+### F1. SPEC AC2 f) 문구 이탈 — 파생 상수로 fallback 을 단언했다 (수정)
+
+SPEC AC2 f) 는 `[]` / `null` / `undefined` → **`'/live-map'` 리터럴**을 요구했는데,
+`TREE_FIRST_ROUTE = APP_NAVIGATION_GROUPS[0].items[0].route` 와 비교하도록 썼다. 리터럴로
+바꾸고, "그 리터럴이 곧 트리 첫 항목" 이라는 별개 성질은 새 test 로 분리했다(총 9 → 10 test).
+
+> **내 오진을 정정한다.** 처음 이 건을 "판별력 0" 으로 보고했는데 **틀렸다.**
+> `TREE_FIRST_ROUTE` 는 트리 *데이터*에서 나온 구체 문자열(`'/live-map'`)이라 구 버전도 실제로는
+> 리터럴 비교였다. 변이 검증으로 확인했다 — fallback 을 `'/eqp/business'` 로 바꾸는 변이(M2)는
+> **구 버전도 잡는다**. 유일한 차이는 트리 재정렬 시나리오인데, 그것은
+> `app-navigation-visibility.test.ts:45-52` 가 그룹 순서를 `deepEqual` 로 이미 고정하고 있다.
+> 즉 이 건은 **커버리지 공백이 아니라 SPEC 문구 이탈**이었다. 수정 근거는 "SPEC 준수" 이고,
+> 커버리지 개선 효과는 미미하다. 과장 보고를 정정한다.
+
+변이별 실측(고친 테스트 기준):
+
+| 변이 | 결과 |
+|---|---|
+| M1 `return '/live-map'` 고정 | 4 fail (권한 무시 검출) |
+| M2 fallback 을 `'/eqp/business'` 로 | 2 fail (fallback 정확성 검출) |
+
+M1 에서 fallback 관련 2 test 가 통과하는 것은 vacuity 가 아니다 — 고정값이 그 케이스의 정답과
+같기 때문이고, 그 케이스를 잡는 것은 M2 의 역할이다.
+
+### F2. 삭제한 상수를 가리키는 stale 주석 2 곳 (수정)
+
+`LOGIN_ENTRY_ROUTE` 를 지우면서 그것을 참조하는 주석을 남겼다. 워크스페이스 grep 으로 발견.
+
+- `tests/e2e/_perf_measure.mjs:148` — "성공 시 useLogin.ts:41 의 LOGIN_ENTRY_ROUTE('/live-map')
+  로 이동한다". **git 추적 파일**이고 상수도 그 줄도 이제 없다.
+- `tests/e2e/verify-ui/_shared.ts:220` — "성공하면 `/live-map`(LOGIN_ENTRY_ROUTE) 으로 이동한다".
+
+과거 SPEC/dev-report(`wm-parity-*`)의 `LOGIN_ENTRY_ROUTE` 언급은 **고치지 않았다** — 그 시점의
+사실을 기록한 이력이다.
+
+### F3. 로그인 헬퍼 2 곳이 `/live-map` 을 하드 단언 — 이제 권한 의존 (주석으로 명시)
+
+`verify-ui/_shared.ts:232` `toHaveURL(/\/live-map$/)` 와 `_perf_measure.mjs:158`
+`waitForURL('**/live-map')` 는 이제 계정 권한에 의존한다. 현행 계정이 `LIVE_MAP_READ` 보유라
+통과하지만, 회수되면 랜딩 결함이 아니라 하네스 타임아웃으로 보인다. 단언을 권한 기반으로 바꾸면
+하네스가 검증 대상 로직을 복제하게 되므로, **전제를 주석으로 명시하고 진단 문구에 권한을
+추가**하는 선에서 멈췄다(사용자 승인).
+
+### 최초 보고에서 정정할 것 — "e2e 회귀 0" 은 추론이었다
+
+`login-page.smoke.spec.ts` **하나만** 돌린 결과를 회귀 0 으로 보고했다. 로그인을 실제로 수행하는
+`verify-ui` / `demo-matrix.harness` / `_perf_measure` 는 실제 백엔드가 필요해 돌리지 않았고,
+"랜딩이 바이트 동일하니 영향 없다" 는 추론이었다. **실행하지 않은 것을 회귀 0 의 근거로 쓴 것은
+잘못이다.** 현재도 그 3 경로는 미실행이며, F3 의 전제 의존이 그 미검증 구간의 실체다.
+
+### 결함 아님으로 확인 (추측 아닌 소스 근거)
+
+- **`onSuccess` async 화로 인한 double-submit 없음** —
+  `node_modules/@tanstack/query-core/build/modern/mutation.js:123` 이
+  `await this.options.onSuccess?.(...)` 이고 `:144` 에서야 `dispatch({ type: "success" })` 한다.
+  즉 `fetchQuery` 동안 상태가 `pending` 이라 `isPending` 이 참이고 제출 버튼은 계속 disabled 다.
+- **401 리다이렉트 루프 없음** — `api-client.ts:23` 이 `pathname !== '/login'` 조건이고,
+  랜딩용 `me` 조회 시점의 경로는 아직 `/login` 이다.
 
 ## 구현 중 얻은 운용 지식
 
