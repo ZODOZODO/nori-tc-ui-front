@@ -323,6 +323,13 @@ PLACEHOLDER_COUNT_pass2   = 0
 남은 2 건은 코드 결함이 아니다. **`verify-ui/*` 는 mock 없이 실제 백엔드에 로그인하는 통합
 스펙이고, `TC_TEST_ENV` 로 기동된 백엔드를 전제한다.**
 
+> **정정 — 이 전제는 새로 발견한 것이 아니다.** `nori-tc-common/.claude/verify/PRECONDITIONS.md`
+> 의 "절대 전제 — 격리 환경에서만 실행" 이 운영/격리 축 표, `set TC_TEST_ENV=1` 실행 절차,
+> "하지 말 것" 의 `TC_TEST_ENV 없이 실행 (운영 오염)` 까지 이미 다 적어 두고 있다. `tc-verify-ui`
+> / `tc-verify-runtime` / `tc-verify-flow` 3 스킬 description 에도 전제로 박혀 있다. 아래는 그
+> 문서의 재확인이며, 문서에 없는 것은 **실행 중 프로세스가 격리인지 판별하는 방법**뿐이다.
+> `verify-ui` 실패를 만나면 새 원인을 찾기 전에 그 문서를 먼저 읽는다.
+
 `nori-tc-exec/config/tc-redis.test.properties` 의 헤더 주석이 근거다 — 로딩 조건이 `TC_TEST_ENV`
 이고, `spring.data.redis.database=1` 로 논리 DB 를 분리하며 **"운영은 인덱스 0(미지정 기본값)을
 쓴다"** 고 명시한다. `tc-db.test.properties` 는 같은 조건에서 DB 를 `nori_tc_test` 로 바꾼다.
