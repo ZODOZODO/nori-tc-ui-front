@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/i18n/i18n-context'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
 import { operationApi } from '@/shared/api/operation.api'
@@ -8,6 +8,11 @@ import {
   type OperationOutcome,
   type OperationPhase,
 } from '@/shared/lib/operation-status'
+import {
+  forgetPendingOperation,
+  readPendingOperation,
+  rememberPendingOperation,
+} from '@/shared/lib/pending-operation-store'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import type { EqpOperationResultStatus } from '../lib/eqp-operation-result-presentation'
 import type { EqpInfo } from '../types/eqp.types'
@@ -15,6 +20,12 @@ import { isActiveEquipment } from '../utils/eqp-runtime-state.util'
 import type { useEqpMutations } from './useEqpMutations'
 
 export type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
+
+const PENDING_OPERATION_SCOPE = 'eqp-lifecycle'
+const LIFECYCLE_ACTIONS: readonly EqpLifecycleAction[] = ['start', 'end', 'restart', 'reconnect']
+
+const isLifecycleAction = (value: string): value is EqpLifecycleAction =>
+  (LIFECYCLE_ACTIONS as readonly string[]).includes(value)
 
 export interface EqpLifecycleDialogState {
   open: boolean
@@ -147,6 +158,9 @@ export function useEqpLifecycleCommands({
   }, [])
 
   const closeLifecycleResultDialog = useCallback(() => {
+    // 사용자가 결과를 닫으면 복원 대상에서 뺀다 — 그러지 않으면 확인 지연 기록이 terminal 을
+    // 관측할 때까지 새로고침마다 다시 열린다.
+    forgetPendingOperation(PENDING_OPERATION_SCOPE)
     setLifecycleResultDialog(EMPTY_EQP_LIFECYCLE_RESULT_DIALOG_STATE)
   }, [])
 
@@ -166,10 +180,19 @@ export function useEqpLifecycleCommands({
   /**
    * 한 단계를 발행하고 결과를 기다린다. PASS 가 아니면 그 결과를 그대로 돌려준다 —
    * restart 처럼 두 단계로 이뤄진 명령의 **부분 적용**도 operation 상태로 드러나야 한다(§14.2).
+   *
+   * `resume` 이 있으면 새로고침 후 재조회할 수 있도록 접수 좌표를 남긴다(§14.1). 결과
+   * 다이얼로그가 없는 폴링 그룹 명령은 복원 대상이 아니므로 `null` 을 넘긴다.
    */
   const runLifecycleStep = useCallback(
-    async (dispatch: () => Promise<string>): Promise<OperationOutcome> => {
+    async (
+      dispatch: () => Promise<string>,
+      resume: { action: EqpLifecycleAction; eqpId: string } | null,
+    ): Promise<OperationOutcome> => {
       const operationId = await dispatch()
+      if (resume !== null) {
+        rememberPendingOperation(PENDING_OPERATION_SCOPE, { operationId, ...resume })
+      }
       return trackOperation(operationId)
     },
     [trackOperation],
@@ -186,29 +209,42 @@ export function useEqpLifecycleCommands({
         uiMessage: null,
       } as const
 
+      const resume = { action, eqpId: eqp.eqpId }
+
       if (action === 'start') {
-        return runLifecycleStep(() => startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }))
+        return runLifecycleStep(
+          () => startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+          resume,
+        )
       }
 
       if (action === 'end') {
-        return runLifecycleStep(() => endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }))
+        return runLifecycleStep(
+          () => endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+          resume,
+        )
       }
 
       if (action === 'reconnect') {
         // stuck(desired=STARTED + control=OFFLINE) 복구 — END+START 가 아니라 EQP_RECONNECT 단일 명령.
-        return runLifecycleStep(() =>
-          reconnectEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+        return runLifecycleStep(
+          () => reconnectEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+          resume,
         )
       }
 
-      const endOutcome = await runLifecycleStep(() =>
-        endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+      const endOutcome = await runLifecycleStep(
+        () => endEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+        resume,
       )
       if (endOutcome.kind !== 'PASS') {
         return endOutcome
       }
 
-      return runLifecycleStep(() => startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }))
+      return runLifecycleStep(
+        () => startEqpMutation.mutateAsync({ eqpId: eqp.eqpId, request }),
+        resume,
+      )
     },
     [endEqpMutation, startEqpMutation, reconnectEqpMutation, runLifecycleStep, t],
   )
@@ -221,6 +257,11 @@ export function useEqpLifecycleCommands({
    */
   const applyOutcomeToResultDialog = useCallback(
     (outcome: OperationOutcome, action: EqpLifecycleAction, eqpId: string, fallback: string) => {
+      // terminal 관측 시에만 재조회 좌표를 버린다 — `DELAYED` 는 종료가 아니다(§14.1).
+      if (outcome.kind !== 'DELAYED') {
+        forgetPendingOperation(PENDING_OPERATION_SCOPE)
+      }
+
       if (outcome.kind === 'PASS') {
         setLifecycleResultDialog({
           open: true,
@@ -346,6 +387,27 @@ export function useEqpLifecycleCommands({
     trackOperation,
   ])
 
+  // 새로고침으로 화면 상태가 사라져도 진행 중 operation 을 다시 조회할 수 있어야 한다(§14.1).
+  useEffect(() => {
+    const pending = readPendingOperation(PENDING_OPERATION_SCOPE)
+    if (pending === null) {
+      return
+    }
+    if (!isLifecycleAction(pending.action)) {
+      forgetPendingOperation(PENDING_OPERATION_SCOPE)
+      return
+    }
+
+    setLifecycleResultDialog({
+      open: true,
+      status: 'delayed',
+      action: pending.action,
+      eqpId: pending.eqpId,
+      message: null,
+      operationId: pending.operationId,
+    })
+  }, [])
+
   // 두 flag 는 mutateAsync(202) settle 뒤 최장 60초 폴링 구간까지 덮어야 한다 — guard 없이
   // mutation.isPending 만 보면 그 구간에 버튼이 되살아나 명령이 중복 발행된다(S09 D-1 / D-2).
   const isLifecyclePending =
@@ -362,8 +424,9 @@ export function useEqpLifecycleCommands({
   const handleStartPollingGroup = useCallback(
     async (eqpId: string, groupMessageName: string): Promise<boolean> => {
       const result = await pollingGroupGuard.run(async () => {
-        const outcome = await runLifecycleStep(() =>
-          startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName }),
+        const outcome = await runLifecycleStep(
+          () => startPollingGroupMutation.mutateAsync({ eqpId, groupMessageName }),
+          null,
         )
         if (outcome.kind === 'PASS') {
           await onOperationPassed()
@@ -377,8 +440,9 @@ export function useEqpLifecycleCommands({
   const handleEndPollingGroup = useCallback(
     async (eqpId: string, groupMessageName: string): Promise<boolean> => {
       const result = await pollingGroupGuard.run(async () => {
-        const outcome = await runLifecycleStep(() =>
-          endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName }),
+        const outcome = await runLifecycleStep(
+          () => endPollingGroupMutation.mutateAsync({ eqpId, groupMessageName }),
+          null,
         )
         if (outcome.kind === 'PASS') {
           await onOperationPassed()

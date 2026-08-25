@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/i18n/i18n-context'
 import { operationApi } from '@/shared/api/operation.api'
 import { useAsyncCommandGuard } from '@/shared/hooks/useAsyncCommandGuard'
@@ -8,6 +8,11 @@ import {
   type OperationOutcome,
   type OperationPhase,
 } from '@/shared/lib/operation-status'
+import {
+  forgetPendingOperation,
+  readPendingOperation,
+  rememberPendingOperation,
+} from '@/shared/lib/pending-operation-store'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 import type { EqpCreateRequest, EqpUpdateRequest } from '../types/eqp.types'
 import type { EqpOperationResultStatus } from '../lib/eqp-operation-result-presentation'
@@ -15,8 +20,14 @@ import type { useEqpMutations } from './useEqpMutations'
 
 const OPERATION_POLL_INTERVAL_MS = 1000
 const OPERATION_MAX_ATTEMPTS = 60
+const PENDING_OPERATION_SCOPE = 'eqp-mutation'
 
 export type EqpMutationAction = 'create' | 'update' | 'delete'
+
+const MUTATION_ACTIONS: readonly EqpMutationAction[] = ['create', 'update', 'delete']
+
+const isMutationAction = (value: string): value is EqpMutationAction =>
+  (MUTATION_ACTIONS as readonly string[]).includes(value)
 
 export interface EqpMutationResultDialogState {
   open: boolean
@@ -96,6 +107,9 @@ export function useEqpMutationCommands({
   const clearAcceptanceError = useCallback(() => setAcceptanceErrorMessage(null), [])
 
   const closeResultDialog = useCallback(() => {
+    // 사용자가 결과를 닫으면 복원 대상에서 뺀다 — 그러지 않으면 확인 지연 기록이 terminal 을
+    // 관측할 때까지 새로고침마다 다시 열린다.
+    forgetPendingOperation(PENDING_OPERATION_SCOPE)
     // Radix Dialog 의 close 애니메이션 동안 직전 status/message 가 유지돼야 한다 — 전체를 초기화하면
     // status 기본값(success)이 잠깐 노출돼 실패 → 정상 팝업이 깜빡인다.
     setResultDialog((previous) => ({ ...previous, open: false }))
@@ -117,6 +131,12 @@ export function useEqpMutationCommands({
   const applyOutcome = useCallback(
     async (outcome: OperationOutcome, action: EqpMutationAction, eqpId: string) => {
       onTerminal(action, eqpId, outcome.kind === 'PASS')
+
+      // terminal 을 실제로 관측했을 때만 재조회 좌표를 버린다 — `DELAYED` 는 operation 의 종료가
+      // 아니라 "아직 확인되지 않음" 이므로 새로고침 후에도 조회할 수 있어야 한다(§14.1).
+      if (outcome.kind !== 'DELAYED') {
+        forgetPendingOperation(PENDING_OPERATION_SCOPE)
+      }
 
       if (outcome.kind === 'PASS') {
         if (action === 'delete') {
@@ -197,6 +217,8 @@ export function useEqpMutationCommands({
           return
         }
 
+        rememberPendingOperation(PENDING_OPERATION_SCOPE, { operationId, action, eqpId })
+
         try {
           await applyOutcome(await trackOperation(operationId), action, eqpId)
         } catch (error) {
@@ -266,6 +288,28 @@ export function useEqpMutationCommands({
       }
     })
   }, [applyOutcome, mutationGuard, resultDialog, t, trackOperation])
+
+  // 새로고침으로 화면 상태가 사라져도 진행 중 operation 을 다시 조회할 수 있어야 한다(§14.1).
+  // 접수 시 남긴 좌표를 "확인 지연" 결과로 복원해 기존 재조회 경로에 연결한다.
+  useEffect(() => {
+    const pending = readPendingOperation(PENDING_OPERATION_SCOPE)
+    if (pending === null) {
+      return
+    }
+    if (!isMutationAction(pending.action)) {
+      forgetPendingOperation(PENDING_OPERATION_SCOPE)
+      return
+    }
+
+    setResultDialog({
+      open: true,
+      status: 'delayed',
+      action: pending.action,
+      eqpId: pending.eqpId,
+      message: null,
+      operationId: pending.operationId,
+    })
+  }, [])
 
   const isMutationPending =
     mutationGuard.isRunning ||
