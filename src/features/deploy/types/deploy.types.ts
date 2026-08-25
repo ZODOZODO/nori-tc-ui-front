@@ -10,6 +10,18 @@ export type DeployEventType =
 
 export type DeployExecutionPolicy = 'BEST_EFFORT' | 'FAIL_FAST'
 
+/**
+ * 지원하지 않는 protocol status 를 받았을 때 쓰는 표시 전용 값입니다(§14.3).
+ *
+ * <p>모르는 값을 `PLANNING` / `PENDING` 같은 **초기 상태로 바꾸지 않습니다** — 그렇게 하면 이미
+ * 실패했거나 복구가 필요한 배포가 "아직 시작 전" 으로 보여 운영자가 방치하게 됩니다. 성공·실패를
+ * 추정하지 않고 "알 수 없는 서버 상태" 로 드러냅니다.</p>
+ */
+export const UNKNOWN_SERVER_STATUS = 'UNKNOWN_SERVER_STATUS'
+
+/** recovery 의미를 표현하는 protocol 상태(§14.3). execution / target / step 모두가 받을 수 있습니다. */
+type DeployRecoveryStatus = 'RECONCILING' | 'FINALIZING' | 'REPAIR_REQUIRED'
+
 export type DeployStatus =
   | 'PLANNING'
   | 'READY'
@@ -18,6 +30,8 @@ export type DeployStatus =
   | 'PARTIAL_FAILED'
   | 'FAILED'
   | 'CANCELED'
+  | DeployRecoveryStatus
+  | typeof UNKNOWN_SERVER_STATUS
 
 export type DeployTargetStatus =
   | 'PENDING'
@@ -29,6 +43,8 @@ export type DeployTargetStatus =
   | 'ROLLED_BACK'
   | 'COMPENSATION_FAILED'
   | 'CANCELED'
+  | DeployRecoveryStatus
+  | typeof UNKNOWN_SERVER_STATUS
 
 export type DeployStepStatus =
   | 'PENDING'
@@ -41,6 +57,8 @@ export type DeployStepStatus =
   | 'ROLLED_BACK'
   | 'COMPENSATION_FAILED'
   | 'CANCELED'
+  | DeployRecoveryStatus
+  | typeof UNKNOWN_SERVER_STATUS
 
 export interface DeployTargetSummary {
   total: number

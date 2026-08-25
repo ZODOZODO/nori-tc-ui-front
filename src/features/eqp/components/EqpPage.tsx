@@ -18,7 +18,7 @@ import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
 import { CheckInModal } from './CheckInModal'
 import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
-import { EqpDeleteResultDialog } from './EqpDeleteResultDialog'
+import { EqpOperationResultDialog } from './EqpOperationResultDialog'
 import { EqpInfoTable } from './EqpInfoTable'
 import { EqpPollingGroupControl } from './EqpPollingGroupControl'
 import { EqpLifecycleActionDialog } from './EqpLifecycleActionDialog'
@@ -44,6 +44,10 @@ import { useEqpCheckoutStatus } from '../hooks/useEqpCheckoutStatus'
 import { useEqpManageDetail } from '../hooks/useEqpManageDetail'
 import { useEqpManageOptions } from '../hooks/useEqpManageOptions'
 import { useEqpLifecycleCommands } from '../hooks/useEqpLifecycleCommands'
+import {
+  useEqpMutationCommands,
+  type EqpMutationAction,
+} from '../hooks/useEqpMutationCommands'
 import { useEqpMutations } from '../hooks/useEqpMutations'
 import { useEqpParams } from '../hooks/useEqpParams'
 import { useEqpParamMutations } from '../hooks/useEqpParamMutations'
@@ -83,20 +87,7 @@ type EqpManagementDialogState =
   | { type: 'model'; eqpId: string }
   | { type: 'delete'; eqpId: string }
 
-interface EqpDeleteResultDialogState {
-  open: boolean
-  status: 'success' | 'failure'
-  eqpId: string | null
-  message: string | null
-}
-
 const EMPTY_MANAGEMENT_DIALOG_STATE: EqpManagementDialogState = { type: 'none' }
-const EMPTY_EQP_DELETE_RESULT_DIALOG_STATE: EqpDeleteResultDialogState = {
-  open: false,
-  status: 'success',
-  eqpId: null,
-  message: null,
-}
 
 /** 설비 페이지의 1단계 스코프 — 확정 메뉴 트리의 `/eqp/business` · `/eqp/gateway` 와 1:1. */
 export type EqpScope = 'business' | 'gateway'
@@ -197,9 +188,6 @@ export function EqpPage({ scope }: EqpPageProps) {
     EMPTY_MANAGEMENT_DIALOG_STATE,
   )
   const [managementErrorMessage, setManagementErrorMessage] = useState<string | null>(null)
-  const [deleteResultDialog, setDeleteResultDialog] = useState<EqpDeleteResultDialogState>(
-    EMPTY_EQP_DELETE_RESULT_DIALOG_STATE,
-  )
   // 가운데 컨테이너 높이 계산용 ref
   const centerContainerRef = useRef<HTMLDivElement>(null)
   // 체크아웃 중복 요청(더블 클릭) 방지용 로컬 가드
@@ -215,17 +203,21 @@ export function EqpPage({ scope }: EqpPageProps) {
     reconnectEqpMutation,
     startPollingGroupMutation,
     endPollingGroupMutation,
+    invalidateAfterOperationPass,
+    invalidateAfterEqpDeletePass,
   } = useEqpMutations()
   const {
     lifecycleDialog,
     lifecycleResultDialog,
     lifecycleErrorMessage,
+    lifecyclePhase,
     isLifecyclePending,
     isPollingGroupPending,
     openLifecycleDialog,
     closeLifecycleDialog,
     closeLifecycleResultDialog,
     handleConfirmLifecycleAction,
+    recheckLifecycleOperation,
     handleStartPollingGroup,
     handleEndPollingGroup,
   } = useEqpLifecycleCommands({
@@ -234,6 +226,10 @@ export function EqpPage({ scope }: EqpPageProps) {
     reconnectEqpMutation,
     startPollingGroupMutation,
     endPollingGroupMutation,
+    onOperationPassed: useCallback(
+      () => invalidateAfterOperationPass(null),
+      [invalidateAfterOperationPass],
+    ),
   })
   const { checkoutMutation, saveEditParamsMutation, undoCheckoutMutation, checkinMutation } =
     useEqpParamMutations()
@@ -446,7 +442,6 @@ export function EqpPage({ scope }: EqpPageProps) {
 
   const openEqpDeleteDialog = useCallback((eqpId: string) => {
     setManagementErrorMessage(null)
-    setDeleteResultDialog(EMPTY_EQP_DELETE_RESULT_DIALOG_STATE)
     setManagementDialog({ type: 'delete', eqpId })
   }, [])
 
@@ -659,15 +654,44 @@ export function EqpPage({ scope }: EqpPageProps) {
     selectBusinessGroup(groupIndex)
   }, [queryClient, selectBusinessGroup])
 
+  const {
+    resultDialog: mutationResultDialog,
+    operationPhase: mutationOperationPhase,
+    isMutationPending,
+    acceptanceErrorMessage: mutationAcceptanceErrorMessage,
+    clearAcceptanceError: clearMutationAcceptanceError,
+    closeResultDialog: closeMutationResultDialog,
+    recheckOperation: recheckMutationOperation,
+    submitCreate,
+    submitUpdate,
+    submitDelete,
+  } = useEqpMutationCommands({
+    createEqpMutation,
+    updateEqpMutation,
+    deleteEqpMutation,
+    invalidateAfterOperationPass,
+    invalidateAfterEqpDeletePass,
+    // 접수(202)는 완료가 아니다 — 입력 다이얼로그를 닫지 않고 그 안에서 진행 phase 를 보여준다
+    // (Plan B3: 기존 다이얼로그 확장). 닫는 시점은 operation 이 terminal 이 된 뒤다.
+    onTerminal: useCallback(
+      (action: EqpMutationAction, eqpId: string, passed: boolean) => {
+        closeManagementDialog()
+        if (!passed) {
+          return
+        }
+        if (action === 'create') {
+          handleSelectEqp(eqpId)
+        }
+        if (action === 'delete' && selectedEqpId === eqpId) {
+          resetSelectionTransientStates()
+        }
+      },
+      [closeManagementDialog, handleSelectEqp, resetSelectionTransientStates, selectedEqpId],
+    ),
+  })
+
   const handleSaveCreateEqp = async (request: EqpCreateRequest) => {
-    try {
-      setManagementErrorMessage(null)
-      await createEqpMutation.mutateAsync(request)
-      closeManagementDialog()
-      handleSelectEqp(request.eqpId)
-    } catch (error) {
-      setManagementErrorMessage(resolveErrorMessage(error, t('error.eqp.create')))
-    }
+    await submitCreate(request)
   }
 
   const handleSaveEqpUpdate = async (request: EqpUpdateRequest) => {
@@ -676,16 +700,7 @@ export function EqpPage({ scope }: EqpPageProps) {
       return
     }
 
-    try {
-      setManagementErrorMessage(null)
-      await updateEqpMutation.mutateAsync({
-        eqpId: managementTargetEqpId,
-        request,
-      })
-      closeManagementDialog()
-    } catch (error) {
-      setManagementErrorMessage(resolveErrorMessage(error, t('error.eqp.update')))
-    }
+    await submitUpdate(managementTargetEqpId, request)
   }
 
   const handleDeleteEqp = async () => {
@@ -693,32 +708,7 @@ export function EqpPage({ scope }: EqpPageProps) {
       return
     }
 
-    const targetEqpId = managementDialog.eqpId
-
-    try {
-      setManagementErrorMessage(null)
-      await deleteEqpMutation.mutateAsync({ eqpId: targetEqpId })
-
-      if (selectedEqpId === targetEqpId) {
-        resetSelectionTransientStates()
-      }
-
-      closeManagementDialog()
-      setDeleteResultDialog({
-        open: true,
-        status: 'success',
-        eqpId: targetEqpId,
-        message: t('eqp.page.deleteSuccess', { eqpId: targetEqpId }),
-      })
-    } catch (error) {
-      closeManagementDialog()
-      setDeleteResultDialog({
-        open: true,
-        status: 'failure',
-        eqpId: targetEqpId,
-        message: resolveErrorMessage(error, t('error.eqp.delete')),
-      })
-    }
+    await submitDelete(managementDialog.eqpId)
   }
 
   /**
@@ -1033,7 +1023,10 @@ export function EqpPage({ scope }: EqpPageProps) {
     ? resolveErrorMessage(eqpManageOptionsQuery.error, t('eqp.page.manageOptionsLoadError'))
     : null
   const managementModalErrorMessage =
-    managementErrorMessage ?? managementDetailErrorMessage ?? managementOptionsErrorMessage
+    managementErrorMessage ??
+    mutationAcceptanceErrorMessage ??
+    managementDetailErrorMessage ??
+    managementOptionsErrorMessage
 
   // Check Out 버튼 비활성화: 설비 정보 없거나 다른 사용자가 이미 체크아웃 중인 경우
   // appliedVersion 없어도 (버전 없는 신규 설비) 체크아웃 가능 → !appliedVersion 조건 제거
@@ -1342,11 +1335,13 @@ export function EqpPage({ scope }: EqpPageProps) {
             options={eqpManageOptionsQuery.data ?? null}
             isLoading={managementDialog.type === 'info' ? eqpManageDetailQuery.isLoading : false}
             isOptionsLoading={eqpManageOptionsQuery.isLoading}
-            isPending={createEqpMutation.isPending || updateEqpMutation.isPending}
+            isPending={isMutationPending}
+            progressPhase={mutationOperationPhase}
             errorMessage={managementModalErrorMessage}
             onOpenChange={(open) => {
               if (!open) {
                 closeManagementDialog()
+                clearMutationAcceptanceError()
               }
             }}
             onSubmit={(request) =>
@@ -1364,11 +1359,13 @@ export function EqpPage({ scope }: EqpPageProps) {
         options={eqpManageOptionsQuery.data ?? null}
         isLoading={eqpManageDetailQuery.isLoading}
         isOptionsLoading={eqpManageOptionsQuery.isLoading}
-        isPending={updateEqpMutation.isPending}
+        isPending={isMutationPending}
+        progressPhase={mutationOperationPhase}
         errorMessage={managementModalErrorMessage}
         onOpenChange={(open) => {
           if (!open) {
             closeManagementDialog()
+            clearMutationAcceptanceError()
           }
         }}
         onSubmit={handleSaveEqpUpdate}
@@ -1377,26 +1374,30 @@ export function EqpPage({ scope }: EqpPageProps) {
       <EqpDeleteConfirmDialog
         open={managementDialog.type === 'delete'}
         eqpId={managementDialog.type === 'delete' ? managementDialog.eqpId : null}
-        isPending={deleteEqpMutation.isPending}
+        isPending={isMutationPending}
+        progressPhase={mutationOperationPhase}
         errorMessage={null}
         onOpenChange={(open) => {
           if (!open) {
             closeManagementDialog()
+            clearMutationAcceptanceError()
           }
         }}
         onConfirm={handleDeleteEqp}
       />
 
-      <EqpDeleteResultDialog
-        open={deleteResultDialog.open}
-        status={deleteResultDialog.status}
-        eqpId={deleteResultDialog.eqpId}
-        message={deleteResultDialog.message}
+      <EqpOperationResultDialog
+        open={mutationResultDialog.open}
+        status={mutationResultDialog.status}
+        action={mutationResultDialog.action}
+        eqpId={mutationResultDialog.eqpId}
+        message={mutationResultDialog.message}
+        operationId={mutationResultDialog.operationId}
+        isRechecking={isMutationPending}
+        onRecheck={() => void recheckMutationOperation()}
         onOpenChange={(open) => {
           if (!open) {
-            // Radix Dialog의 close 애니메이션 동안에도 직전 status/message를 유지해야 합니다.
-            // 전체 상태를 EMPTY로 초기화하면 status 기본값(success)이 잠깐 노출되어 실패 → 정상 팝업이 깜빡이는 버그가 발생합니다.
-            setDeleteResultDialog((prev) => ({ ...prev, open: false }))
+            closeMutationResultDialog()
           }
         }}
       />
@@ -1406,6 +1407,7 @@ export function EqpPage({ scope }: EqpPageProps) {
         action={lifecycleDialog.action}
         eqpId={lifecycleDialog.eqp?.eqpId ?? null}
         isPending={isLifecyclePending}
+        progressPhase={lifecyclePhase}
         errorMessage={lifecycleErrorMessage}
         onOpenChange={(open) => {
           if (!open) {
@@ -1421,6 +1423,9 @@ export function EqpPage({ scope }: EqpPageProps) {
         action={lifecycleResultDialog.action}
         eqpId={lifecycleResultDialog.eqpId}
         message={lifecycleResultDialog.message}
+        operationId={lifecycleResultDialog.operationId}
+        isRechecking={isLifecyclePending}
+        onRecheck={() => void recheckLifecycleOperation()}
         onOpenChange={(open) => {
           if (!open) {
             closeLifecycleResultDialog()

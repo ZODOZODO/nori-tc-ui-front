@@ -1,3 +1,4 @@
+import type { OperationAcceptance } from '@/shared/lib/operation-status'
 import type { ApiResponse } from '@/shared/types/api.types'
 import type { ModelStatus, ProtocolType } from '@/shared/types/domain.types'
 
@@ -393,9 +394,16 @@ export interface EqpLifecycleRequest {
 }
 
 /**
- * create/update/delete 계열의 공통 응답 타입입니다.
+ * create/update/delete 접수(`202 Accepted`) 응답 타입입니다(§13.2 / §14.1).
+ *
+ * 접수는 완료가 아닙니다 — `operationId` 로 `GET /api/async/{id}` 를 조회해야 결과를 알 수 있습니다.
  */
-export type EqpDualCommandResponse = ApiResponse<null>
+export type EqpOperationAcceptResponse = ApiResponse<OperationAcceptance>
+
+/**
+ * checkout / checkin / param 저장처럼 `data: null` 이 정상인 엔드포인트의 응답 타입입니다.
+ */
+export type EqpVoidResponse = ApiResponse<null>
 
 /**
  * START/END 202 Accepted 응답 payload 입니다.
@@ -408,22 +416,6 @@ export interface AsyncAcceptData {
  * START/END 요청의 즉시 응답 타입입니다.
  */
 export type AsyncAcceptResponse = ApiResponse<AsyncAcceptData>
-
-/**
- * GET /api/async/{traceId} polling 결과 payload 입니다.
- */
-export interface AsyncResultData {
-  traceId: string
-  eqpId: string | null
-  status: 'PENDING' | 'PASS' | 'FAIL' | 'TIMEOUT' | (string & {})
-  errorCode: string | null
-  errorMsg: string | null
-}
-
-/**
- * polling 결과 응답 타입입니다.
- */
-export type AsyncResultResponse = ApiResponse<AsyncResultData>
 
 /**
  * EQP Parameter UI 전용 행 모델입니다.

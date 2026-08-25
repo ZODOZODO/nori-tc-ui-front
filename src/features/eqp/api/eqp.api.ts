@@ -2,16 +2,16 @@ import i18n from '@/i18n'
 import { apiClient } from '@/shared/lib/api-client'
 import { ApiError, assertSuccessResponse, createFailResponse, normalizeApiError, resolveSuccessPayload } from '@/shared/lib/api-error'
 import { CSRF_HEADER_NAME, withCsrfHeaders } from '@/shared/lib/csrf'
+import type { OperationAcceptance } from '@/shared/lib/operation-status'
 import {
   type AsyncAcceptResponse,
-  type AsyncResultData,
-  type AsyncResultResponse,
   type EqpCheckinRequest,
   type EqpCheckoutRequest,
   type EqpCheckoutStatus,
   type EqpCheckoutStatusResponse,
   type EqpCreateRequest,
-  type EqpDualCommandResponse,
+  type EqpOperationAcceptResponse,
+  type EqpVoidResponse,
   type EqpInfo,
   type EqpInfoDetailResponse,
   type EqpInfoListResponse,
@@ -39,19 +39,6 @@ import { isRecord } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
-
-/**
- * 설비 생성 / 수정 / 삭제 전용 요청 타임아웃(ms).
- *
- * 이 3 개만 gateway + business 양쪽 응답을 서버가 동기로 기다린다
- * (`EqpController#create|update|delete` 의 `DeferredResult`,
- * `tc.ui.backend.async.dual-request-timeout-ms` = 10s). 공용 `apiClient` 기본값도 10s 라
- * 두 타임아웃이 같아서, 서버가 9 초대에 성공(200)해도 브라우저가 먼저 끊는 경합이 생긴다
- * — 설비는 실제로 만들어졌는데 화면은 실패로 남는다(2026-08-11 실측 9.594s).
- * 클라이언트 타임아웃은 서버 상한보다 반드시 커야 한다.
- */
-const EQP_DUAL_COMMAND_TIMEOUT_MS = 20_000
-
 
 /**
  * 설비 목록 항목 최소 계약(문자열 eqpId)을 만족하는지 확인합니다.
@@ -414,7 +401,7 @@ export const eqpApi = {
   saveEqpEditParams: async (eqpId: string, params: EqpParamSaveItem[]): Promise<void> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.put<EqpDualCommandResponse>(
+        apiClient.put<EqpVoidResponse>(
           `/eqp/${encodeURIComponent(eqpId)}/edit-params`,
           { params },
           {
@@ -437,7 +424,7 @@ export const eqpApi = {
   undoEqpCheckout: async (eqpId: string): Promise<void> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.delete<EqpDualCommandResponse>(
+        apiClient.delete<EqpVoidResponse>(
           `/eqp/${encodeURIComponent(eqpId)}/checkout`,
           {
             withCredentials: true,
@@ -459,7 +446,7 @@ export const eqpApi = {
   checkinEqp: async (eqpId: string, request: EqpCheckinRequest): Promise<void> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.post<EqpDualCommandResponse>(
+        apiClient.post<EqpVoidResponse>(
           `/eqp/${encodeURIComponent(eqpId)}/checkin`,
           request,
           {
@@ -477,66 +464,78 @@ export const eqpApi = {
   },
 
   /**
-   * 설비를 등록합니다.
+   * 설비 등록을 접수합니다(`202 Accepted`).
+   *
+   * 반환값은 **접수 결과**이지 변경 완료가 아니다 — 호출부는 `operationId` 로 operation 을 조회해
+   * PASS 를 확인한 뒤에야 성공을 표시해야 한다(§14.1).
    */
-  createEqp: async (request: EqpCreateRequest): Promise<void> => {
+  createEqp: async (request: EqpCreateRequest): Promise<OperationAcceptance> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.post<EqpDualCommandResponse>('/eqp', request, {
+        apiClient.post<EqpOperationAcceptResponse>('/eqp', request, {
           withCredentials: true,
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
-          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )
 
-      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.create'))
+      return resolveSuccessPayload<OperationAcceptance>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.create'),
+      )
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.create'))
     }
   },
 
   /**
-   * 설비를 수정합니다.
+   * 설비 수정을 접수합니다(`202 Accepted`).
    */
-  updateEqp: async (eqpId: string, request: EqpUpdateRequest): Promise<void> => {
+  updateEqp: async (eqpId: string, request: EqpUpdateRequest): Promise<OperationAcceptance> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.put<EqpDualCommandResponse>(`/eqp/${encodeURIComponent(eqpId)}`, request, {
+        apiClient.put<EqpOperationAcceptResponse>(`/eqp/${encodeURIComponent(eqpId)}`, request, {
           withCredentials: true,
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
-          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )
 
-      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.update'))
+      return resolveSuccessPayload<OperationAcceptance>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.update'),
+      )
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.update'))
     }
   },
 
   /**
-   * 설비를 삭제합니다.
+   * 설비 삭제를 접수합니다(`202 Accepted`).
    */
-  deleteEqp: async (eqpId: string): Promise<void> => {
+  deleteEqp: async (eqpId: string): Promise<OperationAcceptance> => {
     try {
       const response = await withCsrfHeaders((csrfToken) =>
-        apiClient.delete<EqpDualCommandResponse>(`/eqp/${encodeURIComponent(eqpId)}`, {
+        apiClient.delete<EqpOperationAcceptResponse>(`/eqp/${encodeURIComponent(eqpId)}`, {
           withCredentials: true,
           headers: {
             [CSRF_HEADER_NAME]: csrfToken,
           },
-          timeout: EQP_DUAL_COMMAND_TIMEOUT_MS,
           validateStatus: (status) => status >= 200 && status < 600,
         }),
       )
 
-      assertSuccessResponse(response.data, response.status, i18n.t('error.eqp.delete'))
+      return resolveSuccessPayload<OperationAcceptance>(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.delete'),
+      )
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.delete'))
     }
@@ -746,39 +745,6 @@ export const eqpApi = {
       return payload.traceId
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.endPollingGroup'))
-    }
-  },
-
-  /**
-   * 비동기 작업 결과를 조회합니다.
-   * 202(PENDING), 200(PASS/FAIL), 408(TIMEOUT)을 모두 payload로 반환합니다.
-   */
-  getAsyncResult: async (traceId: string): Promise<AsyncResultData> => {
-    try {
-      const response = await apiClient.get<AsyncResultResponse>(`/async/${encodeURIComponent(traceId)}`, {
-        withCredentials: true,
-        validateStatus: (status) => status >= 200 && status < 500,
-      })
-
-      if (response.status === 404) {
-        throw new ApiError(
-          createFailResponse({
-            success: false,
-            data: null,
-            errorCode: 'NOT_FOUND',
-            errorMsg: i18n.t('error.eqp.asyncNotFound'),
-          }, i18n.t('error.eqp.asyncNotFound')),
-          404,
-        )
-      }
-
-      return resolveSuccessPayload<AsyncResultData>(
-        response.data,
-        response.status,
-        i18n.t('error.eqp.asyncResult'),
-      )
-    } catch (error) {
-      throw normalizeApiError(error, i18n.t('error.eqp.asyncResult'))
     }
   },
 }

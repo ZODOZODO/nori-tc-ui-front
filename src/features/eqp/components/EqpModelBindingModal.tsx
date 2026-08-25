@@ -27,6 +27,8 @@ import {
 } from '../lib/eqp-management.util'
 import type { EqpJarOption, EqpManageDetail, EqpManageOptions, EqpUpdateRequest } from '../types/eqp.types'
 import { useI18n } from '@/i18n/i18n-context'
+import type { OperationPhase } from '@/shared/lib/operation-status'
+import { EqpOperationProgress } from './EqpOperationProgress'
 import i18n from '@/i18n'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
 
@@ -38,6 +40,8 @@ interface EqpModelBindingModalProps {
   isOptionsLoading: boolean
   isPending: boolean
   errorMessage: string | null
+  /** 접수된 operation 의 현재 phase. 접수 이후 이 모달이 진행 표시를 맡는다. */
+  progressPhase: OperationPhase | null
   onOpenChange: (open: boolean) => void
   onSubmit: (request: EqpUpdateRequest) => void | Promise<void>
 }
@@ -116,6 +120,7 @@ export function EqpModelBindingModal({
   isOptionsLoading,
   isPending,
   errorMessage,
+  progressPhase,
   onOpenChange,
   onSubmit,
 }: EqpModelBindingModalProps) {
@@ -367,6 +372,8 @@ export function EqpModelBindingModal({
                     {mergedErrorMessage}
                   </p>
                 ) : null}
+
+                <EqpOperationProgress phase={progressPhase} />
               </>
             )}
           </div>

@@ -12,7 +12,6 @@ import { layoutApi } from '@/features/live-map/api/layout.api.ts'
 import { modelApi } from '@/features/model/api/model.api.ts'
 import { modelFlowApi } from '@/features/model/api/model-flow.api.ts'
 import { userApi } from '@/features/user/api/user.api.ts'
-import type { EqpCreateRequest, EqpUpdateRequest } from '@/features/eqp/types/eqp.types.ts'
 import type { UserPasswordResetRequest } from '@/features/user/types/user.types.ts'
 
 /**
@@ -72,18 +71,19 @@ const withVoidSuccessBackend = async (scenario: () => Promise<void>): Promise<vo
 }
 
 /** 요청 본문은 stub 이 무시한다 — 이 테스트가 보는 것은 응답 봉투 처리뿐이다. */
-const IRRELEVANT_EQP_CREATE = { eqpId: 'EQP-1' } as unknown as EqpCreateRequest
-const IRRELEVANT_EQP_UPDATE = { eqpId: 'EQP-1' } as unknown as EqpUpdateRequest
 const IRRELEVANT_PASSWORD_RESET: UserPasswordResetRequest = { newPassword: 'pw' }
 
-/** `Promise<void>` 를 반환하는 API 함수 전건. 새 void 함수를 만들면 여기에 추가한다. */
+/**
+ * `Promise<void>` 를 반환하는 API 함수 전건. 새 void 함수를 만들면 여기에 추가한다.
+ *
+ * `createEqp` / `updateEqp` / `deleteEqp` 는 여기 없다 — 백엔드가 `202 Accepted` + `operationId`
+ * 를 돌려주는 **접수 계약**으로 바뀌어 더 이상 void 가 아니다(§13.2). 그 셋의 회귀망은
+ * `eqp-operation-acceptance.test.ts` 다.
+ */
 const VOID_API_CALLS: ReadonlyArray<readonly [string, () => Promise<void>]> = [
   ['eqpApi.saveEqpEditParams', () => eqpApi.saveEqpEditParams('EQP-1', [])],
   ['eqpApi.undoEqpCheckout', () => eqpApi.undoEqpCheckout('EQP-1')],
   ['eqpApi.checkinEqp', () => eqpApi.checkinEqp('EQP-1', { description: 'desc' })],
-  ['eqpApi.createEqp', () => eqpApi.createEqp(IRRELEVANT_EQP_CREATE)],
-  ['eqpApi.updateEqp', () => eqpApi.updateEqp('EQP-1', IRRELEVANT_EQP_UPDATE)],
-  ['eqpApi.deleteEqp', () => eqpApi.deleteEqp('EQP-1')],
   ['groupApi.deleteGroup', () => groupApi.deleteGroup(1)],
   ['groupApi.addMember', () => groupApi.addMember(1, 2)],
   ['groupApi.removeMember', () => groupApi.removeMember(1, 2)],

@@ -9,6 +9,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n/i18n-context'
+import type { OperationPhase } from '@/shared/lib/operation-status'
+import { EqpOperationProgress } from './EqpOperationProgress'
 
 type EqpLifecycleAction = 'start' | 'end' | 'restart' | 'reconnect'
 
@@ -18,6 +20,8 @@ interface EqpLifecycleActionDialogProps {
   eqpId: string | null
   isPending: boolean
   errorMessage: string | null
+  /** 접수된 operation 의 현재 phase. 접수 이후 이 다이얼로그가 진행 표시를 맡는다. */
+  progressPhase: OperationPhase | null
   onOpenChange: (open: boolean) => void
   onConfirm: () => void | Promise<void>
 }
@@ -43,6 +47,7 @@ export function EqpLifecycleActionDialog({
   eqpId,
   isPending,
   errorMessage,
+  progressPhase,
   onOpenChange,
   onConfirm,
 }: EqpLifecycleActionDialogProps) {
@@ -72,6 +77,8 @@ export function EqpLifecycleActionDialog({
             {errorMessage}
           </p>
         ) : null}
+
+        <EqpOperationProgress phase={progressPhase} />
 
         <DialogFooter>
           <Button

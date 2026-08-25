@@ -16,7 +16,11 @@ import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useDeployScenarios } from '../hooks/useDeployScenarios'
 import { useDeploySummary } from '../hooks/useDeploySummary'
 import { useDeployTargets } from '../hooks/useDeployTargets'
-import { formatDateTime, resolveStatusVariant } from '../lib/deploy-monitor-format'
+import {
+  formatDateTime,
+  resolveDeployStatusLabel,
+  resolveStatusVariant,
+} from '../lib/deploy-monitor-format'
 import { resolveDeployTaskLabel } from '../lib/deploy-utils'
 import { useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployHistoryItem, DeployTargetItem } from '../types/deploy.types'
@@ -28,23 +32,38 @@ interface DeployMonitorViewModalProps {
   onClose: () => void
 }
 
-const resolveTargetResultLabel = (targetStatus: string) => {
+/**
+ * target 상태를 결과 라벨로 바꾼다.
+ *
+ * <p>모르는 status 를 `PENDING` 으로 바꾸지 않는다(§14.3) — 그렇게 하면 복구가 필요한 target 이
+ * "아직 시작 전" 으로 보여 운영자가 방치하게 된다. `COMPENSATION_FAILED` 는 Plan B2 대로
+ * `REPAIR_REQUIRED` 와 같은 "처리 중단·운영 확인 필요" 계열로 매핑한다.</p>
+ */
+const resolveTargetResultLabel = (targetStatus: string, unknownLabel: string) => {
   switch (targetStatus) {
     case 'COMPLETED':
     case 'NO_CHANGE':
       return 'PASS'
     case 'FAILED':
-    case 'COMPENSATION_FAILED':
       return 'FAIL'
+    case 'COMPENSATION_FAILED':
+    case 'REPAIR_REQUIRED':
+      return 'REPAIR_REQUIRED'
     case 'ROLLING_BACK':
     case 'ROLLED_BACK':
       return 'ROLLBACK'
     case 'RUNNING':
       return 'RUNNING'
+    case 'RECONCILING':
+      return 'RECONCILING'
+    case 'FINALIZING':
+      return 'FINALIZING'
     case 'CANCELED':
       return 'CANCELED'
-    default:
+    case 'PENDING':
       return 'PENDING'
+    default:
+      return unknownLabel
   }
 }
 
@@ -52,8 +71,11 @@ const resolveTargetResultVariant = (targetStatus: string) => {
   switch (targetStatus) {
     case 'FAILED':
     case 'COMPENSATION_FAILED':
+    case 'REPAIR_REQUIRED':
       return 'warning'
     case 'RUNNING':
+    case 'RECONCILING':
+    case 'FINALIZING':
       return 'info'
     case 'COMPLETED':
     case 'NO_CHANGE':
@@ -71,6 +93,7 @@ export function DeployMonitorViewModal({
 }: DeployMonitorViewModalProps) {
   const { t } = useI18n()
   const localTargetsByDeployKey = useDeployUiStore((state) => state.localTargetsByDeployKey)
+  const unknownStatusLabel = t('deploy.status.unknown')
 
   const targetPageSize = Math.max(historyItem?.targetSummary.total ?? 0, 50)
 
@@ -226,19 +249,21 @@ export function DeployMonitorViewModal({
     {
       key: 'result',
       header: t('deploy.monitor.colResult'),
-      accessor: (target) => resolveTargetResultLabel(target.targetStatus),
+      accessor: (target) => resolveTargetResultLabel(target.targetStatus, unknownStatusLabel),
       renderCell: (target) => (
         <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
-          {resolveTargetResultLabel(target.targetStatus)}
+          {resolveTargetResultLabel(target.targetStatus, unknownStatusLabel)}
         </Badge>
       ),
     },
     {
       key: 'detailStatus',
       header: t('deploy.monitor.colDetailStatus'),
-      accessor: (target) => target.targetStatus,
+      accessor: (target) => resolveDeployStatusLabel(target.targetStatus),
       renderCell: (target) => (
-        <Badge variant={resolveTargetResultVariant(target.targetStatus)}>{target.targetStatus}</Badge>
+        <Badge variant={resolveTargetResultVariant(target.targetStatus)}>
+          {resolveDeployStatusLabel(target.targetStatus)}
+        </Badge>
       ),
     },
     {
@@ -256,10 +281,13 @@ export function DeployMonitorViewModal({
     {
       key: 'stepStatus',
       header: t('deploy.monitor.colStepStatus'),
-      accessor: (target) => target.currentStepStatus ?? '-',
+      accessor: (target) =>
+        target.currentStepStatus ? resolveDeployStatusLabel(target.currentStepStatus) : '-',
       renderCell: (target) =>
         target.currentStepStatus ? (
-          <Badge variant="secondary">{target.currentStepStatus}</Badge>
+          <Badge variant={resolveTargetResultVariant(target.currentStepStatus)}>
+            {resolveDeployStatusLabel(target.currentStepStatus)}
+          </Badge>
         ) : (
           '-'
         ),

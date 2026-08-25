@@ -9,12 +9,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n/i18n-context'
+import type { OperationPhase } from '@/shared/lib/operation-status'
+import { EqpOperationProgress } from './EqpOperationProgress'
 
 interface EqpDeleteConfirmDialogProps {
   open: boolean
   eqpId: string | null
   isPending: boolean
   errorMessage: string | null
+  /** 접수된 삭제 operation 의 현재 phase. 접수 이후 이 다이얼로그가 진행 표시를 맡는다. */
+  progressPhase: OperationPhase | null
   onOpenChange: (open: boolean) => void
   onConfirm: () => void | Promise<void>
 }
@@ -28,6 +32,7 @@ export function EqpDeleteConfirmDialog({
   eqpId,
   isPending,
   errorMessage,
+  progressPhase,
   onOpenChange,
   onConfirm,
 }: EqpDeleteConfirmDialogProps) {
@@ -56,6 +61,8 @@ export function EqpDeleteConfirmDialog({
             {errorMessage}
           </p>
         ) : null}
+
+        <EqpOperationProgress phase={progressPhase} />
 
         <DialogFooter>
           <Button

@@ -46,7 +46,9 @@ import type {
 import { useI18n } from '@/i18n/i18n-context'
 import i18n from '@/i18n'
 import { useLineList } from '@/shared/hooks/useLineList'
+import type { OperationPhase } from '@/shared/lib/operation-status'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
+import { EqpOperationProgress } from './EqpOperationProgress'
 
 type EqpManageFormMode = 'create' | 'update'
 
@@ -60,6 +62,8 @@ interface EqpManageFormModalProps {
   isOptionsLoading: boolean
   isPending: boolean
   errorMessage: string | null
+  /** 접수된 operation 의 현재 phase. 접수 이후 이 모달이 진행 표시를 맡는다. */
+  progressPhase: OperationPhase | null
   onOpenChange: (open: boolean) => void
   onSubmit: (request: EqpCreateRequest | EqpUpdateRequest) => void | Promise<void>
 }
@@ -462,6 +466,7 @@ export function EqpManageFormModal({
   isOptionsLoading,
   isPending,
   errorMessage,
+  progressPhase,
   onOpenChange,
   onSubmit,
 }: EqpManageFormModalProps) {
@@ -1371,6 +1376,8 @@ export function EqpManageFormModal({
                     {mergedErrorMessage}
                   </p>
                 ) : null}
+
+                <EqpOperationProgress phase={progressPhase} />
               </div>
             )}
           </div>

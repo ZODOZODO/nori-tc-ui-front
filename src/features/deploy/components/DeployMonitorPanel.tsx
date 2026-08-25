@@ -35,7 +35,11 @@ import { useHoldDeploy } from '../hooks/useHoldDeploy'
 import { useRedeployDeploy } from '../hooks/useRedeployDeploy'
 import { useStartDeploy } from '../hooks/useStartDeploy'
 import { useMe, useUsers } from '@/features/profile/hooks/useProfile'
-import { formatDateTime, resolveStatusVariant } from '../lib/deploy-monitor-format'
+import {
+  formatDateTime,
+  resolveDeployStatusLabel,
+  resolveStatusVariant,
+} from '../lib/deploy-monitor-format'
 import { createDefaultMonitorFilters } from '../lib/deploy-ui-state'
 import { useDeployUiStore } from '../stores/deploy-ui.store'
 import type { DeployHistoryItem } from '../types/deploy.types'
@@ -322,7 +326,9 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       accessor: (row) => row.deployStatus,
       renderCell: (row) => (
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={resolveStatusVariant(row.deployStatus)}>{row.deployStatus}</Badge>
+          <Badge variant={resolveStatusVariant(row.deployStatus)}>
+            {resolveDeployStatusLabel(row.deployStatus)}
+          </Badge>
           {row.pauseRequested ? <Badge variant="warning">{t('deploy.monitor.holdRequested')}</Badge> : null}
         </div>
       ),
@@ -821,7 +827,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
                 {t('deploy.monitor.currentSelection')} #{activeHistoryItem.deployKey}
               </span>
               <Badge variant={resolveStatusVariant(activeHistoryItem.deployStatus)}>
-                {activeHistoryItem.deployStatus}
+                {resolveDeployStatusLabel(activeHistoryItem.deployStatus)}
               </Badge>
               {activeHistoryItem.pauseRequested ? (
                 <Badge variant="warning">{t('deploy.monitor.holdRequested')}</Badge>

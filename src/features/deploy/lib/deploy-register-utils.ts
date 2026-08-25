@@ -6,6 +6,7 @@ import type {
   DeployRegisterTargetItem,
   DeployTargetItem,
 } from '../types/deploy.types'
+import { UNKNOWN_SERVER_STATUS } from '../types/deploy.types'
 import { ApiError } from '@/shared/lib/api-error'
 
 export const EMPTY_SELECT_VALUE = '__empty__'
@@ -56,13 +57,24 @@ const CHANGE_KIND_LABEL: Record<string, string> = {
 export const formatChangeKinds = (changeKinds: string[]) =>
   changeKinds.map((kind) => CHANGE_KIND_LABEL[kind] ?? kind).join(', ')
 
-const FAILED_DEPLOY_STATUSES = new Set<DeployStatus>(['FAILED', 'PARTIAL_FAILED', 'CANCELED'])
+// REPAIR_REQUIRED / UNKNOWN_SERVER_STATUS 는 "정상 완료" 로 흘려보내면 안 되는 결과다(§14.3) —
+// 전자는 운영 확인이 필요한 중단이고, 후자는 결과를 모르는 상태다. 둘 다 성공 화면으로 끝나면
+// 운영자가 확인할 기회를 잃으므로 실패 계열 판정에 포함한다.
+const FAILED_DEPLOY_STATUSES = new Set<DeployStatus>([
+  'FAILED',
+  'PARTIAL_FAILED',
+  'CANCELED',
+  'REPAIR_REQUIRED',
+  UNKNOWN_SERVER_STATUS,
+])
 const FAILED_TARGET_STATUSES = new Set([
   'FAILED',
   'ROLLING_BACK',
   'ROLLED_BACK',
   'COMPENSATION_FAILED',
   'CANCELED',
+  'REPAIR_REQUIRED',
+  UNKNOWN_SERVER_STATUS,
 ])
 
 export const delay = (milliseconds: number) =>

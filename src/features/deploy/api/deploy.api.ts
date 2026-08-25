@@ -22,6 +22,7 @@ import type {
   DeployTargetItem,
   DeployTargetPage,
 } from '../types/deploy.types'
+import { UNKNOWN_SERVER_STATUS } from '../types/deploy.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 // (default 파라미터 식은 호출마다 평가되므로 fallback 이 현재 언어를 따른다.)
@@ -41,6 +42,9 @@ const fallbackScenarioPreviewError = () => i18n.t('error.deploy.scenarioPreview'
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+/** protocol recovery 상태 — execution / target / step 이 공통으로 받을 수 있다(§14.3). */
+const DEPLOY_RECOVERY_STATUS_VALUES = ['RECONCILING', 'FINALIZING', 'REPAIR_REQUIRED'] as const
+
 const DEPLOY_STATUS_VALUES = [
   'PLANNING',
   'READY',
@@ -49,6 +53,7 @@ const DEPLOY_STATUS_VALUES = [
   'PARTIAL_FAILED',
   'FAILED',
   'CANCELED',
+  ...DEPLOY_RECOVERY_STATUS_VALUES,
 ] as const satisfies readonly DeployStatus[]
 
 const DEPLOY_TARGET_STATUS_VALUES = [
@@ -61,6 +66,7 @@ const DEPLOY_TARGET_STATUS_VALUES = [
   'ROLLED_BACK',
   'COMPENSATION_FAILED',
   'CANCELED',
+  ...DEPLOY_RECOVERY_STATUS_VALUES,
 ] as const
 
 const DEPLOY_STEP_STATUS_VALUES = [
@@ -74,6 +80,7 @@ const DEPLOY_STEP_STATUS_VALUES = [
   'ROLLED_BACK',
   'COMPENSATION_FAILED',
   'CANCELED',
+  ...DEPLOY_RECOVERY_STATUS_VALUES,
 ] as const
 
 const isDeployStatus = (value: unknown): value is DeployStatus =>
@@ -151,7 +158,8 @@ const normalizeDeployTargetItem = (value: unknown): DeployTargetItem | null => {
   return {
     deployTargetKey: value.deployTargetKey as number,
     eqpId: value.eqpId as string,
-    targetStatus: isDeployTargetStatus(value.targetStatus) ? value.targetStatus : 'PENDING',
+    // 모르는 status 를 PENDING 으로 접지 않는다 — 실패·복구필요 배포가 "시작 전" 으로 보인다(§14.3).
+    targetStatus: isDeployTargetStatus(value.targetStatus) ? value.targetStatus : UNKNOWN_SERVER_STATUS,
     currentStepOrder: typeof value.currentStepOrder === 'number' ? value.currentStepOrder : null,
     currentStepCode: typeof value.currentStepCode === 'string' ? value.currentStepCode : null,
     currentStepStatus: isDeployStepStatus(value.currentStepStatus) ? value.currentStepStatus : null,
@@ -206,7 +214,7 @@ const normalizeDeployHistoryItem = (value: unknown): DeployHistoryItem | null =>
     deployKey: value.deployKey,
     deployName: value.deployName,
     eventType: value.eventType,
-    deployStatus: isDeployStatus(value.deployStatus) ? value.deployStatus : 'PLANNING',
+    deployStatus: isDeployStatus(value.deployStatus) ? value.deployStatus : UNKNOWN_SERVER_STATUS,
     pauseRequested: typeof value.pauseRequested === 'boolean' ? value.pauseRequested : false,
     executionPolicy:
       typeof value.executionPolicy === 'string' ? value.executionPolicy : 'BEST_EFFORT',
@@ -394,7 +402,7 @@ const normalizeDeploySummary = (payload: unknown): DeploySummary => {
             typeof payload.asIsState.eqpParamVersion === 'string' ? payload.asIsState.eqpParamVersion : null,
         }
       : null,
-    deployStatus: isDeployStatus(payload.deployStatus) ? payload.deployStatus : 'PLANNING',
+    deployStatus: isDeployStatus(payload.deployStatus) ? payload.deployStatus : UNKNOWN_SERVER_STATUS,
     pauseRequested: typeof payload.pauseRequested === 'boolean' ? payload.pauseRequested : false,
     executionPolicy:
       isDeployExecutionPolicy(payload.executionPolicy) ? payload.executionPolicy : 'BEST_EFFORT',
