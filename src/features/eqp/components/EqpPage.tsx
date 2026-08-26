@@ -35,6 +35,7 @@ import { ResizableDivider } from '@/components/ui/resizable-divider'
 import { clearDeployUiSessionState } from '@/features/deploy/stores/deploy-ui.store'
 import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
+import { useBusinessAppAssignments } from '../hooks/useBusinessAppAssignments'
 import { useGatewayShardLeases } from '../hooks/useGatewayShardLeases'
 import { useEqpModelInfo } from '../hooks/useEqpModelInfo'
 import { useEqpParamVersions } from '../hooks/useEqpParamVersions'
@@ -66,7 +67,7 @@ import {
   type EqpUpdateRequest,
   type ProtocolType,
 } from '../types/eqp.types'
-import { groupEqpItems } from '../utils/eqp-group.util'
+import { buildBusinessAppNameByPartition, groupEqpItems } from '../utils/eqp-group.util'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -132,6 +133,7 @@ export function EqpPage() {
 
   const eqpListQuery = useEqpList()
   const gatewayShardLeasesQuery = useGatewayShardLeases()
+  const businessAppAssignmentsQuery = useBusinessAppAssignments()
   const modelListQuery = useModelList()
   const lineListQuery = useLineList()
   const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
@@ -262,10 +264,16 @@ export function EqpPage() {
   }, [checkoutStatus.checkedOutBy, checkoutStatus.isCheckedOut, currentUserId])
 
   // 전체 eqpItems 기준으로 그룹화 (Gateway/gateway_group 선택 시 설비 목록 조회용)
-  // gateway 그룹은 Redis shard lease 점유 현황 기준으로 분류한다.
+  // gateway 그룹은 Redis shard lease, business 그룹은 consumer group 멤버 할당 기준으로 분류한다.
   const { gatewayGroups, businessGroups } = useMemo(
-    () => groupEqpItems(eqpItems, gatewayShardLeasesQuery.data),
-    [eqpItems, gatewayShardLeasesQuery.data],
+    () => groupEqpItems(eqpItems, gatewayShardLeasesQuery.data, businessAppAssignmentsQuery.data),
+    [businessAppAssignmentsQuery.data, eqpItems, gatewayShardLeasesQuery.data],
+  )
+
+  // 표의 "Business App" 열과 사이드바 그룹이 같은 답을 내도록 대응표를 한 번만 만든다.
+  const businessAppNameByPartition = useMemo(
+    () => buildBusinessAppNameByPartition(businessAppAssignmentsQuery.data),
+    [businessAppAssignmentsQuery.data],
   )
 
   // Gateway 선택 시 표시할 전체 게이트웨이 설비 목록입니다.
@@ -335,8 +343,8 @@ export function EqpPage() {
   /**
    * Business 카드에 찍는 수 — 선택과 무관하게 전 범위 설비가 참조하는 모델 수다.
    *
-   * 설비 수를 쓰지 않는 이유: business_app 과 gateway_app 은 같은 설비 목록을 route_partition
-   * 산술과 shard lease 로 각각 나눈 것이라(`groupEqpItems`), 두 카드에 설비 수를 넣으면 같은
+   * 설비 수를 쓰지 않는 이유: business_app 과 gateway_app 은 같은 설비 목록을 consumer group
+   * 멤버 할당과 shard lease 로 각각 나눈 것이라(`groupEqpItems`), 두 카드에 설비 수를 넣으면 같은
    * 설비를 두 번 세게 된다. 카드는 각자 눌렀을 때 오른쪽에 실제로 뜨는 것을 센다.
    */
   const businessAllModelCount = useMemo(
@@ -471,6 +479,7 @@ export function EqpPage() {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.businessAppAssignments() })
 
     if (useEqpUiStore.getState().selection.type === 'none') {
       selectGatewayAll()
@@ -491,6 +500,7 @@ export function EqpPage() {
   const handleSelectBusinessScope = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.businessAppAssignments() })
     selectBusinessAll()
   }, [queryClient, selectBusinessAll])
 
@@ -532,6 +542,10 @@ export function EqpPage() {
     }
 
     if (selection.type === 'business_group') {
+      // business 그룹은 프로세스별 할당 조회가 끝나야 확정되므로, 조회 전 오탐으로 선택이 풀리지 않게 한다.
+      if (!businessAppAssignmentsQuery.isSuccess) {
+        return
+      }
       const existsSelectedGroup = businessGroups.some((group) => group.appIndex === selection.groupIndex)
       if (!existsSelectedGroup) {
         resetSelectionTransientStates()
@@ -539,7 +553,11 @@ export function EqpPage() {
       return
     }
 
-    if (selection.type === 'business_all' && businessGroups.length === 0) {
+    if (
+      selection.type === 'business_all' &&
+      businessAppAssignmentsQuery.isSuccess &&
+      businessGroups.length === 0
+    ) {
       resetSelectionTransientStates()
       return
     }
@@ -554,6 +572,7 @@ export function EqpPage() {
   }, [
     eqpListQuery.isSuccess,
     gatewayShardLeasesQuery.isSuccess,
+    businessAppAssignmentsQuery.isSuccess,
     selectedLineKey,
     selection,
     eqpItems,
@@ -666,6 +685,7 @@ export function EqpPage() {
   const handleSelectBusinessGroup = useCallback((groupIndex: number) => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
     void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.businessAppAssignments() })
     selectBusinessGroup(groupIndex)
   }, [queryClient, selectBusinessGroup])
 
@@ -1017,6 +1037,9 @@ export function EqpPage() {
   const shardLeaseErrorMessage = gatewayShardLeasesQuery.error
     ? resolveErrorMessage(gatewayShardLeasesQuery.error, t('error.eqp.shardLeases'))
     : null
+  const businessAssignmentErrorMessage = businessAppAssignmentsQuery.error
+    ? resolveErrorMessage(businessAppAssignmentsQuery.error, t('error.eqp.businessAppAssignments'))
+    : null
   const versionErrorMessage = eqpParamVersionsQuery.error
     ? resolveErrorMessage(eqpParamVersionsQuery.error, t('eqp.page.versionLoadError'))
     : null
@@ -1094,13 +1117,21 @@ export function EqpPage() {
             scope={activeScope}
             eqpItems={eqpItems}
             shardLeases={gatewayShardLeasesQuery.data}
+            businessAssignments={businessAppAssignmentsQuery.data}
             selectedEqpId={selectedEqpId}
             selectedBusinessGroupIndex={selectedBusinessGroupIndex}
             selectedGroupIndex={selectedGroupIndex}
             isLoading={
-              eqpListQuery.isLoading || gatewayShardLeasesQuery.isLoading || lineListQuery.isLoading
+              eqpListQuery.isLoading
+              || gatewayShardLeasesQuery.isLoading
+              || businessAppAssignmentsQuery.isLoading
+              || lineListQuery.isLoading
             }
-            errorMessage={listErrorMessage ?? shardLeaseErrorMessage ?? lineListErrorMessage}
+            errorMessage={
+              listErrorMessage
+              ?? (activeScope === 'business' ? businessAssignmentErrorMessage : shardLeaseErrorMessage)
+              ?? lineListErrorMessage
+            }
             onSelectEqp={handleSelectEqp}
             onSelectGatewayGroup={handleSelectGatewayGroup}
             onSelectBusinessGroup={handleSelectBusinessGroup}
@@ -1125,6 +1156,7 @@ export function EqpPage() {
                   eqpItems={selection.type === 'gateway_all' ? gatewayAllItems : gatewayGroupItems}
                   groupName={selectedGroupName}
                   isUnleased={selectedGatewayGroup?.isUnleased ?? false}
+                  businessAppNameByPartition={businessAppNameByPartition}
                   isLifecyclePending={isLifecyclePending}
                   onLifecycleAction={openLifecycleDialog}
                 />
@@ -1156,6 +1188,7 @@ export function EqpPage() {
                     eqp={eqpDetailQuery.data ?? null}
                     modelInfo={eqpModelInfoQuery.data ?? null}
                     runtimeState={eqpRuntimeStateQuery.data ?? null}
+                    businessAppNameByPartition={businessAppNameByPartition}
                     isLoading={eqpDetailQuery.isLoading}
                     isFetching={
                       eqpDetailQuery.isFetching || eqpRuntimeStateQuery.isFetching || eqpModelInfoQuery.isFetching

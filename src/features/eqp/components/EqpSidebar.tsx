@@ -19,7 +19,12 @@ import {
 } from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import type { EqpInfo, GatewayShardLease, ProtocolType } from '../types/eqp.types'
+import type {
+  BusinessAppAssignment,
+  EqpInfo,
+  GatewayShardLease,
+  ProtocolType,
+} from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
 
 interface EqpSidebarProps {
@@ -28,6 +33,8 @@ interface EqpSidebarProps {
   eqpItems: EqpInfo[]
   /** gateway 그룹 분류 기준이 되는 shard lease 점유 현황 (조회 전이면 undefined) */
   shardLeases: GatewayShardLease[] | undefined
+  /** business 그룹 분류 기준이 되는 프로세스별 partition 할당 (조회 전이면 undefined) */
+  businessAssignments: BusinessAppAssignment[] | undefined
   selectedEqpId: string | null
   selectedBusinessGroupIndex: number | null
   selectedGroupIndex: number | null
@@ -54,6 +61,7 @@ export const EqpSidebar = memo(function EqpSidebar({
   scope,
   eqpItems,
   shardLeases,
+  businessAssignments,
   selectedEqpId,
   selectedBusinessGroupIndex,
   selectedGroupIndex,
@@ -76,8 +84,8 @@ export const EqpSidebar = memo(function EqpSidebar({
   const hasSearch = normalizedKeyword.length > 0
 
   const { gatewayGroups: allGatewayGroups, businessGroups: allBusinessGroups } = useMemo(
-    () => groupEqpItems(eqpItems, shardLeases),
-    [eqpItems, shardLeases],
+    () => groupEqpItems(eqpItems, shardLeases, businessAssignments),
+    [businessAssignments, eqpItems, shardLeases],
   )
 
   /**
@@ -213,9 +221,17 @@ export const EqpSidebar = memo(function EqpSidebar({
                 type="button"
                 variant="ghost"
                 onClick={() => onSelectBusinessGroup(group.appIndex)}
-                className={lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex)}
+                className={cn(
+                  lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex),
+                  'flex items-center gap-1.5',
+                )}
               >
-                {group.appName}
+                <span className="min-w-0 flex-1 truncate text-left">{group.appName}</span>
+                {group.isUnassigned ? (
+                  <Badge variant="warning" title={t('eqp.business.unassignedTitle')}>
+                    {t('eqp.business.unassignedBadge')}
+                  </Badge>
+                ) : null}
               </Button>
             ))
           )}

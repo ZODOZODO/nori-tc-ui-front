@@ -29,7 +29,6 @@ import { eqpApi } from '../api/eqp.api'
 import { eqpQueryKeys } from '../lib/eqp-query-keys'
 import type { EqpInfo, EqpManageDetail } from '../types/eqp.types'
 import { isClientRequestError } from '../utils/eqp-error.util'
-import { resolveBusinessAppName } from '../utils/eqp-group.util'
 import {
   type EquipmentVisualState,
   resolveEquipmentVisualState,
@@ -49,6 +48,8 @@ interface GatewayGroupTableProps {
   groupName: string
   /** 해당 shard group의 lease를 어느 gateway도 점유하지 않은 상태 (헤더에 미점유 뱃지 표시) */
   isUnleased?: boolean
+  /** route_partition → business_app 이름. 할당 미조회면 빈 표(열은 `—`). */
+  businessAppNameByPartition: ReadonlyMap<number, string>
   isLifecyclePending?: boolean
   onLifecycleAction?: (eqp: EqpInfo, action: EqpLifecycleAction) => void
 }
@@ -118,6 +119,7 @@ interface GatewayGroupRow {
 const buildGatewayGroupColumns = (
   missingTitle: string,
   missingBadge: string,
+  businessAppNameByPartition: ReadonlyMap<number, string>,
 ): ReadonlyArray<ColumnDef<GatewayGroupRow>> => [
   {
     key: 'eqpId',
@@ -137,7 +139,10 @@ const buildGatewayGroupColumns = (
   {
     key: 'businessApp',
     header: 'Business App',
-    accessor: (row) => resolveBusinessAppName(row.eqp.routePartition) ?? '—',
+    accessor: (row) =>
+      (typeof row.eqp.routePartition === 'number'
+        ? businessAppNameByPartition.get(row.eqp.routePartition)
+        : undefined) ?? '—',
   },
   {
     key: 'commInterface',
@@ -201,6 +206,7 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
   eqpItems,
   groupName,
   isUnleased = false,
+  businessAppNameByPartition,
   isLifecyclePending = false,
   onLifecycleAction,
 }: GatewayGroupTableProps) {
@@ -208,8 +214,12 @@ export const GatewayGroupTable = memo(function GatewayGroupTable({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(GATEWAY_GROUP_DEFAULT_PAGE_SIZE)
   const columns = useMemo(
-    () => buildGatewayGroupColumns(t('eqp.gateway.missingTitle'), t('eqp.gateway.missingBadge')),
-    [t],
+    () => buildGatewayGroupColumns(
+      t('eqp.gateway.missingTitle'),
+      t('eqp.gateway.missingBadge'),
+      businessAppNameByPartition,
+    ),
+    [businessAppNameByPartition, t],
   )
 
   // EQPID(첫 번째 열 = 이름) 기준 오름차순 정렬

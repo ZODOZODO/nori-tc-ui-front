@@ -569,7 +569,8 @@ export function LiveMap3DScene({ lineKey }: LiveMap3DSceneProps) {
       return map
     }
     const lineEqpInfos = (eqpListQuery.data?.items ?? []).filter((eqp) => eqp.lineKey === lineKey)
-    const { gatewayGroups } = groupEqpItems(lineEqpInfos, gatewayShardLeasesQuery.data)
+    // business 그룹은 층 배치에 쓰지 않으므로 할당을 조회하지 않는다(undefined = 미조회).
+    const { gatewayGroups } = groupEqpItems(lineEqpInfos, gatewayShardLeasesQuery.data, undefined)
     const maxFloor = Math.max(...FLOOR_LEVELS)
     for (const group of gatewayGroups) {
       const floor = Math.min(group.appIndex, maxFloor)

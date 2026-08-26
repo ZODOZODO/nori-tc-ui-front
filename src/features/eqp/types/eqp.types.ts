@@ -114,14 +114,29 @@ export interface GatewayAppGroup {
 }
 
 /**
+ * 살아 있는 business 프로세스 하나(= consumer group 멤버)의 partition 할당입니다.
+ * 멤버 순서는 백엔드가 담당 partition 최솟값 오름차순으로 고정해 내려줍니다.
+ */
+export interface BusinessAppAssignment {
+  /** consumer group 멤버 식별자. 재조인마다 바뀌므로 표시용이 아니라 식별용입니다. */
+  memberId: string
+  /** 멤버가 접속한 호스트. 알 수 없으면 null. */
+  host: string | null
+  ownedPartitions: number[]
+}
+
+/**
  * business_app 그룹 모델입니다.
- * route_partition을 6개씩 묶어 그룹화합니다.
- * 예: [0..5] → business_app1, [6..11] → business_app2
+ * 살아 있는 business 프로세스(consumer group 멤버) 하나가 그룹 하나이며,
+ * 그룹 순서는 백엔드가 내려준 멤버 순서를 그대로 따릅니다.
+ * 예: 멤버 2개(담당 [0,1,2] / [3,4,5]) → business_app1, business_app2
  */
 export interface BusinessAppGroup {
   appIndex: number
   appName: string
   items: EqpInfo[]
+  /** 프로세스는 떠 있으나 담당 partition 이 없는 상태(리밸런스 직후 등). */
+  isUnassigned: boolean
 }
 
 /**
@@ -143,6 +158,11 @@ export type EqpInfoListResponse = ApiResponse<EqpInfoPage>
  * Gateway shard lease 점유 현황 조회 응답 타입입니다.
  */
 export type GatewayShardLeaseListResponse = ApiResponse<GatewayShardLease[]>
+
+/**
+ * Business 프로세스별 partition 할당 조회 응답 타입입니다.
+ */
+export type BusinessAppAssignmentListResponse = ApiResponse<BusinessAppAssignment[]>
 
 /**
  * EQP 단건 조회 응답 타입입니다.

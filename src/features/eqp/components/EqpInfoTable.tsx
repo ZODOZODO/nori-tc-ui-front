@@ -21,7 +21,6 @@ import {
 import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import type { EqpInfo, EqpModelInfo, EqpRuntimeState } from '../types/eqp.types'
-import { resolveBusinessAppName } from '../utils/eqp-group.util'
 import {
   type EquipmentVisualState,
   resolveEquipmentVisualState,
@@ -36,6 +35,8 @@ interface EqpInfoTableProps {
   eqp: EqpInfo | null
   modelInfo: EqpModelInfo | null
   runtimeState: EqpRuntimeState | null
+  /** route_partition → business_app 이름. 할당 미조회면 빈 표(열은 `—`). */
+  businessAppNameByPartition: ReadonlyMap<number, string>
   isLoading: boolean
   isFetching: boolean
   isLifecyclePending?: boolean
@@ -102,12 +103,19 @@ interface EqpInfoRow {
   runtimeState: EqpRuntimeState | null
 }
 
-const EQP_INFO_COLUMNS: ReadonlyArray<ColumnDef<EqpInfoRow>> = [
+// Business App 열은 살아 있는 business 프로세스의 partition 할당에서 온다 — 사이드바 그룹과
+// 같은 대응표를 써야 두 곳이 같은 답을 낸다(호출부가 주입).
+const buildEqpInfoColumns = (
+  businessAppNameByPartition: ReadonlyMap<number, string>,
+): ReadonlyArray<ColumnDef<EqpInfoRow>> => [
   { key: 'eqpId', header: 'EQPID', accessor: (row) => row.eqp.eqpId },
   {
     key: 'businessApp',
     header: 'Business App',
-    accessor: (row) => resolveBusinessAppName(row.eqp.routePartition) ?? '—',
+    accessor: (row) =>
+      (typeof row.eqp.routePartition === 'number'
+        ? businessAppNameByPartition.get(row.eqp.routePartition)
+        : undefined) ?? '—',
   },
   {
     key: 'commInterface',
@@ -154,6 +162,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   eqp,
   modelInfo,
   runtimeState,
+  businessAppNameByPartition,
   isLoading,
   isFetching,
   isLifecyclePending = false,
@@ -172,6 +181,11 @@ export const EqpInfoTable = memo(function EqpInfoTable({
   const tableRows = useMemo<EqpInfoRow[]>(
     () => (eqp ? [{ eqp, modelInfo, runtimeState }] : []),
     [eqp, modelInfo, runtimeState],
+  )
+
+  const columns = useMemo(
+    () => buildEqpInfoColumns(businessAppNameByPartition),
+    [businessAppNameByPartition],
   )
 
   return (
@@ -218,7 +232,7 @@ export const EqpInfoTable = memo(function EqpInfoTable({
         ) : (
           <SelectableTable<EqpInfoRow>
             testId="selectable-table-eqp-info"
-            columns={EQP_INFO_COLUMNS}
+            columns={columns}
             rows={tableRows}
             rowKey={(row) => row.eqp.eqpId}
             tableClassName="min-w-295"

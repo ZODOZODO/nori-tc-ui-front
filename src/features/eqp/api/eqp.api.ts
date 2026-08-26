@@ -15,6 +15,8 @@ import {
   type EqpInfo,
   type EqpInfoDetailResponse,
   type EqpInfoListResponse,
+  type BusinessAppAssignment,
+  type BusinessAppAssignmentListResponse,
   type GatewayShardLease,
   type GatewayShardLeaseListResponse,
   type EqpManageDetail,
@@ -157,6 +159,46 @@ export const eqpApi = {
       return payload as GatewayShardLease[]
     } catch (error) {
       throw normalizeApiError(error, i18n.t('error.eqp.shardLeases'))
+    }
+  },
+
+  /**
+   * 살아 있는 Business 프로세스와 각각의 담당 partition 을 조회합니다.
+   * EQP 목록을 business_app 단위로 분류하는 기준 데이터입니다.
+   */
+  getBusinessAppAssignments: async (): Promise<BusinessAppAssignment[]> => {
+    try {
+      const response = await apiClient.get<BusinessAppAssignmentListResponse>(
+        '/eqp/business-app-assignments',
+        {
+          withCredentials: true,
+        },
+      )
+
+      const payload = resolveSuccessPayload(
+        response.data,
+        response.status,
+        i18n.t('error.eqp.businessAppAssignments'),
+      )
+
+      if (!Array.isArray(payload)) {
+        throw new ApiError(
+          createFailResponse(
+            {
+              success: false,
+              data: null,
+              errorCode: 'INVALID_RESPONSE',
+              errorMsg: i18n.t('error.eqp.businessAppAssignments'),
+            },
+            i18n.t('error.eqp.businessAppAssignments'),
+          ),
+          response.status,
+        )
+      }
+
+      return payload as BusinessAppAssignment[]
+    } catch (error) {
+      throw normalizeApiError(error, i18n.t('error.eqp.businessAppAssignments'))
     }
   },
 
