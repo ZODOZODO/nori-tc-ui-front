@@ -1,5 +1,5 @@
 import { memo, useDeferredValue, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
@@ -11,7 +11,12 @@ import {
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
-import { lnbLeafClass, lnbLeafDotClass, lnbSubLinkClass } from '@/shared/layout/lnb-sidebar'
+import {
+  lnbGroupClass,
+  lnbLeafClass,
+  lnbLeafDotClass,
+  lnbSubLinkClass,
+} from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import type { EqpInfo, GatewayShardLease, ProtocolType } from '../types/eqp.types'
@@ -67,24 +72,39 @@ export const EqpSidebar = memo(function EqpSidebar({
   // 입력 자체는 즉시 반영, 필터링은 deferred 로 — 큰 목록에서 입력 지연 완화.
   const deferredSearchKeyword = useDeferredValue(searchKeyword)
 
-  const filteredEqpItems = useMemo(() => {
-    const normalizedKeyword = deferredSearchKeyword.trim().toLowerCase()
+  const normalizedKeyword = deferredSearchKeyword.trim().toLowerCase()
+  const hasSearch = normalizedKeyword.length > 0
 
-    if (!normalizedKeyword) {
-      return eqpItems
-    }
-
-    return eqpItems.filter((eqp) => eqp.eqpId.toLowerCase().includes(normalizedKeyword))
-  }, [eqpItems, deferredSearchKeyword])
+  const { gatewayGroups: allGatewayGroups, businessGroups: allBusinessGroups } = useMemo(
+    () => groupEqpItems(eqpItems, shardLeases),
+    [eqpItems, shardLeases],
+  )
 
   /**
-   * 검색 필터 후 groupEqpItems 유틸로 그룹화합니다.
-   * 검색 결과 기준으로 그룹이 재계산되며, gateway 그룹은 shard lease 기준입니다.
+   * 검색은 그 스코프의 트리가 실제로 담고 있는 것만 거릅니다.
+   *
+   * <p>gateway 트리는 설비 리프를 가지므로 설비 ID 로 거르고, business 트리는 business_app 노드만
+   * 가지므로 그룹 이름으로 거른다. 두 스코프에서 같은 축으로 거르면 — business 에서 설비 ID 로
+   * 거르면 — 화면에 없는 것을 검색해 그룹이 소리 없이 사라진다.</p>
    */
-  const { gatewayGroups, businessGroups } = useMemo(
-    () => groupEqpItems(filteredEqpItems, shardLeases),
-    [filteredEqpItems, shardLeases],
-  )
+  const gatewayGroups = useMemo(() => {
+    if (!hasSearch) {
+      return allGatewayGroups
+    }
+    return allGatewayGroups.map((group) => ({
+      ...group,
+      items: group.items.filter((eqp) => eqp.eqpId.toLowerCase().includes(normalizedKeyword)),
+    }))
+  }, [allGatewayGroups, hasSearch, normalizedKeyword])
+
+  const businessGroups = useMemo(() => {
+    if (!hasSearch) {
+      return allBusinessGroups
+    }
+    return allBusinessGroups.filter((group) =>
+      group.appName.toLowerCase().includes(normalizedKeyword),
+    )
+  }, [allBusinessGroups, hasSearch, normalizedKeyword])
 
   // gateway_app 별 하위 eqp 노드 펼침/접힘. gateway_app 헤더 클릭으로 토글.
   // 초기값: 선택된 gateway 그룹 + 선택된 eqp 가 속한 그룹은 펼쳐 보여준다.
@@ -103,9 +123,6 @@ export const EqpSidebar = memo(function EqpSidebar({
     }
     return initial
   })
-  // 검색 중에는 결과가 접혀 안 보이는 걸 막기 위해 모든 그룹을 강제로 펼친다(파생값, effect 미사용).
-  const hasSearch = deferredSearchKeyword.trim().length > 0
-
   const toggleGatewayGroup = (appIndex: number) => {
     onSelectGatewayGroup(appIndex)
     setExpandedGatewayGroups((prev) => {
@@ -155,33 +172,34 @@ export const EqpSidebar = memo(function EqpSidebar({
   const groupCount = scope === 'business' ? businessGroups.length : gatewayGroups.length
 
   return (
-    <section className="flex min-h-0 w-[38%] min-w-80 max-w-115 shrink-0 flex-col border-r border-border">
-      <header className="shrink-0 border-b border-border px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-foreground">{t('eqp.sidebar.title')}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t(scope === 'business' ? 'eqp.list.businessHint' : 'eqp.list.gatewayHint')}
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+    <section className="flex min-h-0 w-60 shrink-0 flex-col border-r border-border">
+      <header className="shrink-0 px-3 pt-3">
+        <div className="flex h-7 items-center justify-between gap-2">
+          <h2 className="min-w-0 truncate text-sm font-semibold text-foreground">
+            {t('eqp.sidebar.title')}
+          </h2>
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
             {t('eqp.list.groupCount', { count: groupCount })}
           </span>
         </div>
         <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchKeyword}
             onChange={(event) => setSearchKeyword(event.target.value)}
-            placeholder={t('eqp.sidebar.searchPlaceholder')}
-            className="h-10 rounded-xl bg-background pl-9"
+            placeholder={t(
+              scope === 'business'
+                ? 'eqp.sidebar.searchPlaceholderBusinessApp'
+                : 'eqp.sidebar.searchPlaceholder',
+            )}
+            className="h-9 bg-muted pl-8 text-xs"
           />
         </div>
       </header>
 
       {scope === 'business' ? (
         <nav
-          className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3"
+          className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3 pt-3"
           data-testid="eqp-sidebar-business-tree"
         >
           {businessGroups.length === 0 ? (
@@ -212,7 +230,7 @@ export const EqpSidebar = memo(function EqpSidebar({
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <nav
-              className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3"
+              className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3 pt-3"
               data-testid="eqp-sidebar-gateway-tree"
             >
               {gatewayGroups.length === 0 ? (
@@ -223,31 +241,39 @@ export const EqpSidebar = memo(function EqpSidebar({
                 gatewayGroups
                   // 검색 중에는 결과가 없는 그룹을 숨겨 검색 노이즈를 줄인다 (빈 그룹은 평시에만 노출).
                   .filter((group) => !hasSearch || group.items.length > 0)
-                  .map((group) => (
-                    <div key={group.appName} className="flex flex-col gap-0.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => toggleGatewayGroup(group.appIndex)}
-                        className={cn(
-                          lnbSubLinkClass(selectedGroupIndex === group.appIndex),
-                          'flex items-center gap-1.5',
-                        )}
-                      >
-                        <span className="truncate">{group.appName}</span>
-                        {group.isUnleased ? (
-                          <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
-                            {t('eqp.gateway.unleasedBadge')}
-                          </Badge>
-                        ) : null}
-                      </Button>
-                      {expandedGatewayGroups.has(group.appIndex) || hasSearch
-                        ? group.items.map((eqp) =>
-                            renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                          )
-                        : null}
-                    </div>
-                  ))
+                  .map((group) => {
+                    const isOpen = expandedGatewayGroups.has(group.appIndex) || hasSearch
+                    return (
+                      <div key={group.appName} className="flex flex-col gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => toggleGatewayGroup(group.appIndex)}
+                          className={lnbGroupClass(selectedGroupIndex === group.appIndex)}
+                          aria-expanded={isOpen}
+                        >
+                          <span className="min-w-0 flex-1 truncate text-left">{group.appName}</span>
+                          {group.isUnleased ? (
+                            <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
+                              {t('eqp.gateway.unleasedBadge')}
+                            </Badge>
+                          ) : null}
+                          <ChevronDown
+                            aria-hidden="true"
+                            className={cn(
+                              'size-3 shrink-0 transition-transform',
+                              isOpen ? null : '-rotate-90',
+                            )}
+                          />
+                        </Button>
+                        {isOpen
+                          ? group.items.map((eqp) =>
+                              renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                            )
+                          : null}
+                      </div>
+                    )
+                  })
               )}
 
               {isLoading ? (

@@ -1195,6 +1195,13 @@ export function ModelPage({ scope }: ModelPageProps) {
         setDetailMdfByContext({})
       }}
     >
+      {/* 제목은 사이드바 위 전폭에 둔다 — 사이드바가 제목 줄까지 통으로 덮으면 이 화면만
+          다른 페이지와 제목 위치가 어긋난다(모든 라우트 페이지가 제목을 본문 맨 위에 둔다). */}
+      <AppPageHeading
+        description={t('model.page.description', { protocol: scope })}
+        className="shrink-0 px-5 pt-5 lg:px-6 lg:pt-6"
+      />
+
       <main className="flex flex-1 min-h-0">
         <ModelSidebar
           scope={scope}
@@ -1223,10 +1230,6 @@ export function ModelPage({ scope }: ModelPageProps) {
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <AppPageHeading
-            description={t('model.page.description', { protocol: scope })}
-            className="px-3 pt-3 md:px-4 md:pt-4"
-          />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* 모델을 고르기 전에는 현재 라우트 스코프의 모델 목록을 보여준다 — 스코프가 URL 로
                 항상 정해지므로 구 "선택 없음" 빈 화면 분기는 이 목록이 대신한다. */}

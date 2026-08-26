@@ -53,7 +53,9 @@ export function UserManagementPage() {
 
   return (
     <AppShellPage>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+      {/* 본문 여백·간격은 다른 라우트 페이지(eqp / dlq / deploy)와 같은 값을 쓴다 — 이 화면만
+          p-4 를 쓰면 제목 블록이 페이지마다 다른 위치에서 시작한다. */}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden p-5 lg:p-6">
         <AppPageHeading
           name={t('userManagement.page.title')}
           description={t('userManagement.page.description')}
