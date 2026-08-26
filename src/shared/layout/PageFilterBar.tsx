@@ -7,6 +7,7 @@ interface PageFilterBarProps {
   /** 우측 정렬 영역 (조회 / 초기화 버튼 등). 생략 가능. */
   actions?: ReactNode
   className?: string
+  ariaLabel?: string
 }
 
 /**
@@ -16,15 +17,16 @@ interface PageFilterBarProps {
  * `flex-wrap` 으로 배치, 우측에 조회/초기화 액션. 컨트롤 자체는 페이지가 children 으로 주입
  * (input/select 등 ui-front primitive 재사용 — 내용=ui-front).
  */
-export function PageFilterBar({ children, actions, className }: PageFilterBarProps) {
+export function PageFilterBar({ children, actions, className, ariaLabel }: PageFilterBarProps) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-soft-sm',
+        'flex flex-wrap items-end justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-soft-sm',
         className,
       )}
+      aria-label={ariaLabel}
     >
-      <div className="flex flex-wrap items-end gap-3">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3.5">{children}</div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </div>
   )

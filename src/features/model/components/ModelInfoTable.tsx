@@ -89,34 +89,44 @@ export const ModelInfoTable = memo(function ModelInfoTable({
         key: 'modelName',
         header: 'Model Name',
         accessor: (row) => row.modelName,
+        width: '22%',
+        maxWidth: '22%',
       },
       {
         key: 'modelVersion',
         header: 'Model Version',
         accessor: (row) => row.modelVersion,
+        width: '14%',
+        maxWidth: '14%',
       },
       {
         key: 'status',
         header: 'status',
         accessor: (row) => row.status,
-        renderCell: (row) => (
-          <Badge variant={resolveStatusBadgeVariant(row.status)}>{row.status}</Badge>
-        ),
+        width: '12%',
+        maxWidth: '12%',
+        renderCell: (row) => <Badge variant={resolveStatusBadgeVariant(row.status)}>{row.status}</Badge>,
       },
       {
         key: 'description',
         header: 'description',
-        accessor: (row) => row.description ?? '—',
+        accessor: (row) => row.description ?? '-',
+        width: '22%',
+        maxWidth: '22%',
       },
       {
         key: 'updatedBy',
         header: 'updated_by',
         accessor: (row) => row.updatedBy,
+        width: '14%',
+        maxWidth: '14%',
       },
       {
         key: 'updatedAt',
         header: 'updated_at',
         accessor: (row) => formatDateTime(row.updatedAt),
+        width: '16%',
+        maxWidth: '16%',
       },
     ],
     [],
@@ -128,7 +138,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
 
       {isLoading ? (
         <div className={cn('overflow-auto', compactHeight ? 'max-h-75' : 'flex-1')}>
-          <Table className="min-w-245">
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow className="bg-muted">
                 <TableHead>Model Name</TableHead>
@@ -160,7 +170,7 @@ export const ModelInfoTable = memo(function ModelInfoTable({
           features={{ rangeCopy: true }}
           testId="selectable-table-model-info"
           containerClassName={cn(compactHeight ? 'max-h-75' : 'flex-1')}
-          tableClassName="min-w-245"
+          tableClassName="min-w-full table-fixed"
           emptyState={t('model.infoTable.empty')}
           wrapRow={(model, _rowIdx, children) => (
             <TableRow

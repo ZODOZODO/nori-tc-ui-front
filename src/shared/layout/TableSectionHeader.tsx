@@ -28,8 +28,8 @@ export function TableSectionHeader({
   className,
 }: TableSectionHeaderProps) {
   return (
-    <div className={cn('flex items-start justify-between gap-3', className)}>
-      <div className="flex min-w-0 flex-col gap-1">
+    <div className={cn('flex items-start justify-between gap-4', className)}>
+      <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex items-center gap-2">
           {icon ? <span className="text-muted-foreground [&_svg]:size-4">{icon}</span> : null}
           <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
@@ -39,7 +39,7 @@ export function TableSectionHeader({
             </Badge>
           ) : null}
         </div>
-        {subtitle ? <div className="text-xs text-muted-foreground">{subtitle}</div> : null}
+        {subtitle ? <div className="text-[13px] leading-5 text-muted-foreground">{subtitle}</div> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </div>

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -33,11 +33,12 @@ interface PagePaginationProps {
   onPageSizeChange: (pageSize: number) => void
   /** page-size 선택지 (nori-client 기본 [12,25,50,100]). */
   pageSizeOptions?: readonly number[]
+  isFetching?: boolean
   className?: string
 }
 
 const PAGE_BTN_BASE =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border bg-background px-2 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-9 min-w-9 items-center justify-center rounded-lg border border-input bg-card px-2.5 text-sm font-medium text-foreground shadow-xs transition-[border-color,background-color,box-shadow] hover:border-foreground/20 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40'
 
 /**
  * nori-client `components/list_pagination.jsx` 의 pagination-bar (요약 info + pager + page-size)
@@ -53,6 +54,7 @@ export function PagePagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [12, 25, 50, 100],
+  isFetching = false,
   className,
 }: PagePaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -68,8 +70,9 @@ export function PagePagination({
         className,
       )}
     >
-      <div className="tabular-nums text-muted-foreground">
+      <div className="flex items-center gap-1.5 tabular-nums text-muted-foreground" aria-busy={isFetching}>
         {from.toLocaleString()}–{to.toLocaleString()} / {total.toLocaleString()}
+        {isFetching ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
       </div>
 
       <div className="flex items-center gap-1">
@@ -142,7 +145,7 @@ export function PagePagination({
         value={String(pageSize)}
         onValueChange={(value) => onPageSizeChange(Number(value))}
       >
-        <SelectTrigger className="h-8 w-22" aria-label="page size">
+        <SelectTrigger className="h-9 w-24" aria-label="page size">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

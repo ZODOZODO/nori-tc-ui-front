@@ -22,6 +22,7 @@ interface PageModalProps {
   footer?: ReactNode
   /** DialogContent 폭 등 추가 클래스. */
   className?: string
+  footerClassName?: string
 }
 
 /**
@@ -40,6 +41,7 @@ export function PageModal({
   children,
   footer,
   className,
+  footerClassName,
 }: PageModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,8 +50,8 @@ export function PageModal({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <div className="min-h-0 text-sm leading-body text-foreground">{children}</div>
-        {footer ? <DialogFooter>{footer}</DialogFooter> : null}
+        <div className="min-h-0 overflow-hidden text-sm leading-body text-foreground">{children}</div>
+        {footer ? <DialogFooter className={footerClassName}>{footer}</DialogFooter> : null}
       </DialogContent>
     </Dialog>
   )

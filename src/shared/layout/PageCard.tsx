@@ -43,10 +43,10 @@ export function PageCard({
           icon={icon}
           count={count}
           actions={action}
-          className="px-4 pt-4"
+          className="px-5 pt-5"
         />
       ) : null}
-      <div className={cn('min-h-0 flex-1 p-4', bodyClassName)}>{children}</div>
+      <div className={cn('min-h-0 flex-1 p-5', bodyClassName)}>{children}</div>
     </section>
   )
 }
