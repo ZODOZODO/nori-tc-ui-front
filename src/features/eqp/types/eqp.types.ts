@@ -104,38 +104,75 @@ export interface GatewayShardLease {
  * gateway_app 그룹 모델입니다.
  * shard lease의 ownedPartitions 기준으로 그룹화하며, 그룹 순서는 shard-group 정의 순서를 따릅니다.
  * 예: group-1(ownedPartitions [0,1]) → gateway_app1, group-2([2,3]) → gateway_app2
+ *
+ * shard group 을 잡지 못한 대기 Pod 도 뒤 번호를 이어받아 노드가 됩니다(spareInstance 로 구분).
  */
 export interface GatewayAppGroup {
   appIndex: number
   appName: string
   items: EqpInfo[]
+  /** 대응하는 shard group id. 단일 인스턴스 호환 모드(shard-group 정의 없음)나 대기 Pod 노드면 null. */
+  groupId: string | null
   /** 해당 shard group의 lease를 어느 gateway도 점유하지 않은 상태. 단일 인스턴스 모드면 false. */
   isUnleased: boolean
+  /**
+   * 이 노드가 shard 를 잡지 못한 대기 Pod 이면 그 인스턴스. shard group 노드면 null.
+   *
+   * shard 가 없으므로 items 는 항상 빈 배열입니다 — 설비 0대인 shard group 과는 다른 상태입니다.
+   */
+  spareInstance: RuntimeInstance | null
 }
 
 /**
- * 살아 있는 business 프로세스 하나(= consumer group 멤버)의 partition 할당입니다.
- * 멤버 순서는 백엔드가 담당 partition 최솟값 오름차순으로 고정해 내려줍니다.
+ * 살아 있는 business Pod 하나의 partition 할당입니다.
+ * Pod 순서는 백엔드가 담당 partition 최솟값 오름차순으로 고정해 내려줍니다.
+ *
+ * Pod 하나는 토픽마다 consumer group 멤버를 따로 가지므로(멤버 수 > Pod 수) 백엔드가 같은 host 의
+ * 멤버를 Pod 하나로 합쳐 내려줍니다 — 이 목록의 길이가 곧 살아 있는 business Pod 수입니다.
  */
 export interface BusinessAppAssignment {
-  /** consumer group 멤버 식별자. 재조인마다 바뀌므로 표시용이 아니라 식별용입니다. */
-  memberId: string
-  /** 멤버가 접속한 호스트. 알 수 없으면 null. */
+  /** Pod 의 접속 호스트(Kubernetes 에서는 Pod IP). 알 수 없으면 null. */
   host: string | null
+  /** 이 Pod 에 속한 consumer group 멤버 식별자. 재조인마다 바뀌므로 표시용이 아니라 식별용입니다. */
+  memberIds: string[]
   ownedPartitions: number[]
 }
 
 /**
+ * 살아 있는 런타임 인스턴스(Pod) 하나입니다.
+ *
+ * shard lease 는 "점유된 슬롯"만 답하므로 슬롯을 못 잡은 대기(spare) Pod 이 빠집니다. 이 목록의
+ * 원천은 coordination membership 원장이며, Pod 은 lease 획득 여부와 무관하게 등록됩니다.
+ */
+export interface RuntimeInstance {
+  /** `serviceName:podUid:bootId`. gateway 는 shard lease 의 ownerInstanceId 와 같은 문자열입니다. */
+  sessionId: string
+  /** Pod 이름. 알 수 없으면 null. */
+  podName: string | null
+  /** Pod IP. business 는 consumer group 멤버의 host 와 이 값으로 맞춥니다. 알 수 없으면 null. */
+  podIp: string | null
+  /** membership 상태(JOINING / ACTIVE_SYNCED / STOPPING / FENCED 등). */
+  state: string | null
+  protocolVersion: string | null
+  registeredAtEpochMs: number | null
+  updatedAtEpochMs: number | null
+}
+
+/**
  * business_app 그룹 모델입니다.
- * 살아 있는 business 프로세스(consumer group 멤버) 하나가 그룹 하나이며,
- * 그룹 순서는 백엔드가 내려준 멤버 순서를 그대로 따릅니다.
- * 예: 멤버 2개(담당 [0,1,2] / [3,4,5]) → business_app1, business_app2
+ * 살아 있는 business Pod 하나가 그룹 하나이며,
+ * 그룹 순서는 백엔드가 내려준 Pod 순서를 그대로 따릅니다.
+ * 예: Pod 2개(담당 [0,1,2] / [3,4,5]) → business_app1, business_app2
  */
 export interface BusinessAppGroup {
   appIndex: number
   appName: string
   items: EqpInfo[]
-  /** 프로세스는 떠 있으나 담당 partition 이 없는 상태(리밸런스 직후 등). */
+  /** Pod 의 접속 호스트(Pod IP). 알 수 없으면 null. */
+  host: string | null
+  /** Pod 이름. membership 원장과 host 로 맞춰 얻습니다. 맞출 수 없으면 null. */
+  podName: string | null
+  /** Pod 은 떠 있으나 담당 partition 이 없는 상태(리밸런스 직후 등). */
   isUnassigned: boolean
 }
 
@@ -160,9 +197,14 @@ export type EqpInfoListResponse = ApiResponse<EqpInfoPage>
 export type GatewayShardLeaseListResponse = ApiResponse<GatewayShardLease[]>
 
 /**
- * Business 프로세스별 partition 할당 조회 응답 타입입니다.
+ * Business Pod 별 partition 할당 조회 응답 타입입니다.
  */
 export type BusinessAppAssignmentListResponse = ApiResponse<BusinessAppAssignment[]>
+
+/**
+ * 런타임 인스턴스(Pod) 조망 조회 응답 타입입니다.
+ */
+export type RuntimeInstanceListResponse = ApiResponse<RuntimeInstance[]>
 
 /**
  * EQP 단건 조회 응답 타입입니다.

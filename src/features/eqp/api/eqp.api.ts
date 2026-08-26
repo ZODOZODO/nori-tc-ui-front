@@ -19,6 +19,8 @@ import {
   type BusinessAppAssignmentListResponse,
   type GatewayShardLease,
   type GatewayShardLeaseListResponse,
+  type RuntimeInstance,
+  type RuntimeInstanceListResponse,
   type EqpManageDetail,
   type EqpManageDetailBatch,
   type EqpManageDetailBatchApiResponse,
@@ -41,6 +43,47 @@ import { isRecord } from '@/shared/types/api.types'
 
 // 모듈 로드 시점이 아니라 호출 시점에 i18n.t 를 평가해야 런타임 언어 전환을 반영한다.
 const eqpListFallbackMessage = () => i18n.t('error.eqp.list')
+
+/**
+ * 런타임 인스턴스(Pod) 목록을 조회합니다.
+ *
+ * <p>gateway / business 두 경로가 응답 계약이 같으므로 검증·에러 번역을 한곳에 둡니다.</p>
+ *
+ * @param path 조회 경로
+ * @returns 인스턴스 목록
+ */
+const getRuntimeInstances = async (path: string): Promise<RuntimeInstance[]> => {
+  try {
+    const response = await apiClient.get<RuntimeInstanceListResponse>(path, {
+      withCredentials: true,
+    })
+
+    const payload = resolveSuccessPayload(
+      response.data,
+      response.status,
+      i18n.t('error.eqp.runtimeInstances'),
+    )
+
+    if (!Array.isArray(payload)) {
+      throw new ApiError(
+        createFailResponse(
+          {
+            success: false,
+            data: null,
+            errorCode: 'INVALID_RESPONSE',
+            errorMsg: i18n.t('error.eqp.runtimeInstances'),
+          },
+          i18n.t('error.eqp.runtimeInstances'),
+        ),
+        response.status,
+      )
+    }
+
+    return payload as RuntimeInstance[]
+  } catch (error) {
+    throw normalizeApiError(error, i18n.t('error.eqp.runtimeInstances'))
+  }
+}
 
 /**
  * 설비 목록 항목 최소 계약(문자열 eqpId)을 만족하는지 확인합니다.
@@ -163,7 +206,27 @@ export const eqpApi = {
   },
 
   /**
-   * 살아 있는 Business 프로세스와 각각의 담당 partition 을 조회합니다.
+   * 살아 있는 gateway 런타임 인스턴스(Pod) 를 조회합니다.
+   *
+   * <p>shard lease 는 점유된 슬롯만 답하므로 슬롯을 못 잡은 대기(spare) Pod 이 빠집니다. 이 조회는
+   * membership 원장을 원천으로 하므로 spare 도 포함합니다. 조정 원장을 쓰지 않는 배포에서는 빈 배열이
+   * 내려오며, 그때는 Pod 이름/spare 를 알 수 없다는 뜻입니다.</p>
+   */
+  getGatewayRuntimeInstances: async (): Promise<RuntimeInstance[]> =>
+    getRuntimeInstances('/eqp/gateway-instances'),
+
+  /**
+   * 살아 있는 business 런타임 인스턴스(Pod) 를 조회합니다.
+   *
+   * <p>consumer group 할당은 멤버의 host(Pod IP)까지만 알려주므로 Pod 이름은 이 조회의 `podIp` 를
+   * host 와 맞춰서만 얻습니다. 조정 원장을 쓰지 않는 배포에서는 빈 배열이 내려오며, 그때 화면은
+   * Pod 이름 대신 host 를 그대로 보여줍니다.</p>
+   */
+  getBusinessRuntimeInstances: async (): Promise<RuntimeInstance[]> =>
+    getRuntimeInstances('/eqp/business-instances'),
+
+  /**
+   * 살아 있는 Business Pod 과 각각의 담당 partition 을 조회합니다.
    * EQP 목록을 business_app 단위로 분류하는 기준 데이터입니다.
    */
   getBusinessAppAssignments: async (): Promise<BusinessAppAssignment[]> => {

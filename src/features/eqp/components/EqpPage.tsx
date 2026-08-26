@@ -37,6 +37,10 @@ import { useEqpDetail } from '../hooks/useEqpDetail'
 import { useEqpList } from '../hooks/useEqpList'
 import { useBusinessAppAssignments } from '../hooks/useBusinessAppAssignments'
 import { useGatewayShardLeases } from '../hooks/useGatewayShardLeases'
+import {
+  useBusinessRuntimeInstances,
+  useGatewayRuntimeInstances,
+} from '../hooks/useRuntimeInstances'
 import { useEqpModelInfo } from '../hooks/useEqpModelInfo'
 import { useEqpParamVersions } from '../hooks/useEqpParamVersions'
 import { useEqpRuntimeState } from '../hooks/useEqpRuntimeState'
@@ -67,7 +71,11 @@ import {
   type EqpUpdateRequest,
   type ProtocolType,
 } from '../types/eqp.types'
-import { buildBusinessAppNameByPartition, groupEqpItems } from '../utils/eqp-group.util'
+import {
+  buildBusinessAppNameByPartition,
+  groupEqpItems,
+  resolveGatewayInstanceView,
+} from '../utils/eqp-group.util'
 import { useMe } from '@/features/profile/hooks/useProfile'
 import { useLineList } from '@/shared/hooks/useLineList'
 import { useLineScopeStore } from '@/shared/stores/line-scope.store'
@@ -134,6 +142,10 @@ export function EqpPage() {
   const eqpListQuery = useEqpList()
   const gatewayShardLeasesQuery = useGatewayShardLeases()
   const businessAppAssignmentsQuery = useBusinessAppAssignments()
+  // 점유 Pod 이름·대기(spare) Pod 의 원천. 조정 원장을 쓰지 않는 배포에서는 빈 배열이 내려온다.
+  const gatewayInstancesQuery = useGatewayRuntimeInstances()
+  // business_app 노드의 Pod 이름 원천. consumer group 은 멤버의 host(Pod IP)까지만 알려준다.
+  const businessInstancesQuery = useBusinessRuntimeInstances()
   const modelListQuery = useModelList()
   const lineListQuery = useLineList()
   const selectedLineValue = useLineScopeStore((state) => state.selectedLineValue)
@@ -263,11 +275,31 @@ export function EqpPage() {
     return checkoutStatus.checkedOutBy === currentUserId
   }, [checkoutStatus.checkedOutBy, checkoutStatus.isCheckedOut, currentUserId])
 
+  /*
+   * 그룹(= shard group)과 인스턴스(= Pod)는 개수가 다른 별개 축이다 — 그룹 수는 설정값,
+   * Pod 수는 replica 수다. 그래서 점유 Pod 이름과 대기(spare) Pod 은 lease 만으로는 나오지 않고
+   * 두 목록을 sessionId 로 맞춰야 나온다.
+   */
+  const gatewayInstanceView = useMemo(
+    () => resolveGatewayInstanceView(gatewayShardLeasesQuery.data, gatewayInstancesQuery.data),
+    [gatewayInstancesQuery.data, gatewayShardLeasesQuery.data],
+  )
+
   // 전체 eqpItems 기준으로 그룹화 (Gateway/gateway_group 선택 시 설비 목록 조회용)
-  // gateway 그룹은 Redis shard lease, business 그룹은 consumer group 멤버 할당 기준으로 분류한다.
+  // gateway 그룹은 Redis shard lease, business 그룹은 Pod 별 partition 할당 기준으로 분류한다.
   const { gatewayGroups, businessGroups } = useMemo(
-    () => groupEqpItems(eqpItems, gatewayShardLeasesQuery.data, businessAppAssignmentsQuery.data),
-    [businessAppAssignmentsQuery.data, eqpItems, gatewayShardLeasesQuery.data],
+    () =>
+      groupEqpItems(eqpItems, gatewayShardLeasesQuery.data, businessAppAssignmentsQuery.data, {
+        gatewaySpare: gatewayInstanceView.spareInstances,
+        business: businessInstancesQuery.data,
+      }),
+    [
+      businessAppAssignmentsQuery.data,
+      businessInstancesQuery.data,
+      eqpItems,
+      gatewayInstanceView.spareInstances,
+      gatewayShardLeasesQuery.data,
+    ],
   )
 
   // 표의 "Business App" 열과 사이드바 그룹이 같은 답을 내도록 대응표를 한 번만 만든다.
@@ -1118,6 +1150,9 @@ export function EqpPage() {
             eqpItems={eqpItems}
             shardLeases={gatewayShardLeasesQuery.data}
             businessAssignments={businessAppAssignmentsQuery.data}
+            ownerPodNameByGroupId={gatewayInstanceView.ownerPodNameByGroupId}
+            gatewaySpareInstances={gatewayInstanceView.spareInstances}
+            businessInstances={businessInstancesQuery.data}
             selectedEqpId={selectedEqpId}
             selectedBusinessGroupIndex={selectedBusinessGroupIndex}
             selectedGroupIndex={selectedGroupIndex}

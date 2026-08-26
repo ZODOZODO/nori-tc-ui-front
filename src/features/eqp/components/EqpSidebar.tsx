@@ -24,8 +24,12 @@ import type {
   EqpInfo,
   GatewayShardLease,
   ProtocolType,
+  RuntimeInstance,
 } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
+
+/** 노드 아래 붙는 보조 정보 한 줄 — Pod 이름 / host 처럼 식별에 필요하지만 라벨은 아닌 값. */
+const NODE_META_LINE_CLASS = 'truncate px-1 pl-4 text-[10px] leading-4 text-muted-foreground'
 
 interface EqpSidebarProps {
   /** 현재 스코프. 상단 현황 카드가 정한다 — 이 스코프의 하위 트리만 그린다. */
@@ -33,8 +37,14 @@ interface EqpSidebarProps {
   eqpItems: EqpInfo[]
   /** gateway 그룹 분류 기준이 되는 shard lease 점유 현황 (조회 전이면 undefined) */
   shardLeases: GatewayShardLease[] | undefined
-  /** business 그룹 분류 기준이 되는 프로세스별 partition 할당 (조회 전이면 undefined) */
+  /** business 그룹 분류 기준이 되는 Pod 별 partition 할당 (조회 전이면 undefined) */
   businessAssignments: BusinessAppAssignment[] | undefined
+  /** shard group id → 그 group 을 점유한 gateway Pod 이름. 이름을 모르면 항목이 없다. */
+  ownerPodNameByGroupId: Map<string, string>
+  /** 살아 있으나 어떤 shard group 도 잡지 못한 대기 gateway 인스턴스 — 뒤 번호를 이어 노드가 된다. */
+  gatewaySpareInstances: RuntimeInstance[]
+  /** 살아 있는 business 인스턴스 — business_app 노드의 Pod 이름 원천 (조회 전이면 undefined) */
+  businessInstances: RuntimeInstance[] | undefined
   selectedEqpId: string | null
   selectedBusinessGroupIndex: number | null
   selectedGroupIndex: number | null
@@ -62,6 +72,9 @@ export const EqpSidebar = memo(function EqpSidebar({
   eqpItems,
   shardLeases,
   businessAssignments,
+  ownerPodNameByGroupId,
+  gatewaySpareInstances,
+  businessInstances,
   selectedEqpId,
   selectedBusinessGroupIndex,
   selectedGroupIndex,
@@ -84,8 +97,12 @@ export const EqpSidebar = memo(function EqpSidebar({
   const hasSearch = normalizedKeyword.length > 0
 
   const { gatewayGroups: allGatewayGroups, businessGroups: allBusinessGroups } = useMemo(
-    () => groupEqpItems(eqpItems, shardLeases, businessAssignments),
-    [businessAssignments, eqpItems, shardLeases],
+    () =>
+      groupEqpItems(eqpItems, shardLeases, businessAssignments, {
+        gatewaySpare: gatewaySpareInstances,
+        business: businessInstances,
+      }),
+    [businessAssignments, businessInstances, eqpItems, gatewaySpareInstances, shardLeases],
   )
 
   /**
@@ -184,7 +201,11 @@ export const EqpSidebar = memo(function EqpSidebar({
       <header className="shrink-0 px-3 pt-3">
         <div className="flex h-7 items-center justify-between gap-2">
           <h2 className="min-w-0 truncate text-sm font-semibold text-foreground">
-            {t('eqp.sidebar.title')}
+            {/*
+              스코프마다 이 컬럼이 담는 것이 다르다 — gateway 는 설비 리프, business 는 business_app
+              노드(오른쪽은 그 Pod 이 참조하는 모델 표)다. 제목을 한 축으로 고정하면 다른 축에서 거짓이 된다.
+            */}
+            {t(scope === 'business' ? 'eqp.sidebar.titleBusiness' : 'eqp.sidebar.titleGateway')}
           </h2>
           <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
             {t('eqp.list.groupCount', { count: groupCount })}
@@ -216,23 +237,31 @@ export const EqpSidebar = memo(function EqpSidebar({
             </p>
           ) : (
             businessGroups.map((group) => (
-              <Button
-                key={group.appName}
-                type="button"
-                variant="ghost"
-                onClick={() => onSelectBusinessGroup(group.appIndex)}
-                className={cn(
-                  lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex),
-                  'flex items-center gap-1.5',
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate text-left">{group.appName}</span>
-                {group.isUnassigned ? (
-                  <Badge variant="warning" title={t('eqp.business.unassignedTitle')}>
-                    {t('eqp.business.unassignedBadge')}
-                  </Badge>
+              <div key={group.appName} className="flex flex-col">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onSelectBusinessGroup(group.appIndex)}
+                  className={cn(
+                    lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex),
+                    'flex items-center gap-1.5',
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">{group.appName}</span>
+                  {group.isUnassigned ? (
+                    <Badge variant="warning" title={t('eqp.business.unassignedTitle')}>
+                      {t('eqp.business.unassignedBadge')}
+                    </Badge>
+                  ) : null}
+                </Button>
+                {/*
+                  business_app{N} 은 Pod 하나다. Pod 이름은 membership 원장과 host 를 맞춰야 나오므로,
+                  맞출 수 없으면 host(Pod IP)를 그대로 보여준다 — 모른다는 사실을 추정으로 덮지 않는다.
+                */}
+                {(group.podName ?? group.host) !== null ? (
+                  <p className={NODE_META_LINE_CLASS}>{group.podName ?? group.host}</p>
                 ) : null}
-              </Button>
+              </div>
             ))
           )}
 
@@ -258,7 +287,17 @@ export const EqpSidebar = memo(function EqpSidebar({
                   // 검색 중에는 결과가 없는 그룹을 숨겨 검색 노이즈를 줄인다 (빈 그룹은 평시에만 노출).
                   .filter((group) => !hasSearch || group.items.length > 0)
                   .map((group) => {
-                    const isOpen = expandedGatewayGroups.has(group.appIndex) || hasSearch
+                    const isSpare = group.spareInstance !== null
+                    const isOpen = !isSpare && (expandedGatewayGroups.has(group.appIndex) || hasSearch)
+                    /*
+                      shard group 노드는 점유 Pod 이름을, 대기 Pod 노드는 자기 Pod 이름을 단다 —
+                      두 노드 모두 "이 번호가 지금 어느 Pod 인가"를 같은 자리에서 답해야 한다.
+                    */
+                    const podName = isSpare
+                      ? group.spareInstance?.podName ?? group.spareInstance?.sessionId
+                      : group.groupId === null
+                        ? undefined
+                        : ownerPodNameByGroupId.get(group.groupId)
                     return (
                       <div key={group.appName} className="flex flex-col gap-0.5">
                         <Button
@@ -274,14 +313,29 @@ export const EqpSidebar = memo(function EqpSidebar({
                               {t('eqp.gateway.unleasedBadge')}
                             </Badge>
                           ) : null}
-                          <ChevronDown
-                            aria-hidden="true"
-                            className={cn(
-                              'size-3 shrink-0 transition-transform',
-                              isOpen ? null : '-rotate-90',
-                            )}
-                          />
+                          {isSpare ? (
+                            <Badge variant="outline" title={t('eqp.gateway.spareTitle')}>
+                              {t('eqp.gateway.spareLabel')}
+                            </Badge>
+                          ) : null}
+                          {isSpare ? null : (
+                            <ChevronDown
+                              aria-hidden="true"
+                              className={cn(
+                                'size-3 shrink-0 transition-transform',
+                                isOpen ? null : '-rotate-90',
+                              )}
+                            />
+                          )}
                         </Button>
+                        {podName ? (
+                          <p
+                            className={NODE_META_LINE_CLASS}
+                            title={t(isSpare ? 'eqp.gateway.spareTitle' : 'eqp.gateway.ownerPodTitle')}
+                          >
+                            {podName}
+                          </p>
+                        ) : null}
                         {isOpen
                           ? group.items.map((eqp) =>
                               renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),

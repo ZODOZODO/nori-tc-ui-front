@@ -166,6 +166,13 @@ const setupCheckInMocks = async (page: Page) => {
             ]),
           ),
         })
+      // 점유 Pod 이름·spare·business Pod 이름의 원천. 조정 원장을 쓰지 않는 배포와 같은 빈 배열로 고정한다.
+      if (p === '/api/eqp/gateway-instances' || p === '/api/eqp/business-instances')
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(apiSuccess([])),
+        })
       if (p === `/api/eqp/${EQP_ID}` && method === 'GET')
         return route.fulfill({
           status: 200,
