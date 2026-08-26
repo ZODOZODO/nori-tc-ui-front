@@ -12,6 +12,15 @@ export interface PageMetricItem {
   tone?: PageMetricTone
   selected?: boolean
   onSelect?: () => void
+  /**
+   * 카드에 붙일 `data-testid`.
+   *
+   * <p>지정하면 카드 루트에 `data-testid` 와 — 값이 확정된 수일 때만 — `data-value` 가 함께
+   * 붙는다. 조회 중이라 값이 자리표시자(문자열)인 동안 `data-value` 를 내보내지 않는 것이 계약의
+   * 핵심이다: 속성이 없어야 e2e 의 auto-retry 가 확정 값까지 기다린다. 0 을 내보내면 "장애 없음"
+   * 으로 확정된 것과 구분되지 않는다.</p>
+   */
+  testId?: string
 }
 
 interface PageMetricGridProps {
@@ -67,6 +76,13 @@ export function PageMetricGrid({ items, ariaLabel, className }: PageMetricGridPr
     >
       {items.map((item) => {
         const tone = TONE_CLASS[item.tone ?? 'neutral']
+        // 값이 수일 때만 data-value 를 붙인다(위 testId 주석의 계약).
+        const hookAttributes = item.testId
+          ? {
+              'data-testid': item.testId,
+              ...(typeof item.value === 'number' ? { 'data-value': item.value } : {}),
+            }
+          : {}
         const content = (
           <>
             <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', tone.icon)}>
@@ -93,6 +109,7 @@ export function PageMetricGrid({ items, ariaLabel, className }: PageMetricGridPr
             <button
               key={item.key}
               type="button"
+              {...hookAttributes}
               aria-pressed={item.selected}
               onClick={item.onSelect}
               className={cn(
@@ -107,7 +124,11 @@ export function PageMetricGrid({ items, ariaLabel, className }: PageMetricGridPr
         }
 
         return (
-          <article key={item.key} className={cn('flex min-w-0 items-center gap-3 rounded-xl border p-3.5 shadow-soft-sm', tone.idle)}>
+          <article
+            key={item.key}
+            {...hookAttributes}
+            className={cn('flex min-w-0 items-center gap-3 rounded-xl border p-3.5 shadow-soft-sm', tone.idle)}
+          >
             {content}
           </article>
         )

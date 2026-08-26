@@ -62,6 +62,7 @@ export function DlqPage() {
           items={[
             {
               key: 'gateway',
+              testId: 'dlq-kpi-gateway',
               label: t('dlq.panel.gateway'),
               value: count(entries.gateway.length),
               icon: Cpu,
@@ -71,6 +72,7 @@ export function DlqPage() {
             },
             {
               key: 'business',
+              testId: 'dlq-kpi-business',
               label: t('dlq.panel.business'),
               value: count(entries.business.length),
               icon: Beaker,
@@ -80,6 +82,7 @@ export function DlqPage() {
             },
             {
               key: 'quarantine',
+              testId: 'dlq-kpi-quarantine',
               label: t('dlq.panel.quarantine'),
               value: count(entries.quarantine.length),
               icon: Lock,
@@ -89,6 +92,7 @@ export function DlqPage() {
             },
             {
               key: 'repair-task',
+              testId: 'dlq-kpi-repair-task',
               label: t('dlq.panel.repairTask'),
               value: count(entries.repairTask.length),
               icon: RotateCcw,
