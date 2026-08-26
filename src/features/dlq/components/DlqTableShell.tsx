@@ -73,7 +73,7 @@ export function DlqTableShell({
   const { t } = useI18n()
 
   return (
-    <div data-testid={testId} className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6">
+    <div data-testid={testId} className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6">
       <section className="rounded-xl border border-border bg-card shadow-soft-sm">
         <TableSectionHeader
           title={title}

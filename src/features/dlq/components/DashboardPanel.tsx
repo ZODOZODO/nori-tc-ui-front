@@ -234,7 +234,7 @@ export function DashboardPanel() {
   return (
     <div
       data-testid="dlq-dashboard-panel"
-      className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-4 p-6"
+      className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6"
     >
       <section className={CARD_BASE_CLASS}>
         <div className="flex flex-col gap-3 border-b border-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">

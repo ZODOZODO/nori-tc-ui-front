@@ -58,11 +58,10 @@ export function GroupAdminPanel() {
   }, [permissionsTargetGroupId, groupListQuery.data?.items])
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
-      {/* 제목(h1)은 라우트 헤딩(AppPageHeading)이 그린다 — 한 화면에 h1 을 두 번 두지 않는다.
-          이 줄은 설명 / 총건수 / 액션만 담당한다. */}
-      <div className="flex shrink-0 items-start justify-between gap-4">
-        <p className="text-sm leading-body text-muted-foreground">{t('group.description')}</p>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+      {/* 제목(h1)과 설명은 라우트 헤딩(AppPageHeading)이 그린다 — 한 화면에 같은 문장을 두 번 두지
+          않는다. 이 줄은 총건수 / 액션만 담당한다. 좌우 여백도 페이지 shell 이 소유한다. */}
+      <div className="flex shrink-0 items-start justify-end gap-4">
         <div className="flex shrink-0 items-center gap-2">
           <Badge variant="secondary" className="tabular-nums">
             {(groupListQuery.data?.count ?? 0).toLocaleString()}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { useI18n } from '@/i18n/i18n-context'
 import { AppShellPage } from '@/shared/components/AppShellPage'
 import { AppPageHeading } from '@/shared/layout/AppPageHeading'
 import { DeployHistoryPanel } from './DeployHistoryPanel'
@@ -23,6 +24,13 @@ const renderPanel = (mode: DeployMode) => {
   }
 }
 
+/** 제목 아래 설명문의 i18n 키. 모드마다 하는 일이 달라 문구도 모드별로 갈린다. */
+const DESCRIPTION_KEY_BY_MODE: Record<DeployMode, string> = {
+  register: 'deploy.page.description.register',
+  deploy: 'deploy.page.description.deploy',
+  history: 'deploy.page.description.history',
+}
+
 /**
  * `/deploy/*` 라우트의 통합 페이지입니다. 인증·DEPLOY_READ 권한 검사는 라우트 가드
  * (RequireAuth / RequirePermission)가 담당한다.
@@ -30,6 +38,7 @@ const renderPanel = (mode: DeployMode) => {
  * 등록 / 배포 / 배포 이력 전환은 전역 LNB 가 맡는다.
  */
 export function DeployPage({ mode }: DeployPageProps) {
+  const { t } = useI18n()
   const activePanel = useMemo(() => renderPanel(mode), [mode])
 
   useEffect(() => {
@@ -46,9 +55,11 @@ export function DeployPage({ mode }: DeployPageProps) {
 
   return (
     <AppShellPage onAfterLogout={clearDeployUiSessionState}>
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-5 lg:p-6">
-        <AppPageHeading />
-        <main className="flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-5 lg:p-6">
+        <AppPageHeading description={t(DESCRIPTION_KEY_BY_MODE[mode])} />
+        {/* 세로 스크롤을 이 main 이 갖는다 — 패널이 자체 스크롤 컨테이너를 두지 않으므로
+            여기서 빼면 셸의 overflow-hidden 에 걸려 내용이 잘린다. */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto overflow-x-hidden">
           <div className="flex min-h-full min-w-0 max-w-full flex-1">{activePanel}</div>
         </main>
       </section>

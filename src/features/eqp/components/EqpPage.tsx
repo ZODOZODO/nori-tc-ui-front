@@ -1082,7 +1082,14 @@ export function EqpPage({ scope }: EqpPageProps) {
         />
 
         <section className="flex min-w-0 flex-1 flex-col">
-          <AppPageHeading className="px-3 pt-3 md:px-4 md:pt-4" />
+          <AppPageHeading
+            description={t(
+              scope === 'gateway'
+                ? 'eqp.page.description.gateway'
+                : 'eqp.page.description.business',
+            )}
+            className="px-3 pt-3 md:px-4 md:pt-4"
+          />
           <div className="flex min-h-0 flex-1 flex-col">
             {/* 가운데 영역: selection 유형에 따라 콘텐츠 분기 */}
             {selection.type === 'none' ? (
