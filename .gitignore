@@ -28,6 +28,14 @@ blob-report/
 !/tests/e2e/_perf_measure.mjs
 !/tests/e2e/_load_trace.mjs
 !/tests/e2e/login-landing.spec.ts
+!/tests/e2e/layout-overflow-guard.spec.ts
+!/tests/e2e/modal-overflow-guard-extra.spec.ts
+!/tests/e2e/modal-visual-sweep-eqp.spec.ts
+!/tests/e2e/modal-visual-sweep-group.spec.ts
+!/tests/e2e/modal-visual-sweep-livemap.spec.ts
+!/tests/e2e/model-check-in-diff-overflow.spec.ts
+!/tests/e2e/deploy-monitor-view-modal.spec.ts
+!/tests/e2e/deploy-register-scenario-modal.spec.ts
 !/tests/e2e/deploy/
 /tests/e2e/deploy/*
 !/tests/e2e/deploy/deploy-error-surface.spec.ts

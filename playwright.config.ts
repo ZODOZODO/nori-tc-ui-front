@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test'
  * 프론트 레포의 E2E 검증은 Vite dev server를 직접 띄운 뒤 브라우저 단에서 동작을 확인합니다.
  * 기본값은 개발 환경과 동일한 3000 포트를 사용해 수동 실행 흐름과 테스트 흐름의 차이를 줄입니다.
  */
+const E2E_PORT = process.env.E2E_PORT ?? '3000'
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -17,15 +19,15 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: [['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: `http://127.0.0.1:${E2E_PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 3000',
-    url: 'http://127.0.0.1:3000/login',
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --host 127.0.0.1 --port ${E2E_PORT}`,
+    url: `http://127.0.0.1:${E2E_PORT}/login`,
+    reuseExistingServer: !process.env.CI && process.env.E2E_PORT === undefined,
     timeout: 120_000,
   },
   projects: [
