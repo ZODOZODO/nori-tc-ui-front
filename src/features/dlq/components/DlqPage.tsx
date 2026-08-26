@@ -1,22 +1,26 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
+import { Beaker, Cpu, Lock, RotateCcw } from 'lucide-react'
 import { useI18n } from '@/i18n/i18n-context'
 import { AppShellPage } from '@/shared/components/AppShellPage'
 import { AppPageHeading } from '@/shared/layout/AppPageHeading'
-import type { DlqMode } from '../types/dlq.types'
+import { PageMetricGrid } from '@/shared/layout/PageMetricGrid'
+import { useDlqCategoryEntries } from '../hooks/useDlqCategoryEntries'
+import type { DashboardCategory } from '../lib/dlq-feed'
 import { BusinessDlqPanel } from './BusinessDlqPanel'
 import { DashboardPanel } from './DashboardPanel'
 import { GatewayDlqPanel } from './GatewayDlqPanel'
 import { QuarantinePanel } from './QuarantinePanel'
 import { RepairTaskPanel } from './RepairTaskPanel'
 
-interface DlqPageProps {
-  /** 표시할 모드. 라우트가 정한다 — URL 이 단일 진실 원천이다. */
-  mode: DlqMode
-}
+/**
+ * 선택된 카테고리 — `null` 은 아무 카드도 고르지 않은 상태이고, 그때가 통합 대시보드다.
+ * 카드는 KPI 이자 목록 진입점이라, 고른 카드를 다시 누르면 대시보드로 돌아온다.
+ */
+type DlqView = DashboardCategory | null
 
-const renderPanel = (mode: DlqMode) => {
-  switch (mode) {
-    case 'dashboard':
+const renderPanel = (view: DlqView) => {
+  switch (view) {
+    case null:
       return <DashboardPanel />
     case 'gateway':
       return <GatewayDlqPanel />
@@ -29,33 +33,76 @@ const renderPanel = (mode: DlqMode) => {
   }
 }
 
-/** 제목 아래 설명문의 i18n 키. 모드마다 보여 주는 대상이 달라 문구도 모드별로 갈린다. */
-const DESCRIPTION_KEY_BY_MODE: Record<DlqMode, string> = {
-  dashboard: 'dlq.page.description.dashboard',
-  gateway: 'dlq.page.description.gateway',
-  business: 'dlq.page.description.business',
-  quarantine: 'dlq.page.description.quarantine',
-  'repair-task': 'dlq.page.description.repairTask',
-}
-
 /**
- * `/dlq/*` 라우트의 통합 페이지입니다. 인증·DLQ_READ 권한 검사는 라우트 가드
+ * `/dlq` 라우트의 통합 페이지입니다. 인증·DLQ_READ 권한 검사는 라우트 가드
  * (RequireAuth / RequirePermission)가 담당한다.
  *
- * 5 모드 전환은 전역 LNB 가 맡는다 — 같은 항목을 in-page 사이드바로 한 번 더 보여주지 않는다.
+ * <p>4 카테고리(gateway / business / 격리 / 복구작업)는 서로 다른 화면이 아니라 같은 "막힌 것"의
+ * 갈래다 — 건수 카드를 그 갈래의 진입점으로 쓰고, 아무것도 고르지 않은 상태에서는 4 갈래를
+ * 시간축으로 합친 대시보드를 보여준다.</p>
  */
-export function DlqPage({ mode }: DlqPageProps) {
+export function DlqPage() {
   const { t } = useI18n()
-  const activePanel = useMemo(() => renderPanel(mode), [mode])
+  const [view, setView] = useState<DlqView>(null)
+  const entries = useDlqCategoryEntries()
+
+  // 조회가 끝나기 전 0 을 보여주면 "장애 없음" 으로 읽힌다 — 확정 전에는 값을 비운다.
+  const count = (length: number): number | string => (entries.isSettled ? length : '—')
+  const toggle = (category: DashboardCategory) =>
+    setView((current) => (current === category ? null : category))
 
   return (
     <AppShellPage>
       <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-5 lg:p-6">
-        <AppPageHeading description={t(DESCRIPTION_KEY_BY_MODE[mode])} />
+        <AppPageHeading description={t('dlq.page.description')} />
+
+        <PageMetricGrid
+          className="shrink-0"
+          ariaLabel={t('dlq.summary.ariaLabel')}
+          items={[
+            {
+              key: 'gateway',
+              label: t('dlq.panel.gateway'),
+              value: count(entries.gateway.length),
+              icon: Cpu,
+              tone: entries.gateway.length > 0 ? 'danger' : 'neutral',
+              selected: view === 'gateway',
+              onSelect: () => toggle('gateway'),
+            },
+            {
+              key: 'business',
+              label: t('dlq.panel.business'),
+              value: count(entries.business.length),
+              icon: Beaker,
+              tone: entries.business.length > 0 ? 'danger' : 'neutral',
+              selected: view === 'business',
+              onSelect: () => toggle('business'),
+            },
+            {
+              key: 'quarantine',
+              label: t('dlq.panel.quarantine'),
+              value: count(entries.quarantine.length),
+              icon: Lock,
+              tone: entries.quarantine.length > 0 ? 'warning' : 'neutral',
+              selected: view === 'quarantine',
+              onSelect: () => toggle('quarantine'),
+            },
+            {
+              key: 'repair-task',
+              label: t('dlq.panel.repairTask'),
+              value: count(entries.repairTask.length),
+              icon: RotateCcw,
+              tone: entries.repairTask.length > 0 ? 'brand' : 'neutral',
+              selected: view === 'repair-task',
+              onSelect: () => toggle('repair-task'),
+            },
+          ]}
+        />
+
         {/* 세로 스크롤을 이 main 이 갖는다 — 패널이 자체 스크롤 컨테이너를 두지 않으므로
-            여기서 빼면 셸의 overflow-hidden 에 걸려 목록이 잘린다(실측 376~536px). */}
+            여기서 빼면 셸의 overflow-hidden 에 걸려 목록이 잘린다. */}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto overflow-x-hidden">
-          {activePanel}
+          {renderPanel(view)}
         </main>
       </section>
     </AppShellPage>

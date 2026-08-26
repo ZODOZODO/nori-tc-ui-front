@@ -62,7 +62,7 @@ function RouteLoadingFallback() {
 /**
  * 앱 라우트 트리입니다.
  *
- * <p>LNB 확정 트리의 16 항목이 그대로 라우트다 — 모드/스코프는 store 가 아니라 URL 이 원천이고,
+ * <p>LNB 확정 트리의 8 항목이 그대로 라우트다 — 모드/스코프는 store 가 아니라 URL 이 원천이고,
  * 페이지는 그 값을 prop 으로 받는다(새로고침·딥링크 복원이 URL 만으로 성립).</p>
  *
  * <p>세그먼트를 `:mode` param 으로 받지 않고 정적으로 나열한다 — 미존재 세그먼트가 자동으로
@@ -87,16 +87,11 @@ export function Router() {
             </Route>
 
             <Route element={<RequirePermission permissionCode={DLQ_READ_PERMISSION} />}>
-              <Route path="/dlq/dashboard" element={<DlqPage mode="dashboard" />} />
-              <Route path="/dlq/gateway" element={<DlqPage mode="gateway" />} />
-              <Route path="/dlq/business" element={<DlqPage mode="business" />} />
-              <Route path="/dlq/quarantine" element={<DlqPage mode="quarantine" />} />
-              <Route path="/dlq/repair-task" element={<DlqPage mode="repair-task" />} />
+              <Route path="/dlq" element={<DlqPage />} />
             </Route>
 
             <Route element={<RequirePermission permissionCode={EQP_READ_PERMISSION} />}>
-              <Route path="/eqp/business" element={<EqpPage scope="business" />} />
-              <Route path="/eqp/gateway" element={<EqpPage scope="gateway" />} />
+              <Route path="/eqp" element={<EqpPage />} />
             </Route>
 
             <Route element={<RequirePermission permissionCode={MODEL_READ_PERMISSION} />}>
@@ -106,23 +101,28 @@ export function Router() {
             </Route>
 
             <Route element={<RequirePermission permissionCode={DEPLOY_READ_PERMISSION} />}>
-              <Route path="/deploy/register" element={<DeployPage mode="register" />} />
-              <Route path="/deploy/deploy" element={<DeployPage mode="deploy" />} />
-              <Route path="/deploy/history" element={<DeployPage mode="history" />} />
+              <Route path="/deploy" element={<DeployPage />} />
             </Route>
 
             <Route element={<RequirePermission permissionCode={USER_READ_PERMISSION} />}>
-              <Route path="/user/users" element={<UserManagementPage mode="user" />} />
-              <Route path="/user/groups" element={<UserManagementPage mode="group" />} />
+              <Route path="/user" element={<UserManagementPage />} />
             </Route>
           </Route>
 
           {/* 구 경로 — 북마크 보존. 목적지는 각 화면의 기존 초기 모드다. */}
-          <Route path="/dlq" element={<Navigate to="/dlq/dashboard" replace />} />
-          <Route path="/eqp" element={<Navigate to="/eqp/gateway" replace />} />
+          <Route path="/dlq/dashboard" element={<Navigate to="/dlq" replace />} />
+          <Route path="/dlq/gateway" element={<Navigate to="/dlq" replace />} />
+          <Route path="/dlq/business" element={<Navigate to="/dlq" replace />} />
+          <Route path="/dlq/quarantine" element={<Navigate to="/dlq" replace />} />
+          <Route path="/dlq/repair-task" element={<Navigate to="/dlq" replace />} />
+          <Route path="/eqp/business" element={<Navigate to="/eqp" replace />} />
+          <Route path="/eqp/gateway" element={<Navigate to="/eqp" replace />} />
           <Route path="/model" element={<Navigate to="/model/secs" replace />} />
-          <Route path="/deploy" element={<Navigate to="/deploy/register" replace />} />
-          <Route path="/user" element={<Navigate to="/user/users" replace />} />
+          <Route path="/deploy/register" element={<Navigate to="/deploy" replace />} />
+          <Route path="/deploy/deploy" element={<Navigate to="/deploy" replace />} />
+          <Route path="/deploy/history" element={<Navigate to="/deploy" replace />} />
+          <Route path="/user/users" element={<Navigate to="/user" replace />} />
+          <Route path="/user/groups" element={<Navigate to="/user" replace />} />
           <Route path="/eqp/live-map" element={<Navigate to="/live-map" replace />} />
 
           {import.meta.env.DEV ? (

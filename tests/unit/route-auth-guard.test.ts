@@ -66,21 +66,13 @@ test('보호 라우트 가드가 미인증에서 본문 대신 /login 리다이�
  */
 const PROTECTED_ROUTE_PATHS = [
   '/live-map',
-  '/dlq/dashboard',
-  '/dlq/gateway',
-  '/dlq/business',
-  '/dlq/quarantine',
-  '/dlq/repair-task',
-  '/eqp/business',
-  '/eqp/gateway',
+  '/dlq',
+  '/eqp',
   '/model/secs',
   '/model/socket',
   '/model/plc',
-  '/deploy/register',
-  '/deploy/deploy',
-  '/deploy/history',
-  '/user/users',
-  '/user/groups',
+  '/deploy',
+  '/user',
 ]
 
 /**
@@ -162,7 +154,22 @@ test('로그인·픽스처·리다이렉트를 뺀 모든 라우트가 RequireAu
   }
 
   // 구 경로 리다이렉트는 가드 밖이어야 한다 — 안에 두면 미인증 시 /login 대신 리다이렉트가 먼저 돈다.
-  for (const path of ['/dlq', '/eqp', '/model', '/deploy', '/user', '/eqp/live-map']) {
+  for (const path of [
+    '/dlq/dashboard',
+    '/dlq/gateway',
+    '/dlq/business',
+    '/dlq/quarantine',
+    '/dlq/repair-task',
+    '/eqp/business',
+    '/eqp/gateway',
+    '/model',
+    '/deploy/register',
+    '/deploy/deploy',
+    '/deploy/history',
+    '/user/users',
+    '/user/groups',
+    '/eqp/live-map',
+  ]) {
     const at = router.indexOf(`<Route path="${path}" element={<Navigate`)
     assert.notEqual(at, -1, `구 경로 리다이렉트 ${path} 가 사라졌다 — 북마크가 깨진다`)
     assert.equal(at > guardClose, true, `구 경로 리다이렉트 ${path} 가 가드 블록 안에 있다`)

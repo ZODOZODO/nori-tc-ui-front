@@ -31,10 +31,10 @@ import { chromium } from '@playwright/test'
 // wm-parity-sidebar 확정 메뉴 트리의 기본 진입 라우트 (src/app/Router.tsx 실측).
 // _perf_measure.mjs 의 PAGE_ROUTES 와 동일해야 한다 — 변경 시 두 파일 함께 수정.
 const PAGE_ROUTES = {
-  EqpPage: '/eqp/gateway',
+  EqpPage: '/eqp',
   ModelPage: '/model/secs',
-  DeployPage: '/deploy/register',
-  DlqPage: '/dlq/dashboard',
+  DeployPage: '/deploy',
+  DlqPage: '/dlq',
   LiveMapPage: '/live-map',
 }
 

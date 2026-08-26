@@ -1,7 +1,6 @@
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { memo, useDeferredValue, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -12,13 +11,8 @@ import {
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n/i18n-context'
-import {
-  LNB_FOCUS_RING,
-  lnbLeafClass,
-  lnbLeafDotClass,
-  lnbSubLinkClass,
-} from '@/shared/layout/lnb-sidebar'
-import { cn } from '@/lib/utils'
+import { InPageSidebar } from '@/shared/layout/InPageSidebar'
+import { lnbLeafClass, lnbLeafDotClass, lnbSubLinkClass } from '@/shared/layout/lnb-sidebar'
 import { buildModelTreeGroups, type ModelTreeNode } from '../lib/model-tree.util'
 import type { ModelInfo, ProtocolType } from '../types/model.types'
 
@@ -165,7 +159,8 @@ export const ModelSidebar = memo(function ModelSidebar({
     return (
       <div
         key={`${node.representative.modelName}-${node.representative.modelVersionKey}`}
-        className={depth > 1 ? 'ml-3 border-l border-border pl-1' : undefined}
+        // 하위 안내선은 두지 않는다(전역 LNB 와 동일) — 들여쓰기만으로 depth 를 나타낸다.
+        className={depth > 1 ? 'ml-3 pl-1' : undefined}
       >
         <ContextMenu>
           <ContextMenuTrigger asChild>
@@ -258,101 +253,60 @@ export const ModelSidebar = memo(function ModelSidebar({
     )
   }
 
-  if (!sidebarOpen) {
-    return (
-      <aside
-        className="flex flex-col self-stretch border-r border-border bg-card"
-        style={{ width: `${sidebarWidth}px` }}
-      >
-        <div className="flex h-13 items-center justify-center border-b border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onToggleSidebar}
-            className={cn(
-              'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
-              LNB_FOCUS_RING,
-            )}
-            aria-label={t('model.sidebar.expand')}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      </aside>
-    )
-  }
-
   return (
-    <aside
-      className="flex flex-col self-stretch border-r border-border bg-card"
-      style={{ width: `${sidebarWidth}px` }}
+    <InPageSidebar
+      title={t('model.sidebar.title')}
+      open={sidebarOpen}
+      width={sidebarWidth}
+      expandLabel={t('model.sidebar.expand')}
+      collapseLabel={t('model.sidebar.collapse')}
+      onToggle={onToggleSidebar}
+      onResize={onResizeSidebar}
     >
-      <div className="flex min-w-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-13 items-center justify-between border-b border-border px-3">
-            <span className="truncate text-sm font-semibold text-foreground">{t('model.sidebar.title')}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onToggleSidebar}
-              className={cn(
-                'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
-                LNB_FOCUS_RING,
-              )}
-              aria-label={t('model.sidebar.collapse')}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-          </div>
-
-          <div className="px-3 py-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t('model.sidebar.searchPlaceholder')}
-                className="h-9 bg-muted pl-8 text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Model Create 우클릭 메뉴는 승격된 섹션 헤더 대신 트리 컨테이너가 받는다
-              (생성 대상 인터페이스 = 현재 라우트 스코프). */}
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <nav
-                className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3"
-                data-testid="model-sidebar-tree"
-              >
-                {roots.length === 0 ? (
-                  <p className="py-1 pl-8 text-[11px] text-muted-foreground">
-                    {t('model.sidebar.empty')}
-                  </p>
-                ) : (
-                  roots.map((root) => renderRoot(root))
-                )}
-
-                {isLoading ? (
-                  <p className="px-3 pt-1 text-xs text-muted-foreground">
-                    {t('model.sidebar.loading')}
-                  </p>
-                ) : null}
-                {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
-              </nav>
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-52">
-              <ContextMenuLabel>{scopeTitle}</ContextMenuLabel>
-              <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => onOpenRootCreate(scope)}>
-                {`${scopeTitle} Model Create`}
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+      <div className="px-3 py-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder={t('model.sidebar.searchPlaceholder')}
+            className="h-9 bg-muted pl-8 text-xs"
+          />
         </div>
-
-        <SidebarResizeHandle onDrag={onResizeSidebar} />
       </div>
-    </aside>
+
+      {/* Model Create 우클릭 메뉴는 승격된 섹션 헤더 대신 트리 컨테이너가 받는다
+          (생성 대상 인터페이스 = 현재 라우트 스코프). */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <nav
+            className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3"
+            data-testid="model-sidebar-tree"
+          >
+            {roots.length === 0 ? (
+              <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+                {t('model.sidebar.empty')}
+              </p>
+            ) : (
+              roots.map((root) => renderRoot(root))
+            )}
+
+            {isLoading ? (
+              <p className="px-3 pt-1 text-xs text-muted-foreground">
+                {t('model.sidebar.loading')}
+              </p>
+            ) : null}
+            {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
+          </nav>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-52">
+          <ContextMenuLabel>{scopeTitle}</ContextMenuLabel>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => onOpenRootCreate(scope)}>
+            {`${scopeTitle} Model Create`}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </InPageSidebar>
   )
 })

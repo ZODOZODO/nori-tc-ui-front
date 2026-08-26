@@ -59,7 +59,7 @@ interface FlyoutState {
  * <p>queryKey / queryFn / staleTime 이 각 hook 정의와 정확히 일치해야 cache hit 가 난다 —
  * 하나라도 어긋나면 prefetch 는 네트워크만 한 번 더 쓰고 버려진다.</p>
  *
- * <p>deploy 3 항목은 제외한다: mode/filter 분기로 정적 query 가 없다(구 topbar 제외 사유 승계).
+ * <p>deploy 항목은 제외한다: mode/filter 분기로 정적 query 가 없다(구 topbar 제외 사유 승계).
  * user 계열의 listOffset 은 0 가정이라 사용자가 페이지를 넘긴 상태에서는 prefetch miss 다.</p>
  */
 const prefetchByItemKey = (queryClient: QueryClient, key: AppNavigationItemKey): void => {
@@ -71,9 +71,8 @@ const prefetchByItemKey = (queryClient: QueryClient, key: AppNavigationItemKey):
         staleTime: 5_000,
       })
       return
-    case 'dlqDashboard':
-      // DashboardPanel 은 자체 query 가 없고 gateway/business/quarantine/repair-task 4 종을
-      // 그대로 mount 해 집계한다(DashboardPanel.tsx:168-171) → 4 종을 함께 받는다.
+    case 'dlq':
+      // 통합 페이지가 4 카테고리를 한 번에 집계한다(DlqPage → useDlqCategoryEntries) → 4 종을 함께 받는다.
       void queryClient.prefetchQuery({
         queryKey: ['dlq', 'gateway'],
         queryFn: dlqApi.fetchGatewayDlq,
@@ -95,36 +94,7 @@ const prefetchByItemKey = (queryClient: QueryClient, key: AppNavigationItemKey):
         staleTime: 30_000,
       })
       return
-    case 'dlqGateway':
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'gateway'],
-        queryFn: dlqApi.fetchGatewayDlq,
-        staleTime: 30_000,
-      })
-      return
-    case 'dlqBusiness':
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'business'],
-        queryFn: dlqApi.fetchBusinessDlq,
-        staleTime: 30_000,
-      })
-      return
-    case 'dlqQuarantine':
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'quarantine'],
-        queryFn: dlqApi.fetchQuarantine,
-        staleTime: 30_000,
-      })
-      return
-    case 'dlqRepairTask':
-      void queryClient.prefetchQuery({
-        queryKey: ['dlq', 'repair-task'],
-        queryFn: dlqApi.fetchRepairTasks,
-        staleTime: 30_000,
-      })
-      return
-    case 'eqpBusiness':
-    case 'eqpGateway':
+    case 'eqp':
       void queryClient.prefetchQuery({
         queryKey: eqpQueryKeys.list(),
         queryFn: () => eqpApi.getEqpList(0, 500),
@@ -140,23 +110,20 @@ const prefetchByItemKey = (queryClient: QueryClient, key: AppNavigationItemKey):
         staleTime: 60_000,
       })
       return
-    case 'userUsers':
+    case 'user':
+      // 한 화면에서 User / Group 을 카드로 전환하므로 두 목록 모두 미리 받는다.
       void queryClient.prefetchQuery({
         queryKey: userQueryKeys.list(0, USER_PAGE_SIZE),
         queryFn: () => userApi.getUserList(0, USER_PAGE_SIZE),
         staleTime: 30_000,
       })
-      return
-    case 'userGroups':
       void queryClient.prefetchQuery({
         queryKey: groupQueryKeys.list(0, GROUP_PAGE_SIZE),
         queryFn: () => groupApi.getGroupList(0, GROUP_PAGE_SIZE),
         staleTime: 30_000,
       })
       return
-    case 'deployRegister':
-    case 'deployDeploy':
-    case 'deployHistory':
+    case 'deploy':
       return
   }
 }

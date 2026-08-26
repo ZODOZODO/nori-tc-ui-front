@@ -15,17 +15,16 @@ const viMap = vi as Record<string, string>
 const enMap = en as Record<string, string>
 const koMap = ko as Record<string, string>
 
-// AC2 — ko==en 인 Layer1 키 중 Tier A jargon 으로 분류된 7개. vi 도 en 과 값 동일해야 한다.
+// AC2 — ko==en 인 Layer1 키 중 Tier A jargon 으로 분류된 키. vi 도 en 과 값 동일해야 한다.
 //
 // `dlq.sidebar.*` 3키는 wm-parity-sidebar 에서 DLQ 도메인 사이드바가 사라지며 제거됐고, 같은
-// 라벨이 전역 LNB 의 `navigation.item.*` 로 이관됐다. 없는 키를 그대로 두면
+// 라벨이 전역 LNB 의 `navigation.item.*` 로 이관됐다. 그 뒤 DLQ 5 화면이 `/dlq` 한 장으로
+// 합쳐지며 `navigation.item.dlq{Gateway,Business,RepairTask}` 도 사라졌다 — 같은 jargon 라벨은
+// 이제 현황 카드가 쓰는 `dlq.panel.*` 가 진다. 없는 키를 그대로 두면
 // `assert.equal(undefined, undefined)` 로 조용히 통과해(vacuous pass) 검사가 무력화된다.
 const TIER_A_LAYER1_KEYS = [
-  'navigation.item.dlqGateway',
   'dlq.panel.gateway',
-  'navigation.item.dlqBusiness',
   'dlq.panel.business',
-  'navigation.item.dlqRepairTask',
   'dlq.panel.repairTask',
   'livemap.demo.colEqp',
 ]

@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n-context'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
+import { LNB_GROUP_LABEL, lnbSubLinkClass } from '@/shared/layout/lnb-sidebar'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   summarizeActionDataIndexValue,
@@ -850,7 +851,15 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
         ) : null}
 
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
-          <aside className="flex w-65 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-muted p-2">
+          {/*
+            같은 앱의 다른 사이드바(모델 트리 · 설비 트리)와 같은 시각 언어를 쓴다 — 그룹은 머리글
+            라벨, 항목은 공용 링크 클래스다.
+
+            표면만 `bg-card` 가 아니라 `bg-background` 다 — 다른 사이드바는 배경 위의 카드로 한 단계
+            떠 있지만 이 nav 는 <b>카드 안</b>에 들어가므로 같은 토큰을 쓰면 대비가 0 이 되어 경계가
+            border 하나만 남는다. 색이 아니라 "주변에서 한 단계" 라는 관계를 맞춘다.
+          */}
+          <aside className="flex w-52 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-background p-2">
             <ModelFlowSidebar
               summaries={messageFlowSummaries}
               selectedFlowId={selectedFlowId}
@@ -860,33 +869,27 @@ export const ModelDetailPanel = memo(function ModelDetailPanel({
               isEditable={canEditTableRows}
             />
 
-            <section className="rounded-lg border border-border bg-card p-2">
-              <p className="px-1 pb-2 text-xs font-semibold text-foreground">Reference</p>
-              <div className="flex flex-col gap-0.5">
-                {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
-                    MesMessage / Parameter — workflow 는 Message Flows 가 대체. */}
-                {detailNodes.filter((node) => node !== 'workflow').map((node) => (
-                  <Button
-                    key={node}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      // Reference 노드 선택은 Flow selection / draft 와 상호 배타.
-                      setSelectedFlowId(null)
-                      onSelectDetailNode(node)
-                    }}
-                    className={cn(
-                      'justify-start rounded-md px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30',
-                      selectedFlowId === null && !isDraftMode && normalizedDetailNode === node
-                        ? 'bg-muted font-semibold text-foreground'
-                        : 'text-muted-foreground hover:bg-muted',
-                    )}
-                  >
-                    {MODEL_DETAIL_NODE_LABELS[node]}
-                  </Button>
-                ))}
-              </div>
+            <section className="flex flex-col gap-0.5">
+              <p className={LNB_GROUP_LABEL}>Reference</p>
+              {/* SPEC line 64-65: Reference 영역은 변수 / 리포트 / 이벤트 / MDF / SocketMessage /
+                  MesMessage / Parameter — workflow 는 Message Flows 가 대체. */}
+              {detailNodes.filter((node) => node !== 'workflow').map((node) => (
+                <Button
+                  key={node}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    // Reference 노드 선택은 Flow selection / draft 와 상호 배타.
+                    setSelectedFlowId(null)
+                    onSelectDetailNode(node)
+                  }}
+                  className={lnbSubLinkClass(
+                    selectedFlowId === null && !isDraftMode && normalizedDetailNode === node,
+                  )}
+                >
+                  {MODEL_DETAIL_NODE_LABELS[node]}
+                </Button>
+              ))}
             </section>
           </aside>
 

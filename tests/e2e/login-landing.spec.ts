@@ -48,7 +48,7 @@ const emptyLayout = (lineKey: number) => ({
 /**
  * 로그인 → 랜딩 경로에 필요한 백엔드 응답을 전부 mock 합니다.
  *
- * 목적지가 둘(`/dlq/dashboard` / `/live-map`)이라 두 화면의 엔드포인트를 모두 채운다 —
+ * 목적지가 둘(`/dlq` / `/live-map`)이라 두 화면의 엔드포인트를 모두 채운다 —
  * 미mock 요청이 401 을 받으면 `api-client.ts` 인터셉터가 `/login` 으로 하드 이동시켜, 랜딩
  * 실패가 아니라 하네스 결함으로 URL 단언이 깨진다.
  *
@@ -130,7 +130,7 @@ const setupMocks = async (page: Page, me: typeof ME_WITH_LIVE_MAP) => {
     })
   })
 
-  // 목적지 B — /dlq/dashboard (4 모드 집계)
+  // 목적지 B — /dlq (4 카테고리 집계)
   await page.route(/.*\/api\/dlq\/(gateway|business|quarantine|repair-task)(\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -183,7 +183,7 @@ test('LIVE_MAP_READ 미보유 사용자는 로그인 직후 접근 가능한 첫
   await submitLogin(page)
 
   // 착수 전에는 여기서 `/live-map` 으로 가 AccessDeniedNotice 가 첫 화면이 됐다.
-  await expect(page).toHaveURL(/\/dlq\/dashboard$/)
+  await expect(page).toHaveURL(/\/dlq$/)
   await expect(page.getByTestId('access-denied-notice')).toHaveCount(0)
 
   expect(consoleErrors).toEqual([])

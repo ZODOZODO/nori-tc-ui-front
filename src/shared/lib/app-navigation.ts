@@ -9,15 +9,14 @@ import {
 } from './permission'
 
 /**
- * LNB 1차 내비 그룹 key — SPEC 확정 6 그룹(2026-08-18 사용자 확정 트리).
+ * LNB 1차 내비 그룹 key.
  *
- * <p>구 topbar 의 flat 6 항목이 그대로 그룹이 되고, 각 페이지 도메인 사이드바의 1단계 항목이
- * 그 그룹의 menu-label 로 승격된다. `monitoring` 만 항목이 하나(Live-Map)인데, 그룹 축을
- * "모니터링 / 처리실패 / 설비 / 모델 / 적용 / 시스템" 으로 맞추기 위해 유지한다.</p>
+ * <p>구 topbar 의 flat 항목이 그대로 그룹이 되고, 각 페이지 도메인 사이드바의 1단계 항목이
+ * 그 그룹의 menu-label 로 승격된다. 처리실패(DLQ)는 자기 그룹이 아니라 `monitoring` 의 항목이다 —
+ * 화면이 하나로 합쳐져 그룹으로 둘 하위가 없다.</p>
  */
 export type AppNavigationGroupKey =
   | 'monitoring'
-  | 'dlq'
   | 'equipment'
   | 'model'
   | 'deploy'
@@ -26,21 +25,13 @@ export type AppNavigationGroupKey =
 /** LNB 항목 key — 각 항목이 곧 라우트다. */
 export type AppNavigationItemKey =
   | 'liveMap'
-  | 'dlqDashboard'
-  | 'dlqGateway'
-  | 'dlqBusiness'
-  | 'dlqQuarantine'
-  | 'dlqRepairTask'
-  | 'eqpBusiness'
-  | 'eqpGateway'
+  | 'dlq'
+  | 'eqp'
   | 'modelSecs'
   | 'modelSocket'
   | 'modelPlc'
-  | 'deployRegister'
-  | 'deployDeploy'
-  | 'deployHistory'
-  | 'userUsers'
-  | 'userGroups'
+  | 'deploy'
+  | 'user'
 
 export interface AppNavigationItem {
   key: AppNavigationItemKey
@@ -76,40 +67,10 @@ export const APP_NAVIGATION_GROUPS: readonly AppNavigationGroup[] = [
         route: '/live-map',
         requiredPermission: DASH_READ_PERMISSION,
       },
-    ],
-  },
-  {
-    key: 'dlq',
-    labelKey: 'navigation.group.dlq',
-    items: [
       {
-        key: 'dlqDashboard',
-        labelKey: 'navigation.item.dlqDashboard',
-        route: '/dlq/dashboard',
-        requiredPermission: DLQ_READ_PERMISSION,
-      },
-      {
-        key: 'dlqGateway',
-        labelKey: 'navigation.item.dlqGateway',
-        route: '/dlq/gateway',
-        requiredPermission: DLQ_READ_PERMISSION,
-      },
-      {
-        key: 'dlqBusiness',
-        labelKey: 'navigation.item.dlqBusiness',
-        route: '/dlq/business',
-        requiredPermission: DLQ_READ_PERMISSION,
-      },
-      {
-        key: 'dlqQuarantine',
-        labelKey: 'navigation.item.dlqQuarantine',
-        route: '/dlq/quarantine',
-        requiredPermission: DLQ_READ_PERMISSION,
-      },
-      {
-        key: 'dlqRepairTask',
-        labelKey: 'navigation.item.dlqRepairTask',
-        route: '/dlq/repair-task',
+        key: 'dlq',
+        labelKey: 'navigation.item.dlq',
+        route: '/dlq',
         requiredPermission: DLQ_READ_PERMISSION,
       },
     ],
@@ -119,15 +80,9 @@ export const APP_NAVIGATION_GROUPS: readonly AppNavigationGroup[] = [
     labelKey: 'navigation.group.equipment',
     items: [
       {
-        key: 'eqpBusiness',
-        labelKey: 'navigation.item.eqpBusiness',
-        route: '/eqp/business',
-        requiredPermission: EQP_READ_PERMISSION,
-      },
-      {
-        key: 'eqpGateway',
-        labelKey: 'navigation.item.eqpGateway',
-        route: '/eqp/gateway',
+        key: 'eqp',
+        labelKey: 'navigation.item.eqp',
+        route: '/eqp',
         requiredPermission: EQP_READ_PERMISSION,
       },
     ],
@@ -161,21 +116,9 @@ export const APP_NAVIGATION_GROUPS: readonly AppNavigationGroup[] = [
     labelKey: 'navigation.group.deploy',
     items: [
       {
-        key: 'deployRegister',
-        labelKey: 'navigation.item.deployRegister',
-        route: '/deploy/register',
-        requiredPermission: DEPLOY_READ_PERMISSION,
-      },
-      {
-        key: 'deployDeploy',
-        labelKey: 'navigation.item.deployDeploy',
-        route: '/deploy/deploy',
-        requiredPermission: DEPLOY_READ_PERMISSION,
-      },
-      {
-        key: 'deployHistory',
-        labelKey: 'navigation.item.deployHistory',
-        route: '/deploy/history',
+        key: 'deploy',
+        labelKey: 'navigation.item.deploy',
+        route: '/deploy',
         requiredPermission: DEPLOY_READ_PERMISSION,
       },
     ],
@@ -185,15 +128,9 @@ export const APP_NAVIGATION_GROUPS: readonly AppNavigationGroup[] = [
     labelKey: 'navigation.group.system',
     items: [
       {
-        key: 'userUsers',
-        labelKey: 'navigation.item.userUsers',
-        route: '/user/users',
-        requiredPermission: USER_READ_PERMISSION,
-      },
-      {
-        key: 'userGroups',
-        labelKey: 'navigation.item.userGroups',
-        route: '/user/groups',
+        key: 'user',
+        labelKey: 'navigation.item.user',
+        route: '/user',
         requiredPermission: USER_READ_PERMISSION,
       },
     ],

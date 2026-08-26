@@ -36,15 +36,14 @@ const itemKeys = (permissionCodes: readonly string[] | null | undefined): string
     group.items.map((item) => item.key),
   )
 
-test('확정 메뉴 트리는 6 그룹 / 16 항목이다 (SPEC 표 고정)', () => {
-  assert.equal(APP_NAVIGATION_GROUPS.length, 6)
+test('확정 메뉴 트리는 5 그룹 / 8 항목이다 (SPEC 표 고정)', () => {
+  assert.equal(APP_NAVIGATION_GROUPS.length, 5)
   assert.equal(
     APP_NAVIGATION_GROUPS.reduce((total, group) => total + group.items.length, 0),
-    16,
+    8,
   )
   assert.deepEqual(APP_NAVIGATION_GROUPS.map((group) => group.key), [
     'monitoring',
-    'dlq',
     'equipment',
     'model',
     'deploy',
@@ -52,9 +51,9 @@ test('확정 메뉴 트리는 6 그룹 / 16 항목이다 (SPEC 표 고정)', () 
   ])
 })
 
-test('전 권한 보유자는 6 그룹 16 항목을 모두 본다', () => {
-  assert.equal(groupKeys(ALL_PERMISSIONS).length, 6)
-  assert.equal(itemKeys(ALL_PERMISSIONS).length, 16)
+test('전 권한 보유자는 5 그룹 8 항목을 모두 본다', () => {
+  assert.equal(groupKeys(ALL_PERMISSIONS).length, 5)
+  assert.equal(itemKeys(ALL_PERMISSIONS).length, 8)
 })
 
 test('권한 0 이면 그룹도 항목도 남지 않는다', () => {
@@ -65,25 +64,14 @@ test('권한 0 이면 그룹도 항목도 남지 않는다', () => {
 })
 
 test('권한 없는 항목은 숨기고, 항목이 0 이 된 그룹은 그룹째 숨긴다', () => {
-  // DLQ_READ 만 보유 — dlq 그룹의 5 항목만 남고 나머지 5 그룹은 통째로 사라져야 한다.
-  assert.deepEqual(groupKeys(['DLQ_READ']), ['dlq'])
-  assert.deepEqual(itemKeys(['DLQ_READ']), [
-    'dlqDashboard',
-    'dlqGateway',
-    'dlqBusiness',
-    'dlqQuarantine',
-    'dlqRepairTask',
-  ])
+  // DLQ_READ 만 보유 — monitoring 그룹의 DLQ 항목만 남고(Live-Map 은 숨김) 나머지 그룹은 통째로 사라져야 한다.
+  assert.deepEqual(groupKeys(['DLQ_READ']), ['monitoring'])
+  assert.deepEqual(itemKeys(['DLQ_READ']), ['dlq'])
 })
 
 test('부분 권한 조합은 해당 그룹만 순서대로 노출한다', () => {
   assert.deepEqual(groupKeys(['EQP_READ', 'USER_READ']), ['equipment', 'system'])
-  assert.deepEqual(itemKeys(['EQP_READ', 'USER_READ']), [
-    'eqpBusiness',
-    'eqpGateway',
-    'userUsers',
-    'userGroups',
-  ])
+  assert.deepEqual(itemKeys(['EQP_READ', 'USER_READ']), ['eqp', 'user'])
 })
 
 test('Live-Map 항목은 상수명이 아니라 값 LIVE_MAP_READ 로 게이팅된다', () => {

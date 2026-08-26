@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
+import { CircleCheck, CircleOff, Plus, UsersRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { PageMetricGrid } from '@/shared/layout/PageMetricGrid'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import { useGroups } from '../hooks/useGroups'
 import { useGroupUiStore } from '../stores/group-ui.store'
@@ -28,7 +30,11 @@ export function GroupAdminPanel() {
   const closeAddMembersModal = useGroupUiStore((state) => state.closeAddMembersModal)
   const closePermissionsModal = useGroupUiStore((state) => state.closePermissionsModal)
 
+  // 목록 테이블과 같은 파라미터로 호출해 쿼리 캐시를 공유한다(추가 요청 없음).
   const groupListQuery = useGroups(listOffset, GROUP_PAGE_SIZE)
+  const visibleGroups = groupListQuery.data?.items ?? []
+  const activeCount = visibleGroups.filter((group) => group.isActive).length
+  const inactiveCount = visibleGroups.length - activeCount
 
   const pendingDeleteGroupRow = useMemo(() => {
     if (pendingDeleteGroupId === null) {
@@ -58,19 +64,46 @@ export function GroupAdminPanel() {
   }, [permissionsTargetGroupId, groupListQuery.data?.items])
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-      {/* 제목(h1)과 설명은 라우트 헤딩(AppPageHeading)이 그린다 — 한 화면에 같은 문장을 두 번 두지
-          않는다. 이 줄은 총건수 / 액션만 담당한다. 좌우 여백도 페이지 shell 이 소유한다. */}
-      <div className="flex shrink-0 items-start justify-end gap-4">
-        <div className="flex shrink-0 items-center gap-2">
-          <Badge variant="secondary" className="tabular-nums">
-            {(groupListQuery.data?.count ?? 0).toLocaleString()}
-          </Badge>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+      {/* 페이지 제목(h1)은 /user 페이지가 갖는다 — 여기는 모드 섹션 제목(h2)이다. */}
+      <TableSectionHeader
+        title={t('group.title')}
+        subtitle={t('group.description')}
+        count={groupListQuery.data?.count ?? 0}
+        actions={
           <Button type="button" data-testid="group-create-button" onClick={() => openCreateModal()}>
+            <Plus aria-hidden="true" />
             {t('group.create')}
           </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <PageMetricGrid
+        ariaLabel={t('group.summary.ariaLabel')}
+        items={[
+          {
+            key: 'TOTAL',
+            label: t('group.summary.total'),
+            value: groupListQuery.data?.count ?? 0,
+            icon: UsersRound,
+            tone: 'neutral',
+          },
+          {
+            key: 'ACTIVE',
+            label: t('group.summary.activeOnPage'),
+            value: activeCount,
+            icon: CircleCheck,
+            tone: 'brand',
+          },
+          {
+            key: 'INACTIVE',
+            label: t('group.summary.inactiveOnPage'),
+            value: inactiveCount,
+            icon: CircleOff,
+            tone: 'warning',
+          },
+        ]}
+      />
 
       <GroupListTable />
 

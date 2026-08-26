@@ -6,24 +6,17 @@ import { SelectableTable } from '@/shared/components/SelectableTable'
 import type { ColumnDef } from '@/shared/components/SelectableTable'
 import { useI18n } from '@/i18n/i18n-context'
 import { cn } from '@/lib/utils'
-import { useBusinessDlq } from '../hooks/useBusinessDlq'
-import { useDlqLineScope } from '../hooks/useDlqLineScope'
-import { useGatewayDlq } from '../hooks/useGatewayDlq'
-import { useQuarantine } from '../hooks/useQuarantine'
-import { useRepairTasks } from '../hooks/useRepairTasks'
+import { useDlqCategoryEntries } from '../hooks/useDlqCategoryEntries'
 import {
   buildDashboardFeed,
   type DashboardCategory,
   type DashboardFeedItem,
 } from '../lib/dlq-feed'
 import { formatDlqTime } from '../lib/dlq-format'
-import { filterDlqEntriesByLine } from '../lib/dlq-line-scope'
 
 interface CategoryStyle {
   // 카테고리 라벨은 기존 dlq.panel.* 키를 재사용한다(렌더 시점 t(labelKey)).
   labelKey: string
-  testId: `dlq-kpi-${DashboardCategory}`
-  borderClass: string
   badgeClass: string
   icon: typeof Cpu
 }
@@ -31,35 +24,25 @@ interface CategoryStyle {
 const CATEGORY_STYLES: Record<DashboardCategory, CategoryStyle> = {
   gateway: {
     labelKey: 'dlq.panel.gateway',
-    testId: 'dlq-kpi-gateway',
-    borderClass: 'border-l-4 border-l-blue-400',
     badgeClass: 'bg-blue-50 text-blue-700',
     icon: Cpu,
   },
   business: {
     labelKey: 'dlq.panel.business',
-    testId: 'dlq-kpi-business',
-    borderClass: 'border-l-4 border-l-amber-400',
     badgeClass: 'bg-amber-50 text-amber-700',
     icon: Beaker,
   },
   quarantine: {
     labelKey: 'dlq.panel.quarantine',
-    testId: 'dlq-kpi-quarantine',
-    borderClass: 'border-l-4 border-l-red-400',
     badgeClass: 'bg-red-50 text-red-700',
     icon: Lock,
   },
   'repair-task': {
     labelKey: 'dlq.panel.repairTask',
-    testId: 'dlq-kpi-repair-task',
-    borderClass: 'border-l-4 border-l-violet-400',
     badgeClass: 'bg-violet-50 text-violet-700',
     icon: RotateCcw,
   },
 }
-
-const CARD_BASE_CLASS = 'rounded-xl border border-border bg-card shadow-soft-sm'
 
 // 컬럼 헤더/카테고리 라벨 팩토리(C4) — 모듈 상수라 t() 불가 → t 를 받아 렌더 시점 평가.
 const buildFeedColumns = (
@@ -108,193 +91,64 @@ const buildFeedColumns = (
   },
 ]
 
-interface KpiCardProps {
-  category: DashboardCategory
-  count: number
-  isPending: boolean
-  isError: boolean
-}
-
 /**
- * 카테고리별 KPI 카드 — 카운트 / 로딩 스켈레톤 / 에러를 격리해서 표시.
- * 로딩 중에는 `data-value` 노드를 skeleton 으로 대체하여 e2e auto-retry 가
- * settled 후의 정확한 카운트를 단언하게 한다 (PLAN §5 위험 6).
- */
-function KpiCard({ category, count, isPending, isError }: KpiCardProps) {
-  const { t } = useI18n()
-  const style = CATEGORY_STYLES[category]
-  const Icon = style.icon
-
-  return (
-    <div className={cn(CARD_BASE_CLASS, style.borderClass, 'flex flex-col gap-2 p-4')}>
-      <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            'inline-flex h-7 w-7 items-center justify-center rounded-full',
-            style.badgeClass,
-          )}
-        >
-          <Icon className="size-4" />
-        </span>
-        <span className="text-xs font-medium text-muted-foreground">{t(style.labelKey)}</span>
-      </div>
-      {isError ? (
-        <span className="text-sm text-danger">{t('dlq.dashboard.kpiError')}</span>
-      ) : isPending ? (
-        <span
-          className="inline-block h-7 w-12 animate-pulse rounded bg-muted"
-          aria-hidden="true"
-        />
-      ) : (
-        <span
-          data-testid={style.testId}
-          data-value={count}
-          className="text-2xl font-semibold text-foreground"
-        >
-          {count}
-        </span>
-      )}
-    </div>
-  )
-}
-
-/**
- * `/dlq` 진입 시 가장 먼저 보이는 통합 모니터링 패널. 4 카테고리 hook 을 동시에
- * 호출하여 KPI 4 카드 + 최근 장애 20건 통합 피드를 표시한다. polling 없음 —
- * 우상단 새로고침 버튼만 trigger.
+ * 카테고리 카드를 아무것도 고르지 않았을 때 보이는 통합 대시보드입니다.
+ *
+ * 4 카테고리를 시간 역순으로 합쳐 최근 장애를 한 줄기로 보여준다. 카테고리별 건수(KPI)는
+ * 페이지 상단 현황 카드가 그리므로 여기서 다시 그리지 않는다 — 같은 숫자를 두 번 두지 않는다.
+ * polling 없음 — 우상단 새로고침 버튼만 trigger.
  */
 export function DashboardPanel() {
   const { t } = useI18n()
-  const gatewayQuery = useGatewayDlq()
-  const businessQuery = useBusinessDlq()
-  const quarantineQuery = useQuarantine()
-  const repairQuery = useRepairTasks()
-  const lineScope = useDlqLineScope()
+  const entries = useDlqCategoryEntries()
 
   const feedColumns = useMemo(() => buildFeedColumns(t), [t])
 
-  // KPI/피드 모두 선택 라인 스코프 항목 기준으로 계산한다.
-  const scopedGatewayEntries = useMemo(
-    () => filterDlqEntriesByLine(gatewayQuery.data ?? [], (row) => row.equipmentId, lineScope.scope),
-    [gatewayQuery.data, lineScope.scope],
-  )
-  const scopedBusinessEntries = useMemo(
-    () => filterDlqEntriesByLine(businessQuery.data ?? [], (row) => row.eqpId, lineScope.scope),
-    [businessQuery.data, lineScope.scope],
-  )
-  const scopedQuarantineEntries = useMemo(
-    () => filterDlqEntriesByLine(quarantineQuery.data ?? [], (row) => row.equipmentId, lineScope.scope),
-    [quarantineQuery.data, lineScope.scope],
-  )
-  const scopedRepairEntries = useMemo(
-    () => filterDlqEntriesByLine(repairQuery.data ?? [], (row) => row.eqpId, lineScope.scope),
-    [repairQuery.data, lineScope.scope],
-  )
-
-  const allSettled =
-    !gatewayQuery.isPending &&
-    !businessQuery.isPending &&
-    !quarantineQuery.isPending &&
-    !repairQuery.isPending &&
-    !lineScope.isPending
-
-  const anyFetching =
-    gatewayQuery.isFetching ||
-    businessQuery.isFetching ||
-    quarantineQuery.isFetching ||
-    repairQuery.isFetching
-
   const feed = useMemo(() => {
-    if (!allSettled) {
+    if (!entries.isSettled) {
       return []
     }
     return buildDashboardFeed(
-      scopedGatewayEntries,
-      scopedBusinessEntries,
-      scopedQuarantineEntries,
-      scopedRepairEntries,
+      entries.gateway,
+      entries.business,
+      entries.quarantine,
+      entries.repairTask,
     )
-  }, [
-    allSettled,
-    scopedGatewayEntries,
-    scopedBusinessEntries,
-    scopedQuarantineEntries,
-    scopedRepairEntries,
-  ])
-
-  const handleRefresh = () => {
-    void Promise.all([
-      gatewayQuery.refetch(),
-      businessQuery.refetch(),
-      quarantineQuery.refetch(),
-      repairQuery.refetch(),
-    ])
-  }
+  }, [entries.isSettled, entries.gateway, entries.business, entries.quarantine, entries.repairTask])
 
   return (
     <div
       data-testid="dlq-dashboard-panel"
       className="flex min-w-0 w-full max-w-full flex-1 flex-col gap-6"
     >
-      <section className={CARD_BASE_CLASS}>
+      <section
+        data-testid="dlq-dashboard-feed"
+        className="rounded-xl border border-border bg-card shadow-soft-sm"
+      >
         <div className="flex flex-col gap-3 border-b border-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-foreground">{t('dlq.dashboard.title')}</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {t('dlq.dashboard.recentTitle')}
+            </h2>
             <p className="text-xs text-muted-foreground">
-              {t('dlq.dashboard.subtitle')}
-              {anyFetching ? ` · ${t('dlq.dashboard.syncing')}` : ''}
+              {t('dlq.dashboard.recentSubtitle')}
+              {entries.isFetching ? ` · ${t('dlq.dashboard.syncing')}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={anyFetching}
-              data-testid="dlq-dashboard-refresh"
-            >
-              {t('dlq.dashboard.refresh')}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 px-6 py-5 lg:grid-cols-4">
-          <KpiCard
-            category="gateway"
-            count={scopedGatewayEntries.length}
-            isPending={gatewayQuery.isPending || lineScope.isPending}
-            isError={gatewayQuery.isError || lineScope.isError}
-          />
-          <KpiCard
-            category="business"
-            count={scopedBusinessEntries.length}
-            isPending={businessQuery.isPending || lineScope.isPending}
-            isError={businessQuery.isError || lineScope.isError}
-          />
-          <KpiCard
-            category="quarantine"
-            count={scopedQuarantineEntries.length}
-            isPending={quarantineQuery.isPending || lineScope.isPending}
-            isError={quarantineQuery.isError || lineScope.isError}
-          />
-          <KpiCard
-            category="repair-task"
-            count={scopedRepairEntries.length}
-            isPending={repairQuery.isPending || lineScope.isPending}
-            isError={repairQuery.isError || lineScope.isError}
-          />
-        </div>
-      </section>
-
-      <section data-testid="dlq-dashboard-feed" className={CARD_BASE_CLASS}>
-        <div className="border-b border-border px-6 py-4">
-          <h3 className="text-sm font-semibold text-foreground">{t('dlq.dashboard.recentTitle')}</h3>
-          <p className="text-xs text-muted-foreground">{t('dlq.dashboard.recentSubtitle')}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={entries.refetchAll}
+            disabled={entries.isFetching}
+            data-testid="dlq-dashboard-refresh"
+          >
+            {t('dlq.dashboard.refresh')}
+          </Button>
         </div>
 
         <div className="px-6 py-5">
-          {!allSettled ? (
+          {!entries.isSettled ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               {t('dlq.dashboard.loading')}
             </div>

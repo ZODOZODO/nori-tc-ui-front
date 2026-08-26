@@ -87,7 +87,9 @@ const setupMocks = async (page: Page, overrides: FailureOverrides) => {
 
 const openMonitor = async (page: Page) => {
   await page.addInitScript(() => window.localStorage.setItem('nori-tc-lang', 'ko'))
-  await page.goto('/deploy/deploy')
+  // 등록 / 배포 / 이력이 한 라우트로 합쳐져 단계 전환은 페이지 안 카드가 한다(기본 단계는 등록).
+  await page.goto('/deploy')
+  await page.getByTestId('deploy-mode-deploy').click()
   const history = page.getByTestId('deploy-monitor-history')
   await expect(history).toBeVisible()
   return history

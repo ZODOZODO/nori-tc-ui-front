@@ -8,7 +8,6 @@ import {
   type ColumnDef,
   type SelectableTableActionColumn,
 } from '@/shared/components/SelectableTable'
-import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
@@ -133,12 +132,9 @@ export function UserListTable() {
   const isInitialLoading = userListQuery.isLoading && items.length === 0
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card">
-      <TableSectionHeader
-        title={t('user.table.title')}
-        count={totalCount}
-        className="px-4 pt-4"
-      />
+    // 제목·총건수는 패널 헤딩(TableSectionHeader)이 한 번만 그린다 — 카드가 같은 문장과 같은
+    // 숫자를 다시 얹으면 한 화면에 목록 제목이 두 개로 읽힌다.
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card pt-3">
       <div className="overflow-x-auto" data-testid="user-list-table">
         <SelectableTable
           columns={columns}

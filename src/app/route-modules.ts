@@ -12,7 +12,7 @@ type RouteModuleLoader = () => Promise<unknown>
 /**
  * 경로 → lazy 모듈 loader 표입니다.
  *
- * <p>확정 트리의 16 라우트 + `/login` + `/` 에 더해 **구 경로 6종**도 담는다 — 리다이렉트
+ * <p>확정 트리의 8 라우트 + `/login` + `/` 에 더해 **구 경로 14종**도 담는다 — 리다이렉트
  * 목적지와 같은 loader 를 매핑해, 북마크로 구 경로에 들어온 사용자의 preload 도 히트하게 한다.</p>
  */
 const ROUTE_MODULE_LOADERS: Readonly<Record<string, RouteModuleLoader>> = {
@@ -21,32 +21,32 @@ const ROUTE_MODULE_LOADERS: Readonly<Record<string, RouteModuleLoader>> = {
 
   '/live-map': loadLiveMapPage,
 
-  '/dlq/dashboard': loadDlqPage,
-  '/dlq/gateway': loadDlqPage,
-  '/dlq/business': loadDlqPage,
-  '/dlq/quarantine': loadDlqPage,
-  '/dlq/repair-task': loadDlqPage,
+  '/dlq': loadDlqPage,
 
-  '/eqp/business': loadEqpPage,
-  '/eqp/gateway': loadEqpPage,
+  '/eqp': loadEqpPage,
 
   '/model/secs': loadModelPage,
   '/model/socket': loadModelPage,
   '/model/plc': loadModelPage,
 
+  '/deploy': loadDeployPage,
+
+  '/user': loadUserManagementPage,
+
+  // 구 경로 — Router 가 리다이렉트하지만 첫 진입 preload 는 여기서 히트해야 한다.
+  '/dlq/dashboard': loadDlqPage,
+  '/dlq/gateway': loadDlqPage,
+  '/dlq/business': loadDlqPage,
+  '/dlq/quarantine': loadDlqPage,
+  '/dlq/repair-task': loadDlqPage,
+  '/eqp/business': loadEqpPage,
+  '/eqp/gateway': loadEqpPage,
+  '/model': loadModelPage,
   '/deploy/register': loadDeployPage,
   '/deploy/deploy': loadDeployPage,
   '/deploy/history': loadDeployPage,
-
   '/user/users': loadUserManagementPage,
   '/user/groups': loadUserManagementPage,
-
-  // 구 경로 — Router 가 리다이렉트하지만 첫 진입 preload 는 여기서 히트해야 한다.
-  '/dlq': loadDlqPage,
-  '/eqp': loadEqpPage,
-  '/model': loadModelPage,
-  '/deploy': loadDeployPage,
-  '/user': loadUserManagementPage,
   '/eqp/live-map': loadLiveMapPage,
 }
 

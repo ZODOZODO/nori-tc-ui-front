@@ -20,6 +20,7 @@ import type {
   CreateLocalDeployInput,
   DeployEventType,
   DeployHistoryItem,
+  DeployMode,
   DeployMonitorFilters,
   DeployRegisterFilters,
   DeployRegisterTargetItem,
@@ -28,6 +29,8 @@ import type {
 } from '../types/deploy.types'
 
 interface DeployUiState {
+  /** 한 화면 안에서 보고 있는 단계(등록 / 배포 / 이력). */
+  mode: DeployMode
   selectedEqpIds: string[]
   selectedEqpTargetsById: Record<string, DeployRegisterTargetItem>
   selectedEqpParamVersions: Record<string, string>
@@ -47,6 +50,7 @@ interface DeployUiState {
   selectedModelName: string | null
   selectedModelVersionKey: number | null
   selectedBusinessJarRef: number | null
+  setMode: (mode: DeployMode) => void
   submitRegisterSearch: (filters: DeployRegisterFilters) => void
   resetRegisterFilters: () => void
   setMonitorFilters: (historyOnly: boolean, filters: Partial<DeployMonitorFilters>) => void
@@ -97,6 +101,7 @@ export const useDeployUiStore = create<DeployUiState>()(
   persist(
     (set, get) => ({
       ...createInitialDeployUiDataState(),
+      setMode: (mode) => set({ mode }),
       submitRegisterSearch: (filters) =>
         set((state) => ({
           registerFilters: filters,

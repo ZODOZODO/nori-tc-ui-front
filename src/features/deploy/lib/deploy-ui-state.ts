@@ -6,6 +6,7 @@ import {
 import type {
   DeployEventType,
   DeployHistoryItem,
+  DeployMode,
   DeployMonitorFilters,
   DeployRegisterFilters,
   DeployRegisterTargetItem,
@@ -37,6 +38,9 @@ export const createDefaultMonitorFilters = (): DeployMonitorFilters => {
 }
 
 export const createInitialDeployUiDataState = () => ({
+  // 등록 → 배포 → 이력은 한 화면 안의 단계 전환이다. 라우트가 아니라 store 가 갖되
+  // sessionStorage 에 실려 새로고침해도 보던 단계가 유지된다.
+  mode: 'register' as DeployMode,
   selectedEqpIds: [] as string[],
   selectedEqpTargetsById: {} as Record<string, DeployRegisterTargetItem>,
   selectedEqpParamVersions: {} as Record<string, string>,

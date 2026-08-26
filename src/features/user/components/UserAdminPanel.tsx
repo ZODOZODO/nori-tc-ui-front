@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
+import { CircleAlert, CircleCheck, Plus, UserRound, UsersRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { PageMetricGrid } from '@/shared/layout/PageMetricGrid'
+import { TableSectionHeader } from '@/shared/layout/TableSectionHeader'
 import { useI18n } from '@/i18n/i18n-context'
 import { useUsers } from '../hooks/useUsers'
 import { useUserUiStore } from '../stores/user-ui.store'
@@ -24,7 +26,12 @@ export function UserAdminPanel() {
   const closeDeleteDialog = useUserUiStore((state) => state.closeDeleteDialog)
   const closePasswordResetModal = useUserUiStore((state) => state.closePasswordResetModal)
 
+  // 목록 테이블과 같은 파라미터로 호출해 쿼리 캐시를 공유한다(추가 요청 없음).
   const userListQuery = useUsers(listOffset, USER_PAGE_SIZE)
+  const visibleUsers = userListQuery.data?.items ?? []
+  const activeCount = visibleUsers.filter((user) => user.status === 'ACTIVE').length
+  const attentionCount = visibleUsers.length - activeCount
+  const groupAssignmentCount = visibleUsers.reduce((sum, user) => sum + user.groups.length, 0)
 
   const pendingDeleteUserRow = useMemo(() => {
     if (pendingDeleteUserPk === null) {
@@ -41,19 +48,53 @@ export function UserAdminPanel() {
   }, [passwordResetUserPk, userListQuery.data?.items])
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-      {/* 제목(h1)과 설명은 라우트 헤딩(AppPageHeading)이 그린다 — 한 화면에 같은 문장을 두 번 두지
-          않는다. 이 줄은 총건수 / 액션만 담당한다. 좌우 여백도 페이지 shell 이 소유한다. */}
-      <div className="flex shrink-0 items-start justify-end gap-4">
-        <div className="flex shrink-0 items-center gap-2">
-          <Badge variant="secondary" className="tabular-nums">
-            {(userListQuery.data?.count ?? 0).toLocaleString()}
-          </Badge>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+      {/* 페이지 제목(h1)은 /user 페이지가 갖는다 — 여기는 모드 섹션 제목(h2)이다. */}
+      <TableSectionHeader
+        title={t('user.title')}
+        subtitle={t('user.description')}
+        count={userListQuery.data?.count ?? 0}
+        actions={
           <Button type="button" data-testid="user-create-button" onClick={() => openCreateModal()}>
+            <Plus aria-hidden="true" />
             {t('user.create')}
           </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <PageMetricGrid
+        ariaLabel={t('user.summary.ariaLabel')}
+        items={[
+          {
+            key: 'TOTAL',
+            label: t('user.summary.total'),
+            value: userListQuery.data?.count ?? 0,
+            icon: UserRound,
+            tone: 'neutral',
+          },
+          {
+            key: 'ACTIVE',
+            label: t('user.summary.activeOnPage'),
+            value: activeCount,
+            icon: CircleCheck,
+            tone: 'brand',
+          },
+          {
+            key: 'ATTENTION',
+            label: t('user.summary.attentionOnPage'),
+            value: attentionCount,
+            icon: CircleAlert,
+            tone: 'warning',
+          },
+          {
+            key: 'GROUPS',
+            label: t('user.summary.groupAssignmentsOnPage'),
+            value: groupAssignmentCount,
+            icon: UsersRound,
+            tone: 'neutral',
+          },
+        ]}
+      />
 
       <UserListTable />
 

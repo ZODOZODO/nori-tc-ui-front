@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -175,6 +174,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const setMonitorListOffset = useDeployUiStore((state) => state.setMonitorListOffset)
   const resetMonitorListOffsets = useDeployUiStore((state) => state.resetMonitorListOffsets)
   const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
+  const setMode = useDeployUiStore((state) => state.setMode)
   const applyDeploySummary = useDeployUiStore((state) => state.applyDeploySummary)
   const applyDeployTargets = useDeployUiStore((state) => state.applyDeployTargets)
   const reconcileServerHistory = useDeployUiStore((state) => state.reconcileServerHistory)
@@ -183,7 +183,6 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
   const deleteLocalDeploy = useDeployUiStore((state) => state.deleteLocalDeploy)
   const createServerDeployBridge = useDeployUiStore((state) => state.createServerDeployBridge)
 
-  const navigate = useNavigate()
   const meQuery = useMe(true)
   const monitorOptionsQuery = useDeployRegisterOptions()
   const userListQuery = useUsers(true)
@@ -514,7 +513,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
       return
     }
 
-    navigate('/deploy/deploy')
+    setMode('deploy')
     setFeedbackMessage(t('deploy.monitor.redeployLocalSuccess', { key: nextDeployKey }))
     setFeedbackTone('success')
   }
@@ -542,7 +541,7 @@ export function DeployMonitorPanel({ historyOnly = false }: DeployMonitorPanelPr
         interfaceType: sourceHistoryItem?.interfaceType ?? null,
         targetCount: sourceHistoryItem?.targetSummary.total ?? 0,
       })
-      navigate('/deploy/deploy')
+      setMode('deploy')
       setFeedbackMessage(
         result.resultMessage?.message || t('deploy.monitor.redeployServerSuccess'),
       )

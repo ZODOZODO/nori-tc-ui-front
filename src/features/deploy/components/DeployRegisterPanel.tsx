@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
 import { Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -80,7 +79,6 @@ type ScenarioDialogState = {
 
 export function DeployRegisterPanel() {
   const { t } = useI18n()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const registerFilters = useDeployUiStore((state) => state.registerFilters)
   const selectedEqpIds = useDeployUiStore((state) => state.selectedEqpIds)
@@ -105,6 +103,7 @@ export function DeployRegisterPanel() {
   const setSelectedModelVersionKey = useDeployUiStore((state) => state.setSelectedModelVersionKey)
   const setSelectedBusinessJarRef = useDeployUiStore((state) => state.setSelectedBusinessJarRef)
   const setActiveDeployKey = useDeployUiStore((state) => state.setActiveDeployKey)
+  const setMode = useDeployUiStore((state) => state.setMode)
   const createServerDeployBridge = useDeployUiStore((state) => state.createServerDeployBridge)
   const clearRegisterState = useDeployUiStore((state) => state.clearRegisterState)
 
@@ -322,8 +321,10 @@ export function DeployRegisterPanel() {
     resetMonitorListOffsets()
     setActiveDeployKey(deployKey)
     closeDeployDialog()
-    // 모드는 store 가 아니라 URL 이 원천이다 — navigate 해야 새로고침/뒤로가기가 맞는다.
-    navigate(`/deploy/${nextMode}`)
+    // 등록·배포·이력이 한 라우트로 합쳐져 모드는 store 가 원천이다(sessionStorage 에 실려
+    // 새로고침해도 유지된다). 라우팅으로 옮기면 페이지가 remount 되어 방금 만든 배포의
+    // activeDeployKey 를 다시 잡아야 한다.
+    setMode(nextMode)
   }
 
   const loadCreatedDeploySnapshot = async (deployKey: number) => {

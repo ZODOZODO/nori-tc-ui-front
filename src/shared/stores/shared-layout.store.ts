@@ -18,10 +18,10 @@ interface SharedLayoutState {
 }
 
 /**
- * EQP / Model 페이지 공용 사이드바 레이아웃 상태 저장소입니다.
+ * in-page 사이드바 레이아웃 상태 저장소입니다(현재 소비자는 Model 페이지 하나).
  *
  * - localStorage에 영구 저장되어 페이지 이동 시 사이드바 폭·개폐 상태가 유지됩니다.
- * - eqp-ui.store와 model-ui.store의 사이드바 관련 상태를 이 공용 store로 대체합니다.
+ * - 설비 페이지는 접히지 않는 고정폭 목록 컬럼으로 바뀌며 이 store 를 쓰지 않는다.
  */
 export const useSharedLayoutStore = create<SharedLayoutState>()(
   persist(

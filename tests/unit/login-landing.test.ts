@@ -49,13 +49,13 @@ test('전 권한 보유자는 트리 첫 항목(Live-Map)으로 진입한다', (
 
 test('LIVE_MAP_READ 만 없으면 다음 접근 가능 그룹의 첫 항목으로 진입한다', () => {
   // 착수 전 결함의 정확한 재현 조건 — 이 조합이 '/live-map' 을 받으면 권한없음 화면이 첫 화면이 된다.
-  assert.equal(resolveLoginLandingRoute(['DLQ_READ', 'EQP_READ']), '/dlq/dashboard')
+  assert.equal(resolveLoginLandingRoute(['DLQ_READ', 'EQP_READ']), '/dlq')
 })
 
 test('단일 권한 보유자는 그 그룹의 첫 항목으로 진입한다', () => {
-  assert.equal(resolveLoginLandingRoute(['EQP_READ']), '/eqp/business')
-  assert.equal(resolveLoginLandingRoute(['DEPLOY_READ']), '/deploy/register')
-  assert.equal(resolveLoginLandingRoute(['USER_READ']), '/user/users')
+  assert.equal(resolveLoginLandingRoute(['EQP_READ']), '/eqp')
+  assert.equal(resolveLoginLandingRoute(['DEPLOY_READ']), '/deploy')
+  assert.equal(resolveLoginLandingRoute(['USER_READ']), '/user')
 })
 
 test('접근 가능 항목이 0 이면 /live-map 으로 보내 그 자리에서 안내가 렌더된다', () => {
@@ -79,7 +79,7 @@ test('fallback 목적지는 트리 첫 항목과 같다 — 그래서 현행 사
   assert.equal(resolveLoginLandingRoute([]), TREE_FIRST_ROUTE)
 })
 
-test('결정은 확정 트리 순서를 따른다 — 6 그룹 전건', () => {
+test('결정은 확정 트리 순서를 따른다 — 5 그룹 전건', () => {
   // 별도 우선순위 표를 두거나 라우트를 하드코딩하면 이 순회가 어긋난다. 트리가 단일 원천이다.
   for (const group of APP_NAVIGATION_GROUPS) {
     const firstItem = group.items[0]
@@ -93,8 +93,8 @@ test('결정은 확정 트리 순서를 따른다 — 6 그룹 전건', () => {
 
 test('앞 그룹 권한이 있으면 뒤 그룹 권한보다 우선한다', () => {
   // 인자 순서가 아니라 트리 순서가 결정한다 — 배열을 뒤집어도 결과가 같아야 한다.
-  assert.equal(resolveLoginLandingRoute(['USER_READ', 'DLQ_READ']), '/dlq/dashboard')
-  assert.equal(resolveLoginLandingRoute(['DLQ_READ', 'USER_READ']), '/dlq/dashboard')
+  assert.equal(resolveLoginLandingRoute(['USER_READ', 'DLQ_READ']), '/dlq')
+  assert.equal(resolveLoginLandingRoute(['DLQ_READ', 'USER_READ']), '/dlq')
 })
 
 /**

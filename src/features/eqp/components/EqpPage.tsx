@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2, RotateCcw } from 'lucide-react'
+import { Briefcase, Loader2, RotateCcw, Router as RouterIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -13,8 +13,7 @@ import {
 import { useI18n } from '@/i18n/i18n-context'
 import { AppShellPage } from '@/shared/components/AppShellPage'
 import { AppPageHeading } from '@/shared/layout/AppPageHeading'
-import { clampSidebarWidth } from '@/shared/layout/sidebar-layout'
-import { useSharedLayoutStore } from '@/shared/stores/shared-layout.store'
+import { PageMetricGrid } from '@/shared/layout/PageMetricGrid'
 import { CheckInModal } from './CheckInModal'
 import { BusinessGroupModelTable } from './BusinessGroupModelTable'
 import { EqpDeleteConfirmDialog } from './EqpDeleteConfirmDialog'
@@ -63,6 +62,7 @@ import { eqpQueryKeys, invalidateEqpSelectionQueries } from '../lib/eqp-query-ke
 import { useEqpUiStore } from '../stores/eqp-ui.store'
 import {
   type EqpCreateRequest,
+  type EqpInfo,
   type EqpUpdateRequest,
   type ProtocolType,
 } from '../types/eqp.types'
@@ -89,13 +89,8 @@ type EqpManagementDialogState =
 
 const EMPTY_MANAGEMENT_DIALOG_STATE: EqpManagementDialogState = { type: 'none' }
 
-/** 설비 페이지의 1단계 스코프 — 확정 메뉴 트리의 `/eqp/business` · `/eqp/gateway` 와 1:1. */
+/** 설비 페이지의 1단계 스코프 — 상단 현황 카드 2장과 1:1. */
 export type EqpScope = 'business' | 'gateway'
-
-interface EqpPageProps {
-  /** 표시할 스코프. 라우트가 정한다. */
-  scope: EqpScope
-}
 
 /**
  * EQP Info 메인 페이지입니다.
@@ -113,7 +108,7 @@ interface EqpPageProps {
  * 스코프(Business / Gateway)는 라우트가 정한다 — URL 이 단일 진실 원천이다. store 의 selection 은
  * 스코프 안의 세부 선택(그룹 / 개별 설비)만 담고, 스코프와 어긋나면 진입 시 보정된다.
  */
-export function EqpPage({ scope }: EqpPageProps) {
+export function EqpPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
 
@@ -128,12 +123,6 @@ export function EqpPage({ scope }: EqpPageProps) {
   const setEditMode = useEqpUiStore((state) => state.setEditMode)
   const topPanelHeightPercent = useEqpUiStore((state) => state.topPanelHeightPercent)
   const setTopPanelHeightPercent = useEqpUiStore((state) => state.setTopPanelHeightPercent)
-
-  // 사이드바 상태는 EQP/Model 페이지 간 공유 store에서 관리합니다.
-  const sidebarOpen = useSharedLayoutStore((state) => state.sidebarOpen)
-  const sidebarWidth = useSharedLayoutStore((state) => state.sidebarWidth)
-  const toggleSidebar = useSharedLayoutStore((state) => state.toggleSidebar)
-  const setSidebarWidth = useSharedLayoutStore((state) => state.setSidebarWidth)
 
   // selection에서 현재 선택된 eqpId 파생 (eqp 타입일 때만 유효)
   const selectedEqpId = selection.type === 'eqp' ? selection.eqpId : null
@@ -311,27 +300,49 @@ export function EqpPage({ scope }: EqpPageProps) {
     [businessGroups],
   )
 
+  const modelItems = useMemo(() => modelListQuery.data?.items ?? [], [modelListQuery.data?.items])
+
+  /** 주어진 설비들이 참조하는 모델을 중복 없이 모읍니다(business 표·카드 공용 규칙). */
+  const resolveReferencedModels = useCallback(
+    (targets: readonly EqpInfo[]): ModelInfo[] => {
+      const modelVersionKeySet = new Set(
+        targets
+          .map((eqp) => eqp.modelVersionKey)
+          .filter((modelVersionKey) => typeof modelVersionKey === 'number' && modelVersionKey > 0),
+      )
+
+      const uniqueModels = new Map<number, ModelInfo>()
+      modelItems.forEach((model) => {
+        if (modelVersionKeySet.has(model.modelVersionKey)) {
+          uniqueModels.set(model.modelVersionKey, model)
+        }
+      })
+
+      return Array.from(uniqueModels.values())
+    },
+    [modelItems],
+  )
+
   const businessGroupModels = useMemo(() => {
     if (selection.type !== 'business_group' && selection.type !== 'business_all') {
       return []
     }
-
-    const modelItems = modelListQuery.data?.items ?? []
-    const modelVersionKeySet = new Set(
-      (selection.type === 'business_all' ? businessAllItems : businessGroupItems)
-        .map((eqp) => eqp.modelVersionKey)
-        .filter((modelVersionKey) => typeof modelVersionKey === 'number' && modelVersionKey > 0),
+    return resolveReferencedModels(
+      selection.type === 'business_all' ? businessAllItems : businessGroupItems,
     )
+  }, [businessAllItems, businessGroupItems, resolveReferencedModels, selection])
 
-    const uniqueModels = new Map<number, ModelInfo>()
-    modelItems.forEach((model) => {
-      if (modelVersionKeySet.has(model.modelVersionKey)) {
-        uniqueModels.set(model.modelVersionKey, model)
-      }
-    })
-
-    return Array.from(uniqueModels.values())
-  }, [businessAllItems, businessGroupItems, modelListQuery.data?.items, selection])
+  /**
+   * Business 카드에 찍는 수 — 선택과 무관하게 전 범위 설비가 참조하는 모델 수다.
+   *
+   * 설비 수를 쓰지 않는 이유: business_app 과 gateway_app 은 같은 설비 목록을 route_partition
+   * 산술과 shard lease 로 각각 나눈 것이라(`groupEqpItems`), 두 카드에 설비 수를 넣으면 같은
+   * 설비를 두 번 세게 된다. 카드는 각자 눌렀을 때 오른쪽에 실제로 뜨는 것을 센다.
+   */
+  const businessAllModelCount = useMemo(
+    () => resolveReferencedModels(businessAllItems).length,
+    [businessAllItems, resolveReferencedModels],
+  )
 
   const managementTargetEqpId =
     managementDialog.type === 'info' ||
@@ -446,44 +457,48 @@ export function EqpPage({ scope }: EqpPageProps) {
   }, [])
 
   /**
-   * 라우트 스코프와 store 의 selection 을 맞춥니다(URL → store 단방향 보정).
+   * 진입 시 목록 캐시를 새로 받고, 선택이 없으면 기본 스코프(Gateway)를 고릅니다.
    *
-   * selection 은 sessionStorage 에 남으므로 `/eqp/business` 로 들어와도 이전 gateway 선택이
-   * 복원될 수 있다. 그러면 URL 은 business 인데 화면은 gateway 를 그린다 — URL 이 원천이므로
-   * 어긋난 쪽(store)을 그 스코프의 "전체" 선택으로 되돌린다.
+   * <p>selection 은 sessionStorage 에 남으므로 다시 들어오면 마지막 선택이 복원된다 — 그때는
+   * 그대로 두고, `none` 일 때만 기본값을 고른다. 구 `/eqp` 리다이렉트 목적지가
+   * `/eqp/gateway` 였으므로 기본값도 Gateway 다.</p>
    *
-   * 역방향(store → URL)은 만들지 않는다. 스코프를 바꾸는 수단이 LNB navigate 뿐이라
-   * 역방향 동기화는 같은 상태를 두 곳에서 쓰게 만들 뿐이다.
-   *
-   * selection 을 렌더 클로저가 아니라 `getState()` 로 읽어 **스코프가 바뀔 때만** 돈다. selection
-   * 을 의존성에 넣으면, 아래 정합성 effect 가 빈 그룹을 감지해 선택을 풀 때마다 이 effect 가
-   * 다시 선택해 두 effect 가 서로를 되돌리는 무한 루프가 된다.
-   *
-   * 스코프 진입 시 그 스코프가 그리는 목록 캐시를 무효화한다 — 이 무효화는 원래 사이드바의
-   * Business/Gateway 헤더 클릭 핸들러가 하던 일이고, 헤더가 전역 LNB 로 승격되며 트리거가
-   * 라우팅으로 옮겨왔으므로 책임도 여기로 따라온다. 무효화 범위는 같은 목록을 그리는 형제
-   * 핸들러(`handleSelectGatewayGroup` / `handleSelectBusinessGroup`)와 동일하게 맞춘다 —
-   * 갈라지면 "그룹을 고르면 최신인데 스코프로 들어오면 옛 데이터" 가 된다.
+   * <p>selection 을 렌더 클로저가 아니라 `getState()` 로 읽어 **마운트 때만** 돈다. selection 을
+   * 의존성에 넣으면, 아래 정합성 effect 가 빈 그룹을 감지해 선택을 풀 때마다 이 effect 가 다시
+   * 선택해 두 effect 가 서로를 되돌리는 무한 루프가 된다.</p>
    */
   useEffect(() => {
     void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
-    void queryClient.invalidateQueries({
-      queryKey: scope === 'business' ? modelQueryKeys.list() : eqpQueryKeys.gatewayShardLeases(),
-    })
+    void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
 
-    const { type } = useEqpUiStore.getState().selection
-    const isBusinessSelection = type === 'business_all' || type === 'business_group'
-    const isGatewaySelection =
-      type === 'gateway_all' || type === 'gateway_group' || type === 'eqp'
-
-    if (scope === 'business' && !isBusinessSelection) {
-      selectBusinessAll()
-      return
-    }
-    if (scope === 'gateway' && !isGatewaySelection) {
+    if (useEqpUiStore.getState().selection.type === 'none') {
       selectGatewayAll()
     }
-  }, [scope, queryClient, selectBusinessAll, selectGatewayAll])
+  }, [queryClient, selectGatewayAll])
+
+  /** 현재 스코프 — selection 에서 파생한다. 스코프를 따로 저장하면 두 값이 어긋난다. */
+  const activeScope: EqpScope =
+    selection.type === 'business_all' || selection.type === 'business_group'
+      ? 'business'
+      : 'gateway'
+
+  /**
+   * 스코프 카드 클릭 — 그 스코프가 그리는 목록 캐시를 무효화하고 "전체" 선택으로 들어갑니다.
+   * 무효화 범위를 형제 핸들러(`handleSelectGatewayGroup` / `handleSelectBusinessGroup`)와 맞춘다 —
+   * 갈라지면 "그룹을 고르면 최신인데 카드로 들어오면 옛 데이터" 가 된다.
+   */
+  const handleSelectBusinessScope = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: modelQueryKeys.list() })
+    selectBusinessAll()
+  }, [queryClient, selectBusinessAll])
+
+  const handleSelectGatewayScope = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.list() })
+    void queryClient.invalidateQueries({ queryKey: eqpQueryKeys.gatewayShardLeases() })
+    selectGatewayAll()
+  }, [queryClient, selectGatewayAll])
 
   /**
    * sessionStorage에서 복원된 선택 상태가 현재 목록과 불일치하면 선택을 정리합니다.
@@ -726,17 +741,6 @@ export function EqpPage({ scope }: EqpPageProps) {
       return Math.min(PANEL_MAX_PERCENT, Math.max(PANEL_MIN_PERCENT, previous + deltaPct))
     })
   }, [setTopPanelHeightPercent])
-
-  const handleSidebarDrag = useCallback(
-    (deltaX: number) => {
-      if (!sidebarOpen) {
-        return
-      }
-
-      setSidebarWidth(clampSidebarWidth(sidebarWidth + deltaX))
-    },
-    [setSidebarWidth, sidebarOpen, sidebarWidth],
-  )
 
   /**
    * Check Out 버튼 클릭: DB에 EDIT 버전 파라미터 생성 후 편집 모드로 전환합니다.
@@ -1055,42 +1059,58 @@ export function EqpPage({ scope }: EqpPageProps) {
         closeManagementDialog()
       }}
     >
-      {/* main: flex-1로 남은 화면 전체 높이 차지, min-h-0으로 flex shrink 허용 */}
-      <main className="flex flex-1 min-h-0">
-        <EqpSidebar
-          scope={scope}
-          eqpItems={eqpItems}
-          shardLeases={gatewayShardLeasesQuery.data}
-          selectedEqpId={selectedEqpId}
-          selectedBusinessGroupIndex={selectedBusinessGroupIndex}
-          selectedGroupIndex={selectedGroupIndex}
-          sidebarOpen={sidebarOpen}
-          sidebarWidth={sidebarWidth}
-          isLoading={
-            eqpListQuery.isLoading || gatewayShardLeasesQuery.isLoading || lineListQuery.isLoading
-          }
-          errorMessage={listErrorMessage ?? shardLeaseErrorMessage ?? lineListErrorMessage}
-          onSelectEqp={handleSelectEqp}
-          onSelectGatewayGroup={handleSelectGatewayGroup}
-          onSelectBusinessGroup={handleSelectBusinessGroup}
-          onOpenEqpInfoUpdate={openEqpInfoDialog}
-          onOpenEqpModelBinding={openEqpModelDialog}
-          onOpenEqpDelete={openEqpDeleteDialog}
-          onOpenEqpCreate={openEqpCreateDialog}
-          onToggleSidebar={toggleSidebar}
-          onResizeSidebar={handleSidebarDrag}
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 p-5 lg:p-6">
+        <AppPageHeading description={t('eqp.page.description')} />
+
+        <PageMetricGrid
+          className="shrink-0"
+          ariaLabel={t('eqp.summary.ariaLabel')}
+          items={[
+            {
+              key: 'business',
+              label: t('eqp.scope.business'),
+              value: businessAllModelCount,
+              hint: t('eqp.scope.businessHint'),
+              icon: Briefcase,
+              tone: 'neutral',
+              selected: activeScope === 'business',
+              onSelect: handleSelectBusinessScope,
+            },
+            {
+              key: 'gateway',
+              label: t('eqp.scope.gateway'),
+              value: gatewayAllItems.length,
+              hint: t('eqp.scope.gatewayHint'),
+              icon: RouterIcon,
+              tone: 'brand',
+              selected: activeScope === 'gateway',
+              onSelect: handleSelectGatewayScope,
+            },
+          ]}
         />
 
-        <section className="flex min-w-0 flex-1 flex-col">
-          <AppPageHeading
-            description={t(
-              scope === 'gateway'
-                ? 'eqp.page.description.gateway'
-                : 'eqp.page.description.business',
-            )}
-            className="px-3 pt-3 md:px-4 md:pt-4"
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-soft-sm">
+          <EqpSidebar
+            scope={activeScope}
+            eqpItems={eqpItems}
+            shardLeases={gatewayShardLeasesQuery.data}
+            selectedEqpId={selectedEqpId}
+            selectedBusinessGroupIndex={selectedBusinessGroupIndex}
+            selectedGroupIndex={selectedGroupIndex}
+            isLoading={
+              eqpListQuery.isLoading || gatewayShardLeasesQuery.isLoading || lineListQuery.isLoading
+            }
+            errorMessage={listErrorMessage ?? shardLeaseErrorMessage ?? lineListErrorMessage}
+            onSelectEqp={handleSelectEqp}
+            onSelectGatewayGroup={handleSelectGatewayGroup}
+            onSelectBusinessGroup={handleSelectBusinessGroup}
+            onOpenEqpInfoUpdate={openEqpInfoDialog}
+            onOpenEqpModelBinding={openEqpModelDialog}
+            onOpenEqpDelete={openEqpDeleteDialog}
+            onOpenEqpCreate={openEqpCreateDialog}
           />
-          <div className="flex min-h-0 flex-1 flex-col">
+
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* 가운데 영역: selection 유형에 따라 콘텐츠 분기 */}
             {selection.type === 'none' ? (
               /* 초기 진입 / 선택 없음: 안내 문구만 표시 */
@@ -1313,9 +1333,9 @@ export function EqpPage({ scope }: EqpPageProps) {
                 </div>
               </div>
             )}
-          </div>
-        </section>
-      </main>
+          </section>
+        </div>
+      </section>
 
       <CheckInModal
         open={isCheckInModalOpen}

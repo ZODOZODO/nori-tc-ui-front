@@ -1,5 +1,5 @@
 import { memo, useDeferredValue, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
@@ -10,21 +10,15 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
-import { SidebarResizeHandle } from '@/components/ui/sidebar-resize-handle'
 import { useI18n } from '@/i18n/i18n-context'
-import {
-  LNB_FOCUS_RING,
-  lnbLeafClass,
-  lnbLeafDotClass,
-  lnbSubLinkClass,
-} from '@/shared/layout/lnb-sidebar'
+import { lnbLeafClass, lnbLeafDotClass, lnbSubLinkClass } from '@/shared/layout/lnb-sidebar'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import type { EqpInfo, GatewayShardLease, ProtocolType } from '../types/eqp.types'
 import { groupEqpItems } from '../utils/eqp-group.util'
 
 interface EqpSidebarProps {
-  /** 현재 라우트 스코프. 이 스코프의 하위 트리만 그린다(1단계 Business/Gateway 는 전역 LNB 소관). */
+  /** 현재 스코프. 상단 현황 카드가 정한다 — 이 스코프의 하위 트리만 그린다. */
   scope: 'business' | 'gateway'
   eqpItems: EqpInfo[]
   /** gateway 그룹 분류 기준이 되는 shard lease 점유 현황 (조회 전이면 undefined) */
@@ -32,8 +26,6 @@ interface EqpSidebarProps {
   selectedEqpId: string | null
   selectedBusinessGroupIndex: number | null
   selectedGroupIndex: number | null
-  sidebarOpen: boolean
-  sidebarWidth: number
   isLoading: boolean
   errorMessage: string | null
   onSelectEqp: (eqpId: string) => void
@@ -43,16 +35,15 @@ interface EqpSidebarProps {
   onOpenEqpModelBinding: (eqpId: string) => void
   onOpenEqpDelete: (eqpId: string) => void
   onOpenEqpCreate: (interfaceType: ProtocolType) => void
-  onToggleSidebar: () => void
-  onResizeSidebar: (deltaX: number) => void
 }
 
 /**
- * 설비 페이지의 in-page 2차 내비입니다 — 현재 라우트 스코프의 하위 트리만 담당합니다.
+ * 설비 페이지의 좌측 목록 컬럼입니다 — 현재 스코프의 그룹·설비 노드, 검색, 우클릭 CRUD 를 담습니다.
  *
- * 1단계였던 Business / Gateway 아코디언 헤더는 전역 LNB 의 menu-label 로 승격돼 여기서 사라졌다
- * (`/eqp/business` · `/eqp/gateway`). 남은 것은 그 스코프 안의 그룹·설비 노드, 검색, 우클릭 CRUD 다.
- * 시각 클래스는 `@/shared/layout/lnb-sidebar` 공용 헬퍼(eqp/model 공유).
+ * <p>Business / Gateway 1단계는 페이지 상단 현황 카드가 고르고, 고른 결과를 이 컬럼이 편다.
+ * 접히지 않는 고정폭 컬럼이라 토글·폭 드래그가 없다 — 오른쪽 상세와 한 카드 안에서 짝을 이룬다.</p>
+ *
+ * <p>시각 클래스는 `@/shared/layout/lnb-sidebar` 공용 헬퍼(eqp/model 공유).</p>
  */
 export const EqpSidebar = memo(function EqpSidebar({
   scope,
@@ -61,8 +52,6 @@ export const EqpSidebar = memo(function EqpSidebar({
   selectedEqpId,
   selectedBusinessGroupIndex,
   selectedGroupIndex,
-  sidebarOpen,
-  sidebarWidth,
   isLoading,
   errorMessage,
   onSelectEqp,
@@ -72,8 +61,6 @@ export const EqpSidebar = memo(function EqpSidebar({
   onOpenEqpModelBinding,
   onOpenEqpDelete,
   onOpenEqpCreate,
-  onToggleSidebar,
-  onResizeSidebar,
 }: EqpSidebarProps) {
   const { t } = useI18n()
   const [searchKeyword, setSearchKeyword] = useState('')
@@ -165,167 +152,127 @@ export const EqpSidebar = memo(function EqpSidebar({
     )
   }
 
-  if (!sidebarOpen) {
-    return (
-      <aside
-        className="flex flex-col self-stretch border-r border-border bg-card"
-        style={{ width: `${sidebarWidth}px` }}
-      >
-        <div className="flex h-13 items-center justify-center border-b border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onToggleSidebar}
-            className={cn(
-              'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
-              LNB_FOCUS_RING,
-            )}
-            aria-label={t('eqp.sidebar.expand')}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      </aside>
-    )
-  }
+  const groupCount = scope === 'business' ? businessGroups.length : gatewayGroups.length
 
   return (
-    <aside
-      className="flex flex-col self-stretch border-r border-border bg-card"
-      style={{ width: `${sidebarWidth}px` }}
-    >
-      <div className="flex min-w-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-13 items-center justify-between border-b border-border px-3">
-            <span className="truncate text-sm font-semibold text-foreground">
-              {t('eqp.sidebar.title')}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onToggleSidebar}
-              className={cn(
-                'flex size-8 items-center justify-center rounded-md border border-border p-0 text-muted-foreground hover:bg-muted',
-                LNB_FOCUS_RING,
-              )}
-              aria-label={t('eqp.sidebar.collapse')}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
+    <section className="flex min-h-0 w-[38%] min-w-80 max-w-115 shrink-0 flex-col border-r border-border">
+      <header className="shrink-0 border-b border-border px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">{t('eqp.sidebar.title')}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t(scope === 'business' ? 'eqp.list.businessHint' : 'eqp.list.gatewayHint')}
+            </p>
           </div>
+          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+            {t('eqp.list.groupCount', { count: groupCount })}
+          </span>
+        </div>
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder={t('eqp.sidebar.searchPlaceholder')}
+            className="h-10 rounded-xl bg-background pl-9"
+          />
+        </div>
+      </header>
 
-          <div className="px-3 py-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t('eqp.sidebar.searchPlaceholder')}
-                className="h-9 bg-muted pl-8 text-xs"
-              />
-            </div>
-          </div>
+      {scope === 'business' ? (
+        <nav
+          className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3"
+          data-testid="eqp-sidebar-business-tree"
+        >
+          {businessGroups.length === 0 ? (
+            <p className="py-1 pl-8 text-[11px] text-muted-foreground">
+              {t('eqp.sidebar.noBusinessGroups')}
+            </p>
+          ) : (
+            businessGroups.map((group) => (
+              <Button
+                key={group.appName}
+                type="button"
+                variant="ghost"
+                onClick={() => onSelectBusinessGroup(group.appIndex)}
+                className={lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex)}
+              >
+                {group.appName}
+              </Button>
+            ))
+          )}
 
-          {scope === 'business' ? (
+          {isLoading ? (
+            <p className="px-3 pt-1 text-xs text-muted-foreground">{t('eqp.sidebar.loading')}</p>
+          ) : null}
+          {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
+        </nav>
+      ) : (
+        /* Gateway 스코프 — Eqp Create 우클릭 메뉴는 승격된 헤더 대신 트리 컨테이너가 받는다. */
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
             <nav
-              className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3"
-              data-testid="eqp-sidebar-business-tree"
+              className="hover-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3"
+              data-testid="eqp-sidebar-gateway-tree"
             >
-              {businessGroups.length === 0 ? (
+              {gatewayGroups.length === 0 ? (
                 <p className="py-1 pl-8 text-[11px] text-muted-foreground">
-                  {t('eqp.sidebar.noBusinessGroups')}
+                  {t('eqp.sidebar.noGatewayGroups')}
                 </p>
               ) : (
-                businessGroups.map((group) => (
-                  <Button
-                    key={group.appName}
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onSelectBusinessGroup(group.appIndex)}
-                    className={lnbSubLinkClass(selectedBusinessGroupIndex === group.appIndex)}
-                  >
-                    {group.appName}
-                  </Button>
-                ))
+                gatewayGroups
+                  // 검색 중에는 결과가 없는 그룹을 숨겨 검색 노이즈를 줄인다 (빈 그룹은 평시에만 노출).
+                  .filter((group) => !hasSearch || group.items.length > 0)
+                  .map((group) => (
+                    <div key={group.appName} className="flex flex-col gap-0.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => toggleGatewayGroup(group.appIndex)}
+                        className={cn(
+                          lnbSubLinkClass(selectedGroupIndex === group.appIndex),
+                          'flex items-center gap-1.5',
+                        )}
+                      >
+                        <span className="truncate">{group.appName}</span>
+                        {group.isUnleased ? (
+                          <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
+                            {t('eqp.gateway.unleasedBadge')}
+                          </Badge>
+                        ) : null}
+                      </Button>
+                      {expandedGatewayGroups.has(group.appIndex) || hasSearch
+                        ? group.items.map((eqp) =>
+                            renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
+                          )
+                        : null}
+                    </div>
+                  ))
               )}
 
               {isLoading ? (
-                <p className="px-3 pt-1 text-xs text-muted-foreground">{t('eqp.sidebar.loading')}</p>
+                <p className="px-3 pt-1 text-xs text-muted-foreground">
+                  {t('eqp.sidebar.loading')}
+                </p>
               ) : null}
               {errorMessage ? <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p> : null}
             </nav>
-          ) : (
-            /* Gateway 스코프 — Eqp Create 우클릭 메뉴는 승격된 헤더 대신 트리 컨테이너가 받는다. */
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <nav
-                  className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3"
-                  data-testid="eqp-sidebar-gateway-tree"
-                >
-                  {gatewayGroups.length === 0 ? (
-                    <p className="py-1 pl-8 text-[11px] text-muted-foreground">
-                      {t('eqp.sidebar.noGatewayGroups')}
-                    </p>
-                  ) : (
-                    gatewayGroups
-                      // 검색 중에는 결과가 없는 그룹을 숨겨 검색 노이즈를 줄인다 (빈 그룹은 평시에만 노출).
-                      .filter((group) => !hasSearch || group.items.length > 0)
-                      .map((group) => (
-                        <div key={group.appName} className="flex flex-col gap-0.5">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => toggleGatewayGroup(group.appIndex)}
-                            className={cn(
-                              lnbSubLinkClass(selectedGroupIndex === group.appIndex),
-                              'flex items-center gap-1.5',
-                            )}
-                          >
-                            <span className="truncate">{group.appName}</span>
-                            {group.isUnleased ? (
-                              <Badge variant="warning" title={t('eqp.gateway.unleasedTitle')}>
-                                {t('eqp.gateway.unleasedBadge')}
-                              </Badge>
-                            ) : null}
-                          </Button>
-                          {expandedGatewayGroups.has(group.appIndex) || hasSearch
-                            ? group.items.map((eqp) =>
-                                renderEqpNode(eqp, `${group.appIndex}-${eqp.eqpId}`),
-                              )
-                            : null}
-                        </div>
-                      ))
-                  )}
-
-                  {isLoading ? (
-                    <p className="px-3 pt-1 text-xs text-muted-foreground">
-                      {t('eqp.sidebar.loading')}
-                    </p>
-                  ) : null}
-                  {errorMessage ? (
-                    <p className="px-3 pt-1 text-xs text-danger">{errorMessage}</p>
-                  ) : null}
-                </nav>
-              </ContextMenuTrigger>
-              <ContextMenuContent className="w-52">
-                <ContextMenuLabel>Gateway</ContextMenuLabel>
-                <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onOpenEqpCreate('SECS')}>
-                  SECS Eqp Create
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onOpenEqpCreate('SOCKET')}>
-                  Socket Eqp Create
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onOpenEqpCreate('PLC')}>
-                  PLC Eqp Create
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          )}
-        </div>
-
-        <SidebarResizeHandle onDrag={onResizeSidebar} />
-      </div>
-    </aside>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-52">
+            <ContextMenuLabel>Gateway</ContextMenuLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => onOpenEqpCreate('SECS')}>
+              SECS Eqp Create
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onOpenEqpCreate('SOCKET')}>
+              Socket Eqp Create
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onOpenEqpCreate('PLC')}>
+              PLC Eqp Create
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      )}
+    </section>
   )
 })

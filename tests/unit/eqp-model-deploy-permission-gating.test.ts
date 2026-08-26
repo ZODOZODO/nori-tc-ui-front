@@ -49,31 +49,22 @@ test('OPERATOR 시드 권한 조합에서는 eqp·model·deploy 메뉴가 보인
   // 시드의 OPERATOR 그룹 grant (postgres_insert_user_ui_sample_data.sql:144-153).
   const operator = ['EQP_READ', 'DLQ_READ', 'MODEL_READ', 'DEPLOY_READ', 'DEPLOY_WRITE']
   assert.deepEqual(itemKeys(operator), [
-    'dlqDashboard',
-    'dlqGateway',
-    'dlqBusiness',
-    'dlqQuarantine',
-    'dlqRepairTask',
-    'eqpBusiness',
-    'eqpGateway',
+    'dlq',
+    'eqp',
     'modelSecs',
     'modelSocket',
     'modelPlc',
-    'deployRegister',
-    'deployDeploy',
-    'deployHistory',
+    'deploy',
   ])
 })
 
 test('부분 권한은 해당 메뉴만 노출한다', () => {
-  assert.deepEqual(itemKeys(['EQP_READ']), ['eqpBusiness', 'eqpGateway'])
+  assert.deepEqual(itemKeys(['EQP_READ']), ['eqp'])
   assert.deepEqual(itemKeys(['MODEL_READ', 'DEPLOY_READ']), [
     'modelSecs',
     'modelSocket',
     'modelPlc',
-    'deployRegister',
-    'deployDeploy',
-    'deployHistory',
+    'deploy',
   ])
 })
 
@@ -91,9 +82,9 @@ test('eqp·model·deploy 라우트가 RequirePermission 으로 본문 진입을 
   const router = readSource('src/app/Router.tsx')
 
   const groups = [
-    ['EQP_READ_PERMISSION', ['/eqp/business', '/eqp/gateway']],
+    ['EQP_READ_PERMISSION', ['/eqp']],
     ['MODEL_READ_PERMISSION', ['/model/secs', '/model/socket', '/model/plc']],
-    ['DEPLOY_READ_PERMISSION', ['/deploy/register', '/deploy/deploy', '/deploy/history']],
+    ['DEPLOY_READ_PERMISSION', ['/deploy']],
   ] as const
 
   for (const [permissionConstant, paths] of groups) {
