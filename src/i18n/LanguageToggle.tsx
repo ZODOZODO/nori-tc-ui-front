@@ -37,7 +37,7 @@ export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
       <Button
         type="button"
         variant="outline"
-        className="h-9.5 gap-1.5 rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
+        className="h-9 gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground has-[>svg]:px-3.5"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -51,7 +51,7 @@ export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
       {isOpen ? (
         <ul
           role="listbox"
-          className={`absolute right-0 z-(--z-dropdown) min-w-37 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-lg ${
+          className={`absolute right-0 z-(--z-dropdown) min-w-37 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-soft-md ${
             placement === 'up' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]'
           }`}
         >
@@ -67,7 +67,7 @@ export function LanguageToggle({ placement = 'down' }: LanguageToggleProps) {
                     setLang(item.code)
                     setIsOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted focus:bg-muted focus:outline-none ${
+                  className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted focus:bg-muted focus:outline-none ${
                     isActive ? 'font-bold text-foreground' : 'font-medium text-muted-foreground'
                   }`}
                 >

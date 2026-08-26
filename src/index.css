@@ -5,11 +5,12 @@
 @theme {
   --font-fraunces: 'Fraunces', serif;
   --font-inter: 'Inter', sans-serif;
-  /* UI 본문/라벨 — index.html 에서 실제 로드하는 Inter(라틴) + Noto Sans KR(한글).
-     이전 'Pretendard' 는 로드되지 않아 system-ui 로 폴백됐다(불일치 해소). */
-  --font-ui: 'Inter', 'Noto Sans KR', system-ui, sans-serif;
+  /* Pretendard(가변, 자체 호스팅 — main.tsx 에서 로드). 외부 CDN 은 쓰지 않는다.
+     폰트가 도착하기 전에는 뒤의 운영체제 기본 UI 글꼴로 그린다. */
+  --font-ui: 'Pretendard Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
 
-  /* typography rhythm (R1.2 / D11) — Inter/Noto Sans KR 기준 */
+  /* typography rhythm (R1.2 / D11) */
   --leading-tight: 1.25;
   --leading-body: 1.5;
   --leading-relaxed: 1.7;
@@ -214,6 +215,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-ui);
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 

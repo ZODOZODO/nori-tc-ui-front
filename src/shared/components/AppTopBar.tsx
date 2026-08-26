@@ -65,7 +65,7 @@ export function AppTopBar({ onOpenProfile, onAfterLogout }: AppTopBarProps) {
   }
 
   return (
-    <header className="z-20 flex h-13.25 shrink-0 items-center justify-between gap-6 border-b border-border bg-card px-5">
+    <header className="z-20 flex h-14 shrink-0 items-center justify-between gap-6 border-b border-border bg-card/95 px-5 backdrop-blur-sm lg:px-6">
       <div className="flex min-w-0 items-center gap-2">
         {isMobile ? (
           <Button
@@ -95,7 +95,7 @@ export function AppTopBar({ onOpenProfile, onAfterLogout }: AppTopBarProps) {
         <Button
           type="button"
           variant="outline"
-          className="h-9.5 rounded-full border-border px-3.5 text-sm font-medium text-muted-foreground"
+          className="h-9 rounded-lg px-3 text-sm font-medium text-muted-foreground has-[>svg]:px-3.5"
           onClick={() => void handleLogout()}
           disabled={isLogoutPending}
           aria-label={t('topbar.logout')}
@@ -111,7 +111,7 @@ export function AppTopBar({ onOpenProfile, onAfterLogout }: AppTopBarProps) {
         <Button
           type="button"
           variant="ghost"
-          className="size-9.5 rounded-full border border-border text-muted-foreground"
+          className="size-9 rounded-lg border border-input text-muted-foreground"
           onClick={onOpenProfile}
           aria-label={t('topbar.openProfile')}
           disabled={isLogoutPending}

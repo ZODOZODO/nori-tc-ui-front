@@ -22,8 +22,8 @@ export function PageLocation({ subtitle, name, className }: PageLocationProps) {
   const lastIndex = segments.length - 1
 
   return (
-    <nav aria-label="breadcrumb" className={cn('text-xs leading-body', className)}>
-      <ol className="flex flex-wrap items-center gap-1">
+    <nav aria-label="breadcrumb" className={cn('text-[13px] leading-5', className)}>
+      <ol className="flex flex-wrap items-center gap-1.5">
         {segments.map((segment, index) => {
           const isLast = index === lastIndex
           return (
@@ -39,7 +39,7 @@ export function PageLocation({ subtitle, name, className }: PageLocationProps) {
               </li>
               {isLast ? null : (
                 <li aria-hidden="true" className="text-muted-foreground/60">
-                  <ChevronRight className="size-3" />
+                  <ChevronRight className="size-3.5" />
                 </li>
               )}
             </Fragment>

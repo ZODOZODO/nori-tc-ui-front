@@ -17,7 +17,7 @@ export function ThemeToggle() {
     <Button
       type="button"
       variant="ghost"
-      className="size-9.5 rounded-full border border-border text-muted-foreground"
+      className="size-9 rounded-lg border border-input text-muted-foreground"
       onClick={toggleTheme}
       aria-label={isDark ? t('theme.toLight') : t('theme.toDark')}
     >
