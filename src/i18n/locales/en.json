@@ -1087,6 +1087,7 @@
   "accessDenied.requiredPermission": "Required permission",
   "error.operation.notFound": "The requested operation was not found.",
   "error.operation.status": "Failed to read the operation status.",
+  "eqp.operation.idempotencyConflictHint": "Rejected: the same request key was already used with different content. An earlier request may have already been applied, so check the equipment's current state before retrying.",
   "eqp.operation.idLabel": "Operation ID",
   "eqp.operation.phaseLabel": "Phase",
   "eqp.operation.recheck": "Check again",

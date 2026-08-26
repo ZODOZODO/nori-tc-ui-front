@@ -1087,6 +1087,7 @@
   "accessDenied.requiredPermission": "필요한 권한",
   "error.operation.notFound": "요청한 작업을 찾을 수 없습니다.",
   "error.operation.status": "작업 상태를 조회하지 못했습니다.",
+  "eqp.operation.idempotencyConflictHint": "같은 요청 키로 다른 내용이 접수되어 거부되었습니다. 앞선 요청이 이미 반영되었을 수 있으니, 다시 시도하기 전에 설비의 현재 상태를 확인해 주세요.",
   "eqp.operation.idLabel": "작업 ID",
   "eqp.operation.phaseLabel": "단계",
   "eqp.operation.recheck": "다시 조회",

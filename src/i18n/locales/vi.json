@@ -1087,6 +1087,7 @@
   "accessDenied.requiredPermission": "Quyền cần thiết",
   "error.operation.notFound": "Không tìm thấy tác vụ được yêu cầu.",
   "error.operation.status": "Không thể đọc trạng thái tác vụ.",
+  "eqp.operation.idempotencyConflictHint": "Bị từ chối: cùng một khóa yêu cầu đã được dùng với nội dung khác. Yêu cầu trước có thể đã được áp dụng, hãy kiểm tra trạng thái hiện tại của thiết bị trước khi thử lại.",
   "eqp.operation.idLabel": "Mã tác vụ",
   "eqp.operation.phaseLabel": "Giai đoạn",
   "eqp.operation.recheck": "Kiểm tra lại",

@@ -14,6 +14,7 @@ import {
   rememberPendingOperation,
 } from '@/shared/lib/pending-operation-store'
 import { resolveErrorMessage } from '@/shared/lib/resolve-error-message'
+import { resolveAcceptanceErrorMessage } from '../lib/eqp-acceptance-error'
 import type { EqpCreateRequest, EqpUpdateRequest } from '../types/eqp.types'
 import type { EqpOperationResultStatus } from '../lib/eqp-operation-result-presentation'
 import type { useEqpMutations } from './useEqpMutations'
@@ -105,6 +106,12 @@ export function useEqpMutationCommands({
   const mutationGuard = useAsyncCommandGuard()
 
   const clearAcceptanceError = useCallback(() => setAcceptanceErrorMessage(null), [])
+
+  const describeAcceptanceError = useCallback(
+    (error: unknown, fallbackMessage: string): string =>
+      resolveAcceptanceErrorMessage(error, fallbackMessage, t),
+    [t],
+  )
 
   const closeResultDialog = useCallback(() => {
     // 사용자가 결과를 닫으면 복원 대상에서 뺀다 — 그러지 않으면 확인 지연 기록이 terminal 을
@@ -213,7 +220,7 @@ export function useEqpMutationCommands({
         try {
           operationId = (await accept()).operationId
         } catch (error) {
-          setAcceptanceErrorMessage(resolveErrorMessage(error, acceptFallbackMessage))
+          setAcceptanceErrorMessage(describeAcceptanceError(error, acceptFallbackMessage))
           return
         }
 
@@ -234,7 +241,7 @@ export function useEqpMutationCommands({
         }
       })
     },
-    [applyOutcome, mutationGuard, onTerminal, trackOperation],
+    [applyOutcome, describeAcceptanceError, mutationGuard, onTerminal, trackOperation],
   )
 
   const submitCreate = useCallback(
