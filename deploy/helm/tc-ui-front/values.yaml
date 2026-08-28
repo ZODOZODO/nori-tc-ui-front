@@ -1,10 +1,10 @@
 global:
   registry: "harbor.nori.local"
-  namespace: "mes"
+  namespace: "tc"
   imagePullSecret: "harbor-pull-secret"
 
 common:
-  projectName: "mes-services"
+  projectName: "nori-tc"
 
 app:
   name: "tc-ui-front"

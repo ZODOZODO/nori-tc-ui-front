@@ -7,10 +7,10 @@ stages:
 
 variables:
   HARBOR_REGISTRY: harbor.nori.local
-  HARBOR_PROJECT: mes-services
+  HARBOR_PROJECT: nori-tc
   IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/tc-ui-front
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-  NAMESPACE: mes
+  NAMESPACE: tc
 
 # 애플리케이션 이미지와 배포 결과에 영향을 주는 파일을 한곳에서 관리한다.
 .frontend-change-rules:
@@ -151,7 +151,7 @@ deploy:
     - nori-msa
   image: harbor.nori.local/library/kubectl:1.32.2
   script:
-    - helm upgrade --install $NAMESPACE-tc-ui-front ./deploy/helm/tc-ui-front
+    - helm upgrade --install tc-ui-front ./deploy/helm/tc-ui-front
       --namespace $NAMESPACE
       --set app.imageTag=$IMAGE_TAG
       -f ./deploy/helm/tc-ui-front/values.yaml
