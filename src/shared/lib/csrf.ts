@@ -2,6 +2,14 @@ import i18n from '@/i18n'
 import { apiClient } from './api-client'
 import { ApiError, createFailResponse } from './api-error'
 
+/*
+ * [계약] 아래 두 이름은 ui-backend 의 tc.ui.backend.auth.csrf-cookie-name /
+ * csrf-header-name 과 반드시 같아야 한다(UiAuthProperties 의 기본값이 이 값과 같다).
+ * 프런트는 번들에 박힌 상수라 백엔드 프로퍼티를 읽지 못한다 — 백엔드만 바꾸면 모든 쓰기 요청이
+ * 403 이 되고, 되돌리려면 설정이 아니라 프런트 재빌드가 필요하다. 두 곳을 함께 바꾼다.
+ * (세션 쿠키 이름은 HttpOnly 라 프런트에 사본이 없어 이 문제가 없다.)
+ */
+
 /** 서버가 발급하는 double-submit CSRF 쿠키 이름(JS 가시). */
 export const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 
