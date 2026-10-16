@@ -9,7 +9,9 @@ variables:
   HARBOR_REGISTRY: harbor.nori.local
   HARBOR_PROJECT: nori-tc
   IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/tc-ui-front
-  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  # pipeline 마다 고유한 tag 다. 같은 commit 을 다시 빌드해도 tag 가 바뀌어 helm template 이 달라지고,
+  # 이 pipeline 이 build·scan 한 이미지가 그대로 rollout 된다(commit SHA 만 쓰면 기존 pod 가 옛 digest 로 남는다).
+  IMAGE_TAG: ${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}
   NAMESPACE: tc
 
 # 애플리케이션 이미지와 배포 결과에 영향을 주는 파일을 한곳에서 관리한다.
@@ -27,6 +29,8 @@ variables:
         - tsconfig.app.json
         - tsconfig.node.json
         - deploy/**/*
+        # 파이프라인 정의만 고친 커밋도 test/package/build/scan/deploy 를 태워 고친 구성이 실제로 반영되게 한다.
+        - .gitlab-ci.yml
 
 pipeline-ok:
   stage: check
